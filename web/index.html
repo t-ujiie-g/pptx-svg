@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pptx-render — Phase 1 Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 { color: #7c7cff; margin-bottom: 8px; }
+    .subtitle { color: #888; margin-bottom: 24px; font-size: 0.9em; }
+
+    .card {
+      background: #16213e;
+      border: 1px solid #2a2a5a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { color: #a0a0ff; margin-bottom: 12px; font-size: 1em; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    #drop-zone {
+      border: 2px dashed #4a4a8a;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: #7c7cff;
+      background: #1e1e4a;
+    }
+    #drop-zone p { color: #888; }
+    #drop-zone strong { color: #7c7cff; }
+    #file-input { display: none; }
+
+    #status {
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    #status.ok    { background: #0d3322; color: #4caf50; border: 1px solid #2d6e4e; }
+    #status.error { background: #330d0d; color: #f44336; border: 1px solid #6e2d2d; }
+    #status.info  { background: #1a1a3a; color: #9c9cff; border: 1px solid #3a3a7a; }
+
+    #info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .info-item { text-align: center; }
+    .info-value { font-size: 2em; font-weight: bold; color: #7c7cff; }
+    .info-label { font-size: 0.8em; color: #888; text-transform: uppercase; }
+
+    #entry-list, #xml-output {
+      font-family: monospace;
+      font-size: 0.8em;
+      background: #0d1117;
+      border: 1px solid #2a2a4a;
+      border-radius: 4px;
+      padding: 12px;
+      overflow: auto;
+      max-height: 300px;
+      white-space: pre;
+      color: #c9d1d9;
+    }
+    #slide-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    button {
+      background: #7c7cff;
+      color: white;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    button:hover { background: #6a6aee; }
+    button:disabled { background: #3a3a6a; cursor: not-allowed; }
+    #slide-num { color: #888; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>pptx-render</h1>
+  <p class="subtitle">MoonBit + Wasm-GC — Phase 1: Foundation Demo</p>
+
+  <div class="card">
+    <h2>Load PPTX File</h2>
+    <div id="drop-zone">
+      <p><strong>Drop a .pptx file here</strong> or click to browse</p>
+      <p style="margin-top:8px; font-size:0.8em">The file is processed entirely in-browser (no server upload)</p>
+      <input type="file" id="file-input" accept=".pptx">
+    </div>
+  </div>
+
+  <div class="card" id="status-card" style="display:none">
+    <h2>Status</h2>
+    <div id="status" class="info">Initializing...</div>
+  </div>
+
+  <div class="card" id="info-card" style="display:none">
+    <h2>Presentation Info</h2>
+    <div id="info-grid">
+      <div class="info-item">
+        <div class="info-value" id="slide-count-val">—</div>
+        <div class="info-label">Slides</div>
+      </div>
+      <div class="info-item">
+        <div class="info-value" id="entry-count-val">—</div>
+        <div class="info-label">ZIP Entries</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="entries-card" style="display:none">
+    <h2>ZIP Entry List</h2>
+    <div id="entry-list"></div>
+  </div>
+
+  <div class="card" id="xml-card" style="display:none">
+    <h2>Slide XML (raw)</h2>
+    <div id="slide-controls">
+      <button id="prev-btn" disabled>◀ Prev</button>
+      <span id="slide-num">Slide 1</span>
+      <button id="next-btn" disabled>Next ▶</button>
+    </div>
+    <div id="xml-output"></div>
+  </div>
+
+  <script type="module">
+    import { PptxRenderer } from './host.js';
+
+    const WASM_URL = '../_build/wasm-gc/release/build/main/main.wasm';
+
+    const renderer = new PptxRenderer();
+    let currentSlide = 0;
+    let totalSlides = 0;
+
+    // UI elements
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const statusEl = document.getElementById('status');
+    const statusCard = document.getElementById('status-card');
+    const infoCard = document.getElementById('info-card');
+    const entriesCard = document.getElementById('entries-card');
+    const xmlCard = document.getElementById('xml-card');
+    const slideCountVal = document.getElementById('slide-count-val');
+    const entryCountVal = document.getElementById('entry-count-val');
+    const entryList = document.getElementById('entry-list');
+    const xmlOutput = document.getElementById('xml-output');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const slideNum = document.getElementById('slide-num');
+
+    function setStatus(msg, type = 'info') {
+      statusCard.style.display = '';
+      statusEl.className = type;
+      statusEl.textContent = msg;
+    }
+
+    function showSlideXml(idx) {
+      currentSlide = idx;
+      totalSlides = renderer.getSlideCount();
+      slideNum.textContent = `Slide ${idx + 1} / ${totalSlides}`;
+      prevBtn.disabled = idx === 0;
+      nextBtn.disabled = idx >= totalSlides - 1;
+      const xml = renderer.getSlideXmlRaw(idx);
+      // Pretty-print basic XML by adding newlines after tags
+      xmlOutput.textContent = xml.length > 10000
+        ? xml.slice(0, 10000) + '\n... (truncated)'
+        : xml;
+    }
+
+    prevBtn.addEventListener('click', () => showSlideXml(currentSlide - 1));
+    nextBtn.addEventListener('click', () => showSlideXml(currentSlide + 1));
+
+    async function loadPptx(file) {
+      setStatus(`Loading ${file.name}...`);
+
+      try {
+        const buffer = await file.arrayBuffer();
+        const { slideCount } = await renderer.loadPptx(buffer);
+        totalSlides = slideCount;
+
+        setStatus(`✓ Loaded "${file.name}" — ${slideCount} slide(s)`, 'ok');
+
+        // Show info
+        infoCard.style.display = '';
+        slideCountVal.textContent = slideCount;
+
+        // Show entry list
+        const entries = renderer.getEntryList();
+        entryCountVal.textContent = entries.length;
+        entriesCard.style.display = '';
+        entryList.textContent = entries.join('\n');
+
+        // Show first slide XML
+        if (slideCount > 0) {
+          xmlCard.style.display = '';
+          showSlideXml(0);
+        }
+      } catch (err) {
+        setStatus(`✗ Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    // File drop
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) loadPptx(file);
+    });
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) loadPptx(file);
+    });
+
+    // Initialize Wasm — disable drop zone until ready
+    dropZone.style.pointerEvents = 'none';
+    dropZone.style.opacity = '0.5';
+    setStatus('Loading WebAssembly module...');
+    statusCard.style.display = '';
+    renderer.init(WASM_URL)
+      .then(() => {
+        setStatus('✓ Wasm module ready. Drop a .pptx file to start.', 'ok');
+        dropZone.style.pointerEvents = '';
+        dropZone.style.opacity = '';
+      })
+      .catch(err => {
+        setStatus(`✗ Wasm init failed: ${err.message}`, 'error');
+        console.error('[pptx] Init error details:', err);
+      });
+  </script>
+</body>
+</html>

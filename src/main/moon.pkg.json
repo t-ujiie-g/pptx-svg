@@ -1,0 +1,16 @@
+{
+  "import": [
+    { "path": "pptx-render/ffi", "alias": "ffi" }
+  ],
+  "link": {
+    "wasm-gc": {
+      "exports": [
+        "initialize_pptx",
+        "get_slide_count",
+        "get_slide_xml_raw",
+        "get_entry_list"
+      ],
+      "use-js-builtin-string": true
+    }
+  }
+}
