@@ -29,9 +29,8 @@
 //   Tier 2 — importedStringConstants + manual wasm:js-string  (Chrome 115–116)
 //   Tier 3 — fully manual '_' globals + wasm:js-string        (Chrome 111+)
 //
-// IMPORTANT: After each `moon build --target wasm-gc --release`, run:
-//   python3 scripts/gen_string_constants.py
-// to regenerate STRING_CONSTANTS below if the MoonBit source strings changed.
+// The '_' module string constants are parsed dynamically from the Wasm binary
+// at startup, so no manual STRING_CONSTANTS list needs to be maintained.
 
 /** Manual implementations of wasm:js-string builtin functions (Tier 2 & 3). */
 const JS_STRING_MODULE = {
@@ -42,28 +41,78 @@ const JS_STRING_MODULE = {
 };
 
 /**
- * String-constant field names for the '_' Wasm import module.
- * Each field name IS the string value (importedStringConstants convention).
+ * Parse the Wasm binary's import section to extract all '_' module
+ * string-constant field names dynamically.
  *
- * Auto-generated from the Wasm binary by scripts/gen_string_constants.py.
- * Regenerate after any change to MoonBit source that adds/removes string literals.
+ * This replaces the hand-maintained STRING_CONSTANTS array and eliminates
+ * the need to run gen_string_constants.py after every source change.
+ *
+ * Format: each import with module="_" is a global whose field name IS the
+ * string value (importedStringConstants convention from the js-string spec).
+ *
+ * @param {ArrayBuffer} buffer - Raw .wasm bytes
+ * @returns {string[]}
  */
-const STRING_CONSTANTS = [
-  '7', '', '<p:sldId/>', '-', ' chars', '6', '4', 'Slide count: ',
-  '<p:sldId\n', '5', '<p:sldId\t', '8', '3',
-  'ERROR:ppt/presentation.xml not found', '2', 'ppt/presentation.xml',
-  '9', '1', '0', 'get_slide_xml_raw: ', 'ppt/slides/slide',
-  'initialize_pptx: reading ppt/presentation.xml', 'presentation.xml: ',
-  'ERROR:not found: ', '<p:sldId ', 'OK:', '.xml',
-];
+function parseWasmStringConstants(buffer) {
+  const data = new Uint8Array(buffer);
+  let pos = 8; // skip 4-byte magic + 4-byte version
+
+  function readLEB128() {
+    let result = 0, shift = 0;
+    while (pos < data.length) {
+      const b = data[pos++];
+      result |= (b & 0x7f) << shift;
+      shift += 7;
+      if ((b & 0x80) === 0) break;
+    }
+    return result >>> 0;
+  }
+
+  function readUtf8() {
+    const len = readLEB128();
+    const chunk = data.subarray(pos, pos + len);
+    pos += len;
+    return new TextDecoder('utf-8').decode(chunk);
+  }
+
+  const constants = [];
+  while (pos < data.length) {
+    const sectionId = data[pos++];
+    const sectionSize = readLEB128();
+    const sectionEnd = pos + sectionSize;
+
+    if (sectionId !== 2) { pos = sectionEnd; continue; } // not Import section
+
+    const count = readLEB128();
+    for (let i = 0; i < count; i++) {
+      const mod   = readUtf8();
+      const field = readUtf8();
+      const kind  = data[pos++];
+      if (kind === 0) {          // function: skip type index
+        readLEB128();
+      } else if (kind === 3) {   // global: skip valtype + possible heap-type + mutability
+        const vt = data[pos++];
+        if (vt === 0x64 || vt === 0x63) pos++; // ref non-null / null has heap-type byte
+        pos++;                   // mutability byte
+        if (mod === '_') constants.push(field);
+      } else {
+        break; // table/memory/tag — not expected in this binary
+      }
+    }
+    break; // Import section fully parsed
+  }
+  return constants;
+}
 
 /**
  * Build the '_' import module as WebAssembly.Global(externref) objects.
  * Used in Tier 3 when the engine cannot resolve the module automatically.
+ *
+ * @param {string[]} constants - String values parsed from the Wasm binary
  */
-function makeUnderscoreModule() {
+function makeUnderscoreModule(constants) {
   const mod = {};
-  for (const s of STRING_CONSTANTS) {
+  for (const s of constants) {
     mod[s] = new WebAssembly.Global({ value: 'externref', mutable: false }, s);
   }
   return mod;
@@ -77,6 +126,10 @@ function makeUnderscoreModule() {
  * @returns {Promise<WebAssembly.WebAssemblyInstantiatedSource>}
  */
 async function instantiateWasmWithFallback(bytes, importObject) {
+  // Parse '_' module string constants from the binary (used in Tier 3).
+  const stringConstants = parseWasmStringConstants(bytes);
+  console.log(`[pptx] Parsed ${stringConstants.length} string constants from Wasm binary`);
+
   // Tier 1: modern builtins
   try {
     const r = await WebAssembly.instantiate(bytes, importObject, { builtins: ['js-string'] });
@@ -100,7 +153,7 @@ async function instantiateWasmWithFallback(bytes, importObject) {
       const imports3 = {
         ...importObject,
         'wasm:js-string': JS_STRING_MODULE,
-        '_': makeUnderscoreModule(),
+        '_': makeUnderscoreModule(stringConstants),
       };
       try {
         const r = await WebAssembly.instantiate(bytes, imports3);
@@ -197,6 +250,15 @@ export class PptxRenderer {
     return this.#wasm.exports.get_entry_list().split('\n').filter(Boolean);
   }
 
+  /**
+   * Render a slide as an SVG string (0-indexed).
+   * @param {number} slideIdx
+   * @returns {string} SVG markup, or a string starting with "ERROR:" on failure
+   */
+  renderSlideSvg(slideIdx) {
+    return this.#wasm.exports.render_slide_svg(slideIdx);
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────────
 
   /**
@@ -206,9 +268,10 @@ export class PptxRenderer {
   #buildImportObject() {
     return {
       'pptx_ffi': {
-        get_file:       (path) => this.#files.get(path) ?? '',
-        get_entry_list: () => [...this.#files.keys(), ...this.#rawFiles.keys()].join('\n'),
-        get_file_base64:(path) => bytesToBase64(this.#rawFiles.get(path)),
+        get_file:         (path) => this.#files.get(path) ?? '',
+        get_entry_list:   () => [...this.#files.keys(), ...this.#rawFiles.keys()].join('\n'),
+        get_file_base64:  (path) => bytesToBase64(this.#rawFiles.get(path)),
+        char_code_to_str: (n) => String.fromCharCode(n),
         log:   (msg) => console.log('[pptx]', msg),
         warn:  (msg) => console.warn('[pptx]', msg),
         error: (msg) => console.error('[pptx]', msg),

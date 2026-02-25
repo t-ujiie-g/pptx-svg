@@ -1,0 +1,5 @@
+{
+  "import": [
+    { "path": "pptx-render/xml", "alias": "xml" }
+  ]
+}

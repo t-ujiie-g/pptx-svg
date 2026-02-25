@@ -18,6 +18,11 @@ pub fn ffi_get_entry_list() -> String = "pptx_ffi" "get_entry_list"
 /// Used for binary files (images, fonts, etc.)
 pub fn ffi_get_file_base64(path : String) -> String = "pptx_ffi" "get_file_base64"
 
+///| Convert a Unicode code point (int) to a single-character string.
+/// Implemented via String.fromCharCode in the JavaScript host.
+/// Used to build strings without StringBuilder (avoids fromCharCodeArray).
+pub fn ffi_char_code_to_str(code : Int) -> String = "pptx_ffi" "char_code_to_str"
+
 ///| Log an informational message to the browser console.
 pub fn ffi_log(msg : String) -> Unit = "pptx_ffi" "log"
 

@@ -1,4 +1,4 @@
-// pptx-render: Phase 1 — Foundation
+// pptx-render: Phase 2 — SVG Rendering
 //
 // Architecture:
 //   JavaScript host:
@@ -19,6 +19,11 @@
 // Global state
 let g_slide_count : Ref[Int] = { val: 0 }
 
+// Cache parsed slide size from presentation.xml
+let g_slide_size : Ref[@ooxml.SlideSize] = {
+  val: @ooxml.SlideSize::default(),
+}
+
 ///| Initialize the PPTX processor.
 ///
 /// Reads presentation.xml via FFI and counts the number of slides.
@@ -34,6 +39,7 @@ pub fn initialize_pptx() -> String {
   @ffi.ffi_log("presentation.xml: " + int_to_str(prs_xml.length()) + " chars")
   let count = count_slide_ids(prs_xml)
   g_slide_count.val = count
+  g_slide_size.val = @ooxml.parse_slide_size(prs_xml)
   @ffi.ffi_log("Slide count: " + int_to_str(count))
   "OK:" + int_to_str(count)
 }
@@ -58,6 +64,39 @@ pub fn get_slide_xml_raw(slide_idx : Int) -> String {
 ///| Get a newline-separated list of all PPTX entry paths.
 pub fn get_entry_list() -> String {
   @ffi.ffi_get_entry_list()
+}
+
+///| Render slide `slide_idx` (0-indexed) as an SVG string.
+///
+/// Returns the SVG markup on success, or "ERROR:<message>" on failure.
+pub fn render_slide_svg(slide_idx : Int) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide_num = slide_idx + 1
+  // Load slide XML
+  let slide_path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
+  let slide_xml = @ffi.ffi_get_file(slide_path)
+  if slide_xml.is_empty() {
+    return "ERROR:slide XML not found: " + slide_path
+  }
+  // Load slide relationships (.rels)
+  let rels_path =
+    "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+  let rels_xml = @ffi.ffi_get_file(rels_path)
+  let rels = if rels_xml.is_empty() {
+    []
+  } else {
+    @ooxml.parse_rels(rels_xml)
+  }
+  // Parse slide
+  let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val)
+  // Render to SVG
+  @renderer.render_slide_svg(slide_data, rels, slide_num)
 }
 
 // ── Integer → String conversion ───────────────────────────────────────────────

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>pptx-render — Phase 1 Demo</title>
+  <title>pptx-render — Phase 2 Demo</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -61,24 +61,78 @@
     .info-value { font-size: 2em; font-weight: bold; color: #7c7cff; }
     .info-label { font-size: 0.8em; color: #888; text-transform: uppercase; }
 
-    #entry-list, #xml-output {
+    /* ── Slide viewer ── */
+    #slide-viewer-card { display: none; }
+
+    .slide-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .slide-nav button {
+      background: #7c7cff;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.95em;
+      transition: background 0.15s;
+    }
+    .slide-nav button:hover:not(:disabled) { background: #6a6aee; }
+    .slide-nav button:disabled { background: #3a3a6a; cursor: not-allowed; }
+    #slide-num { color: #aaa; font-family: monospace; min-width: 100px; text-align: center; }
+
+    #svg-container {
+      background: #0d1117;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
+      overflow: auto;
+    }
+    #svg-container svg {
+      max-width: 100%;
+      height: auto;
+      border-radius: 2px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+    #svg-error {
+      color: #f44336;
       font-family: monospace;
-      font-size: 0.8em;
+      font-size: 0.85em;
+    }
+
+    /* ── Debug (raw XML) ── */
+    #xml-card { display: none; }
+    #xml-output {
+      font-family: monospace;
+      font-size: 0.78em;
       background: #0d1117;
       border: 1px solid #2a2a4a;
       border-radius: 4px;
       padding: 12px;
       overflow: auto;
-      max-height: 300px;
+      max-height: 260px;
       white-space: pre;
       color: #c9d1d9;
     }
-    #slide-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
+    .toggle-btn {
+      background: none;
+      border: 1px solid #4a4a8a;
+      color: #888;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.82em;
+      margin-bottom: 10px;
     }
+    .toggle-btn:hover { border-color: #7c7cff; color: #aaaaff; }
+
     button {
       background: #7c7cff;
       color: white;
@@ -90,18 +144,17 @@
     }
     button:hover { background: #6a6aee; }
     button:disabled { background: #3a3a6a; cursor: not-allowed; }
-    #slide-num { color: #888; font-family: monospace; }
   </style>
 </head>
 <body>
   <h1>pptx-render</h1>
-  <p class="subtitle">MoonBit + Wasm-GC — Phase 1: Foundation Demo</p>
+  <p class="subtitle">MoonBit + Wasm-GC — Phase 2: SVG Rendering</p>
 
   <div class="card">
     <h2>Load PPTX File</h2>
     <div id="drop-zone">
       <p><strong>Drop a .pptx file here</strong> or click to browse</p>
-      <p style="margin-top:8px; font-size:0.8em">The file is processed entirely in-browser (no server upload)</p>
+      <p style="margin-top:8px; font-size:0.8em">Processed entirely in-browser — no server upload</p>
       <input type="file" id="file-input" accept=".pptx">
     </div>
   </div>
@@ -118,26 +171,27 @@
         <div class="info-value" id="slide-count-val">—</div>
         <div class="info-label">Slides</div>
       </div>
-      <div class="info-item">
-        <div class="info-value" id="entry-count-val">—</div>
-        <div class="info-label">ZIP Entries</div>
-      </div>
     </div>
   </div>
 
-  <div class="card" id="entries-card" style="display:none">
-    <h2>ZIP Entry List</h2>
-    <div id="entry-list"></div>
-  </div>
-
-  <div class="card" id="xml-card" style="display:none">
-    <h2>Slide XML (raw)</h2>
-    <div id="slide-controls">
+  <!-- SVG slide viewer -->
+  <div class="card" id="slide-viewer-card">
+    <h2>Slide Viewer</h2>
+    <div class="slide-nav">
       <button id="prev-btn" disabled>◀ Prev</button>
-      <span id="slide-num">Slide 1</span>
+      <span id="slide-num">Slide 1 / 1</span>
       <button id="next-btn" disabled>Next ▶</button>
     </div>
-    <div id="xml-output"></div>
+    <div id="svg-container">
+      <span style="color:#555">No slide loaded</span>
+    </div>
+  </div>
+
+  <!-- Raw XML debug (collapsed by default) -->
+  <div class="card" id="xml-card">
+    <h2>Debug — Raw Slide XML</h2>
+    <button class="toggle-btn" id="xml-toggle">Show XML</button>
+    <div id="xml-output" style="display:none"></div>
   </div>
 
   <script type="module">
@@ -149,21 +203,20 @@
     let currentSlide = 0;
     let totalSlides = 0;
 
-    // UI elements
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const statusEl = document.getElementById('status');
-    const statusCard = document.getElementById('status-card');
-    const infoCard = document.getElementById('info-card');
-    const entriesCard = document.getElementById('entries-card');
-    const xmlCard = document.getElementById('xml-card');
+    const dropZone    = document.getElementById('drop-zone');
+    const fileInput   = document.getElementById('file-input');
+    const statusEl    = document.getElementById('status');
+    const statusCard  = document.getElementById('status-card');
+    const infoCard    = document.getElementById('info-card');
     const slideCountVal = document.getElementById('slide-count-val');
-    const entryCountVal = document.getElementById('entry-count-val');
-    const entryList = document.getElementById('entry-list');
-    const xmlOutput = document.getElementById('xml-output');
-    const prevBtn = document.getElementById('prev-btn');
-    const nextBtn = document.getElementById('next-btn');
-    const slideNum = document.getElementById('slide-num');
+    const slideViewerCard = document.getElementById('slide-viewer-card');
+    const svgContainer = document.getElementById('svg-container');
+    const prevBtn     = document.getElementById('prev-btn');
+    const nextBtn     = document.getElementById('next-btn');
+    const slideNum    = document.getElementById('slide-num');
+    const xmlCard     = document.getElementById('xml-card');
+    const xmlOutput   = document.getElementById('xml-output');
+    const xmlToggle   = document.getElementById('xml-toggle');
 
     function setStatus(msg, type = 'info') {
       statusCard.style.display = '';
@@ -171,25 +224,48 @@
       statusEl.textContent = msg;
     }
 
-    function showSlideXml(idx) {
+    function showSlide(idx) {
       currentSlide = idx;
-      totalSlides = renderer.getSlideCount();
       slideNum.textContent = `Slide ${idx + 1} / ${totalSlides}`;
       prevBtn.disabled = idx === 0;
       nextBtn.disabled = idx >= totalSlides - 1;
-      const xml = renderer.getSlideXmlRaw(idx);
-      // Pretty-print basic XML by adding newlines after tags
-      xmlOutput.textContent = xml.length > 10000
-        ? xml.slice(0, 10000) + '\n... (truncated)'
-        : xml;
+
+      // Render SVG via Wasm
+      const svg = renderer.renderSlideSvg(idx);
+      console.log('[pptx] SVG output (first 500 chars):', svg.slice(0, 500));
+      if (svg.startsWith('ERROR:')) {
+        svgContainer.innerHTML = `<span id="svg-error">${svg}</span>`;
+      } else {
+        svgContainer.innerHTML = svg;
+      }
+
+      // Update raw XML if visible
+      if (xmlOutput.style.display !== 'none') {
+        const xml = renderer.getSlideXmlRaw(idx);
+        xmlOutput.textContent = xml.length > 12000
+          ? xml.slice(0, 12000) + '\n… (truncated)'
+          : xml;
+      }
     }
 
-    prevBtn.addEventListener('click', () => showSlideXml(currentSlide - 1));
-    nextBtn.addEventListener('click', () => showSlideXml(currentSlide + 1));
+    prevBtn.addEventListener('click', () => showSlide(currentSlide - 1));
+    nextBtn.addEventListener('click', () => showSlide(currentSlide + 1));
+
+    // XML debug toggle
+    xmlToggle.addEventListener('click', () => {
+      const hidden = xmlOutput.style.display === 'none';
+      xmlOutput.style.display = hidden ? '' : 'none';
+      xmlToggle.textContent = hidden ? 'Hide XML' : 'Show XML';
+      if (hidden) {
+        const xml = renderer.getSlideXmlRaw(currentSlide);
+        xmlOutput.textContent = xml.length > 12000
+          ? xml.slice(0, 12000) + '\n… (truncated)'
+          : xml;
+      }
+    });
 
     async function loadPptx(file) {
-      setStatus(`Loading ${file.name}...`);
-
+      setStatus(`Loading ${file.name}…`);
       try {
         const buffer = await file.arrayBuffer();
         const { slideCount } = await renderer.loadPptx(buffer);
@@ -197,20 +273,13 @@
 
         setStatus(`✓ Loaded "${file.name}" — ${slideCount} slide(s)`, 'ok');
 
-        // Show info
         infoCard.style.display = '';
         slideCountVal.textContent = slideCount;
 
-        // Show entry list
-        const entries = renderer.getEntryList();
-        entryCountVal.textContent = entries.length;
-        entriesCard.style.display = '';
-        entryList.textContent = entries.join('\n');
-
-        // Show first slide XML
         if (slideCount > 0) {
-          xmlCard.style.display = '';
-          showSlideXml(0);
+          slideViewerCard.style.display = 'block';
+          xmlCard.style.display = 'block';
+          showSlide(0);
         }
       } catch (err) {
         setStatus(`✗ Error: ${err.message}`, 'error');
@@ -218,7 +287,7 @@
       }
     }
 
-    // File drop
+    // File drop / click
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -236,11 +305,12 @@
       if (file) loadPptx(file);
     });
 
-    // Initialize Wasm — disable drop zone until ready
+    // Init Wasm
     dropZone.style.pointerEvents = 'none';
     dropZone.style.opacity = '0.5';
-    setStatus('Loading WebAssembly module...');
+    setStatus('Loading WebAssembly module…');
     statusCard.style.display = '';
+
     renderer.init(WASM_URL)
       .then(() => {
         setStatus('✓ Wasm module ready. Drop a .pptx file to start.', 'ok');
@@ -249,7 +319,7 @@
       })
       .catch(err => {
         setStatus(`✗ Wasm init failed: ${err.message}`, 'error');
-        console.error('[pptx] Init error details:', err);
+        console.error('[pptx] Init error:', err);
       });
   </script>
 </body>

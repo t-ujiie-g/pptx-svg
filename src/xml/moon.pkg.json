@@ -1,0 +1,5 @@
+{
+  "import": [
+    { "path": "pptx-render/ffi", "alias": "ffi" }
+  ]
+}

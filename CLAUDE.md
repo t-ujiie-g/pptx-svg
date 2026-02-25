@@ -46,7 +46,7 @@ main → renderer → ffi
 
 **No external packages.** `bobzhang/zip` and `ruifeng/XMLParser` are incompatible with the current compiler (Feb 2026). Do not add external deps; implement needed parsers inline.
 
-## Browser compatibility and STRING_CONSTANTS
+## Browser compatibility and string constants
 
 `use-js-builtin-string: true` in `src/main/moon.pkg.json` generates Wasm that imports:
 1. Functions from `wasm:js-string` (length, charCodeAt, equals, concat)
@@ -57,7 +57,9 @@ main → renderer → ffi
 - **Tier 2** `{ importedStringConstants: '_' }` + manual `wasm:js-string` — Chrome 115–116
 - **Tier 3** Manual `WebAssembly.Global(externref)` for `_` + manual `wasm:js-string` — Chrome 111+
 
-The `STRING_CONSTANTS` array in `host.js` must list every string literal in the MoonBit binary. After any MoonBit source change that adds or removes string literals, run `python3 scripts/gen_string_constants.py --update` to regenerate it.
+`host.js` parses the Wasm binary at startup to extract `_` module string constants dynamically — no manual `STRING_CONSTANTS` list to maintain. `gen_string_constants.py` is kept for debugging only.
+
+**Critical**: Never use `StringBuilder` in MoonBit. `StringBuilder::to_string()` calls `wasm:js-string "fromCharCodeArray"` which cannot be polyfilled in JS. Build strings with `+` (concat) instead. For Char→String use `@ffi.ffi_char_code_to_str(Char::to_int(c))` (→ `String.fromCharCode`).
 
 ## Key files
 

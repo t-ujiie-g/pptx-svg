@@ -1,0 +1,6 @@
+{
+  "import": [
+    { "path": "pptx-render/ooxml", "alias": "ooxml" },
+    { "path": "pptx-render/ffi",   "alias": "ffi"   }
+  ]
+}
