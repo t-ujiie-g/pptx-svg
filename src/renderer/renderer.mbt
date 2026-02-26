@@ -1,17 +1,12 @@
-// SVG renderer for PPTX slides — Phase 2
+// SVG renderer for PPTX slides — Round-trip capable
 //
 // All OOXML coordinates are in EMU (English Metric Units).
 // This renderer converts EMU → pixels at a fixed target width of 960 px,
 // producing an SVG with explicit pixel dimensions and NO viewBox transform.
 //
-// Why no viewBox?  When an SVG is injected via innerHTML, some browsers
-// interpret bare-number SVG presentation attributes (e.g. font-size="228600")
-// as CSS pixels rather than scaled user-units, making text invisible.
-// Emitting px-valued coordinates sidesteps the issue entirely.
-//
-// Scale for standard PPTX slides (cx = 9 144 000 EMU, width = 960 px):
-//   scale_denom = 9 144 000 / 960 = 9 525  (exact integer)
-//   font 18 pt  = 228 600 EMU / 9 525 = 24 px
+// Round-trip support: each SVG element carries data-ooxml-* attributes
+// preserving original OOXML values (EMU, hundredths-of-a-point, etc.)
+// so the SVG can be parsed back to SlideData losslessly.
 //
 // NOTE: No StringBuilder.  All strings built via `+` (wasm:js-string "concat"),
 // which is polyfillable in Tier-2/3 browsers.
@@ -43,6 +38,10 @@ fn a(name : String, value : String) -> String {
 
 fn ai(name : String, value : Int) -> String {
   a(name, int_to_str(value))
+}
+
+fn bool_str(b : Bool) -> String {
+  if b { "1" } else { "0" }
 }
 
 // Escape text for SVG content.
@@ -80,22 +79,12 @@ fn svg_escape(s : String) -> String {
 }
 
 // ── EMU → pixel conversion ────────────────────────────────────────────────────
-//
-// px(emu, scale_denom) = emu / scale_denom
-//
-// scale_denom = slide_cx / 960.  For standard slides: 9144000 / 960 = 9525.
-// Division-first avoids 32-bit overflow (emu * 960 would overflow for large EMU values).
 
 fn px(emu : Int, scale : Int) -> Int {
   if scale <= 0 { 0 } else { emu / scale }
 }
 
 // ── Font size ─────────────────────────────────────────────────────────────────
-//
-// PPTX run property `sz` is in hundredths of a point (e.g. 1800 = 18 pt).
-//   EMU = sz * 127   (because 1 pt = 12700 EMU, 1 hundredth-pt = 127 EMU)
-//
-// Default font size: 18 pt = 228 600 EMU.
 
 fn hundredth_pt_to_emu(sz : Int) -> Int {
   sz * 127
@@ -164,6 +153,25 @@ fn mime_from_ext(path : String) -> String {
   else { "image/png" }
 }
 
+// ── data-ooxml-* attribute helpers ───────────────────────────────────────────
+
+fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
+  match kind {
+    @ooxml.ShapeKind::AutoShape(_) => "autoshape"
+    @ooxml.ShapeKind::Picture(_) => "picture"
+    @ooxml.ShapeKind::Table => "table"
+    @ooxml.ShapeKind::GroupShape => "group"
+    @ooxml.ShapeKind::Other => "other"
+  }
+}
+
+fn geom_str(kind : @ooxml.ShapeKind) -> String {
+  match kind {
+    @ooxml.ShapeKind::AutoShape(g) => g.to_prst()
+    _ => "rect"
+  }
+}
+
 // ── Text rendering ────────────────────────────────────────────────────────────
 
 fn render_text(
@@ -204,15 +212,20 @@ fn render_text(
       } else {
         (text_x, " text-anchor=\"start\"")
       }
+      // Paragraph-level tspan with data-ooxml-* attributes
+      let para_align = if para.align.is_empty() { "l" } else { para.align }
       out = out + "<tspan" +
         ai("x", anchor_x) +
         ai("y", cur_y) +
         anchor_attr +
+        a("data-ooxml-para-idx", int_to_str(pi)) +
+        a("data-ooxml-para-align", para_align) +
         ">"
       let mut ri = 0
       while ri < nr {
         let run = para.runs[ri]
         let mut span = "<tspan"
+        // Visual attributes
         if run.bold   { span = span + " font-weight=\"bold\""  }
         if run.italic { span = span + " font-style=\"italic\"" }
         if run.font_size > 0 {
@@ -221,6 +234,12 @@ fn render_text(
         if not(run.color.is_none()) {
           span = span + a("fill", run.color.to_css())
         }
+        // data-ooxml-* attributes for round-trip
+        span = span +
+          a("data-ooxml-run-idx", int_to_str(ri)) +
+          a("data-ooxml-bold", bool_str(run.bold)) +
+          a("data-ooxml-font-size", int_to_str(run.font_size)) +
+          a("data-ooxml-color", run.color.to_hex())
         out = out + span + ">" + svg_escape(run.text) + "</tspan>"
         ri = ri + 1
       }
@@ -238,7 +257,8 @@ fn render_shape(
   shape : @ooxml.Shape,
   rels : Array[@ooxml.Relationship],
   _slide_num : Int,
-  scale : Int
+  scale : Int,
+  shape_idx : Int
 ) -> String {
   let t    = shape.transform
   let x_p  = px(t.x,  scale)
@@ -247,7 +267,22 @@ fn render_shape(
   let cy_p = px(t.cy, scale)
   if cx_p <= 0 || cy_p <= 0 { return "" }
   let rot = rotation_attr(t, scale)
-  match shape.kind {
+
+  // Build data-ooxml-* attributes for the <g> wrapper
+  let g_attrs =
+    a("data-ooxml-shape-type", shape_type_str(shape.kind)) +
+    a("data-ooxml-geom", geom_str(shape.kind)) +
+    ai("data-ooxml-x", t.x) +
+    ai("data-ooxml-y", t.y) +
+    ai("data-ooxml-cx", t.cx) +
+    ai("data-ooxml-cy", t.cy) +
+    ai("data-ooxml-rot", t.rot) +
+    a("data-ooxml-fill", shape.fill.to_hex()) +
+    a("data-ooxml-stroke", shape.stroke.to_hex()) +
+    ai("data-ooxml-stroke-w", shape.stroke_w) +
+    ai("data-ooxml-shape-idx", shape_idx)
+
+  let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
       let fill   = a("fill", shape.fill.to_css())
       let stroke = if shape.stroke.is_none() {
@@ -308,11 +343,17 @@ fn render_shape(
     }
     _ => ""
   }
+
+  if inner.is_empty() {
+    ""
+  } else {
+    "<g" + g_attrs + ">" + inner + "</g>"
+  }
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-///| Render a SlideData to an SVG string.
+///| Render a SlideData to an SVG string with data-ooxml-* attributes.
 pub fn render_slide_svg(
   slide : @ooxml.SlideData,
   rels : Array[@ooxml.Relationship],
@@ -321,15 +362,18 @@ pub fn render_slide_svg(
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
   let w = 960
-  // scale_denom: EMU per pixel.  9144000 / 960 = 9525 (standard PPTX).
   let scale = if sw > 0 { sw / w } else { 9525 }
-  // height in px — computed without overflow: sh / scale
   let h = if scale > 0 { sh / scale } else { 540 }
   let header = "<svg" +
     " xmlns=\"http://www.w3.org/2000/svg\"" +
     " xmlns:xlink=\"http://www.w3.org/1999/xlink\"" +
     ai("width", w) + ai("height", h) +
     " style=\"background:white;display:block\"" +
+    // data-ooxml-* metadata on SVG root for round-trip
+    ai("data-ooxml-slide-cx", sw) +
+    ai("data-ooxml-slide-cy", sh) +
+    a("data-ooxml-bg", slide.background.to_hex()) +
+    ai("data-ooxml-scale", scale) +
     ">"
   let bg = "<rect" +
     ai("width", w) + ai("height", h) +
@@ -339,7 +383,7 @@ pub fn render_slide_svg(
   let n = slide.shapes.length()
   let mut i = 0
   while i < n {
-    shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale)
+    shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale, i)
     i = i + 1
   }
   header + bg + shapes_svg + "</svg>"

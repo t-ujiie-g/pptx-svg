@@ -1,8 +1,10 @@
 {
   "import": [
-    { "path": "pptx-render/ffi",      "alias": "ffi"      },
-    { "path": "pptx-render/ooxml",    "alias": "ooxml"    },
-    { "path": "pptx-render/renderer", "alias": "renderer" }
+    { "path": "pptx-render/ffi",        "alias": "ffi"        },
+    { "path": "pptx-render/ooxml",      "alias": "ooxml"      },
+    { "path": "pptx-render/renderer",   "alias": "renderer"   },
+    { "path": "pptx-render/serializer", "alias": "serializer" },
+    { "path": "pptx-render/svg_parser", "alias": "svg_parser" }
   ],
   "link": {
     "wasm-gc": {
@@ -11,7 +13,10 @@
         "get_slide_count",
         "get_slide_xml_raw",
         "get_entry_list",
-        "render_slide_svg"
+        "render_slide_svg",
+        "update_slide_from_svg",
+        "get_slide_ooxml",
+        "get_modified_entries"
       ],
       "use-js-builtin-string": true
     }

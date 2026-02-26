@@ -9,28 +9,10 @@
  *   3. Expose decompressed entry content to MoonBit via FFI imports
  *   4. Instantiate the Wasm module with js-string builtins compatibility
  *   5. Drive the MoonBit PPTX processing pipeline
+ *   6. Export modified PPTX via round-trip pipeline
  */
 
 // ── Wasm js-string builtins compatibility ─────────────────────────────────────
-//
-// MoonBit's wasm-gc target with `use-js-builtin-string: true` generates a Wasm
-// binary that imports:
-//   • Functions from `wasm:js-string` (length, charCodeAt, equals, concat)
-//   • String-constant globals from `_` (one per string literal in MoonBit code)
-//
-// Browser support timeline:
-//   Chrome 111+: WebAssembly GC (wasm-gc)
-//   Chrome 115+: importedStringConstants option ('_' module)
-//   Chrome 117+: builtins: ['js-string'] (covers both wasm:js-string + '_')
-//   Firefox 120+, Safari 17+: builtins: ['js-string']
-//
-// We try three tiers in order, falling back to wider compat:
-//   Tier 1 — builtins: ['js-string']       (Chrome 117+, FF 120+, Safari 17+)
-//   Tier 2 — importedStringConstants + manual wasm:js-string  (Chrome 115–116)
-//   Tier 3 — fully manual '_' globals + wasm:js-string        (Chrome 111+)
-//
-// The '_' module string constants are parsed dynamically from the Wasm binary
-// at startup, so no manual STRING_CONSTANTS list needs to be maintained.
 
 /** Manual implementations of wasm:js-string builtin functions (Tier 2 & 3). */
 const JS_STRING_MODULE = {
@@ -43,12 +25,6 @@ const JS_STRING_MODULE = {
 /**
  * Parse the Wasm binary's import section to extract all '_' module
  * string-constant field names dynamically.
- *
- * This replaces the hand-maintained STRING_CONSTANTS array and eliminates
- * the need to run gen_string_constants.py after every source change.
- *
- * Format: each import with module="_" is a global whose field name IS the
- * string value (importedStringConstants convention from the js-string spec).
  *
  * @param {ArrayBuffer} buffer - Raw .wasm bytes
  * @returns {string[]}
@@ -106,8 +82,6 @@ function parseWasmStringConstants(buffer) {
 
 /**
  * Build the '_' import module as WebAssembly.Global(externref) objects.
- * Used in Tier 3 when the engine cannot resolve the module automatically.
- *
  * @param {string[]} constants - String values parsed from the Wasm binary
  */
 function makeUnderscoreModule(constants) {
@@ -126,7 +100,6 @@ function makeUnderscoreModule(constants) {
  * @returns {Promise<WebAssembly.WebAssemblyInstantiatedSource>}
  */
 async function instantiateWasmWithFallback(bytes, importObject) {
-  // Parse '_' module string constants from the binary (used in Tier 3).
   const stringConstants = parseWasmStringConstants(bytes);
   console.log(`[pptx] Parsed ${stringConstants.length} string constants from Wasm binary`);
 
@@ -185,10 +158,11 @@ export class PptxRenderer {
   /** @type {Map<string, Uint8Array>} Raw binary ZIP entries (path → bytes) */
   #rawFiles = new Map();
 
+  /** @type {ArrayBuffer|null} Original PPTX bytes for export */
+  #originalBuffer = null;
+
   /**
    * Initialize the renderer by loading the Wasm module.
-   * The drop zone should be disabled until this resolves.
-   *
    * @param {string} wasmUrl - URL to the .wasm file
    */
   async init(wasmUrl) {
@@ -203,9 +177,6 @@ export class PptxRenderer {
 
   /**
    * Load a PPTX file from an ArrayBuffer.
-   * Parses the ZIP archive and decompresses all entries,
-   * then calls MoonBit's initialize_pptx() to count slides.
-   *
    * @param {ArrayBuffer} arrayBuffer - Raw PPTX file bytes
    * @returns {Promise<{slideCount: number}>}
    */
@@ -213,6 +184,7 @@ export class PptxRenderer {
     if (!this.#wasm) {
       throw new Error('Wasm not initialized — wait for init() to complete before loading files.');
     }
+    this.#originalBuffer = arrayBuffer.slice(0); // keep a copy for export
     console.log('[pptx] Parsing ZIP archive...');
     const { textFiles, binaryFiles } = await this.#extractZip(arrayBuffer);
     this.#files = textFiles;
@@ -259,11 +231,62 @@ export class PptxRenderer {
     return this.#wasm.exports.render_slide_svg(slideIdx);
   }
 
+  /**
+   * Update a slide's internal data from an edited SVG string.
+   * Parses the SVG's data-ooxml-* attributes back into SlideData.
+   * @param {number} slideIdx
+   * @param {string} svgString
+   * @returns {string} "OK" on success, "ERROR:..." on failure
+   */
+  updateSlideFromSvg(slideIdx, svgString) {
+    return this.#wasm.exports.update_slide_from_svg(slideIdx, svgString);
+  }
+
+  /**
+   * Get the OOXML slide XML for a slide (0-indexed).
+   * Returns modified XML if the slide was updated, otherwise original.
+   * @param {number} slideIdx
+   * @returns {string}
+   */
+  getSlideOoxml(slideIdx) {
+    return this.#wasm.exports.get_slide_ooxml(slideIdx);
+  }
+
+  /**
+   * Export the (possibly modified) presentation as a PPTX ArrayBuffer.
+   * Replaces modified slide XML entries in the original ZIP and rebuilds it.
+   * @returns {Promise<ArrayBuffer>}
+   */
+  async exportPptx() {
+    if (!this.#originalBuffer) {
+      throw new Error('No PPTX loaded — call loadPptx() first.');
+    }
+
+    // Get modified entries from Wasm: "path\tcontent\n..."
+    const modifiedStr = this.#wasm.exports.get_modified_entries();
+    const modifications = new Map();
+    if (modifiedStr) {
+      const lines = modifiedStr.split('\n');
+      for (const line of lines) {
+        if (!line) continue;
+        const tabIdx = line.indexOf('\t');
+        if (tabIdx < 0) continue;
+        const path = line.substring(0, tabIdx);
+        const content = line.substring(tabIdx + 1);
+        modifications.set(path, content);
+      }
+    }
+
+    console.log(`[pptx] Exporting PPTX with ${modifications.size} modified entries`);
+
+    // Rebuild ZIP with modifications
+    return this.#buildZip(this.#originalBuffer, modifications);
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────────
 
   /**
    * Build the Wasm import object that satisfies MoonBit's FFI declarations.
-   * Arrow functions capture `this` so they can access #files and #rawFiles.
    */
   #buildImportObject() {
     return {
@@ -277,7 +300,6 @@ export class PptxRenderer {
         error: (msg) => console.error('[pptx]', msg),
         measure_text: (text, fontFace, fontSizePt) => this.#measureText(text, fontFace, fontSizePt),
       },
-      // make_closure is used by some MoonBit wasm-gc closure patterns.
       'moonbit:ffi': {
         make_closure: (f, ctx) => f.bind(null, ctx),
       },
@@ -288,12 +310,6 @@ export class PptxRenderer {
 
   /**
    * Extract all entries from a ZIP archive.
-   *
-   * Text entries (XML, rels, …) → textFiles Map (path → UTF-8 string)
-   * Binary entries (images, …)  → binaryFiles Map (path → Uint8Array)
-   *
-   * Handles method 0 (stored) and method 8 (DEFLATE).
-   *
    * @param {ArrayBuffer} buffer
    * @returns {Promise<{textFiles: Map<string,string>, binaryFiles: Map<string,Uint8Array>}>}
    */
@@ -306,7 +322,6 @@ export class PptxRenderer {
 
     let offset = 0;
     while (offset < bytes.length - 4) {
-      // Local File Header signature: PK\x03\x04
       if (view.getUint32(offset, true) !== 0x04034b50) break;
 
       const method          = view.getUint16(offset + 8,  true);
@@ -345,7 +360,7 @@ export class PptxRenderer {
   /**
    * Decompress raw DEFLATE bytes using the browser's native DecompressionStream.
    * @param {Uint8Array} compressed
-   * @param {number} _hint - expected size (unused; browser handles allocation)
+   * @param {number} _hint
    * @returns {Promise<Uint8Array>}
    */
   async #inflate(compressed, _hint) {
@@ -372,8 +387,36 @@ export class PptxRenderer {
   }
 
   /**
+   * Compress bytes using DEFLATE-raw via CompressionStream.
+   * @param {Uint8Array} data
+   * @returns {Promise<Uint8Array>}
+   */
+  async #deflate(data) {
+    const stream = new CompressionStream('deflate-raw');
+    const writer = stream.writable.getWriter();
+    const reader = stream.readable.getReader();
+
+    writer.write(data);
+    writer.close();
+
+    const chunks = [];
+    let totalLen = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLen += value.length;
+    }
+
+    const result = new Uint8Array(totalLen);
+    let pos = 0;
+    for (const chunk of chunks) { result.set(chunk, pos); pos += chunk.length; }
+    return result;
+  }
+
+  /**
    * Return true if a ZIP entry should be decoded as UTF-8 text.
-   * @param {string} name - entry path
+   * @param {string} name
    */
   #isTextEntry(name) {
     const lower = name.toLowerCase();
@@ -386,7 +429,153 @@ export class PptxRenderer {
            lower === '[content_types].xml';
   }
 
-  // ── Text measurement (Phase 2+) ──────────────────────────────────────────────
+  // ── ZIP building ────────────────────────────────────────────────────────────
+
+  /**
+   * Build a new ZIP by iterating the original ZIP entries and replacing
+   * modified text entries with new content.
+   *
+   * @param {ArrayBuffer} originalBuffer - The original PPTX bytes
+   * @param {Map<string, string>} modifications - path → new XML content
+   * @returns {Promise<ArrayBuffer>}
+   */
+  async #buildZip(originalBuffer, modifications) {
+    const origBytes = new Uint8Array(originalBuffer);
+    const origView = new DataView(originalBuffer);
+    const decoder = new TextDecoder('utf-8');
+    const encoder = new TextEncoder();
+
+    // Collect all local file entries
+    const entries = [];
+    let offset = 0;
+    while (offset < origBytes.length - 4) {
+      if (origView.getUint32(offset, true) !== 0x04034b50) break;
+
+      const method           = origView.getUint16(offset + 8, true);
+      const compressedSize   = origView.getUint32(offset + 18, true);
+      const fileNameLen      = origView.getUint16(offset + 26, true);
+      const extraLen         = origView.getUint16(offset + 28, true);
+      const name             = decoder.decode(origBytes.slice(offset + 30, offset + 30 + fileNameLen));
+      const dataOffset       = offset + 30 + fileNameLen + extraLen;
+
+      // Copy the flags, time, date from the original header
+      const flags   = origView.getUint16(offset + 6, true);
+      const time    = origView.getUint16(offset + 10, true);
+      const date    = origView.getUint16(offset + 12, true);
+      const crc32   = origView.getUint32(offset + 14, true);
+      const uncompressedSize = origView.getUint32(offset + 22, true);
+
+      const compressedData = origBytes.slice(dataOffset, dataOffset + compressedSize);
+
+      entries.push({
+        name, method, flags, time, date, crc32,
+        compressedSize, uncompressedSize,
+        compressedData, extra: origBytes.slice(offset + 30 + fileNameLen, dataOffset),
+      });
+
+      offset = dataOffset + compressedSize;
+    }
+
+    // Process modifications: replace entry data
+    for (const entry of entries) {
+      if (modifications.has(entry.name)) {
+        const newContent = encoder.encode(modifications.get(entry.name));
+        const compressed = await this.#deflate(newContent);
+        entry.method = 8;
+        entry.compressedData = compressed;
+        entry.compressedSize = compressed.length;
+        entry.uncompressedSize = newContent.length;
+        entry.crc32 = crc32(newContent);
+        entry.extra = new Uint8Array(0);
+      }
+    }
+
+    // Build the new ZIP
+    const parts = [];
+    const centralDir = [];
+    let localOffset = 0;
+
+    for (const entry of entries) {
+      const nameBytes = encoder.encode(entry.name);
+
+      // Local file header (30 bytes + name + extra + data)
+      const localHeader = new ArrayBuffer(30);
+      const lhView = new DataView(localHeader);
+      lhView.setUint32(0, 0x04034b50, true);   // signature
+      lhView.setUint16(4, 20, true);            // version needed
+      lhView.setUint16(6, entry.flags, true);   // flags
+      lhView.setUint16(8, entry.method, true);  // method
+      lhView.setUint16(10, entry.time, true);   // time
+      lhView.setUint16(12, entry.date, true);   // date
+      lhView.setUint32(14, entry.crc32, true);  // crc32
+      lhView.setUint32(18, entry.compressedSize, true);
+      lhView.setUint32(22, entry.uncompressedSize, true);
+      lhView.setUint16(26, nameBytes.length, true);
+      lhView.setUint16(28, entry.extra.length, true);
+
+      parts.push(new Uint8Array(localHeader));
+      parts.push(nameBytes);
+      parts.push(entry.extra);
+      parts.push(entry.compressedData);
+
+      // Central directory entry (46 bytes + name)
+      const cdHeader = new ArrayBuffer(46);
+      const cdView = new DataView(cdHeader);
+      cdView.setUint32(0, 0x02014b50, true);    // signature
+      cdView.setUint16(4, 20, true);             // version made by
+      cdView.setUint16(6, 20, true);             // version needed
+      cdView.setUint16(8, entry.flags, true);
+      cdView.setUint16(10, entry.method, true);
+      cdView.setUint16(12, entry.time, true);
+      cdView.setUint16(14, entry.date, true);
+      cdView.setUint32(16, entry.crc32, true);
+      cdView.setUint32(20, entry.compressedSize, true);
+      cdView.setUint32(24, entry.uncompressedSize, true);
+      cdView.setUint16(28, nameBytes.length, true);
+      cdView.setUint16(30, 0, true);             // extra length
+      cdView.setUint16(32, 0, true);             // comment length
+      cdView.setUint16(34, 0, true);             // disk number
+      cdView.setUint16(36, 0, true);             // internal attrs
+      cdView.setUint32(38, 0, true);             // external attrs
+      cdView.setUint32(42, localOffset, true);   // local header offset
+
+      centralDir.push(new Uint8Array(cdHeader));
+      centralDir.push(nameBytes);
+
+      localOffset += 30 + nameBytes.length + entry.extra.length + entry.compressedData.length;
+    }
+
+    const cdOffset = localOffset;
+    let cdSize = 0;
+    for (const part of centralDir) cdSize += part.length;
+
+    // End of central directory (22 bytes)
+    const eocd = new ArrayBuffer(22);
+    const eocdView = new DataView(eocd);
+    eocdView.setUint32(0, 0x06054b50, true);    // signature
+    eocdView.setUint16(4, 0, true);              // disk number
+    eocdView.setUint16(6, 0, true);              // cd disk number
+    eocdView.setUint16(8, entries.length, true);  // entries on disk
+    eocdView.setUint16(10, entries.length, true); // total entries
+    eocdView.setUint32(12, cdSize, true);         // cd size
+    eocdView.setUint32(16, cdOffset, true);       // cd offset
+    eocdView.setUint16(20, 0, true);              // comment length
+
+    // Combine all parts
+    let totalSize = 0;
+    for (const p of parts) totalSize += p.length;
+    totalSize += cdSize + 22;
+
+    const result = new Uint8Array(totalSize);
+    let pos = 0;
+    for (const p of parts) { result.set(p, pos); pos += p.length; }
+    for (const p of centralDir) { result.set(p, pos); pos += p.length; }
+    result.set(new Uint8Array(eocd), pos);
+
+    return result.buffer;
+  }
+
+  // ── Text measurement ──────────────────────────────────────────────────────────
 
   /** @type {HTMLCanvasElement|null} */
   #canvas = null;
@@ -395,8 +584,6 @@ export class PptxRenderer {
 
   /**
    * Measure the rendered pixel width of text using Canvas 2D.
-   * Lazily creates the canvas on first call.
-   *
    * @param {string} text
    * @param {string} fontFace
    * @param {number} fontSizePt
@@ -424,4 +611,20 @@ function bytesToBase64(bytes) {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
+}
+
+/**
+ * Compute CRC-32 for a Uint8Array.
+ * @param {Uint8Array} data
+ * @returns {number}
+ */
+function crc32(data) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
 }

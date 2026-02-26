@@ -7,7 +7,7 @@
 
 // ── Color ─────────────────────────────────────────────────────────────────────
 
-pub struct Color {
+pub(all) struct Color {
   r : Int
   g : Int
   b : Int
@@ -63,9 +63,31 @@ pub fn Color::to_css(self : Color) -> String {
   }
 }
 
+///| Convert Color to 6-char hex string "RRGGBB" for data attributes.
+pub fn Color::to_hex(self : Color) -> String {
+  if self.is_none() {
+    "none"
+  } else {
+    hex_byte(self.r) + hex_byte(self.g) + hex_byte(self.b)
+  }
+}
+
+fn hex_byte(v : Int) -> String {
+  hex_nibble(v / 16) + hex_nibble(v % 16)
+}
+
+fn hex_nibble(n : Int) -> String {
+  match n {
+    0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4"
+    5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; 9 => "9"
+    10 => "A"; 11 => "B"; 12 => "C"; 13 => "D"; 14 => "E"
+    _ => "F"
+  }
+}
+
 // ── Text model ────────────────────────────────────────────────────────────────
 
-pub struct TextRun {
+pub(all) struct TextRun {
   text      : String
   bold      : Bool
   italic    : Bool
@@ -73,14 +95,14 @@ pub struct TextRun {
   color     : Color
 }
 
-pub struct TextParagraph {
+pub(all) struct TextParagraph {
   runs      : Array[TextRun]
   align     : String  // "l", "c", "r", "just" or ""
 }
 
 // ── Shape geometry ────────────────────────────────────────────────────────────
 
-pub enum ShapeGeom {
+pub(all) enum ShapeGeom {
   Rect
   Ellipse
   RoundRect
@@ -102,9 +124,20 @@ fn parse_geom(prst : String) -> ShapeGeom {
   }
 }
 
+///| Convert ShapeGeom back to OOXML preset geometry name.
+pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
+  match self {
+    ShapeGeom::Rect => "rect"
+    ShapeGeom::Ellipse => "ellipse"
+    ShapeGeom::RoundRect => "roundRect"
+    ShapeGeom::Line => "line"
+    ShapeGeom::Other(s) => s
+  }
+}
+
 // ── Shape ─────────────────────────────────────────────────────────────────────
 
-pub struct ShapeTransform {
+pub(all) struct ShapeTransform {
   x  : Int
   y  : Int
   cx : Int
@@ -118,7 +151,7 @@ pub fn ShapeTransform::default() -> ShapeTransform {
   { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flip_h: false, flip_v: false }
 }
 
-pub enum ShapeKind {
+pub(all) enum ShapeKind {
   AutoShape(ShapeGeom)
   Picture(String)  // relationship ID (r:embed)
   Table
@@ -126,7 +159,7 @@ pub enum ShapeKind {
   Other
 }
 
-pub struct Shape {
+pub(all) struct Shape {
   kind        : ShapeKind
   transform   : ShapeTransform
   fill        : Color          // Color::none() = no fill
@@ -137,7 +170,7 @@ pub struct Shape {
 
 // ── Slide data ────────────────────────────────────────────────────────────────
 
-pub struct SlideSize {
+pub(all) struct SlideSize {
   cx : Int
   cy : Int
 }
@@ -147,7 +180,7 @@ pub fn SlideSize::default() -> SlideSize {
   { cx: 9144000, cy: 6858000 }
 }
 
-pub struct SlideData {
+pub(all) struct SlideData {
   slide_size : SlideSize
   background : Color
   shapes     : Array[Shape]
@@ -427,7 +460,7 @@ fn empty_shape() -> Shape {
 
 // ── Relationship parsing ──────────────────────────────────────────────────────
 
-pub struct Relationship {
+pub(all) struct Relationship {
   id     : String
   target : String
   type_  : String

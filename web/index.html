@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>pptx-render — Phase 2 Demo</title>
+  <title>pptx-render — Round-trip Demo</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -107,6 +107,21 @@
       font-size: 0.85em;
     }
 
+    /* ── Export ── */
+    #export-card { display: none; }
+    .export-btn {
+      background: #4caf50;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.15s;
+    }
+    .export-btn:hover:not(:disabled) { background: #43a047; }
+    .export-btn:disabled { background: #2d4a2e; cursor: not-allowed; }
+
     /* ── Debug (raw XML) ── */
     #xml-card { display: none; }
     #xml-output {
@@ -148,7 +163,7 @@
 </head>
 <body>
   <h1>pptx-render</h1>
-  <p class="subtitle">MoonBit + Wasm-GC — Phase 2: SVG Rendering</p>
+  <p class="subtitle">MoonBit + Wasm-GC — Round-trip PPTX / SVG Engine</p>
 
   <div class="card">
     <h2>Load PPTX File</h2>
@@ -187,10 +202,23 @@
     </div>
   </div>
 
+  <!-- Export -->
+  <div class="card" id="export-card">
+    <h2>Export</h2>
+    <p style="color:#888; margin-bottom:12px; font-size:0.85em">
+      Export the presentation as a .pptx file. Modified slides will be included.
+    </p>
+    <button class="export-btn" id="export-btn">Export PPTX</button>
+    <span id="export-status" style="margin-left:12px; font-size:0.85em; color:#888"></span>
+  </div>
+
   <!-- Raw XML debug (collapsed by default) -->
   <div class="card" id="xml-card">
-    <h2>Debug — Raw Slide XML</h2>
-    <button class="toggle-btn" id="xml-toggle">Show XML</button>
+    <h2>Debug — Slide XML</h2>
+    <div style="display:flex; gap:8px; margin-bottom:10px">
+      <button class="toggle-btn" id="xml-toggle">Show Raw XML</button>
+      <button class="toggle-btn" id="ooxml-toggle">Show OOXML Output</button>
+    </div>
     <div id="xml-output" style="display:none"></div>
   </div>
 
@@ -214,9 +242,15 @@
     const prevBtn     = document.getElementById('prev-btn');
     const nextBtn     = document.getElementById('next-btn');
     const slideNum    = document.getElementById('slide-num');
+    const exportCard  = document.getElementById('export-card');
+    const exportBtn   = document.getElementById('export-btn');
+    const exportStatus = document.getElementById('export-status');
     const xmlCard     = document.getElementById('xml-card');
     const xmlOutput   = document.getElementById('xml-output');
     const xmlToggle   = document.getElementById('xml-toggle');
+    const ooxmlToggle = document.getElementById('ooxml-toggle');
+
+    let xmlMode = 'none'; // 'none', 'raw', 'ooxml'
 
     function setStatus(msg, type = 'info') {
       statusCard.style.display = '';
@@ -239,28 +273,78 @@
         svgContainer.innerHTML = svg;
       }
 
-      // Update raw XML if visible
-      if (xmlOutput.style.display !== 'none') {
-        const xml = renderer.getSlideXmlRaw(idx);
-        xmlOutput.textContent = xml.length > 12000
-          ? xml.slice(0, 12000) + '\n… (truncated)'
-          : xml;
+      // Update XML if visible
+      updateXmlDisplay();
+    }
+
+    function updateXmlDisplay() {
+      if (xmlMode === 'none') return;
+      let xml;
+      if (xmlMode === 'raw') {
+        xml = renderer.getSlideXmlRaw(currentSlide);
+      } else {
+        xml = renderer.getSlideOoxml(currentSlide);
       }
+      xmlOutput.textContent = xml.length > 12000
+        ? xml.slice(0, 12000) + '\n… (truncated)'
+        : xml;
     }
 
     prevBtn.addEventListener('click', () => showSlide(currentSlide - 1));
     nextBtn.addEventListener('click', () => showSlide(currentSlide + 1));
 
-    // XML debug toggle
+    // XML debug toggles
     xmlToggle.addEventListener('click', () => {
-      const hidden = xmlOutput.style.display === 'none';
-      xmlOutput.style.display = hidden ? '' : 'none';
-      xmlToggle.textContent = hidden ? 'Hide XML' : 'Show XML';
-      if (hidden) {
-        const xml = renderer.getSlideXmlRaw(currentSlide);
-        xmlOutput.textContent = xml.length > 12000
-          ? xml.slice(0, 12000) + '\n… (truncated)'
-          : xml;
+      if (xmlMode === 'raw') {
+        xmlMode = 'none';
+        xmlOutput.style.display = 'none';
+        xmlToggle.textContent = 'Show Raw XML';
+      } else {
+        xmlMode = 'raw';
+        xmlOutput.style.display = '';
+        xmlToggle.textContent = 'Hide Raw XML';
+        ooxmlToggle.textContent = 'Show OOXML Output';
+        updateXmlDisplay();
+      }
+    });
+
+    ooxmlToggle.addEventListener('click', () => {
+      if (xmlMode === 'ooxml') {
+        xmlMode = 'none';
+        xmlOutput.style.display = 'none';
+        ooxmlToggle.textContent = 'Show OOXML Output';
+      } else {
+        xmlMode = 'ooxml';
+        xmlOutput.style.display = '';
+        ooxmlToggle.textContent = 'Hide OOXML Output';
+        xmlToggle.textContent = 'Show Raw XML';
+        updateXmlDisplay();
+      }
+    });
+
+    // Export button
+    exportBtn.addEventListener('click', async () => {
+      exportBtn.disabled = true;
+      exportStatus.textContent = 'Exporting...';
+      try {
+        const buffer = await renderer.exportPptx();
+        const blob = new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'exported.pptx';
+        link.click();
+        URL.revokeObjectURL(url);
+        exportStatus.textContent = 'Exported successfully!';
+        exportStatus.style.color = '#4caf50';
+      } catch (err) {
+        exportStatus.textContent = `Error: ${err.message}`;
+        exportStatus.style.color = '#f44336';
+        console.error('[pptx] Export error:', err);
+      } finally {
+        exportBtn.disabled = false;
       }
     });
 
@@ -271,18 +355,19 @@
         const { slideCount } = await renderer.loadPptx(buffer);
         totalSlides = slideCount;
 
-        setStatus(`✓ Loaded "${file.name}" — ${slideCount} slide(s)`, 'ok');
+        setStatus(`Loaded "${file.name}" — ${slideCount} slide(s)`, 'ok');
 
         infoCard.style.display = '';
         slideCountVal.textContent = slideCount;
 
         if (slideCount > 0) {
           slideViewerCard.style.display = 'block';
+          exportCard.style.display = 'block';
           xmlCard.style.display = 'block';
           showSlide(0);
         }
       } catch (err) {
-        setStatus(`✗ Error: ${err.message}`, 'error');
+        setStatus(`Error: ${err.message}`, 'error');
         console.error(err);
       }
     }
@@ -313,12 +398,12 @@
 
     renderer.init(WASM_URL)
       .then(() => {
-        setStatus('✓ Wasm module ready. Drop a .pptx file to start.', 'ok');
+        setStatus('Wasm module ready. Drop a .pptx file to start.', 'ok');
         dropZone.style.pointerEvents = '';
         dropZone.style.opacity = '';
       })
       .catch(err => {
-        setStatus(`✗ Wasm init failed: ${err.message}`, 'error');
+        setStatus(`Wasm init failed: ${err.message}`, 'error');
         console.error('[pptx] Init error:', err);
       });
   </script>

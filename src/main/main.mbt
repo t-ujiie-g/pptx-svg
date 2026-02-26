@@ -1,4 +1,4 @@
-// pptx-render: Phase 2 — SVG Rendering
+// pptx-render: Round-trip PPTX ↔ SVG engine
 //
 // Architecture:
 //   JavaScript host:
@@ -8,13 +8,10 @@
 //
 //   MoonBit (this module):
 //     - Receives OOXML XML strings via FFI
-//     - Parses XML to build document model
-//     - Generates SVG output
-//
-// Phase 1 scope:
-//   - Prove the end-to-end Wasm FFI works
-//   - Read presentation.xml and count slides
-//   - Return slide XML on request
+//     - Parses XML to build document model (SlideData)
+//     - Generates SVG output with data-ooxml-* attributes
+//     - Parses SVG back to SlideData (round-trip)
+//     - Serializes SlideData to OOXML slide XML
 
 // Global state
 let g_slide_count : Ref[Int] = { val: 0 }
@@ -23,6 +20,13 @@ let g_slide_count : Ref[Int] = { val: 0 }
 let g_slide_size : Ref[@ooxml.SlideSize] = {
   val: @ooxml.SlideSize::default(),
 }
+
+// Slide cache: parsed SlideData for each slide (0-indexed)
+// Updated by update_slide_from_svg() for round-trip editing
+let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [] }
+
+// Track which slides have been modified
+let g_modified : Ref[Array[Bool]] = { val: [] }
 
 ///| Initialize the PPTX processor.
 ///
@@ -34,12 +38,27 @@ pub fn initialize_pptx() -> String {
   if prs_xml.is_empty() {
     return "ERROR:ppt/presentation.xml not found"
   }
-  // Avoid string interpolation of integers (uses fromCharCodeArray internally).
-  // Use explicit int_to_str() which only relies on concat + string literals.
   @ffi.ffi_log("presentation.xml: " + int_to_str(prs_xml.length()) + " chars")
   let count = count_slide_ids(prs_xml)
   g_slide_count.val = count
   g_slide_size.val = @ooxml.parse_slide_size(prs_xml)
+  // Initialize slide cache
+  let slides : Array[@ooxml.SlideData] = []
+  let modified : Array[Bool] = []
+  let mut i = 0
+  while i < count {
+    slides.push(
+      {
+        slide_size: g_slide_size.val,
+        background: @ooxml.Color::white(),
+        shapes: [],
+      },
+    )
+    modified.push(false)
+    i = i + 1
+  }
+  g_slides.val = slides
+  g_modified.val = modified
   @ffi.ffi_log("Slide count: " + int_to_str(count))
   "OK:" + int_to_str(count)
 }
@@ -93,18 +112,79 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   } else {
     @ooxml.parse_rels(rels_xml)
   }
-  // Parse slide
+  // Parse slide and cache it
   let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val)
+  g_slides.val[slide_idx] = slide_data
   // Render to SVG
   @renderer.render_slide_svg(slide_data, rels, slide_num)
 }
 
+///| Update a slide's internal data from an edited SVG string.
+///
+/// Parses the SVG's data-ooxml-* attributes back into SlideData.
+/// Returns "OK" on success, "ERROR:<message>" on failure.
+pub fn update_slide_from_svg(slide_idx : Int, svg_string : String) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide_data = @svg_parser.parse_svg_to_slide(svg_string)
+  g_slides.val[slide_idx] = slide_data
+  g_modified.val[slide_idx] = true
+  "OK"
+}
+
+///| Get the OOXML slide XML for a slide (0-indexed).
+///
+/// If the slide has been modified via update_slide_from_svg(),
+/// returns the serialized modified data. Otherwise returns the
+/// original slide XML from the PPTX.
+pub fn get_slide_ooxml(slide_idx : Int) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  if g_modified.val[slide_idx] {
+    @serializer.serialize_slide(g_slides.val[slide_idx])
+  } else {
+    // Return original XML
+    let slide_num = slide_idx + 1
+    let path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
+    let xml = @ffi.ffi_get_file(path)
+    if xml.is_empty() {
+      "ERROR:slide XML not found: " + path
+    } else {
+      xml
+    }
+  }
+}
+
+///| Get tab-separated list of modified entries for ZIP rebuild.
+///
+/// Format: "path\tcontent\n" for each modified slide.
+/// JS uses this to replace entries in the ZIP archive.
+pub fn get_modified_entries() -> String {
+  let n = g_slide_count.val
+  let mut result = ""
+  let mut i = 0
+  while i < n {
+    if g_modified.val[i] {
+      let path = "ppt/slides/slide" + int_to_str(i + 1) + ".xml"
+      let content = @serializer.serialize_slide(g_slides.val[i])
+      result = result + path + "\t" + content + "\n"
+    }
+    i = i + 1
+  }
+  result
+}
+
 // ── Integer → String conversion ───────────────────────────────────────────────
-//
-// MoonBit's built-in integer interpolation uses `wasm:js-string.fromCharCodeArray`,
-// which requires browser support for the WebAssembly JS String Builtins proposal.
-// These helpers use only `wasm:js-string.concat` and string literals, which are
-// far more widely supported and can be polyfilled when builtins are unavailable.
 
 fn int_digit_str(d : Int) -> String {
   match d {
@@ -133,14 +213,11 @@ fn int_to_str(n : Int) -> String {
 
 // ── Slide counting ────────────────────────────────────────────────────────────
 
-// Count slide IDs by finding <p:sldId or <sldId occurrences in presentation.xml.
-// PPTX spec: each slide is referenced by a <p:sldId> element inside <p:sldIdLst>.
 fn count_slide_ids(xml : String) -> Int {
   count_occurrences(xml, "<p:sldId ") + count_occurrences(xml, "<p:sldId\t") +
   count_occurrences(xml, "<p:sldId\n") + count_occurrences(xml, "<p:sldId/>")
 }
 
-// Count non-overlapping occurrences of `pattern` in `text`.
 fn count_occurrences(text : String, pattern : String) -> Int {
   let plen = pattern.length()
   let tlen = text.length()
@@ -160,7 +237,6 @@ fn count_occurrences(text : String, pattern : String) -> Int {
   count
 }
 
-// Check if `pattern` matches `text` starting at position `pos`.
 fn match_at(text : String, pattern : String, pos : Int) -> Bool {
   let plen = pattern.length()
   for j = 0; j < plen; j = j + 1 {
