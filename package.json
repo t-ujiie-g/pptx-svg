@@ -1,0 +1,25 @@
+{
+  "name": "pptx-render",
+  "version": "0.1.0",
+  "description": "PPTX rendering library powered by MoonBit + Wasm-GC",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build:ts": "tsc",
+    "build:wasm": "moon build --target wasm-gc --release",
+    "build": "npm run build:wasm && npm run build:ts"
+  },
+  "keywords": ["pptx", "powerpoint", "renderer", "wasm", "moonbit", "svg"],
+  "license": "MIT"
+}

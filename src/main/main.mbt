@@ -28,6 +28,9 @@ let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [] }
 // Track which slides have been modified
 let g_modified : Ref[Array[Bool]] = { val: [] }
 
+// Cached theme data parsed from theme1.xml
+let g_theme : Ref[@ooxml.ThemeData] = { val: @ooxml.ThemeData::default() }
+
 ///| Initialize the PPTX processor.
 ///
 /// Reads presentation.xml via FFI and counts the number of slides.
@@ -42,6 +45,19 @@ pub fn initialize_pptx() -> String {
   let count = count_slide_ids(prs_xml)
   g_slide_count.val = count
   g_slide_size.val = @ooxml.parse_slide_size(prs_xml)
+  // Load theme from presentation rels
+  let prs_rels_xml = @ffi.ffi_get_file("ppt/_rels/presentation.xml.rels")
+  if not(prs_rels_xml.is_empty()) {
+    let prs_rels = @ooxml.parse_rels(prs_rels_xml)
+    let theme_path = find_theme_path(prs_rels)
+    if not(theme_path.is_empty()) {
+      let theme_xml = @ffi.ffi_get_file(theme_path)
+      if not(theme_xml.is_empty()) {
+        g_theme.val = @ooxml.parse_theme(theme_xml)
+        @ffi.ffi_log("Theme loaded from " + theme_path)
+      }
+    }
+  }
   // Initialize slide cache
   let slides : Array[@ooxml.SlideData] = []
   let modified : Array[Bool] = []
@@ -113,10 +129,10 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     @ooxml.parse_rels(rels_xml)
   }
   // Parse slide and cache it
-  let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val)
+  let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val, g_theme.val)
   g_slides.val[slide_idx] = slide_data
   // Render to SVG
-  @renderer.render_slide_svg(slide_data, rels, slide_num)
+  @renderer.render_slide_svg(slide_data, rels, slide_num, g_theme.val)
 }
 
 ///| Update a slide's internal data from an edited SVG string.
@@ -179,6 +195,65 @@ pub fn get_modified_entries() -> String {
       let content = @serializer.serialize_slide(g_slides.val[i])
       result = result + path + "\t" + content + "\n"
     }
+    i = i + 1
+  }
+  result
+}
+
+// ── Theme path resolution ────────────────────────────────────────────────────
+
+///| Find the theme file path from presentation.xml.rels.
+fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
+  let n = rels.length()
+  let mut i = 0
+  while i < n {
+    let rel = rels[i]
+    // Theme relationship type ends with "/theme"
+    if ends_with(rel.type_, "/theme") {
+      // Target is relative to ppt/ directory
+      if starts_with(rel.target, "/") {
+        return suffix(rel.target, 1)
+      } else {
+        return "ppt/" + rel.target
+      }
+    }
+    i = i + 1
+  }
+  // Fallback: try the standard location
+  ""
+}
+
+fn ends_with(s : String, pat : String) -> Bool {
+  let slen = s.length()
+  let plen = pat.length()
+  if slen < plen { return false }
+  let start = slen - plen
+  for j = 0; j < plen; j = j + 1 {
+    if s.get_char(start + j).unwrap() != pat.get_char(j).unwrap() {
+      return false
+    }
+  }
+  true
+}
+
+fn starts_with(s : String, pat : String) -> Bool {
+  let slen = s.length()
+  let plen = pat.length()
+  if slen < plen { return false }
+  for j = 0; j < plen; j = j + 1 {
+    if s.get_char(j).unwrap() != pat.get_char(j).unwrap() {
+      return false
+    }
+  }
+  true
+}
+
+fn suffix(s : String, from : Int) -> String {
+  let len = s.length()
+  let mut result = ""
+  let mut i = from
+  while i < len {
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(s.get_char(i).unwrap()))
     i = i + 1
   }
   result

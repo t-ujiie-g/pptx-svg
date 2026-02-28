@@ -1,4 +1,6 @@
 .claude/
 .mooncakes/
 _build/
+dist/
+node_modules/
 .serena/

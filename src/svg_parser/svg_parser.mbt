@@ -68,6 +68,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
         if tag == "tspan" {
           // This is a paragraph-level tspan
           let align = get_data_attr(child, "data-ooxml-para-align")
+          let level = get_data_int(child, "data-ooxml-para-lvl")
           let runs : Array[@ooxml.TextRun] = []
           let tspan_children = @xml.get_children(child)
           let nc = tspan_children.length()
@@ -91,7 +92,8 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   // Check italic from font-style attribute
                   let italic_s = get_data_attr(run_node, "font-style")
                   let italic = italic_s == "italic"
-                  runs.push({ text, bold, italic, font_size, color })
+                  let font_face = get_data_attr(run_node, "data-ooxml-run-font")
+                  runs.push({ text, bold, italic, font_size, color, font_face })
                 }
               }
               @xml.XmlNode::Text(text) => {
@@ -104,6 +106,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                       italic: false,
                       font_size: 0,
                       color: @ooxml.Color::none(),
+                      font_face: "",
                     },
                   )
                 }
@@ -111,7 +114,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             }
             j = j + 1
           }
-          paras.push({ runs, align })
+          paras.push({ runs, align, level })
         }
       }
       _ => ()
@@ -146,6 +149,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     // For pictures, we don't have the relationship ID in SVG
     // Use an empty string — the original rels will be preserved
     @ooxml.ShapeKind::Picture("")
+  } else if shape_type == "table" {
+    // Table shapes carry no inline data in SVG for now — use empty table
+    let table_data : @ooxml.TableData = { col_widths: [], rows: [] }
+    @ooxml.ShapeKind::TableShape(table_data)
   } else {
     let geom = parse_geom(geom_str)
     @ooxml.ShapeKind::AutoShape(geom)

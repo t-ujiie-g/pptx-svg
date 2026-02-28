@@ -5,8 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~24KB)
+# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~35KB)
 moon build --target wasm-gc --release
+
+# Build TypeScript library (output: dist/)
+tsc
+
+# Build everything (Wasm + TypeScript)
+npm run build
 
 # Run JS-layer tests (no browser needed, tests ZIP extraction + slide counting)
 node test_fixtures/test_node.mjs
@@ -19,8 +25,9 @@ python3 -m http.server 8765 --directory .
 ## Architecture
 
 **Separation of concerns:**
-- **JavaScript** (`web/host.js`): ZIP parsing/building, DEFLATE via `DecompressionStream`/`CompressionStream`, Wasm lifecycle, CRC-32
+- **TypeScript library** (`lib/` → `dist/`): ZIP parsing/building, DEFLATE, Wasm lifecycle, CRC-32, `PptxRenderer` class
 - **MoonBit** (`src/`): OOXML parsing, SVG generation, SVG→SlideData parsing, OOXML serialization
+- **Demo** (`web/`): Browser demo UI (imports from `dist/`)
 
 **FFI boundary:**
 - JS pre-decompresses all ZIP entries → stores in `Map<path, string>` and `Map<path, Uint8Array>`
@@ -51,14 +58,35 @@ main → renderer   → ooxml → xml
 1. Functions from `wasm:js-string` (length, charCodeAt, equals, concat)
 2. String-constant globals from module `_` (one per string literal in MoonBit)
 
-`web/host.js` handles this with a 3-tier fallback:
+`lib/wasm-compat.ts` handles this with a 3-tier fallback:
 - **Tier 1** `{ builtins: ['js-string'] }` — Chrome 117+, Firefox 120+, Safari 17+
 - **Tier 2** `{ importedStringConstants: '_' }` + manual `wasm:js-string` — Chrome 115–116
 - **Tier 3** Manual `WebAssembly.Global(externref)` for `_` + manual `wasm:js-string` — Chrome 111+
 
-`host.js` parses the Wasm binary at startup to extract `_` module string constants dynamically — no manual list to maintain.
+`wasm-compat.ts` parses the Wasm binary at startup to extract `_` module string constants dynamically — no manual list to maintain.
 
 **Critical**: Never use `StringBuilder` in MoonBit. `StringBuilder::to_string()` calls `wasm:js-string "fromCharCodeArray"` which cannot be polyfilled in JS. Build strings with `+` (concat) instead. For Char→String use `@ffi.ffi_char_code_to_str(Char::to_int(c))` (→ `String.fromCharCode`).
+
+## Data model (ooxml.mbt)
+
+```
+SlideData { slide_size: SlideSize, background: Color, shapes: Array[Shape] }
+Shape { kind: ShapeKind, transform: ShapeTransform, fill, stroke, stroke_w, paragraphs }
+
+ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape | Other
+ShapeGeom = Rect | Ellipse | RoundRect | Line | Other(String)
+ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
+
+TextParagraph { runs: Array[TextRun], align: String, level: Int }
+TextRun { text, bold, italic, font_size, color, font_face }
+
+TableData { col_widths: Array[Int], rows: Array[TableRow] }
+TableRow { height: Int, cells: Array[TableCell] }
+TableCell { paragraphs: Array[TextParagraph], fill: Color }
+
+Color { r, g, b }  // -1 = none (sentinel)
+ThemeData { dk1..fol_hlink: Color, major_font, minor_font: String }
+```
 
 ## Key files
 
@@ -72,5 +100,11 @@ main → renderer   → ooxml → xml
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), round-trip orchestration |
 | `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
-| `web/host.js` | ZIP extract/build, 3-tier Wasm instantiation, `PptxRenderer` class |
+| `lib/index.ts` | Library public API re-exports |
+| `lib/pptx-renderer.ts` | `PptxRenderer` class (core API) |
+| `lib/wasm-compat.ts` | 3-tier Wasm js-string builtins fallback |
+| `lib/zip.ts` | ZIP extraction and building |
+| `lib/utils.ts` | bytesToBase64, crc32 utilities |
+| `web/host.js` | Legacy JS host (kept for reference; demo uses `dist/`) |
+| `web/index.html` | Browser demo UI |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |

@@ -159,7 +159,7 @@ fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
   match kind {
     @ooxml.ShapeKind::AutoShape(_) => "autoshape"
     @ooxml.ShapeKind::Picture(_) => "picture"
-    @ooxml.ShapeKind::Table => "table"
+    @ooxml.ShapeKind::TableShape(_) => "table"
     @ooxml.ShapeKind::GroupShape => "group"
     @ooxml.ShapeKind::Other => "other"
   }
@@ -177,7 +177,8 @@ fn geom_str(kind : @ooxml.ShapeKind) -> String {
 fn render_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
-  scale : Int
+  scale : Int,
+  theme : @ooxml.ThemeData
 ) -> String {
   if paragraphs.length() == 0 { return "" }
   let pad_x   = px(t.cx / 20, scale)
@@ -187,12 +188,14 @@ fn render_text(
   let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides
   let line_h  = def_sz * 12 / 10
 
+  let font_face = theme.minor_font + ", sans-serif"
   let mut out = "<text" +
     ai("x", text_x) +
     a("xml:space", "preserve") +
-    a("font-family", "Arial, sans-serif") +
+    a("font-family", font_face) +
     ai("font-size", def_sz) +
     a("fill", "black") +
+    a("data-ooxml-font-face", theme.minor_font) +
     ">"
 
   let mut cur_y = px(t.y, scale) + pad_y + def_sz
@@ -205,12 +208,13 @@ fn render_text(
       cur_y = cur_y + line_h
       pi = pi + 1
     } else {
+      let indent = para.level * 30
       let (anchor_x, anchor_attr) = if para.align == "ctr" || para.align == "c" {
-        (text_x + text_w / 2, " text-anchor=\"middle\"")
+        (text_x + indent + (text_w - indent) / 2, " text-anchor=\"middle\"")
       } else if para.align == "r" {
         (text_x + text_w, " text-anchor=\"end\"")
       } else {
-        (text_x, " text-anchor=\"start\"")
+        (text_x + indent, " text-anchor=\"start\"")
       }
       // Paragraph-level tspan with data-ooxml-* attributes
       let para_align = if para.align.is_empty() { "l" } else { para.align }
@@ -220,6 +224,7 @@ fn render_text(
         anchor_attr +
         a("data-ooxml-para-idx", int_to_str(pi)) +
         a("data-ooxml-para-align", para_align) +
+        ai("data-ooxml-para-lvl", para.level) +
         ">"
       let mut ri = 0
       while ri < nr {
@@ -231,6 +236,9 @@ fn render_text(
         if run.font_size > 0 {
           span = span + ai("font-size", px(hundredth_pt_to_emu(run.font_size), scale))
         }
+        if not(run.font_face.is_empty()) {
+          span = span + a("font-family", run.font_face + ", sans-serif")
+        }
         if not(run.color.is_none()) {
           span = span + a("fill", run.color.to_css())
         }
@@ -239,7 +247,8 @@ fn render_text(
           a("data-ooxml-run-idx", int_to_str(ri)) +
           a("data-ooxml-bold", bool_str(run.bold)) +
           a("data-ooxml-font-size", int_to_str(run.font_size)) +
-          a("data-ooxml-color", run.color.to_hex())
+          a("data-ooxml-color", run.color.to_hex()) +
+          a("data-ooxml-run-font", run.font_face)
         out = out + span + ">" + svg_escape(run.text) + "</tspan>"
         ri = ri + 1
       }
@@ -258,7 +267,8 @@ fn render_shape(
   rels : Array[@ooxml.Relationship],
   _slide_num : Int,
   scale : Int,
-  shape_idx : Int
+  shape_idx : Int,
+  theme : @ooxml.ThemeData
 ) -> String {
   let t    = shape.transform
   let x_p  = px(t.x,  scale)
@@ -315,7 +325,7 @@ fn render_shape(
           }
         }
       }
-      rect_svg + render_text(shape.paragraphs, t, scale)
+      rect_svg + render_text(shape.paragraphs, t, scale, theme)
     }
     @ooxml.ShapeKind::Picture(rid) => {
       let target = @ooxml.find_rel_target(rels, rid)
@@ -341,6 +351,9 @@ fn render_shape(
         }
       }
     }
+    @ooxml.ShapeKind::TableShape(table) => {
+      render_table(table, t, scale, theme)
+    }
     _ => ""
   }
 
@@ -351,13 +364,126 @@ fn render_shape(
   }
 }
 
+// ── Table rendering ─────────────────────────────────────────────────────────
+
+fn render_table_cell_text(
+  paragraphs : Array[@ooxml.TextParagraph],
+  cell_x : Int,
+  cell_y : Int,
+  _cell_w : Int,
+  cell_h : Int,
+  scale : Int,
+  theme : @ooxml.ThemeData
+) -> String {
+  if paragraphs.length() == 0 { return "" }
+  let pad = 4
+  let tx = cell_x + pad
+  let def_sz = px(default_font_size_emu(), scale)
+  let font_sz = if def_sz > cell_h - pad * 2 { cell_h - pad * 2 } else { def_sz }
+  let line_h = font_sz * 12 / 10
+  let font_face = theme.minor_font + ", sans-serif"
+  let mut out = "<text" +
+    ai("x", tx) +
+    a("xml:space", "preserve") +
+    a("font-family", font_face) +
+    ai("font-size", font_sz) +
+    a("fill", "black") +
+    ">"
+  let mut cur_y = cell_y + pad + font_sz
+  let np = paragraphs.length()
+  let mut pi = 0
+  while pi < np {
+    let para = paragraphs[pi]
+    let nr = para.runs.length()
+    if nr == 0 {
+      cur_y = cur_y + line_h
+    } else {
+      let mut ri = 0
+      while ri < nr {
+        let run = para.runs[ri]
+        let mut span = "<tspan"
+        span = span + ai("x", tx) + ai("y", cur_y)
+        if run.bold { span = span + " font-weight=\"bold\"" }
+        if run.italic { span = span + " font-style=\"italic\"" }
+        if run.font_size > 0 {
+          span = span + ai("font-size", px(hundredth_pt_to_emu(run.font_size), scale))
+        }
+        if not(run.font_face.is_empty()) {
+          span = span + a("font-family", run.font_face + ", sans-serif")
+        }
+        if not(run.color.is_none()) {
+          span = span + a("fill", run.color.to_css())
+        }
+        out = out + span + ">" + svg_escape(run.text) + "</tspan>"
+        ri = ri + 1
+      }
+      cur_y = cur_y + line_h
+    }
+    pi = pi + 1
+    // Stop if we overflow the cell
+    if cur_y > cell_y + cell_h - pad { break }
+  }
+  out + "</text>"
+}
+
+fn render_table(
+  table : @ooxml.TableData,
+  t : @ooxml.ShapeTransform,
+  scale : Int,
+  theme : @ooxml.ThemeData
+) -> String {
+  let base_x = px(t.x, scale)
+  let base_y = px(t.y, scale)
+  let mut out = ""
+  // Precompute column x-offsets in pixels
+  let ncols = table.col_widths.length()
+  let col_x : Array[Int] = []
+  let mut cx_accum = 0
+  let mut ci = 0
+  while ci < ncols {
+    col_x.push(px(cx_accum, scale))
+    cx_accum = cx_accum + table.col_widths[ci]
+    ci = ci + 1
+  }
+  // Render rows
+  let nrows = table.rows.length()
+  let mut row_y_emu = 0
+  let mut ri = 0
+  while ri < nrows {
+    let row = table.rows[ri]
+    let ry = base_y + px(row_y_emu, scale)
+    let rh = px(row.height, scale)
+    let ncells = row.cells.length()
+    let mut cj = 0
+    while cj < ncells && cj < ncols {
+      let cell = row.cells[cj]
+      let cx_px = base_x + col_x[cj]
+      let cw = px(table.col_widths[cj], scale)
+      // Cell background
+      let cell_fill = if cell.fill.is_none() { "none" } else { cell.fill.to_css() }
+      out = out + "<rect" +
+        ai("x", cx_px) + ai("y", ry) +
+        ai("width", cw) + ai("height", rh) +
+        a("fill", cell_fill) +
+        " stroke=\"#999999\" stroke-width=\"1\"/>"
+      // Cell text
+      out = out + render_table_cell_text(cell.paragraphs, cx_px, ry, cw, rh, scale, theme)
+      cj = cj + 1
+    }
+    row_y_emu = row_y_emu + row.height
+    ri = ri + 1
+  }
+  out
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 ///| Render a SlideData to an SVG string with data-ooxml-* attributes.
 pub fn render_slide_svg(
   slide : @ooxml.SlideData,
   rels : Array[@ooxml.Relationship],
-  slide_num : Int
+  slide_num : Int,
+  theme : @ooxml.ThemeData
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
@@ -368,7 +494,7 @@ pub fn render_slide_svg(
     " xmlns=\"http://www.w3.org/2000/svg\"" +
     " xmlns:xlink=\"http://www.w3.org/1999/xlink\"" +
     ai("width", w) + ai("height", h) +
-    " style=\"background:white;display:block\"" +
+    " style=\"background:" + slide.background.to_css() + ";display:block\"" +
     // data-ooxml-* metadata on SVG root for round-trip
     ai("data-ooxml-slide-cx", sw) +
     ai("data-ooxml-slide-cy", sh) +
@@ -383,7 +509,7 @@ pub fn render_slide_svg(
   let n = slide.shapes.length()
   let mut i = 0
   while i < n {
-    shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale, i)
+    shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale, i, theme)
     i = i + 1
   }
   header + bg + shapes_svg + "</svg>"

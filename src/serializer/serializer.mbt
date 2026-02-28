@@ -73,11 +73,13 @@ fn serialize_color(color : @ooxml.Color) -> String {
 
 // ── Text body serialization ──────────────────────────────────────────────────
 
-fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
-  if paragraphs.length() == 0 {
-    return ""
-  }
-  let mut out = "<p:txBody>"
+///| Serialize paragraphs as OOXML text body content (shared by shapes and table cells).
+///  `wrapper` is the outer tag: "p:txBody" for shapes, "a:txBody" for table cells.
+fn serialize_text_body_inner(
+  paragraphs : Array[@ooxml.TextParagraph],
+  wrapper : String
+) -> String {
+  let mut out = "<" + wrapper + ">"
   out = out + "<a:bodyPr/><a:lstStyle/>"
   let np = paragraphs.length()
   let mut pi = 0
@@ -85,8 +87,17 @@ fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
     let para = paragraphs[pi]
     out = out + "<a:p>"
     // Paragraph properties
-    if not(para.align.is_empty()) {
-      out = out + "<a:pPr algn=\"" + para.align + "\"/>"
+    let has_align = not(para.align.is_empty())
+    let has_level = para.level > 0
+    if has_align || has_level {
+      let mut ppr = "<a:pPr"
+      if has_align {
+        ppr = ppr + " algn=\"" + para.align + "\""
+      }
+      if has_level {
+        ppr = ppr + " lvl=\"" + int_to_str(para.level) + "\""
+      }
+      out = out + ppr + "/>"
     }
     // Runs
     let nr = para.runs.length()
@@ -94,23 +105,7 @@ fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
     while ri < nr {
       let run = para.runs[ri]
       out = out + "<a:r>"
-      // Run properties
-      let mut rpr = "<a:rPr lang=\"en-US\" dirty=\"0\""
-      if run.bold {
-        rpr = rpr + " b=\"1\""
-      }
-      if run.italic {
-        rpr = rpr + " i=\"1\""
-      }
-      if run.font_size > 0 {
-        rpr = rpr + " sz=\"" + int_to_str(run.font_size) + "\""
-      }
-      if not(run.color.is_none()) {
-        rpr = rpr + ">" + serialize_color(run.color) + "</a:rPr>"
-      } else {
-        rpr = rpr + "/>"
-      }
-      out = out + rpr
+      out = out + serialize_run_props(run)
       out = out + "<a:t>" + xml_escape(run.text) + "</a:t>"
       out = out + "</a:r>"
       ri = ri + 1
@@ -122,7 +117,41 @@ fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
     out = out + "</a:p>"
     pi = pi + 1
   }
-  out + "</p:txBody>"
+  out + "</" + wrapper + ">"
+}
+
+///| Serialize a:rPr element for a text run.
+fn serialize_run_props(run : @ooxml.TextRun) -> String {
+  let mut rpr = "<a:rPr lang=\"en-US\" dirty=\"0\""
+  if run.bold {
+    rpr = rpr + " b=\"1\""
+  }
+  if run.italic {
+    rpr = rpr + " i=\"1\""
+  }
+  if run.font_size > 0 {
+    rpr = rpr + " sz=\"" + int_to_str(run.font_size) + "\""
+  }
+  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty())
+  if has_children {
+    rpr = rpr + ">"
+    if not(run.color.is_none()) {
+      rpr = rpr + serialize_color(run.color)
+    }
+    if not(run.font_face.is_empty()) {
+      rpr = rpr + "<a:latin typeface=\"" + xml_escape(run.font_face) + "\"/>"
+    }
+    rpr + "</a:rPr>"
+  } else {
+    rpr + "/>"
+  }
+}
+
+fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
+  if paragraphs.length() == 0 {
+    return ""
+  }
+  serialize_text_body_inner(paragraphs, "p:txBody")
 }
 
 // ── Shape serialization ──────────────────────────────────────────────────────
@@ -196,10 +225,75 @@ fn serialize_picture(shape : @ooxml.Shape, rid : String) -> String {
   out + "</p:pic>"
 }
 
+fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
+  let mut out = "<a:tc>"
+  // Text body
+  if cell.paragraphs.length() > 0 {
+    out = out + serialize_table_text_body(cell.paragraphs)
+  } else {
+    out = out + "<a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang=\"en-US\"/></a:p></a:txBody>"
+  }
+  // Cell properties
+  out = out + "<a:tcPr>"
+  if not(cell.fill.is_none()) {
+    out = out + serialize_color(cell.fill)
+  }
+  out = out + "</a:tcPr>"
+  out + "</a:tc>"
+}
+
+fn serialize_table_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
+  serialize_text_body_inner(paragraphs, "a:txBody")
+}
+
+fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
+  let mut out = "<p:graphicFrame>"
+  // Non-visual properties
+  out = out + "<p:nvGraphicFramePr>"
+  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + "<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp=\"1\"/></p:cNvGraphicFramePr>"
+  out = out + "<p:nvPr/>"
+  out = out + "</p:nvGraphicFramePr>"
+  // Transform (directly under graphicFrame)
+  out = out + serialize_transform(shape.transform)
+  // Table content
+  out = out + "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/table\">"
+  out = out + "<a:tbl>"
+  out = out + "<a:tblPr firstRow=\"1\" bandRow=\"1\"/>"
+  // Grid columns
+  out = out + "<a:tblGrid>"
+  let ncols = table.col_widths.length()
+  let mut ci = 0
+  while ci < ncols {
+    out = out + "<a:gridCol w=\"" + int_to_str(table.col_widths[ci]) + "\"/>"
+    ci = ci + 1
+  }
+  out = out + "</a:tblGrid>"
+  // Rows
+  let nrows = table.rows.length()
+  let mut ri = 0
+  while ri < nrows {
+    let row = table.rows[ri]
+    out = out + "<a:tr h=\"" + int_to_str(row.height) + "\">"
+    let ncells = row.cells.length()
+    let mut cj = 0
+    while cj < ncells {
+      out = out + serialize_table_cell(row.cells[cj])
+      cj = cj + 1
+    }
+    out = out + "</a:tr>"
+    ri = ri + 1
+  }
+  out = out + "</a:tbl>"
+  out = out + "</a:graphicData></a:graphic>"
+  out + "</p:graphicFrame>"
+}
+
 fn serialize_shape(shape : @ooxml.Shape) -> String {
   match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => serialize_autoshape(shape, geom)
     @ooxml.ShapeKind::Picture(rid) => serialize_picture(shape, rid)
+    @ooxml.ShapeKind::TableShape(table) => serialize_table(shape, table)
     _ => ""
   }
 }
