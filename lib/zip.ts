@@ -24,7 +24,7 @@ async function inflate(compressed: Uint8Array): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
   const reader = stream.readable.getReader();
 
-  writer.write(compressed);
+  writer.write(compressed as BufferSource);
   writer.close();
 
   const chunks: Uint8Array[] = [];
@@ -48,7 +48,7 @@ async function deflate(data: Uint8Array): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
   const reader = stream.readable.getReader();
 
-  writer.write(data);
+  writer.write(data as BufferSource);
   writer.close();
 
   const chunks: Uint8Array[] = [];
