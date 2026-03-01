@@ -15,6 +15,9 @@ Slides:
  10. Line spacing (a:lnSpc) — EMU and percentage
  11. Character spacing (a:rPr spc) + lstStyle
  12. normAutofit (fontScale / lnSpcReduction)
+ 13. Text wrapping (long text, CJK, wrap="none")
+ 14. Bullet formatting (a:buFont, a:buSzPct, a:buSzPts, a:buClr)
+ 15. Capitalization (a:rPr cap="all" / "small")
 """
 
 from pptx import Presentation
@@ -956,6 +959,330 @@ p12info = tf12info.paragraphs[0]
 p12info.text = "Compare: top-left (80%) should be visibly smaller than bottom-right (no autofit). Top-right (62.5%+20%) should be smallest and tightest."
 p12info.font.size = Pt(12)
 p12info.font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 13: Text wrapping ───────────────────────────────────────────────
+slide13 = prs.slides.add_slide(blank)
+
+title13 = slide13.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title13.text_frame.paragraphs[0].text = "Slide 13: Text Wrapping"
+title13.text_frame.paragraphs[0].font.size = Pt(24)
+title13.text_frame.paragraphs[0].font.bold = True
+
+# Box with long Latin text that should wrap
+box13a = slide13.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(4), Inches(2.5))
+tf13a = box13a.text_frame
+tf13a.word_wrap = True
+fill13a = box13a.fill
+fill13a.solid()
+fill13a.fore_color.rgb = RGBColor(230, 240, 255)
+p13a = tf13a.paragraphs[0]
+p13a.text = "This is a long paragraph of Latin text that should automatically wrap at the shape boundary. Word-level wrapping should break at spaces."
+p13a.font.size = Pt(16)
+
+# Second paragraph: even longer
+p13a2 = tf13a.add_paragraph()
+p13a2.text = "Another paragraph with a very long sentence that exercises the wrapping algorithm more thoroughly, including multiple lines of content."
+p13a2.font.size = Pt(14)
+
+# Box with CJK text that should wrap character by character
+box13b = slide13.shapes.add_textbox(Inches(5), Inches(1.2), Inches(4.5), Inches(2.5))
+tf13b = box13b.text_frame
+tf13b.word_wrap = True
+fill13b = box13b.fill
+fill13b.solid()
+fill13b.fore_color.rgb = RGBColor(255, 245, 230)
+p13b = tf13b.paragraphs[0]
+run13b = p13b.add_run()
+run13b.text = "日本語テキストの折り返しテスト。文字単位で折り返されるべきです。漢字とひらがなが混在しています。"
+run13b.font.size = Pt(16)
+rPr13b = run13b._r.find('a:rPr', nsmap)
+if rPr13b is None:
+    rPr13b = etree.SubElement(run13b._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run13b._r.insert(0, rPr13b)
+ea13b = etree.SubElement(rPr13b, '{http://schemas.openxmlformats.org/drawingml/2006/main}ea')
+ea13b.set('typeface', 'Yu Gothic')
+
+# Box with mixed Latin + CJK text
+p13b2 = tf13b.add_paragraph()
+run13b2 = p13b2.add_run()
+run13b2.text = "Mixed テキスト: ABC あいう 123 日本語 English words and 漢字が混在"
+run13b2.font.size = Pt(14)
+rPr13b2 = run13b2._r.find('a:rPr', nsmap)
+if rPr13b2 is None:
+    rPr13b2 = etree.SubElement(run13b2._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run13b2._r.insert(0, rPr13b2)
+ea13b2 = etree.SubElement(rPr13b2, '{http://schemas.openxmlformats.org/drawingml/2006/main}ea')
+ea13b2.set('typeface', 'Yu Gothic')
+
+# Box with wrap="none" — text should NOT wrap
+box13c = slide13.shapes.add_textbox(Inches(0.5), Inches(4.2), Inches(4), Inches(1.5))
+tf13c = box13c.text_frame
+tf13c.word_wrap = False  # This sets wrap="none"
+fill13c = box13c.fill
+fill13c.solid()
+fill13c.fore_color.rgb = RGBColor(255, 230, 230)
+p13c = tf13c.paragraphs[0]
+p13c.text = "wrap=none: This text should NOT wrap even though it is long and exceeds the box width"
+p13c.font.size = Pt(16)
+# Ensure wrap="none" is set in bodyPr
+bodyPr13c = tf13c._txBody.find('{http://schemas.openxmlformats.org/drawingml/2006/main}bodyPr')
+bodyPr13c.set('wrap', 'none')
+
+# Narrow box to test wrapping with large font
+box13d = slide13.shapes.add_textbox(Inches(5), Inches(4.2), Inches(2.5), Inches(2.5))
+tf13d = box13d.text_frame
+tf13d.word_wrap = True
+fill13d = box13d.fill
+fill13d.solid()
+fill13d.fore_color.rgb = RGBColor(230, 255, 230)
+p13d = tf13d.paragraphs[0]
+p13d.text = "Large font in narrow box"
+p13d.font.size = Pt(28)
+p13d2 = tf13d.add_paragraph()
+p13d2.text = "Should wrap to multiple lines"
+p13d2.font.size = Pt(20)
+
+# ── Slide 14: Bullet formatting ──────────────────────────────────────────
+slide14 = prs.slides.add_slide(blank)
+
+title14 = slide14.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title14.text_frame.paragraphs[0].text = "Slide 14: Bullet Formatting (buFont / buSzPct / buSzPts / buClr)"
+title14.text_frame.paragraphs[0].font.size = Pt(22)
+title14.text_frame.paragraphs[0].font.bold = True
+
+# Box with custom bullet font (Wingdings)
+box14a = slide14.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(4), Inches(2.5))
+tf14a = box14a.text_frame
+tf14a.word_wrap = True
+fill14a = box14a.fill
+fill14a.solid()
+fill14a.fore_color.rgb = RGBColor(240, 235, 255)
+
+bullet_format_items = [
+    ("Wingdings bullet font", "Wingdings", "\u006C"),       # Wingdings 'l' = checkmark-like
+    ("Symbol bullet font", "Symbol", "\u00B7"),              # Symbol middle dot
+    ("Default font bullet", "", "\u2022"),                    # Regular bullet
+]
+
+for i, (text, bu_font, bu_char) in enumerate(bullet_format_items):
+    if i == 0:
+        p = tf14a.paragraphs[0]
+    else:
+        p = tf14a.add_paragraph()
+    p.text = text
+    p.font.size = Pt(16)
+    pPr = p._p.find('a:pPr', nsmap)
+    if pPr is None:
+        pPr = etree.SubElement(p._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+        p._p.insert(0, pPr)
+    pPr.set('marL', str(457200))
+    pPr.set('indent', str(-228600))
+    if bu_font:
+        buFontElem = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buFont')
+        buFontElem.set('typeface', bu_font)
+    buChar14 = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buChar')
+    buChar14.set('char', bu_char)
+
+# Box with bullet size (percentage + points)
+box14b = slide14.shapes.add_textbox(Inches(5), Inches(1.2), Inches(4.5), Inches(2.5))
+tf14b = box14b.text_frame
+tf14b.word_wrap = True
+fill14b = box14b.fill
+fill14b.solid()
+fill14b.fore_color.rgb = RGBColor(230, 255, 240)
+
+bu_size_items = [
+    ("buSzPct=150000 (150%)", 150000, None),
+    ("buSzPct=75000 (75%)", 75000, None),
+    ("buSzPts=3200 (32pt)", None, 3200),
+    ("buSzPts=800 (8pt)", None, 800),
+]
+
+for i, (text, sz_pct, sz_pts) in enumerate(bu_size_items):
+    if i == 0:
+        p = tf14b.paragraphs[0]
+    else:
+        p = tf14b.add_paragraph()
+    p.text = text
+    p.font.size = Pt(16)
+    pPr = p._p.find('a:pPr', nsmap)
+    if pPr is None:
+        pPr = etree.SubElement(p._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+        p._p.insert(0, pPr)
+    pPr.set('marL', str(457200))
+    pPr.set('indent', str(-228600))
+    buChar14b = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buChar')
+    buChar14b.set('char', '\u2022')
+    if sz_pct is not None:
+        buSzPct = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buSzPct')
+        buSzPct.set('val', str(sz_pct))
+    if sz_pts is not None:
+        buSzPts = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buSzPts')
+        buSzPts.set('val', str(sz_pts))
+
+# Box with bullet color
+box14c = slide14.shapes.add_textbox(Inches(0.5), Inches(4.2), Inches(4), Inches(2.5))
+tf14c = box14c.text_frame
+tf14c.word_wrap = True
+fill14c = box14c.fill
+fill14c.solid()
+fill14c.fore_color.rgb = RGBColor(255, 245, 235)
+
+bu_color_items = [
+    ("Red bullet", "FF0000"),
+    ("Green bullet", "00AA00"),
+    ("Blue bullet", "0000FF"),
+    ("No bullet color (inherits)", None),
+]
+
+for i, (text, bu_clr) in enumerate(bu_color_items):
+    if i == 0:
+        p = tf14c.paragraphs[0]
+    else:
+        p = tf14c.add_paragraph()
+    p.text = text
+    p.font.size = Pt(16)
+    pPr = p._p.find('a:pPr', nsmap)
+    if pPr is None:
+        pPr = etree.SubElement(p._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+        p._p.insert(0, pPr)
+    pPr.set('marL', str(457200))
+    pPr.set('indent', str(-228600))
+    buChar14c = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buChar')
+    buChar14c.set('char', '\u2022')
+    if bu_clr is not None:
+        buClrElem = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}buClr')
+        srgbClr14 = etree.SubElement(buClrElem, '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr')
+        srgbClr14.set('val', bu_clr)
+
+# Box with combined: buFont + buSzPct + buClr
+box14d = slide14.shapes.add_textbox(Inches(5), Inches(4.2), Inches(4.5), Inches(2.5))
+tf14d = box14d.text_frame
+tf14d.word_wrap = True
+fill14d = box14d.fill
+fill14d.solid()
+fill14d.fore_color.rgb = RGBColor(245, 240, 255)
+
+p14d = tf14d.paragraphs[0]
+p14d.text = "Combined: Wingdings + 120% + red"
+p14d.font.size = Pt(16)
+pPr14d = p14d._p.find('a:pPr', nsmap)
+if pPr14d is None:
+    pPr14d = etree.SubElement(p14d._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+    p14d._p.insert(0, pPr14d)
+pPr14d.set('marL', str(457200))
+pPr14d.set('indent', str(-228600))
+buFont14d = etree.SubElement(pPr14d, '{http://schemas.openxmlformats.org/drawingml/2006/main}buFont')
+buFont14d.set('typeface', 'Wingdings')
+buSzPct14d = etree.SubElement(pPr14d, '{http://schemas.openxmlformats.org/drawingml/2006/main}buSzPct')
+buSzPct14d.set('val', '120000')
+buClr14d = etree.SubElement(pPr14d, '{http://schemas.openxmlformats.org/drawingml/2006/main}buClr')
+srgbClr14d = etree.SubElement(buClr14d, '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr')
+srgbClr14d.set('val', 'FF0000')
+buChar14d = etree.SubElement(pPr14d, '{http://schemas.openxmlformats.org/drawingml/2006/main}buChar')
+buChar14d.set('char', '\u006C')
+
+p14d2 = tf14d.add_paragraph()
+p14d2.text = "Normal bullet for comparison"
+p14d2.font.size = Pt(16)
+pPr14d2 = p14d2._p.find('a:pPr', nsmap)
+if pPr14d2 is None:
+    pPr14d2 = etree.SubElement(p14d2._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+    p14d2._p.insert(0, pPr14d2)
+pPr14d2.set('marL', str(457200))
+pPr14d2.set('indent', str(-228600))
+buChar14d2 = etree.SubElement(pPr14d2, '{http://schemas.openxmlformats.org/drawingml/2006/main}buChar')
+buChar14d2.set('char', '\u2022')
+
+# ── Slide 15: Capitalization (cap) ──────────────────────────────────────
+slide15 = prs.slides.add_slide(blank)
+
+title15 = slide15.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title15.text_frame.paragraphs[0].text = "Slide 15: Capitalization (a:rPr cap)"
+title15.text_frame.paragraphs[0].font.size = Pt(24)
+title15.text_frame.paragraphs[0].font.bold = True
+
+# Box with cap="all"
+box15a = slide15.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(4), Inches(2.5))
+tf15a = box15a.text_frame
+tf15a.word_wrap = True
+fill15a = box15a.fill
+fill15a.solid()
+fill15a.fore_color.rgb = RGBColor(230, 245, 255)
+
+p15a = tf15a.paragraphs[0]
+run15a = p15a.add_run()
+run15a.text = "cap=all: This Should Be All Caps"
+run15a.font.size = Pt(18)
+rPr15a = run15a._r.find('a:rPr', nsmap)
+if rPr15a is None:
+    rPr15a = etree.SubElement(run15a._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run15a._r.insert(0, rPr15a)
+rPr15a.set('cap', 'all')
+
+p15a2 = tf15a.add_paragraph()
+run15a2 = p15a2.add_run()
+run15a2.text = "Mixed: "
+run15a2.font.size = Pt(16)
+run15a2b = p15a2.add_run()
+run15a2b.text = "all caps part"
+run15a2b.font.size = Pt(16)
+rPr15a2b = run15a2b._r.find('a:rPr', nsmap)
+if rPr15a2b is None:
+    rPr15a2b = etree.SubElement(run15a2b._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run15a2b._r.insert(0, rPr15a2b)
+rPr15a2b.set('cap', 'all')
+run15a2c = p15a2.add_run()
+run15a2c.text = " and normal part"
+run15a2c.font.size = Pt(16)
+
+p15a3 = tf15a.add_paragraph()
+run15a3 = p15a3.add_run()
+run15a3.text = "No cap: Regular text for comparison"
+run15a3.font.size = Pt(16)
+
+# Box with cap="small"
+box15b = slide15.shapes.add_textbox(Inches(5), Inches(1.2), Inches(4.5), Inches(2.5))
+tf15b = box15b.text_frame
+tf15b.word_wrap = True
+fill15b = box15b.fill
+fill15b.solid()
+fill15b.fore_color.rgb = RGBColor(255, 245, 230)
+
+p15b = tf15b.paragraphs[0]
+run15b = p15b.add_run()
+run15b.text = "cap=small: Small Caps Text"
+run15b.font.size = Pt(18)
+rPr15b = run15b._r.find('a:rPr', nsmap)
+if rPr15b is None:
+    rPr15b = etree.SubElement(run15b._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run15b._r.insert(0, rPr15b)
+rPr15b.set('cap', 'small')
+
+p15b2 = tf15b.add_paragraph()
+run15b2 = p15b2.add_run()
+run15b2.text = "No cap: Regular text"
+run15b2.font.size = Pt(16)
+
+p15b3 = tf15b.add_paragraph()
+run15b3 = p15b3.add_run()
+run15b3.text = "Bold Small Caps"
+run15b3.font.size = Pt(18)
+run15b3.font.bold = True
+rPr15b3 = run15b3._r.find('a:rPr', nsmap)
+if rPr15b3 is None:
+    rPr15b3 = etree.SubElement(run15b3._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run15b3._r.insert(0, rPr15b3)
+rPr15b3.set('cap', 'small')
+
+# Info text
+info15 = slide15.shapes.add_textbox(Inches(0.5), Inches(4.5), Inches(9), Inches(2))
+tf15info = info15.text_frame
+tf15info.word_wrap = True
+p15info = tf15info.paragraphs[0]
+p15info.text = "cap=all: lowercase a-z should display as UPPERCASE A-Z. cap=small: should display with SVG font-variant=small-caps."
+p15info.font.size = Pt(12)
+p15info.font.color.rgb = RGBColor(100, 100, 100)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

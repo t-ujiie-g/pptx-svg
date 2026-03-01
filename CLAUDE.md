@@ -79,9 +79,9 @@ ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | Gro
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Other(String)
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
 
-TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, bullet, bullet_auto, bullet_none }
-TextRun { text, bold, italic, font_size, color, font_face, underline, strike, baseline }
-BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit }
+TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color }
+TextRun { text, bold, italic, font_size, color, font_face, ea_font, underline, strike, baseline, char_spacing, cap }
+BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap }
 
 TableData { col_widths: Array[Int], rows: Array[TableRow] }
 TableRow { height: Int, cells: Array[TableCell] }

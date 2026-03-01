@@ -57,9 +57,9 @@
 ### 2.2 箇条書き / 番号付きリスト
 - [x] 文字バレット (`a:buChar char="●"`)
 - [x] 自動番号 (`a:buAutoNum type="arabicPeriod/alphaLcParenR/..."`)
-- [ ] バレットフォント (`a:buFont typeface`)
-- [ ] バレットサイズ (`a:buSzPct` / `a:buSzPts`)
-- [ ] バレット色 (`a:buClr`)
+- [x] バレットフォント (`a:buFont typeface`)
+- [x] バレットサイズ (`a:buSzPct` / `a:buSzPts`)
+- [x] バレット色 (`a:buClr`)
 - [x] バレット非表示 (`a:buNone`)
 - [ ] 画像バレット (`a:buBlip`)
 
@@ -69,7 +69,7 @@
 - [x] 上付き / 下付き (`a:rPr baseline="30000/-25000"`)
 - [x] 文字間隔 (`a:rPr spc`) — パース + letter-spacing レンダリング
 - [ ] カーニング (`a:rPr kern`)
-- [ ] キャピタライズ (`a:rPr cap="all/small"`)
+- [x] キャピタライズ (`a:rPr cap="all/small"`)
 
 ### 2.4 フォント
 - [x] 東アジアフォント (`a:ea typeface`) — パース + font-family レンダリング + round-trip
@@ -81,8 +81,8 @@
 - [x] `a:bodyPr` — アンカー (`anchor="ctr/b/t"`) 垂直位置合わせ
 - [x] 内部マージン (`lIns/tIns/rIns/bIns`)
 - [x] シェイプ自動フィット (`a:spAutoFit`) — テキスト溢れ時にシェイプ拡大
-- [ ] テキスト自動フィット (`a:normAutofit fontScale/lnSpcReduction`)
-- [ ] テキスト折り返し (`wrap="square/none"`)
+- [x] テキスト自動フィット (`a:normAutofit fontScale/lnSpcReduction`)
+- [x] テキスト折り返し (`wrap="square/none"`)
 - [ ] カラム数 (`numCol`) / カラム間隔 (`spcCol`)
 - [ ] 縦書き (`vert="eaVert/vert/vert270/wordArtVert/..."`)
 - [ ] テキスト回転 (`rot`)

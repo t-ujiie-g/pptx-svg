@@ -689,6 +689,7 @@ fn apply_text_defaults(shape : @ooxml.Shape, text_styles : @ooxml.MasterTextStyl
           strike: run.strike,
           baseline: run.baseline,
           char_spacing: run.char_spacing,
+          cap: run.cap,
         }
         para.runs[ri] = new_run
       }

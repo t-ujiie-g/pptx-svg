@@ -265,15 +265,15 @@ pub fn apply_color_modifiers(
       @xml.XmlNode::Element(tag, _, _) => {
         let val = attr_int(modifier_nodes[i], "val")
         if tag == "a:shade" {
-          // shade: multiply each RGB component by val/100000
-          r = r * val / 100000
-          g = g * val / 100000
-          b = b * val / 100000
+          // shade: multiply each RGB component by val/pct_100
+          r = r * val / pct_100
+          g = g * val / pct_100
+          b = b * val / pct_100
         } else if tag == "a:tint" {
           // tint: move each component toward 255
-          r = r + (255 - r) * val / 100000
-          g = g + (255 - g) * val / 100000
-          b = b + (255 - b) * val / 100000
+          r = r + (255 - r) * val / pct_100
+          g = g + (255 - g) * val / pct_100
+          b = b + (255 - b) * val / pct_100
         } else if tag == "a:lumMod" {
           lum_mod = val
         } else if tag == "a:lumOff" {
@@ -281,7 +281,7 @@ pub fn apply_color_modifiers(
         } else if tag == "a:satMod" {
           // Saturation modification via HSL
           let (h, s, l) = rgb_to_hsl(r, g, b)
-          let new_s = s * val / 100000
+          let new_s = s * val / pct_100
           let ns = if new_s > 1000 { 1000 } else { new_s }
           let c2 = hsl_to_rgb(h, ns, l)
           r = c2.r
@@ -299,7 +299,7 @@ pub fn apply_color_modifiers(
   // Apply lumMod/lumOff together (they work as a pair)
   if lum_mod >= 0 {
     let (h, s, l) = rgb_to_hsl(r, g, b)
-    let mut new_l = l * lum_mod / 100000 + lum_off * 1000 / 100000
+    let mut new_l = l * lum_mod / pct_100 + lum_off * 1000 / pct_100
     if new_l < 0 { new_l = 0 }
     if new_l > 1000 { new_l = 1000 }
     let c2 = hsl_to_rgb(h, s, new_l)
@@ -557,6 +557,7 @@ pub(all) struct TextRun {
   strike    : String   // "sngStrike", "dblStrike"; "" = none
   baseline  : Int      // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
   char_spacing : Int   // character spacing in hundredths-of-a-point (spc attr); 0 = default
+  cap       : String   // "all", "small"; "" = none
 }
 
 pub(all) struct TextParagraph {
@@ -571,6 +572,9 @@ pub(all) struct TextParagraph {
   bullet     : String  // bullet char (from a:buChar); "" = none/inherit
   bullet_auto : String // auto-number type (from a:buAutoNum); "" = none
   bullet_none : Bool   // explicitly no bullet (a:buNone)
+  bullet_font  : String // a:buFont typeface; "" = run font
+  bullet_size  : Int    // a:buSzPct (percentage 100000=100%) or negative for a:buSzPts; 0 = inherit
+  bullet_color : Color  // a:buClr; Color::none() = inherit
 }
 
 // ── Text body properties ────────────────────────────────────────────────────
@@ -587,10 +591,11 @@ pub(all) struct BodyProps {
   auto_fit : Bool   // <a:spAutoFit/> — expand shape to fit text
   font_scale : Int       // <a:normAutofit fontScale="..."/> -1=unset, 0-100000=percent
   ln_spc_reduction : Int // <a:normAutofit lnSpcReduction="..."/> -1=unset, 0-100000=percent
+  wrap : String          // "square" (default=wrap) or "none"; "" = default (square)
 }
 
 pub fn BodyProps::default() -> BodyProps {
-  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false, font_scale: -1, ln_spc_reduction: -1 }
+  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false, font_scale: -1, ln_spc_reduction: -1, wrap: "" }
 }
 
 // ── Table model ──────────────────────────────────────────────────────────────
@@ -726,36 +731,37 @@ fn child_attr(
 // ── Color parsing ─────────────────────────────────────────────────────────────
 
 // Extract a solid fill color from <a:solidFill> child of `nodes`.
-fn parse_solid_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Color {
-  match @xml.find_child(nodes, "a:solidFill") {
-    None => Color::none()
-    Some(fill_node) => {
-      let fill_ch = @xml.get_children(fill_node)
-      // Try <a:srgbClr val="RRGGBB">
-      match @xml.find_child(fill_ch, "a:srgbClr") {
+///| Parse a color from direct children (a:srgbClr or a:schemeClr), without a:solidFill wrapper.
+///  Used for e.g. a:buClr which contains color child directly.
+fn parse_color_from_children(children : Array[@xml.XmlNode], theme : ThemeData) -> Color {
+  match @xml.find_child(children, "a:srgbClr") {
+    Some(clr) =>
+      match @xml.get_attr(clr, "val") {
+        Some(v) => {
+          let base = parse_hex_color(v)
+          apply_color_modifiers(base, @xml.get_children(clr))
+        }
+        None => Color::none()
+      }
+    None =>
+      match @xml.find_child(children, "a:schemeClr") {
         Some(clr) =>
           match @xml.get_attr(clr, "val") {
             Some(v) => {
-              let base = parse_hex_color(v)
+              let base = resolve_scheme_color(v, theme)
               apply_color_modifiers(base, @xml.get_children(clr))
             }
-            None => Color::black()
+            None => Color::none()
           }
-        None =>
-          // Try <a:schemeClr val="..."> — resolve from theme + apply modifiers
-          match @xml.find_child(fill_ch, "a:schemeClr") {
-            Some(clr) =>
-              match @xml.get_attr(clr, "val") {
-                Some(v) => {
-                  let base = resolve_scheme_color(v, theme)
-                  apply_color_modifiers(base, @xml.get_children(clr))
-                }
-                None => Color::black()
-              }
-            None => Color::black()
-          }
+        None => Color::none()
       }
-    }
+  }
+}
+
+fn parse_solid_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Color {
+  match @xml.find_child(nodes, "a:solidFill") {
+    None => Color::none()
+    Some(fill_node) => parse_color_from_children(@xml.get_children(fill_node), theme)
   }
 }
 
@@ -856,7 +862,8 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
         }
         None => (-1, -1)
       }
-      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction }
+      let wrap = match @xml.get_attr(bpr, "wrap") { Some(v) => v; None => "" }
+      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap }
     }
   }
 }
@@ -885,8 +892,9 @@ fn resolve_ea_font_theme(typeface : String, theme : ThemeData) -> String {
 
 ///| Parse paragraph-level properties from <a:pPr>.
 fn parse_para_props(
-  ppr : @xml.XmlNode
-) -> (String, Int, Int, Int, Int, Int, Int, String, String, Bool) {
+  ppr : @xml.XmlNode,
+  theme : ThemeData
+) -> (String, Int, Int, Int, Int, Int, Int, String, String, Bool, String, Int, Color) {
   let a = match @xml.get_attr(ppr, "algn") { Some(v) => v; None => "" }
   let l = attr_int(ppr, "lvl")
   let ml = attr_int(ppr, "marL")
@@ -904,7 +912,27 @@ fn parse_para_props(
     Some(ba) => match @xml.get_attr(ba, "type") { Some(v) => v; None => "" }
   }
   let bu_none = match @xml.find_child(ppr_ch, "a:buNone") { Some(_) => true; None => false }
-  (a, l, sb, sa, lnspc, ml, ind, bu_char, bu_auto, bu_none)
+  // Bullet formatting
+  let bu_font = match @xml.find_child(ppr_ch, "a:buFont") {
+    None => ""
+    Some(bf) => match @xml.get_attr(bf, "typeface") { Some(v) => v; None => "" }
+  }
+  let bu_size = match @xml.find_child(ppr_ch, "a:buSzPct") {
+    Some(bp) => match @xml.get_attr(bp, "val") { Some(v) => @xml.parse_int(v); None => 0 }
+    None => match @xml.find_child(ppr_ch, "a:buSzPts") {
+      Some(bp) => -(match @xml.get_attr(bp, "val") { Some(v) => @xml.parse_int(v); None => 0 })
+      None => 0
+    }
+  }
+  let bu_color = match @xml.find_child(ppr_ch, "a:buClr") {
+    None => Color::none()
+    Some(bc) => {
+      let bc_ch = @xml.get_children(bc)
+      // a:buClr contains color child directly (a:srgbClr, a:schemeClr) without a:solidFill wrapper
+      parse_color_from_children(bc_ch, theme)
+    }
+  }
+  (a, l, sb, sa, lnspc, ml, ind, bu_char, bu_auto, bu_none, bu_font, bu_size, bu_color)
 }
 
 ///| Parse <a:defRPr> defaults from a <a:pPr> node.
@@ -936,7 +964,7 @@ fn parse_run_props(
   def_bold : Bool, def_italic : Bool, def_font_size : Int,
   def_color : Color, def_font_face : String, def_ea_font : String,
   theme : ThemeData
-) -> (Bool, Bool, Int, Color, String, String, String, String, Int, Int) {
+) -> (Bool, Bool, Int, Color, String, String, String, String, Int, Int, String) {
   let b = match @xml.get_attr(rpr, "b") { Some(v) => v == "1" || v == "true"; None => def_bold }
   let it = match @xml.get_attr(rpr, "i") { Some(v) => v == "1" || v == "true"; None => def_italic }
   let sz_raw = attr_int(rpr, "sz")
@@ -954,7 +982,8 @@ fn parse_run_props(
   let ea_raw = child_attr(rpr_ch, "a:ea", "typeface")
   let ea_resolved = resolve_ea_font_theme(ea_raw, theme)
   let ea = if ea_resolved.is_empty() { def_ea_font } else { ea_resolved }
-  (b, it, sz, clr, ff, ea, u, st, bl, spc)
+  let cap = match @xml.get_attr(rpr, "cap") { Some(v) => v; None => "" }
+  (b, it, sz, clr, ff, ea, u, st, bl, spc, cap)
 }
 
 fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParagraph], BodyProps) {
@@ -972,9 +1001,9 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
   while pi < np {
     let p = pnodes[pi]
     let p_ch = @xml.get_children(p)
-    let (align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none) = match @xml.find_child(p_ch, "a:pPr") {
-      None => ("", 0, 0, 0, 0, 0, 0, "", "", false)
-      Some(ppr) => parse_para_props(ppr)
+    let (align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color) = match @xml.find_child(p_ch, "a:pPr") {
+      None => ("", 0, 0, 0, 0, 0, 0, "", "", false, "", 0, Color::none())
+      Some(ppr) => parse_para_props(ppr, theme)
     }
     let (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font) = match @xml.find_child(p_ch, "a:pPr") {
       None => (false, false, 0, Color::none(), "", "")
@@ -998,16 +1027,16 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
         None => ""
         Some(t_node) => @xml.get_text_content(t_node)
       }
-      let (bold, italic, font_size, run_color, font_face, ea_font, underline, strike, baseline, char_spacing) = match @xml.find_child(r_ch, "a:rPr") {
-        None => (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, "", "", 0, 0)
+      let (bold, italic, font_size, run_color, font_face, ea_font, underline, strike, baseline, char_spacing, cap) = match @xml.find_child(r_ch, "a:rPr") {
+        None => (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, "", "", 0, 0, "")
         Some(rpr) => parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, theme)
       }
       if not(text.is_empty()) {
-        runs.push({ text, bold, italic, font_size, color: run_color, font_face, ea_font, underline, strike, baseline, char_spacing })
+        runs.push({ text, bold, italic, font_size, color: run_color, font_face, ea_font, underline, strike, baseline, char_spacing, cap })
       }
       ri = ri + 1
     }
-    paras.push({ runs, align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none })
+    paras.push({ runs, align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color })
     pi = pi + 1
   }
   (paras, body_props)

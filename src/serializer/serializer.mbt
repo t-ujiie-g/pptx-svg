@@ -61,7 +61,7 @@ fn serialize_color(color : @ooxml.Color) -> String {
 ///| Serialize a:bodyPr element.
 fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   let has_attrs = not(bp.anchor.is_empty()) || bp.l_ins >= 0 || bp.t_ins >= 0 ||
-    bp.r_ins >= 0 || bp.b_ins >= 0
+    bp.r_ins >= 0 || bp.b_ins >= 0 || bp.wrap == "none"
   let has_children = bp.auto_fit || bp.font_scale >= 0
   if not(has_attrs) && not(has_children) {
     return "<a:bodyPr/>"
@@ -69,6 +69,9 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   let mut out = "<a:bodyPr"
   if not(bp.anchor.is_empty()) {
     out = out + " anchor=\"" + bp.anchor + "\""
+  }
+  if bp.wrap == "none" {
+    out = out + " wrap=\"none\""
   }
   if bp.l_ins >= 0 {
     out = out + " lIns=\"" + int_to_str(bp.l_ins) + "\""
@@ -137,7 +140,8 @@ fn serialize_text_body_inner(
     let has_indent = para.indent != 0
     let has_spc = para.spc_before != 0 || para.spc_after != 0
     let has_lnspc = para.line_spacing != 0
-    let has_bullet = not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) || para.bullet_none
+    let has_bullet = not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) || para.bullet_none ||
+      not(para.bullet_font.is_empty()) || para.bullet_size != 0 || not(para.bullet_color.is_none())
     let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_lnspc || has_bullet
     if has_ppr {
       let mut ppr = "<a:pPr"
@@ -161,6 +165,18 @@ fn serialize_text_body_inner(
         }
         ppr = ppr + serialize_spacing("a:spcBef", para.spc_before)
         ppr = ppr + serialize_spacing("a:spcAft", para.spc_after)
+        // Bullet formatting
+        if not(para.bullet_font.is_empty()) {
+          ppr = ppr + "<a:buFont typeface=\"" + xml_escape(para.bullet_font) + "\"/>"
+        }
+        if para.bullet_size > 0 {
+          ppr = ppr + "<a:buSzPct val=\"" + int_to_str(para.bullet_size) + "\"/>"
+        } else if para.bullet_size < 0 {
+          ppr = ppr + "<a:buSzPts val=\"" + int_to_str(-(para.bullet_size)) + "\"/>"
+        }
+        if not(para.bullet_color.is_none()) {
+          ppr = ppr + "<a:buClr><a:srgbClr val=\"" + para.bullet_color.to_hex() + "\"/></a:buClr>"
+        }
         if para.bullet_none {
           ppr = ppr + "<a:buNone/>"
         } else if not(para.bullet.is_empty()) {
@@ -217,6 +233,9 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   }
   if run.char_spacing != 0 {
     rpr = rpr + " spc=\"" + int_to_str(run.char_spacing) + "\""
+  }
+  if not(run.cap.is_empty()) {
+    rpr = rpr + " cap=\"" + run.cap + "\""
   }
   let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty())
   if has_children {

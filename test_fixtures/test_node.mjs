@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 12', slideCount === 12, `got ${slideCount}`);
+  assert('slide count = 15', slideCount === 15, `got ${slideCount}`);
 
-  // Verify all 12 slides exist
-  for (let i = 1; i <= 12; i++) {
+  // Verify all 15 slides exist
+  for (let i = 1; i <= 15; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 12; i++) {
+  for (let i = 1; i <= 15; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -421,6 +421,56 @@ async function testFeaturesPptx() {
     assert('slide11 lstStyle has sz="2000" (20pt)', slide11.includes('sz="2000"'));
     assert('slide11 lstStyle has Meiryo EA', slide11.includes('Meiryo'));
     assert('slide11 lstStyle has #003366 color', slide11.includes('003366'));
+  }
+
+  // ── Slide 13: Text wrapping ──
+  section('test_features.pptx — Slide 13: text wrapping');
+  const slide13 = textFiles.get('ppt/slides/slide13.xml');
+  if (slide13) {
+    // Long text that should wrap
+    assert('slide13 has long Latin text', slide13.includes('automatically wrap'));
+    // CJK text
+    assert('slide13 has CJK text', slide13.includes('折り返しテスト'));
+    // Mixed Latin + CJK
+    assert('slide13 has mixed text', slide13.includes('Mixed'));
+    // wrap="none" attribute
+    assert('slide13 has wrap="none"', slide13.includes('wrap="none"'));
+    // Multiple textboxes
+    assert('slide13 has word_wrap bodyPr', hasTag(slide13, 'a:bodyPr'));
+  }
+
+  // ── Slide 14: Bullet formatting ──
+  section('test_features.pptx — Slide 14: bullet formatting');
+  const slide14 = textFiles.get('ppt/slides/slide14.xml');
+  if (slide14) {
+    // Bullet font
+    assert('slide14 has a:buFont', hasTag(slide14, 'a:buFont'));
+    assert('slide14 has Wingdings buFont', slide14.includes('Wingdings'));
+    assert('slide14 has Symbol buFont', slide14.includes('Symbol'));
+    // Bullet size percentage
+    assert('slide14 has a:buSzPct', hasTag(slide14, 'a:buSzPct'));
+    assert('slide14 has buSzPct 150000', slide14.includes('150000'));
+    assert('slide14 has buSzPct 75000', slide14.includes('75000'));
+    // Bullet size points
+    assert('slide14 has a:buSzPts', hasTag(slide14, 'a:buSzPts'));
+    assert('slide14 has buSzPts 3200', slide14.includes('3200'));
+    assert('slide14 has buSzPts 800', slide14.includes('800'));
+    // Bullet color
+    assert('slide14 has a:buClr', hasTag(slide14, 'a:buClr'));
+    assert('slide14 has red bullet (FF0000)', slide14.includes('FF0000'));
+    assert('slide14 has green bullet (00AA00)', slide14.includes('00AA00'));
+    assert('slide14 has blue bullet (0000FF)', slide14.includes('0000FF'));
+  }
+
+  // ── Slide 15: Capitalization ──
+  section('test_features.pptx — Slide 15: capitalization');
+  const slide15 = textFiles.get('ppt/slides/slide15.xml');
+  if (slide15) {
+    assert('slide15 has cap="all"', slide15.includes('cap="all"'));
+    assert('slide15 has cap="small"', slide15.includes('cap="small"'));
+    // Text content should be original (not uppercased in XML)
+    assert('slide15 has original text (not uppercased)', slide15.includes('This Should Be All Caps'));
+    assert('slide15 has small caps text', slide15.includes('Small Caps Text'));
   }
 }
 

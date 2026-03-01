@@ -34,6 +34,15 @@ fn get_data_int(node : @xml.XmlNode, name : String) -> Int {
   parse_int(get_data_attr(node, name))
 }
 
+///| Shorthand for reading data-ooxml-* attributes.
+fn get_da(node : @xml.XmlNode, name : String) -> String {
+  get_data_attr(node, "data-ooxml-" + name)
+}
+
+fn get_dai(node : @xml.XmlNode, name : String) -> Int {
+  get_data_int(node, "data-ooxml-" + name)
+}
+
 // ── Text parsing from SVG ────────────────────────────────────────────────────
 
 fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] {
@@ -47,8 +56,8 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
       @xml.XmlNode::Element(tag, _, _) => {
         if tag == "tspan" {
           // This is a paragraph-level tspan
-          let align = get_data_attr(child, "data-ooxml-para-align")
-          let level = get_data_int(child, "data-ooxml-para-lvl")
+          let align = get_da(child, "para-align")
+          let level = get_dai(child, "para-lvl")
           let runs : Array[@ooxml.TextRun] = []
           let tspan_children = @xml.get_children(child)
           let nc = tspan_children.length()
@@ -60,10 +69,10 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   // Run-level tspan
                   let run_node = tspan_children[j]
                   let text = @xml.get_text_content(run_node)
-                  let bold_s = get_data_attr(run_node, "data-ooxml-bold")
+                  let bold_s = get_da(run_node, "bold")
                   let bold = bold_s == "1"
-                  let font_size = get_data_int(run_node, "data-ooxml-font-size")
-                  let color_hex = get_data_attr(run_node, "data-ooxml-color")
+                  let font_size = get_dai(run_node, "font-size")
+                  let color_hex = get_da(run_node, "color")
                   let color = if color_hex.is_empty() {
                     @ooxml.Color::none()
                   } else {
@@ -72,10 +81,11 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   // Check italic from font-style attribute
                   let italic_s = get_data_attr(run_node, "font-style")
                   let italic = italic_s == "italic"
-                  let font_face = get_data_attr(run_node, "data-ooxml-run-font")
-                  let ea_font = get_data_attr(run_node, "data-ooxml-ea-font")
-                  let char_spacing = get_data_int(run_node, "data-ooxml-char-spacing")
-                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, underline: "", strike: "", baseline: 0, char_spacing })
+                  let font_face = get_da(run_node, "run-font")
+                  let ea_font = get_da(run_node, "ea-font")
+                  let char_spacing = get_dai(run_node, "char-spacing")
+                  let cap = get_da(run_node, "cap")
+                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, underline: "", strike: "", baseline: 0, char_spacing, cap })
                 }
               }
               @xml.XmlNode::Text(text) => {
@@ -94,6 +104,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                       strike: "",
                       baseline: 0,
                       char_spacing: 0,
+                      cap: "",
                     },
                   )
                 }
@@ -101,7 +112,11 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             }
             j = j + 1
           }
-          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, line_spacing: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false })
+          let bu_font = get_da(child, "bu-font")
+          let bu_size = get_dai(child, "bu-size")
+          let bu_color_hex = get_da(child, "bu-color")
+          let bu_color = if bu_color_hex.is_empty() { @ooxml.Color::none() } else { parse_hex_color(bu_color_hex) }
+          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, line_spacing: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false, bullet_font: bu_font, bullet_size: bu_size, bullet_color: bu_color })
         }
       }
       _ => ()
@@ -114,16 +129,16 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
 // ── Shape parsing from SVG <g> ───────────────────────────────────────────────
 
 fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
-  let shape_type = get_data_attr(g_node, "data-ooxml-shape-type")
-  let geom_str = get_data_attr(g_node, "data-ooxml-geom")
-  let x = get_data_int(g_node, "data-ooxml-x")
-  let y = get_data_int(g_node, "data-ooxml-y")
-  let cx = get_data_int(g_node, "data-ooxml-cx")
-  let cy = get_data_int(g_node, "data-ooxml-cy")
-  let rot = get_data_int(g_node, "data-ooxml-rot")
-  let fill_hex = get_data_attr(g_node, "data-ooxml-fill")
-  let stroke_hex = get_data_attr(g_node, "data-ooxml-stroke")
-  let stroke_w = get_data_int(g_node, "data-ooxml-stroke-w")
+  let shape_type = get_da(g_node, "shape-type")
+  let geom_str = get_da(g_node, "geom")
+  let x = get_dai(g_node, "x")
+  let y = get_dai(g_node, "y")
+  let cx = get_dai(g_node, "cx")
+  let cy = get_dai(g_node, "cy")
+  let rot = get_dai(g_node, "rot")
+  let fill_hex = get_da(g_node, "fill")
+  let stroke_hex = get_da(g_node, "stroke")
+  let stroke_w = get_dai(g_node, "stroke-w")
 
   let fill = parse_hex_color(fill_hex)
   let stroke = parse_hex_color(stroke_hex)
@@ -163,17 +178,18 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   }
 
   // Parse body props from data attributes
-  let bp_anchor = get_data_attr(g_node, "data-ooxml-anchor")
-  let bp_l_ins = get_data_int(g_node, "data-ooxml-l-ins")
-  let bp_t_ins = get_data_int(g_node, "data-ooxml-t-ins")
-  let bp_r_ins = get_data_int(g_node, "data-ooxml-r-ins")
-  let bp_b_ins = get_data_int(g_node, "data-ooxml-b-ins")
-  let bp_auto_fit = get_data_attr(g_node, "data-ooxml-auto-fit") == "1"
-  // normAutofit: get_data_int returns 0 for missing attrs; 0 maps to -1 (inactive).
+  let bp_anchor = get_da(g_node, "anchor")
+  let bp_l_ins = get_dai(g_node, "l-ins")
+  let bp_t_ins = get_dai(g_node, "t-ins")
+  let bp_r_ins = get_dai(g_node, "r-ins")
+  let bp_b_ins = get_dai(g_node, "b-ins")
+  let bp_auto_fit = get_da(g_node, "auto-fit") == "1"
+  // normAutofit: get_dai returns 0 for missing attrs; 0 maps to -1 (inactive).
   // This is safe because font_scale=0 (0%) never occurs in practice, and
   // ln_spc_reduction=0 is functionally identical to -1 (no reduction).
-  let bp_font_scale = get_data_int(g_node, "data-ooxml-font-scale")
-  let bp_ln_spc_reduction = get_data_int(g_node, "data-ooxml-ln-spc-reduction")
+  let bp_font_scale = get_dai(g_node, "font-scale")
+  let bp_ln_spc_reduction = get_dai(g_node, "ln-spc-reduction")
+  let bp_wrap = get_da(g_node, "wrap")
   let body_props : @ooxml.BodyProps = {
     anchor: bp_anchor,
     l_ins: if bp_l_ins == 0 { -1 } else { bp_l_ins },
@@ -183,9 +199,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     auto_fit: bp_auto_fit,
     font_scale: if bp_font_scale == 0 { -1 } else { bp_font_scale },
     ln_spc_reduction: if bp_ln_spc_reduction == 0 { -1 } else { bp_ln_spc_reduction },
+    wrap: bp_wrap,
   }
-  let ph_type = get_data_attr(g_node, "data-ooxml-ph-type")
-  let ph_idx = get_data_int(g_node, "data-ooxml-ph-idx")
+  let ph_type = get_da(g_node, "ph-type")
+  let ph_idx = get_dai(g_node, "ph-idx")
   { kind, transform, fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
 }
 
@@ -220,9 +237,9 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     }
   }
   // Read slide metadata from SVG root
-  let slide_cx = get_data_int(svg_node, "data-ooxml-slide-cx")
-  let slide_cy = get_data_int(svg_node, "data-ooxml-slide-cy")
-  let bg_hex = get_data_attr(svg_node, "data-ooxml-bg")
+  let slide_cx = get_dai(svg_node, "slide-cx")
+  let slide_cy = get_dai(svg_node, "slide-cy")
+  let bg_hex = get_da(svg_node, "bg")
 
   let slide_size : @ooxml.SlideSize = if slide_cx > 0 && slide_cy > 0 {
     { cx: slide_cx, cy: slide_cy }
@@ -245,7 +262,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     match svg_children[i] {
       @xml.XmlNode::Element(tag, _, _) => {
         if tag == "g" {
-          let st = get_data_attr(svg_children[i], "data-ooxml-shape-type")
+          let st = get_da(svg_children[i], "shape-type")
           if not(st.is_empty()) {
             shapes.push(parse_shape_from_g(svg_children[i]))
           }

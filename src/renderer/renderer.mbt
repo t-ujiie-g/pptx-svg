@@ -22,6 +22,10 @@ let svg_target_width : Int = 960           // output SVG width in px
 let default_emu_per_px : Int = 9525        // EMU per pixel at 96 DPI
 let line_height_numer : Int = 12           // line-height = font-size * line_height_numer / line_height_denom
 let line_height_denom : Int = 10
+let table_cell_pad : Int = 4              // padding inside table cells (px)
+let default_text_fill : String = "black"
+let image_placeholder_fill : String = "#dddddd"
+let table_border_color : String = "#999999"
 
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
@@ -35,6 +39,15 @@ fn a(name : String, value : String) -> String {
 
 fn ai(name : String, value : Int) -> String {
   a(name, int_to_str(value))
+}
+
+///| Shorthand for data-ooxml-* attributes.
+fn da(name : String, value : String) -> String {
+  " data-ooxml-" + name + "=\"" + value + "\""
+}
+
+fn dai(name : String, value : Int) -> String {
+  da(name, int_to_str(value))
 }
 
 fn bool_str(b : Bool) -> String {
@@ -227,6 +240,130 @@ fn roman_convert(n : Int, lower : Bool) -> String {
   result
 }
 
+// ── Text helpers ─────────────────────────────────────────────────────────────
+
+///| Convert ASCII lowercase letters to uppercase.
+fn to_upper_ascii(s : String) -> String {
+  let len = s.length()
+  let mut result = ""
+  let mut i = 0
+  while i < len {
+    let c = s.get_char(i).unwrap()
+    let code = Char::to_int(c)
+    if code >= 97 && code <= 122 {
+      // a-z → A-Z
+      result = result + @ffi.ffi_char_code_to_str(code - 32)
+    } else {
+      result = result + @ffi.ffi_char_code_to_str(code)
+    }
+    i = i + 1
+  }
+  result
+}
+
+///| Check if a character is CJK (Chinese/Japanese/Korean).
+fn is_cjk(c : Char) -> Bool {
+  let code = Char::to_int(c)
+  // CJK Unified Ideographs, CJK Compat Ideographs, Fullwidth forms, CJK Ext-B+
+  (code >= 0x3000 && code <= 0x9FFF) ||
+  (code >= 0xF900 && code <= 0xFAFF) ||
+  (code >= 0xFF00 && code <= 0xFFEF) ||
+  (code >= 0x20000 && code <= 0x2FA1F)
+}
+
+// ── Text wrapping ────────────────────────────────────────────────────────────
+
+///| A visual line fragment: (run_index, text_fragment)
+///  Used to split paragraph runs into wrapped lines.
+
+///| Split paragraph runs into visual lines that fit within max_width pixels.
+///| Returns Array of lines, each line being Array of (run_idx, text).
+fn wrap_paragraph(
+  para : @ooxml.TextParagraph,
+  max_width : Int,
+  scale : Int,
+  def_sz : Int,
+  font_scale : Int,
+  theme : @ooxml.ThemeData
+) -> Array[Array[(Int, String)]] {
+  let lines : Array[Array[(Int, String)]] = []
+  let mut cur_line : Array[(Int, String)] = []
+  let mut cur_width : Double = 0.0
+  let max_w : Double = max_width.to_double()
+  let nr = para.runs.length()
+  let mut ri = 0
+  while ri < nr {
+    let run = para.runs[ri]
+    let fs_raw = if run.font_size > 0 { run.font_size } else { if def_sz > 0 { def_sz * scale / 127 } else { 1800 } }
+    let fs_pt = apply_font_scale(fs_raw, font_scale).to_double() / 100.0
+    let ff = if not(run.ea_font.is_empty()) {
+      run.ea_font
+    } else if not(run.font_face.is_empty()) {
+      run.font_face
+    } else {
+      theme.minor_font
+    }
+    let text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
+    let text_len = text.length()
+    // Split text into segments (words for Latin, chars for CJK)
+    let mut seg_start = 0
+    while seg_start < text_len {
+      let c = text.get_char(seg_start).unwrap()
+      let mut seg_end = seg_start
+      if is_cjk(c) {
+        // Single CJK character as one segment
+        seg_end = seg_start + 1
+      } else {
+        // Collect word (non-CJK chars until space/CJK)
+        seg_end = seg_start
+        while seg_end < text_len {
+          let sc = text.get_char(seg_end).unwrap()
+          if is_cjk(sc) { break }
+          seg_end = seg_end + 1
+          // Break after whitespace
+          if sc == ' ' || sc == '\t' { break }
+        }
+      }
+      // Extract segment text
+      let seg_text = str_sub(text, seg_start, seg_end)
+      let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_pt)
+      // Check if adding this segment would overflow
+      if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
+        // Start new line
+        if cur_line.length() > 0 {
+          lines.push(cur_line)
+        }
+        cur_line = []
+        cur_width = 0.0
+      }
+      cur_line.push((ri, seg_text))
+      cur_width = cur_width + seg_w
+      seg_start = seg_end
+    }
+    ri = ri + 1
+  }
+  if cur_line.length() > 0 {
+    lines.push(cur_line)
+  }
+  if lines.length() == 0 {
+    // Empty paragraph - one empty line
+    lines.push([])
+  }
+  lines
+}
+
+///| Extract substring from start (inclusive) to end (exclusive).
+fn str_sub(s : String, start : Int, end_ : Int) -> String {
+  let mut result = ""
+  let mut i = start
+  while i < end_ {
+    let c = s.get_char(i).unwrap()
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    i = i + 1
+  }
+  result
+}
+
 // ── Text rendering ────────────────────────────────────────────────────────────
 
 fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
@@ -281,12 +418,86 @@ fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) 
     let pct = -(para.line_spacing) // e.g. 150000 for 150%
     let emu = para_max_font_emu(para)
     let base_line_h = if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
-    base_line_h * pct / 100000
+    base_line_h * pct / @ooxml.pct_100
   } else {
     // Default: use font size * line_height ratio
     let emu = para_max_font_emu(para)
     if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
   }
+}
+
+///| Render a single text run as a <tspan> element.
+fn render_run_tspan(
+  run : @ooxml.TextRun,
+  ri : Int,
+  display_text : String,
+  scale : Int,
+  font_scale : Int
+) -> String {
+  let mut span = "<tspan"
+  // Visual attributes
+  if run.bold   { span = span + " font-weight=\"bold\""  }
+  if run.italic { span = span + " font-style=\"italic\"" }
+  if run.font_size > 0 {
+    span = span + ai("font-size", apply_font_scale(px(hundredth_pt_to_emu(run.font_size), scale), font_scale))
+  }
+  // font-family: ea_font, latin_font, sans-serif
+  if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
+    let mut ff = ""
+    if not(run.ea_font.is_empty()) { ff = run.ea_font }
+    if not(run.font_face.is_empty()) {
+      if not(ff.is_empty()) { ff = ff + ", " }
+      ff = ff + run.font_face
+    }
+    span = span + a("font-family", ff + ", sans-serif")
+  }
+  if not(run.color.is_none()) {
+    span = span + a("fill", run.color.to_css())
+  }
+  // Character spacing
+  if run.char_spacing != 0 {
+    let ls_px = run.char_spacing * 96 / 7200
+    if ls_px != 0 {
+      span = span + ai("letter-spacing", ls_px)
+    }
+  }
+  // Text decorations
+  let mut deco = ""
+  if not(run.underline.is_empty()) && run.underline != "none" {
+    deco = "underline"
+  }
+  if run.strike == "sngStrike" || run.strike == "dblStrike" {
+    if deco.is_empty() { deco = "line-through" } else { deco = deco + " line-through" }
+  }
+  if not(deco.is_empty()) {
+    span = span + a("text-decoration", deco)
+  }
+  // Superscript / subscript via baseline-shift
+  if run.baseline > 0 {
+    span = span + a("baseline-shift", "super")
+    span = span + a("font-size", "70%")
+  } else if run.baseline < 0 {
+    span = span + a("baseline-shift", "sub")
+    span = span + a("font-size", "70%")
+  }
+  // Capitalization
+  if run.cap == "small" {
+    span = span + a("font-variant", "small-caps")
+  }
+  // data-ooxml-* attributes for round-trip
+  span = span +
+    da("run-idx", int_to_str(ri)) +
+    da("bold", bool_str(run.bold)) +
+    da("font-size", int_to_str(run.font_size)) +
+    da("color", run.color.to_hex()) +
+    da("run-font", run.font_face) +
+    da("ea-font", run.ea_font) +
+    da("underline", run.underline) +
+    da("strike", run.strike) +
+    dai("baseline", run.baseline) +
+    dai("char-spacing", run.char_spacing) +
+    da("cap", run.cap)
+  span + ">" + svg_escape(display_text) + "</tspan>"
 }
 
 fn render_text(
@@ -312,6 +523,8 @@ fn render_text(
   let fs = body_props.font_scale
   let lr = body_props.ln_spc_reduction
 
+  let do_wrap = body_props.wrap != "none"
+
   // Calculate total text height for vertical alignment
   let np = paragraphs.length()
   let mut total_text_h = 0
@@ -327,7 +540,17 @@ fn render_text(
       if para.spc_before > 0 && ti > 0 {
         total_text_h = total_text_h + px(para.spc_before, scale)
       }
-      total_text_h = total_text_h + para_line_h
+      // Count visual lines for wrapped text
+      let num_visual_lines = if do_wrap {
+        let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
+        let indent_px = px(indent_emu, scale)
+        let wrap_w = text_w - indent_px
+        let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
+        vlines.length()
+      } else {
+        1
+      }
+      total_text_h = total_text_h + para_line_h * num_visual_lines
       // Add spacing after
       if para.spc_after > 0 {
         total_text_h = total_text_h + px(para.spc_after, scale)
@@ -357,8 +580,8 @@ fn render_text(
     a("xml:space", "preserve") +
     a("font-family", font_face) +
     ai("font-size", scaled_def_sz) +
-    a("fill", "black") +
-    a("data-ooxml-font-face", theme.minor_font) +
+    a("fill", default_text_fill) +
+    da("font-face", theme.minor_font) +
     ">"
 
   let mut cur_y = px(t.y, scale) + pad_t + anchor_offset_clamped
@@ -404,78 +627,71 @@ fn render_text(
         ai("x", anchor_x) +
         ai("y", cur_y) +
         anchor_attr +
-        a("data-ooxml-para-idx", int_to_str(pi)) +
-        a("data-ooxml-para-align", para_align) +
-        ai("data-ooxml-para-lvl", para.level) +
+        da("para-idx", int_to_str(pi)) +
+        da("para-align", para_align) +
+        dai("para-lvl", para.level) +
+        da("bu-font", para.bullet_font) +
+        dai("bu-size", para.bullet_size) +
+        da("bu-color", para.bullet_color.to_hex()) +
         ">"
       // Render bullet if present
       if not(bullet_text.is_empty()) {
-        out = out + "<tspan>" + svg_escape(bullet_text) + " </tspan>"
+        let mut bu_span = "<tspan"
+        if not(para.bullet_font.is_empty()) {
+          bu_span = bu_span + a("font-family", para.bullet_font + ", sans-serif")
+        }
+        if para.bullet_size > 0 {
+          // Percentage of run font size
+          let run_fs = if p_font_sz > 0 { p_font_sz } else { scaled_def_sz }
+          let bu_fs = run_fs * para.bullet_size / @ooxml.pct_100
+          bu_span = bu_span + ai("font-size", bu_fs)
+        } else if para.bullet_size < 0 {
+          // Absolute size in hundredths-of-a-point (negated)
+          let bu_fs_emu = hundredth_pt_to_emu(-(para.bullet_size))
+          bu_span = bu_span + ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
+        }
+        if not(para.bullet_color.is_none()) {
+          bu_span = bu_span + a("fill", para.bullet_color.to_css())
+        }
+        out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
       }
-      let mut ri = 0
-      while ri < nr {
-        let run = para.runs[ri]
-        let mut span = "<tspan"
-        // Visual attributes
-        if run.bold   { span = span + " font-weight=\"bold\""  }
-        if run.italic { span = span + " font-style=\"italic\"" }
-        if run.font_size > 0 {
-          span = span + ai("font-size", apply_font_scale(px(hundredth_pt_to_emu(run.font_size), scale), fs))
-        }
-        // font-family: ea_font, latin_font, sans-serif
-        if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
-          let mut ff = ""
-          if not(run.ea_font.is_empty()) { ff = run.ea_font }
-          if not(run.font_face.is_empty()) {
-            if not(ff.is_empty()) { ff = ff + ", " }
-            ff = ff + run.font_face
+      // Text wrapping: split runs into visual lines
+      if do_wrap {
+        let wrap_w = text_w - indent
+        let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
+        let nvl = vlines.length()
+        let mut vli = 0
+        while vli < nvl {
+          let vline = vlines[vli]
+          // For wrapped lines after the first, emit a new positioning tspan
+          if vli > 0 {
+            cur_y = cur_y + p_line_h
+            out = out + "</tspan><tspan" +
+              ai("x", anchor_x) +
+              ai("y", cur_y) +
+              anchor_attr +
+              ">"
           }
-          span = span + a("font-family", ff + ", sans-serif")
-        }
-        if not(run.color.is_none()) {
-          span = span + a("fill", run.color.to_css())
-        }
-        // Character spacing
-        if run.char_spacing != 0 {
-          // hundredths-of-pt → px: val * 96 / 7200
-          let ls_px = run.char_spacing * 96 / 7200
-          if ls_px != 0 {
-            span = span + ai("letter-spacing", ls_px)
+          // Render fragments in this visual line
+          let nf = vline.length()
+          let mut fi = 0
+          while fi < nf {
+            let (run_idx, frag_text) = vline[fi]
+            let run = para.runs[run_idx]
+            out = out + render_run_tspan(run, run_idx, frag_text, scale, fs)
+            fi = fi + 1
           }
+          vli = vli + 1
         }
-        // Text decorations
-        let mut deco = ""
-        if not(run.underline.is_empty()) && run.underline != "none" {
-          deco = "underline"
+      } else {
+        // No wrapping: render runs directly
+        let mut ri = 0
+        while ri < nr {
+          let run = para.runs[ri]
+          let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
+          out = out + render_run_tspan(run, ri, display_text, scale, fs)
+          ri = ri + 1
         }
-        if run.strike == "sngStrike" || run.strike == "dblStrike" {
-          if deco.is_empty() { deco = "line-through" } else { deco = deco + " line-through" }
-        }
-        if not(deco.is_empty()) {
-          span = span + a("text-decoration", deco)
-        }
-        // Superscript / subscript via baseline-shift
-        if run.baseline > 0 {
-          span = span + a("baseline-shift", "super")
-          span = span + a("font-size", "70%")
-        } else if run.baseline < 0 {
-          span = span + a("baseline-shift", "sub")
-          span = span + a("font-size", "70%")
-        }
-        // data-ooxml-* attributes for round-trip
-        span = span +
-          a("data-ooxml-run-idx", int_to_str(ri)) +
-          a("data-ooxml-bold", bool_str(run.bold)) +
-          a("data-ooxml-font-size", int_to_str(run.font_size)) +
-          a("data-ooxml-color", run.color.to_hex()) +
-          a("data-ooxml-run-font", run.font_face) +
-          a("data-ooxml-ea-font", run.ea_font) +
-          a("data-ooxml-underline", run.underline) +
-          a("data-ooxml-strike", run.strike) +
-          ai("data-ooxml-baseline", run.baseline) +
-          ai("data-ooxml-char-spacing", run.char_spacing)
-        out = out + span + ">" + svg_escape(run.text) + "</tspan>"
-        ri = ri + 1
       }
       out = out + "</tspan>"
       cur_y = cur_y + (p_line_h - p_font_sz)
@@ -545,27 +761,28 @@ fn render_shape(
 
   // Build data-ooxml-* attributes for the <g> wrapper
   let g_attrs =
-    a("data-ooxml-shape-type", shape_type_str(shape.kind)) +
-    a("data-ooxml-geom", geom_str(shape.kind)) +
-    ai("data-ooxml-x", t.x) +
-    ai("data-ooxml-y", t.y) +
-    ai("data-ooxml-cx", t.cx) +
-    ai("data-ooxml-cy", t.cy) +
-    ai("data-ooxml-rot", t.rot) +
-    a("data-ooxml-fill", shape.fill.to_hex()) +
-    a("data-ooxml-stroke", shape.stroke.to_hex()) +
-    ai("data-ooxml-stroke-w", shape.stroke_w) +
-    ai("data-ooxml-shape-idx", shape_idx) +
-    a("data-ooxml-ph-type", shape.ph_type) +
-    ai("data-ooxml-ph-idx", shape.ph_idx) +
-    a("data-ooxml-anchor", shape.body_props.anchor) +
-    ai("data-ooxml-l-ins", shape.body_props.l_ins) +
-    ai("data-ooxml-t-ins", shape.body_props.t_ins) +
-    ai("data-ooxml-r-ins", shape.body_props.r_ins) +
-    ai("data-ooxml-b-ins", shape.body_props.b_ins) +
-    a("data-ooxml-auto-fit", bool_str(shape.body_props.auto_fit)) +
-    ai("data-ooxml-font-scale", shape.body_props.font_scale) +
-    ai("data-ooxml-ln-spc-reduction", shape.body_props.ln_spc_reduction)
+    da("shape-type", shape_type_str(shape.kind)) +
+    da("geom", geom_str(shape.kind)) +
+    dai("x", t.x) +
+    dai("y", t.y) +
+    dai("cx", t.cx) +
+    dai("cy", t.cy) +
+    dai("rot", t.rot) +
+    da("fill", shape.fill.to_hex()) +
+    da("stroke", shape.stroke.to_hex()) +
+    dai("stroke-w", shape.stroke_w) +
+    dai("shape-idx", shape_idx) +
+    da("ph-type", shape.ph_type) +
+    dai("ph-idx", shape.ph_idx) +
+    da("anchor", shape.body_props.anchor) +
+    dai("l-ins", shape.body_props.l_ins) +
+    dai("t-ins", shape.body_props.t_ins) +
+    dai("r-ins", shape.body_props.r_ins) +
+    dai("b-ins", shape.body_props.b_ins) +
+    da("auto-fit", bool_str(shape.body_props.auto_fit)) +
+    dai("font-scale", shape.body_props.font_scale) +
+    dai("ln-spc-reduction", shape.body_props.ln_spc_reduction) +
+    da("wrap", shape.body_props.wrap)
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
@@ -613,7 +830,7 @@ fn render_shape(
       let placeholder = "<rect" +
         ai("x", x_p) + ai("y", y_p) +
         ai("width", cx_p) + ai("height", cy_p) +
-        " fill=\"#dddddd\"" + rot + "/>"
+        " fill=\"" + image_placeholder_fill + "\"" + rot + "/>"
       if target.is_empty() {
         placeholder
       } else {
@@ -657,10 +874,9 @@ fn render_table_cell_text(
   theme : @ooxml.ThemeData
 ) -> String {
   if paragraphs.length() == 0 { return "" }
-  let pad = 4
-  let tx = cell_x + pad
+  let tx = cell_x + table_cell_pad
   let def_sz = px(default_font_size_emu(), scale)
-  let font_sz = if def_sz > cell_h - pad * 2 { cell_h - pad * 2 } else { def_sz }
+  let font_sz = if def_sz > cell_h - table_cell_pad * 2 { cell_h - table_cell_pad * 2 } else { def_sz }
   let line_h = font_sz * line_height_numer / line_height_denom
   let font_face = theme.minor_font + ", sans-serif"
   let mut out = "<text" +
@@ -668,9 +884,9 @@ fn render_table_cell_text(
     a("xml:space", "preserve") +
     a("font-family", font_face) +
     ai("font-size", font_sz) +
-    a("fill", "black") +
+    a("fill", default_text_fill) +
     ">"
-  let mut cur_y = cell_y + pad + font_sz
+  let mut cur_y = cell_y + table_cell_pad + font_sz
   let np = paragraphs.length()
   let mut pi = 0
   while pi < np {
@@ -679,36 +895,21 @@ fn render_table_cell_text(
     if nr == 0 {
       cur_y = cur_y + line_h
     } else {
+      // Paragraph-level tspan for positioning
+      out = out + "<tspan" + ai("x", tx) + ai("y", cur_y) + ">"
       let mut ri = 0
       while ri < nr {
         let run = para.runs[ri]
-        let mut span = "<tspan"
-        span = span + ai("x", tx) + ai("y", cur_y)
-        if run.bold { span = span + " font-weight=\"bold\"" }
-        if run.italic { span = span + " font-style=\"italic\"" }
-        if run.font_size > 0 {
-          span = span + ai("font-size", px(hundredth_pt_to_emu(run.font_size), scale))
-        }
-        if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
-          let mut ff = ""
-          if not(run.ea_font.is_empty()) { ff = run.ea_font }
-          if not(run.font_face.is_empty()) {
-            if not(ff.is_empty()) { ff = ff + ", " }
-            ff = ff + run.font_face
-          }
-          span = span + a("font-family", ff + ", sans-serif")
-        }
-        if not(run.color.is_none()) {
-          span = span + a("fill", run.color.to_css())
-        }
-        out = out + span + ">" + svg_escape(run.text) + "</tspan>"
+        let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
+        out = out + render_run_tspan(run, ri, display_text, scale, -1)
         ri = ri + 1
       }
+      out = out + "</tspan>"
       cur_y = cur_y + line_h
     }
     pi = pi + 1
     // Stop if we overflow the cell
-    if cur_y > cell_y + cell_h - pad { break }
+    if cur_y > cell_y + cell_h - table_cell_pad { break }
   }
   out + "</text>"
 }
@@ -752,7 +953,7 @@ fn render_table(
         ai("x", cx_px) + ai("y", ry) +
         ai("width", cw) + ai("height", rh) +
         a("fill", cell_fill) +
-        " stroke=\"#999999\" stroke-width=\"1\"/>"
+        " stroke=\"" + table_border_color + "\" stroke-width=\"1\"/>"
       // Cell text
       out = out + render_table_cell_text(cell.paragraphs, cx_px, ry, cw, rh, scale, theme)
       cj = cj + 1
@@ -784,10 +985,10 @@ pub fn render_slide_svg(
     ai("width", w) + ai("height", h) +
     " style=\"background:" + slide.background.to_css() + ";display:block\"" +
     // data-ooxml-* metadata on SVG root for round-trip
-    ai("data-ooxml-slide-cx", sw) +
-    ai("data-ooxml-slide-cy", sh) +
-    a("data-ooxml-bg", slide.background.to_hex()) +
-    ai("data-ooxml-scale", scale) +
+    dai("slide-cx", sw) +
+    dai("slide-cy", sh) +
+    da("bg", slide.background.to_hex()) +
+    dai("scale", scale) +
     ">"
   let bg_rect = "<rect" +
     ai("width", w) + ai("height", h) +
