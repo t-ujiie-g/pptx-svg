@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 8', slideCount === 8, `got ${slideCount}`);
+  assert('slide count = 11', slideCount === 11, `got ${slideCount}`);
 
-  // Verify all 8 slides exist
-  for (let i = 1; i <= 8; i++) {
+  // Verify all 11 slides exist
+  for (let i = 1; i <= 11; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 8; i++) {
+  for (let i = 1; i <= 11; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -355,6 +355,54 @@ async function testFeaturesPptx() {
     assert('theme has a:fontScheme', hasTag(themeXml, 'a:fontScheme'));
     assert('theme has a:majorFont', hasTag(themeXml, 'a:majorFont'));
     assert('theme has a:minorFont', hasTag(themeXml, 'a:minorFont'));
+    // EA font in theme
+    assert('theme majorFont has a:ea', themeXml.includes('<a:ea') && themeXml.includes('Yu Gothic'));
+  }
+
+  // ── Slide 9: East Asian fonts + font theme references ──
+  section('test_features.pptx — Slide 9: EA fonts & theme refs');
+  const slide9 = textFiles.get('ppt/slides/slide9.xml');
+  if (slide9) {
+    // Explicit EA font
+    assert('slide9 has a:ea element', hasTag(slide9, 'a:ea'));
+    assert('slide9 has MS PGothic EA font', slide9.includes('MS PGothic'));
+    // Theme font references
+    assert('slide9 has +mj-ea reference', slide9.includes('+mj-ea'));
+    assert('slide9 has +mj-lt reference', slide9.includes('+mj-lt'));
+    assert('slide9 has +mn-ea reference', slide9.includes('+mn-ea'));
+    assert('slide9 has +mn-lt reference', slide9.includes('+mn-lt'));
+    // Explicit EA font: Meiryo
+    assert('slide9 has Meiryo EA font', slide9.includes('Meiryo'));
+    // Latin fonts alongside EA
+    assert('slide9 has a:latin element', hasTag(slide9, 'a:latin'));
+  }
+
+  // ── Slide 10: Line spacing ──
+  section('test_features.pptx — Slide 10: line spacing');
+  const slide10 = textFiles.get('ppt/slides/slide10.xml');
+  if (slide10) {
+    assert('slide10 has a:lnSpc', hasTag(slide10, 'a:lnSpc'));
+    // Percentage: 150%
+    assert('slide10 has spcPct 150000', slide10.includes('150000'));
+    // Point-based: 36pt = 3600 hundredths
+    assert('slide10 has spcPts 3600', slide10.includes('3600'));
+    // Tight: 80%
+    assert('slide10 has spcPct 80000', slide10.includes('80000'));
+  }
+
+  // ── Slide 11: Character spacing + lstStyle ──
+  section('test_features.pptx — Slide 11: char spacing & lstStyle');
+  const slide11 = textFiles.get('ppt/slides/slide11.xml');
+  if (slide11) {
+    // Character spacing: spc attribute on rPr
+    assert('slide11 has spc="300" (wide)', slide11.includes('spc="300"'));
+    assert('slide11 has spc="1000" (very wide)', slide11.includes('spc="1000"'));
+    assert('slide11 has spc="-100" (tight)', slide11.includes('spc="-100"'));
+    // lstStyle
+    assert('slide11 has a:lstStyle with content', slide11.includes('<a:lstStyle>') && slide11.includes('a:lvl1pPr'));
+    assert('slide11 lstStyle has sz="2000" (20pt)', slide11.includes('sz="2000"'));
+    assert('slide11 lstStyle has Meiryo EA', slide11.includes('Meiryo'));
+    assert('slide11 lstStyle has #003366 color', slide11.includes('003366'));
   }
 }
 

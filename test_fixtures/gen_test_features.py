@@ -11,6 +11,9 @@ Slides:
   6. Master/Layout inheritance: slide with NO explicit bg (inherits master bg)
   7. Master/Layout inheritance: placeholder shapes with text style defaults
   8. Master/Layout inheritance: slide WITH explicit bg (overrides master)
+  9. East Asian fonts + font theme references (+mj-lt/+mn-lt/+mj-ea/+mn-ea)
+ 10. Line spacing (a:lnSpc) — EMU and percentage
+ 11. Character spacing (a:rPr spc) + lstStyle
 """
 
 from pptx import Presentation
@@ -564,6 +567,296 @@ p8b = tf8i.add_paragraph()
 p8b.text = "If you see green, explicit bg override is working correctly."
 p8b.font.size = Pt(18)
 p8b.font.color.rgb = RGBColor(255, 255, 255)
+
+# ── Set theme EA fonts ────────────────────────────────────────────────────
+# Modify theme1.xml to add East Asian font entries
+# Access theme via slide master's relationship
+ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+theme_part = None
+for rel in sld_master.part.rels.values():
+    if 'theme' in rel.reltype:
+        theme_part = rel.target_part
+        break
+
+if theme_part is not None:
+    theme_elem = etree.fromstring(theme_part.blob)
+    font_scheme = theme_elem.find(f'.//{{{ns_a}}}fontScheme')
+    if font_scheme is not None:
+        # Add a:ea to majorFont
+        major_font_elem = font_scheme.find(f'{{{ns_a}}}majorFont')
+        if major_font_elem is not None:
+            for old_ea in major_font_elem.findall(f'{{{ns_a}}}ea'):
+                major_font_elem.remove(old_ea)
+            ea_major = etree.SubElement(major_font_elem, f'{{{ns_a}}}ea')
+            ea_major.set('typeface', 'Yu Gothic')
+        # Add a:ea to minorFont
+        minor_font_elem = font_scheme.find(f'{{{ns_a}}}minorFont')
+        if minor_font_elem is not None:
+            for old_ea in minor_font_elem.findall(f'{{{ns_a}}}ea'):
+                minor_font_elem.remove(old_ea)
+            ea_minor = etree.SubElement(minor_font_elem, f'{{{ns_a}}}ea')
+            ea_minor.set('typeface', 'Yu Gothic')
+    # Write back the modified theme XML
+    theme_part._blob = etree.tostring(theme_elem, xml_declaration=True, encoding='UTF-8', standalone=True)
+    print("Theme EA fonts set: Yu Gothic")
+
+# ── Slide 9: East Asian fonts + font theme references ───────────────────
+slide9 = prs.slides.add_slide(blank)
+
+title9 = slide9.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title9.text_frame.paragraphs[0].text = "Slide 9: East Asian Fonts & Theme References"
+title9.text_frame.paragraphs[0].font.size = Pt(24)
+title9.text_frame.paragraphs[0].font.bold = True
+
+# Box with explicit EA font (a:ea typeface="MS PGothic")
+box9a = slide9.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(4), Inches(2))
+tf9a = box9a.text_frame
+tf9a.word_wrap = True
+fill9a = box9a.fill
+fill9a.solid()
+fill9a.fore_color.rgb = RGBColor(240, 240, 255)
+p9a = tf9a.paragraphs[0]
+run9a = p9a.add_run()
+run9a.text = "日本語テキスト（MS PGothic）"
+run9a.font.size = Pt(18)
+# Set a:ea typeface directly in XML
+rPr9a = run9a._r.find('a:rPr', nsmap)
+if rPr9a is None:
+    rPr9a = etree.SubElement(run9a._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run9a._r.insert(0, rPr9a)
+ea9a = etree.SubElement(rPr9a, '{http://schemas.openxmlformats.org/drawingml/2006/main}ea')
+ea9a.set('typeface', 'MS PGothic')
+latin9a = etree.SubElement(rPr9a, '{http://schemas.openxmlformats.org/drawingml/2006/main}latin')
+latin9a.set('typeface', 'Arial')
+
+# Second para: theme font reference +mj-ea and +mj-lt
+p9b = tf9a.add_paragraph()
+run9b = p9b.add_run()
+run9b.text = "テーマ参照: +mj-ea / +mj-lt"
+run9b.font.size = Pt(16)
+rPr9b = run9b._r.find('a:rPr', nsmap)
+if rPr9b is None:
+    rPr9b = etree.SubElement(run9b._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run9b._r.insert(0, rPr9b)
+ea9b = etree.SubElement(rPr9b, '{http://schemas.openxmlformats.org/drawingml/2006/main}ea')
+ea9b.set('typeface', '+mj-ea')
+latin9b = etree.SubElement(rPr9b, '{http://schemas.openxmlformats.org/drawingml/2006/main}latin')
+latin9b.set('typeface', '+mj-lt')
+
+# Third para: minor font theme reference +mn-ea and +mn-lt
+p9c = tf9a.add_paragraph()
+run9c = p9c.add_run()
+run9c.text = "マイナーフォント: +mn-ea / +mn-lt"
+run9c.font.size = Pt(14)
+rPr9c = run9c._r.find('a:rPr', nsmap)
+if rPr9c is None:
+    rPr9c = etree.SubElement(run9c._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run9c._r.insert(0, rPr9c)
+ea9c = etree.SubElement(rPr9c, '{http://schemas.openxmlformats.org/drawingml/2006/main}ea')
+ea9c.set('typeface', '+mn-ea')
+latin9c = etree.SubElement(rPr9c, '{http://schemas.openxmlformats.org/drawingml/2006/main}latin')
+latin9c.set('typeface', '+mn-lt')
+
+# Box with mixed Latin + EA text in same run
+box9b = slide9.shapes.add_textbox(Inches(5), Inches(1.2), Inches(4.5), Inches(2))
+tf9b = box9b.text_frame
+tf9b.word_wrap = True
+fill9b = box9b.fill
+fill9b.solid()
+fill9b.fore_color.rgb = RGBColor(255, 245, 235)
+p9d = tf9b.paragraphs[0]
+run9d = p9d.add_run()
+run9d.text = "Mixed: ABC + あいう + 123"
+run9d.font.size = Pt(18)
+rPr9d = run9d._r.find('a:rPr', nsmap)
+if rPr9d is None:
+    rPr9d = etree.SubElement(run9d._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run9d._r.insert(0, rPr9d)
+ea9d = etree.SubElement(rPr9d, '{http://schemas.openxmlformats.org/drawingml/2006/main}ea')
+ea9d.set('typeface', 'Meiryo')
+latin9d = etree.SubElement(rPr9d, '{http://schemas.openxmlformats.org/drawingml/2006/main}latin')
+latin9d.set('typeface', 'Segoe UI')
+
+# Info text
+info9 = slide9.shapes.add_textbox(Inches(0.5), Inches(4), Inches(9), Inches(2))
+tf9info = info9.text_frame
+tf9info.word_wrap = True
+p9info = tf9info.paragraphs[0]
+p9info.text = "Verify: EA fonts should appear in font-family. Theme refs (+mj-ea/+mn-ea) should resolve to Yu Gothic."
+p9info.font.size = Pt(12)
+p9info.font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 10: Line spacing ──────────────────────────────────────────────
+slide10 = prs.slides.add_slide(blank)
+
+title10 = slide10.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title10.text_frame.paragraphs[0].text = "Slide 10: Line Spacing (a:lnSpc)"
+title10.text_frame.paragraphs[0].font.size = Pt(24)
+title10.text_frame.paragraphs[0].font.bold = True
+
+# Box with percentage-based line spacing (150%)
+box10a = slide10.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(4), Inches(3))
+tf10a = box10a.text_frame
+tf10a.word_wrap = True
+fill10a = box10a.fill
+fill10a.solid()
+fill10a.fore_color.rgb = RGBColor(230, 245, 255)
+
+for i, text in enumerate(["Line 1: 150% spacing", "Line 2: wider gap above", "Line 3: still 150%"]):
+    if i == 0:
+        p = tf10a.paragraphs[0]
+    else:
+        p = tf10a.add_paragraph()
+    p.text = text
+    p.font.size = Pt(14)
+    pPr = p._p.find('a:pPr', nsmap)
+    if pPr is None:
+        pPr = etree.SubElement(p._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+        p._p.insert(0, pPr)
+    lnSpc = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc')
+    spcPct = etree.SubElement(lnSpc, '{http://schemas.openxmlformats.org/drawingml/2006/main}spcPct')
+    spcPct.set('val', '150000')  # 150%
+
+# Box with point-based line spacing (36pt absolute)
+box10b = slide10.shapes.add_textbox(Inches(5), Inches(1.2), Inches(4.5), Inches(3))
+tf10b = box10b.text_frame
+tf10b.word_wrap = True
+fill10b = box10b.fill
+fill10b.solid()
+fill10b.fore_color.rgb = RGBColor(255, 240, 230)
+
+for i, text in enumerate(["Line 1: 36pt absolute", "Line 2: fixed height", "Line 3: still 36pt"]):
+    if i == 0:
+        p = tf10b.paragraphs[0]
+    else:
+        p = tf10b.add_paragraph()
+    p.text = text
+    p.font.size = Pt(14)
+    pPr = p._p.find('a:pPr', nsmap)
+    if pPr is None:
+        pPr = etree.SubElement(p._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+        p._p.insert(0, pPr)
+    lnSpc = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc')
+    spcPts = etree.SubElement(lnSpc, '{http://schemas.openxmlformats.org/drawingml/2006/main}spcPts')
+    spcPts.set('val', '3600')  # 36pt
+
+# Box with tight line spacing (80%)
+box10c = slide10.shapes.add_textbox(Inches(0.5), Inches(4.5), Inches(4), Inches(2.5))
+tf10c = box10c.text_frame
+tf10c.word_wrap = True
+fill10c = box10c.fill
+fill10c.solid()
+fill10c.fore_color.rgb = RGBColor(245, 255, 240)
+
+for i, text in enumerate(["Tight: 80% spacing", "Lines should be close together", "Third tight line"]):
+    if i == 0:
+        p = tf10c.paragraphs[0]
+    else:
+        p = tf10c.add_paragraph()
+    p.text = text
+    p.font.size = Pt(14)
+    pPr = p._p.find('a:pPr', nsmap)
+    if pPr is None:
+        pPr = etree.SubElement(p._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+        p._p.insert(0, pPr)
+    lnSpc = etree.SubElement(pPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}lnSpc')
+    spcPct = etree.SubElement(lnSpc, '{http://schemas.openxmlformats.org/drawingml/2006/main}spcPct')
+    spcPct.set('val', '80000')  # 80%
+
+# ── Slide 11: Character spacing + lstStyle ──────────────────────────────
+slide11 = prs.slides.add_slide(blank)
+
+title11 = slide11.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title11.text_frame.paragraphs[0].text = "Slide 11: Character Spacing & lstStyle"
+title11.text_frame.paragraphs[0].font.size = Pt(24)
+title11.text_frame.paragraphs[0].font.bold = True
+
+# Box with character spacing variations
+box11a = slide11.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9), Inches(2.5))
+tf11a = box11a.text_frame
+tf11a.word_wrap = True
+fill11a = box11a.fill
+fill11a.solid()
+fill11a.fore_color.rgb = RGBColor(245, 240, 255)
+
+# Normal spacing
+p11_0 = tf11a.paragraphs[0]
+run11_0 = p11_0.add_run()
+run11_0.text = "Normal spacing (spc=0)"
+run11_0.font.size = Pt(16)
+
+# Wide spacing (spc=300 = 3pt)
+p11_1 = tf11a.add_paragraph()
+run11_1 = p11_1.add_run()
+run11_1.text = "Wide spacing (spc=300, 3pt)"
+run11_1.font.size = Pt(16)
+rPr11_1 = run11_1._r.find('a:rPr', nsmap)
+if rPr11_1 is None:
+    rPr11_1 = etree.SubElement(run11_1._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run11_1._r.insert(0, rPr11_1)
+rPr11_1.set('spc', '300')
+
+# Very wide spacing (spc=1000 = 10pt)
+p11_2 = tf11a.add_paragraph()
+run11_2 = p11_2.add_run()
+run11_2.text = "Very wide (spc=1000, 10pt)"
+run11_2.font.size = Pt(16)
+rPr11_2 = run11_2._r.find('a:rPr', nsmap)
+if rPr11_2 is None:
+    rPr11_2 = etree.SubElement(run11_2._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run11_2._r.insert(0, rPr11_2)
+rPr11_2.set('spc', '1000')
+
+# Tight spacing (spc=-100 = -1pt)
+p11_3 = tf11a.add_paragraph()
+run11_3 = p11_3.add_run()
+run11_3.text = "Tight spacing (spc=-100, -1pt)"
+run11_3.font.size = Pt(16)
+rPr11_3 = run11_3._r.find('a:rPr', nsmap)
+if rPr11_3 is None:
+    rPr11_3 = etree.SubElement(run11_3._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    run11_3._r.insert(0, rPr11_3)
+rPr11_3.set('spc', '-100')
+
+# Box with lstStyle (shape-specific list style defaults)
+box11b = slide11.shapes.add_textbox(Inches(0.5), Inches(4.2), Inches(9), Inches(2.5))
+tf11b = box11b.text_frame
+tf11b.word_wrap = True
+fill11b = box11b.fill
+fill11b.solid()
+fill11b.fore_color.rgb = RGBColor(255, 250, 235)
+
+# Add a:lstStyle to the txBody with level defaults
+ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+txBody11b = tf11b._txBody
+# Remove existing lstStyle
+for old_ls in txBody11b.findall(f'{{{ns_a}}}lstStyle'):
+    txBody11b.remove(old_ls)
+lstStyle = etree.SubElement(txBody11b, f'{{{ns_a}}}lstStyle')
+# Insert lstStyle after bodyPr (should be second child of txBody)
+bodyPr11b = txBody11b.find(f'{{{ns_a}}}bodyPr')
+if bodyPr11b is not None:
+    idx = list(txBody11b).index(bodyPr11b) + 1
+    txBody11b.remove(lstStyle)
+    txBody11b.insert(idx, lstStyle)
+
+# Level 1: 20pt, bold, dark blue
+lvl1pPr_ls = etree.SubElement(lstStyle, f'{{{ns_a}}}lvl1pPr')
+defRPr_ls1 = etree.SubElement(lvl1pPr_ls, f'{{{ns_a}}}defRPr')
+defRPr_ls1.set('sz', '2000')  # 20pt
+defRPr_ls1.set('b', '1')
+solidFill_ls1 = etree.SubElement(defRPr_ls1, f'{{{ns_a}}}solidFill')
+srgbClr_ls1 = etree.SubElement(solidFill_ls1, f'{{{ns_a}}}srgbClr')
+srgbClr_ls1.set('val', '003366')
+ea_ls1 = etree.SubElement(defRPr_ls1, f'{{{ns_a}}}ea')
+ea_ls1.set('typeface', 'Meiryo')
+
+p11_ls1 = tf11b.paragraphs[0]
+p11_ls1.text = "lstStyle lvl1: inherits 20pt bold #003366 Meiryo"
+# Don't set font size/color — let lstStyle provide defaults
+
+p11_ls2 = tf11b.add_paragraph()
+p11_ls2.text = "Second paragraph: should also inherit lstStyle defaults"
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

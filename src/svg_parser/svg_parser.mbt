@@ -73,7 +73,9 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   let italic_s = get_data_attr(run_node, "font-style")
                   let italic = italic_s == "italic"
                   let font_face = get_data_attr(run_node, "data-ooxml-run-font")
-                  runs.push({ text, bold, italic, font_size, color, font_face, underline: "", strike: "", baseline: 0 })
+                  let ea_font = get_data_attr(run_node, "data-ooxml-ea-font")
+                  let char_spacing = get_data_int(run_node, "data-ooxml-char-spacing")
+                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, underline: "", strike: "", baseline: 0, char_spacing })
                 }
               }
               @xml.XmlNode::Text(text) => {
@@ -87,9 +89,11 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                       font_size: 0,
                       color: @ooxml.Color::none(),
                       font_face: "",
+                      ea_font: "",
                       underline: "",
                       strike: "",
                       baseline: 0,
+                      char_spacing: 0,
                     },
                   )
                 }
@@ -97,7 +101,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             }
             j = j + 1
           }
-          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false })
+          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, line_spacing: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false })
         }
       }
       _ => ()

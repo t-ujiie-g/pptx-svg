@@ -247,8 +247,21 @@ fn para_font_size(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> Int
 }
 
 fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) -> Int {
-  let emu = para_max_font_emu(para)
-  if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+  if para.line_spacing > 0 {
+    // Positive = EMU absolute value
+    px(para.line_spacing, scale)
+  } else if para.line_spacing < 0 {
+    // Negative = percentage (-100000 = 100% = single spacing)
+    // In OOXML, 100% means the default single-line spacing (font_size * 1.2)
+    let pct = -(para.line_spacing) // e.g. 150000 for 150%
+    let emu = para_max_font_emu(para)
+    let base_line_h = if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+    base_line_h * pct / 100000
+  } else {
+    // Default: use font size * line_height ratio
+    let emu = para_max_font_emu(para)
+    if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+  }
 }
 
 fn render_text(
@@ -381,11 +394,26 @@ fn render_text(
         if run.font_size > 0 {
           span = span + ai("font-size", px(hundredth_pt_to_emu(run.font_size), scale))
         }
-        if not(run.font_face.is_empty()) {
-          span = span + a("font-family", run.font_face + ", sans-serif")
+        // font-family: ea_font, latin_font, sans-serif
+        if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
+          let mut ff = ""
+          if not(run.ea_font.is_empty()) { ff = run.ea_font }
+          if not(run.font_face.is_empty()) {
+            if not(ff.is_empty()) { ff = ff + ", " }
+            ff = ff + run.font_face
+          }
+          span = span + a("font-family", ff + ", sans-serif")
         }
         if not(run.color.is_none()) {
           span = span + a("fill", run.color.to_css())
+        }
+        // Character spacing
+        if run.char_spacing != 0 {
+          // hundredths-of-pt → px: val * 96 / 7200
+          let ls_px = run.char_spacing * 96 / 7200
+          if ls_px != 0 {
+            span = span + ai("letter-spacing", ls_px)
+          }
         }
         // Text decorations
         let mut deco = ""
@@ -413,9 +441,11 @@ fn render_text(
           a("data-ooxml-font-size", int_to_str(run.font_size)) +
           a("data-ooxml-color", run.color.to_hex()) +
           a("data-ooxml-run-font", run.font_face) +
+          a("data-ooxml-ea-font", run.ea_font) +
           a("data-ooxml-underline", run.underline) +
           a("data-ooxml-strike", run.strike) +
-          ai("data-ooxml-baseline", run.baseline)
+          ai("data-ooxml-baseline", run.baseline) +
+          ai("data-ooxml-char-spacing", run.char_spacing)
         out = out + span + ">" + svg_escape(run.text) + "</tspan>"
         ri = ri + 1
       }
@@ -629,8 +659,14 @@ fn render_table_cell_text(
         if run.font_size > 0 {
           span = span + ai("font-size", px(hundredth_pt_to_emu(run.font_size), scale))
         }
-        if not(run.font_face.is_empty()) {
-          span = span + a("font-family", run.font_face + ", sans-serif")
+        if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
+          let mut ff = ""
+          if not(run.ea_font.is_empty()) { ff = run.ea_font }
+          if not(run.font_face.is_empty()) {
+            if not(ff.is_empty()) { ff = ff + ", " }
+            ff = ff + run.font_face
+          }
+          span = span + a("font-family", ff + ", sans-serif")
         }
         if not(run.color.is_none()) {
           span = span + a("fill", run.color.to_css())
@@ -704,7 +740,8 @@ pub fn render_slide_svg(
   slide : @ooxml.SlideData,
   rels : Array[@ooxml.Relationship],
   slide_num : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
+  bg_shapes : Array[@ooxml.Shape]
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
@@ -722,10 +759,19 @@ pub fn render_slide_svg(
     a("data-ooxml-bg", slide.background.to_hex()) +
     ai("data-ooxml-scale", scale) +
     ">"
-  let bg = "<rect" +
+  let bg_rect = "<rect" +
     ai("width", w) + ai("height", h) +
     a("fill", slide.background.to_css()) +
     "/>"
+  // Render master/layout background shapes (non-placeholder)
+  let mut bg_shapes_svg = ""
+  let nbg = bg_shapes.length()
+  let mut bi = 0
+  while bi < nbg {
+    bg_shapes_svg = bg_shapes_svg + render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme)
+    bi = bi + 1
+  }
+  // Render slide shapes
   let mut shapes_svg = ""
   let n = slide.shapes.length()
   let mut i = 0
@@ -733,5 +779,5 @@ pub fn render_slide_svg(
     shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale, i, theme)
     i = i + 1
   }
-  header + bg + shapes_svg + "</svg>"
+  header + bg_rect + bg_shapes_svg + shapes_svg + "</svg>"
 }

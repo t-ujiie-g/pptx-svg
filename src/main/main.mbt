@@ -437,8 +437,38 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     shapes: slide_data.shapes,
   }
   g_slides.val[slide_idx] = resolved_slide
+  // ── Collect master/layout background shapes (non-placeholder) ──
+  let bg_shapes : Array[@ooxml.Shape] = []
+  match master_opt {
+    Some(master) => {
+      let ms = master.shapes.length()
+      let mut mi = 0
+      while mi < ms {
+        let s = master.shapes[mi]
+        if s.ph_type.is_empty() {
+          bg_shapes.push(s)
+        }
+        mi = mi + 1
+      }
+    }
+    None => ()
+  }
+  match layout_opt {
+    Some(layout) => {
+      let ls = layout.shapes.length()
+      let mut li = 0
+      while li < ls {
+        let s = layout.shapes[li]
+        if s.ph_type.is_empty() {
+          bg_shapes.push(s)
+        }
+        li = li + 1
+      }
+    }
+    None => ()
+  }
   // Render to SVG
-  @renderer.render_slide_svg(resolved_slide, rels, slide_num, g_theme.val)
+  @renderer.render_slide_svg(resolved_slide, rels, slide_num, g_theme.val, bg_shapes)
 }
 
 ///| Update a slide's internal data from an edited SVG string.
@@ -641,33 +671,24 @@ fn apply_text_defaults(shape : @ooxml.Shape, text_styles : @ooxml.MasterTextStyl
     let mut ri = 0
     while ri < nr {
       let run = para.runs[ri]
-      // Font size: apply if run has 0 (unset)
-      if run.font_size == 0 && defaults.font_size > 0 {
-        // We need to create a new run with the default applied
-        // MoonBit pub fields are read-only from other packages, so we reconstruct
+      // Apply defaults if any field is unset
+      let need_font_size = run.font_size == 0 && defaults.font_size > 0
+      let need_color = run.color.is_none() && not(defaults.color.is_none())
+      let need_font_face = run.font_face.is_empty() && not(defaults.font_face.is_empty())
+      let need_ea_font = run.ea_font.is_empty() && not(defaults.ea_font.is_empty())
+      if need_font_size || need_color || need_font_face || need_ea_font {
         let new_run : @ooxml.TextRun = {
           text: run.text,
           bold: run.bold,
           italic: run.italic,
-          font_size: defaults.font_size,
-          color: if run.color.is_none() && not(defaults.color.is_none()) { defaults.color } else { run.color },
-          font_face: if run.font_face.is_empty() && not(defaults.font_face.is_empty()) { defaults.font_face } else { run.font_face },
+          font_size: if need_font_size { defaults.font_size } else { run.font_size },
+          color: if need_color { defaults.color } else { run.color },
+          font_face: if need_font_face { defaults.font_face } else { run.font_face },
+          ea_font: if need_ea_font { defaults.ea_font } else { run.ea_font },
           underline: run.underline,
           strike: run.strike,
           baseline: run.baseline,
-        }
-        para.runs[ri] = new_run
-      } else if (run.color.is_none() && not(defaults.color.is_none())) || (run.font_face.is_empty() && not(defaults.font_face.is_empty())) {
-        let new_run : @ooxml.TextRun = {
-          text: run.text,
-          bold: run.bold,
-          italic: run.italic,
-          font_size: run.font_size,
-          color: if run.color.is_none() && not(defaults.color.is_none()) { defaults.color } else { run.color },
-          font_face: if run.font_face.is_empty() && not(defaults.font_face.is_empty()) { defaults.font_face } else { run.font_face },
-          underline: run.underline,
-          strike: run.strike,
-          baseline: run.baseline,
+          char_spacing: run.char_spacing,
         }
         para.runs[ri] = new_run
       }

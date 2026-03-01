@@ -125,8 +125,9 @@ fn serialize_text_body_inner(
     let has_mar_l = para.mar_l > 0
     let has_indent = para.indent != 0
     let has_spc = para.spc_before != 0 || para.spc_after != 0
+    let has_lnspc = para.line_spacing != 0
     let has_bullet = not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) || para.bullet_none
-    let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_bullet
+    let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_lnspc || has_bullet
     if has_ppr {
       let mut ppr = "<a:pPr"
       if has_align {
@@ -141,9 +142,12 @@ fn serialize_text_body_inner(
       if has_indent {
         ppr = ppr + " indent=\"" + int_to_str(para.indent) + "\""
       }
-      let has_children = has_spc || has_bullet
+      let has_children = has_spc || has_lnspc || has_bullet
       if has_children {
         ppr = ppr + ">"
+        if has_lnspc {
+          ppr = ppr + serialize_spacing("a:lnSpc", para.line_spacing)
+        }
         ppr = ppr + serialize_spacing("a:spcBef", para.spc_before)
         ppr = ppr + serialize_spacing("a:spcAft", para.spc_after)
         if para.bullet_none {
@@ -200,7 +204,10 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if run.baseline != 0 {
     rpr = rpr + " baseline=\"" + int_to_str(run.baseline) + "\""
   }
-  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty())
+  if run.char_spacing != 0 {
+    rpr = rpr + " spc=\"" + int_to_str(run.char_spacing) + "\""
+  }
+  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty())
   if has_children {
     rpr = rpr + ">"
     if not(run.color.is_none()) {
@@ -208,6 +215,9 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     }
     if not(run.font_face.is_empty()) {
       rpr = rpr + "<a:latin typeface=\"" + xml_escape(run.font_face) + "\"/>"
+    }
+    if not(run.ea_font.is_empty()) {
+      rpr = rpr + "<a:ea typeface=\"" + xml_escape(run.ea_font) + "\"/>"
     }
     rpr + "</a:rPr>"
   } else {

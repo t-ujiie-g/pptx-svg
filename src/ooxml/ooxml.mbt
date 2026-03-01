@@ -107,6 +107,8 @@ pub(all) struct ThemeData {
   fol_hlink : Color
   major_font : String
   minor_font : String
+  major_ea_font : String  // East Asian major font (from a:majorFont/a:ea)
+  minor_ea_font : String  // East Asian minor font (from a:minorFont/a:ea)
 }
 
 pub fn ThemeData::default() -> ThemeData {
@@ -125,6 +127,8 @@ pub fn ThemeData::default() -> ThemeData {
     fol_hlink: { r: 149, g: 79, b: 163 },
     major_font: "Calibri Light",
     minor_font: "Calibri",
+    major_ea_font: "",
+    minor_ea_font: "",
   }
 }
 
@@ -424,6 +428,8 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   // ── Font scheme ──
   let mut major_font = def.major_font
   let mut minor_font = def.minor_font
+  let mut major_ea_font = def.major_ea_font
+  let mut minor_ea_font = def.minor_ea_font
   match @xml.find_child(te_ch, "a:fontScheme") {
     None => ()
     Some(fs) => {
@@ -437,6 +443,14 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
             Some(latin) =>
               match @xml.get_attr(latin, "typeface") {
                 Some(v) => major_font = v
+                None => ()
+              }
+          }
+          match @xml.find_child(mj_ch, "a:ea") {
+            None => ()
+            Some(ea) =>
+              match @xml.get_attr(ea, "typeface") {
+                Some(v) => major_ea_font = v
                 None => ()
               }
           }
@@ -454,6 +468,14 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
                 None => ()
               }
           }
+          match @xml.find_child(mn_ch, "a:ea") {
+            None => ()
+            Some(ea) =>
+              match @xml.get_attr(ea, "typeface") {
+                Some(v) => minor_ea_font = v
+                None => ()
+              }
+          }
         }
       }
     }
@@ -462,7 +484,7 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     dk1, lt1, dk2, lt2,
     accent1, accent2, accent3, accent4, accent5, accent6,
     hlink, fol_hlink,
-    major_font, minor_font,
+    major_font, minor_font, major_ea_font, minor_ea_font,
   }
 }
 
@@ -474,6 +496,7 @@ pub(all) struct LevelTextDefaults {
   italic      : Bool
   color       : Color    // Color::none() = unset
   font_face   : String   // "" = inherit
+  ea_font     : String   // "" = inherit
   align       : String   // "" = inherit
   mar_l       : Int      // EMU; -1 = unset
   indent      : Int      // EMU; 0 = unset
@@ -482,7 +505,7 @@ pub(all) struct LevelTextDefaults {
 }
 
 pub fn LevelTextDefaults::empty() -> LevelTextDefaults {
-  { font_size: 0, bold: false, italic: false, color: Color::none(), font_face: "", align: "", mar_l: -1, indent: 0, bullet: "", bullet_none: false }
+  { font_size: 0, bold: false, italic: false, color: Color::none(), font_face: "", ea_font: "", align: "", mar_l: -1, indent: 0, bullet: "", bullet_none: false }
 }
 
 pub(all) struct TextStyleGroup {
@@ -529,9 +552,11 @@ pub(all) struct TextRun {
   font_size : Int      // in hundredths-of-a-point (sz attr); 0 = inherit
   color     : Color
   font_face : String   // explicit typeface from <a:latin>; "" = use theme font
+  ea_font   : String   // East Asian typeface from <a:ea>; "" = use theme ea font
   underline : String   // "sng", "dbl", "heavy", etc.; "" = none
   strike    : String   // "sngStrike", "dblStrike"; "" = none
   baseline  : Int      // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
+  char_spacing : Int   // character spacing in hundredths-of-a-point (spc attr); 0 = default
 }
 
 pub(all) struct TextParagraph {
@@ -540,6 +565,7 @@ pub(all) struct TextParagraph {
   level      : Int     // indent level (0 = top-level, from a:pPr lvl="N")
   spc_before : Int     // spacing before in EMU (from a:spcBef); 0 = default
   spc_after  : Int     // spacing after in EMU (from a:spcAft); 0 = default
+  line_spacing : Int   // line spacing: >0 = EMU, <0 = percentage (-100000=100%), 0 = default
   mar_l      : Int     // left margin in EMU (from marL attr in a:pPr); 0 = default
   indent     : Int     // first-line indent in EMU (from indent attr in a:pPr); 0 = default
   bullet     : String  // bullet char (from a:buChar); "" = none/inherit
@@ -821,10 +847,32 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
   }
 }
 
+///| Resolve font theme references for Latin fonts.
+fn resolve_font_theme(typeface : String, theme : ThemeData) -> String {
+  if typeface == "+mj-lt" {
+    theme.major_font
+  } else if typeface == "+mn-lt" {
+    theme.minor_font
+  } else {
+    typeface
+  }
+}
+
+///| Resolve font theme references for East Asian fonts.
+fn resolve_ea_font_theme(typeface : String, theme : ThemeData) -> String {
+  if typeface == "+mj-ea" {
+    theme.major_ea_font
+  } else if typeface == "+mn-ea" {
+    theme.minor_ea_font
+  } else {
+    typeface
+  }
+}
+
 ///| Parse paragraph-level properties from <a:pPr>.
 fn parse_para_props(
   ppr : @xml.XmlNode
-) -> (String, Int, Int, Int, Int, Int, String, String, Bool) {
+) -> (String, Int, Int, Int, Int, Int, Int, String, String, Bool) {
   let a = match @xml.get_attr(ppr, "algn") { Some(v) => v; None => "" }
   let l = attr_int(ppr, "lvl")
   let ml = attr_int(ppr, "marL")
@@ -832,6 +880,7 @@ fn parse_para_props(
   let ppr_ch = @xml.get_children(ppr)
   let sb = match @xml.find_child(ppr_ch, "a:spcBef") { None => 0; Some(n) => parse_spacing(n) }
   let sa = match @xml.find_child(ppr_ch, "a:spcAft") { None => 0; Some(n) => parse_spacing(n) }
+  let lnspc = match @xml.find_child(ppr_ch, "a:lnSpc") { None => 0; Some(n) => parse_spacing(n) }
   let bu_char = match @xml.find_child(ppr_ch, "a:buChar") {
     None => ""
     Some(bc) => match @xml.get_attr(bc, "char") { Some(v) => v; None => "" }
@@ -841,25 +890,28 @@ fn parse_para_props(
     Some(ba) => match @xml.get_attr(ba, "type") { Some(v) => v; None => "" }
   }
   let bu_none = match @xml.find_child(ppr_ch, "a:buNone") { Some(_) => true; None => false }
-  (a, l, sb, sa, ml, ind, bu_char, bu_auto, bu_none)
+  (a, l, sb, sa, lnspc, ml, ind, bu_char, bu_auto, bu_none)
 }
 
 ///| Parse <a:defRPr> defaults from a <a:pPr> node.
 fn parse_def_rpr(
   ppr : @xml.XmlNode,
   theme : ThemeData
-) -> (Bool, Bool, Int, Color, String) {
+) -> (Bool, Bool, Int, Color, String, String) {
   let ppr_ch = @xml.get_children(ppr)
   match @xml.find_child(ppr_ch, "a:defRPr") {
-    None => (false, false, 0, Color::none(), "")
+    None => (false, false, 0, Color::none(), "", "")
     Some(drpr) => {
       let db = match @xml.get_attr(drpr, "b") { Some(v) => v == "1" || v == "true"; None => false }
       let di = match @xml.get_attr(drpr, "i") { Some(v) => v == "1" || v == "true"; None => false }
       let dsz = attr_int(drpr, "sz")
       let drpr_ch = @xml.get_children(drpr)
       let dclr = parse_solid_fill(drpr_ch, theme)
-      let dff = child_attr(drpr_ch, "a:latin", "typeface")
-      (db, di, dsz, dclr, dff)
+      let dff_raw = child_attr(drpr_ch, "a:latin", "typeface")
+      let dff = resolve_font_theme(dff_raw, theme)
+      let dea_raw = child_attr(drpr_ch, "a:ea", "typeface")
+      let dea = resolve_ea_font_theme(dea_raw, theme)
+      (db, di, dsz, dclr, dff, dea)
     }
   }
 }
@@ -868,9 +920,9 @@ fn parse_def_rpr(
 fn parse_run_props(
   rpr : @xml.XmlNode,
   def_bold : Bool, def_italic : Bool, def_font_size : Int,
-  def_color : Color, def_font_face : String,
+  def_color : Color, def_font_face : String, def_ea_font : String,
   theme : ThemeData
-) -> (Bool, Bool, Int, Color, String, String, String, Int) {
+) -> (Bool, Bool, Int, Color, String, String, String, String, Int, Int) {
   let b = match @xml.get_attr(rpr, "b") { Some(v) => v == "1" || v == "true"; None => def_bold }
   let it = match @xml.get_attr(rpr, "i") { Some(v) => v == "1" || v == "true"; None => def_italic }
   let sz_raw = attr_int(rpr, "sz")
@@ -878,32 +930,49 @@ fn parse_run_props(
   let u = match @xml.get_attr(rpr, "u") { Some(v) => v; None => "" }
   let st = match @xml.get_attr(rpr, "strike") { Some(v) => v; None => "" }
   let bl = attr_int(rpr, "baseline")
+  let spc = attr_int(rpr, "spc")
   let rpr_ch = @xml.get_children(rpr)
   let clr_raw = parse_solid_fill(rpr_ch, theme)
   let clr = if clr_raw.is_none() { def_color } else { clr_raw }
   let ff_raw = child_attr(rpr_ch, "a:latin", "typeface")
-  let ff = if ff_raw.is_empty() { def_font_face } else { ff_raw }
-  (b, it, sz, clr, ff, u, st, bl)
+  let ff_resolved = resolve_font_theme(ff_raw, theme)
+  let ff = if ff_resolved.is_empty() { def_font_face } else { ff_resolved }
+  let ea_raw = child_attr(rpr_ch, "a:ea", "typeface")
+  let ea_resolved = resolve_ea_font_theme(ea_raw, theme)
+  let ea = if ea_resolved.is_empty() { def_ea_font } else { ea_resolved }
+  (b, it, sz, clr, ff, ea, u, st, bl, spc)
 }
 
 fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParagraph], BodyProps) {
   let paras : Array[TextParagraph] = []
   let ch = @xml.get_children(txbody)
   let body_props = parse_body_props(ch)
+  // Parse a:lstStyle for shape-specific level defaults
+  let lst_style = match @xml.find_child(ch, "a:lstStyle") {
+    None => TextStyleGroup::empty()
+    Some(ls) => parse_text_style_group(ls, theme)
+  }
   let pnodes = @xml.find_children(ch, "a:p")
   let np = pnodes.length()
   let mut pi = 0
   while pi < np {
     let p = pnodes[pi]
     let p_ch = @xml.get_children(p)
-    let (align, level, spc_before, spc_after, mar_l, indent, bullet, bullet_auto, bullet_none) = match @xml.find_child(p_ch, "a:pPr") {
-      None => ("", 0, 0, 0, 0, 0, "", "", false)
+    let (align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none) = match @xml.find_child(p_ch, "a:pPr") {
+      None => ("", 0, 0, 0, 0, 0, 0, "", "", false)
       Some(ppr) => parse_para_props(ppr)
     }
-    let (def_bold, def_italic, def_font_size, def_color, def_font_face) = match @xml.find_child(p_ch, "a:pPr") {
-      None => (false, false, 0, Color::none(), "")
+    let (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font) = match @xml.find_child(p_ch, "a:pPr") {
+      None => (false, false, 0, Color::none(), "", "")
       Some(ppr) => parse_def_rpr(ppr, theme)
     }
+    // Apply lstStyle level defaults as fallback
+    let lvl_idx = if level >= 0 && level < 9 { level } else { 0 }
+    let lst_def = lst_style.levels[lvl_idx]
+    let def_font_size = if def_font_size == 0 && lst_def.font_size > 0 { lst_def.font_size } else { def_font_size }
+    let def_color = if def_color.is_none() && not(lst_def.color.is_none()) { lst_def.color } else { def_color }
+    let def_font_face = if def_font_face.is_empty() && not(lst_def.font_face.is_empty()) { lst_def.font_face } else { def_font_face }
+    let def_ea_font = if def_ea_font.is_empty() && not(lst_def.ea_font.is_empty()) { lst_def.ea_font } else { def_ea_font }
     let rnodes = @xml.find_children(p_ch, "a:r")
     let runs : Array[TextRun] = []
     let nr = rnodes.length()
@@ -915,16 +984,16 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
         None => ""
         Some(t_node) => @xml.get_text_content(t_node)
       }
-      let (bold, italic, font_size, run_color, font_face, underline, strike, baseline) = match @xml.find_child(r_ch, "a:rPr") {
-        None => (def_bold, def_italic, def_font_size, def_color, def_font_face, "", "", 0)
-        Some(rpr) => parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, theme)
+      let (bold, italic, font_size, run_color, font_face, ea_font, underline, strike, baseline, char_spacing) = match @xml.find_child(r_ch, "a:rPr") {
+        None => (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, "", "", 0, 0)
+        Some(rpr) => parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, theme)
       }
       if not(text.is_empty()) {
-        runs.push({ text, bold, italic, font_size, color: run_color, font_face, underline, strike, baseline })
+        runs.push({ text, bold, italic, font_size, color: run_color, font_face, ea_font, underline, strike, baseline, char_spacing })
       }
       ri = ri + 1
     }
-    paras.push({ runs, align, level, spc_before, spc_after, mar_l, indent, bullet, bullet_auto, bullet_none })
+    paras.push({ runs, align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none })
     pi = pi + 1
   }
   (paras, body_props)
@@ -1334,19 +1403,22 @@ fn parse_level_defaults(ppr : @xml.XmlNode, theme : ThemeData) -> LevelTextDefau
   }
   let bu_none = match @xml.find_child(ppr_ch, "a:buNone") { Some(_) => true; None => false }
   // Default run properties from a:defRPr
-  let (bold, italic, font_size, color, font_face) = match @xml.find_child(ppr_ch, "a:defRPr") {
-    None => (false, false, 0, Color::none(), "")
+  let (bold, italic, font_size, color, font_face, ea_font) = match @xml.find_child(ppr_ch, "a:defRPr") {
+    None => (false, false, 0, Color::none(), "", "")
     Some(drpr) => {
       let db = match @xml.get_attr(drpr, "b") { Some(v) => v == "1" || v == "true"; None => false }
       let di = match @xml.get_attr(drpr, "i") { Some(v) => v == "1" || v == "true"; None => false }
       let dsz = attr_int(drpr, "sz")
       let drpr_ch = @xml.get_children(drpr)
       let dclr = parse_solid_fill(drpr_ch, theme)
-      let dff = child_attr(drpr_ch, "a:latin", "typeface")
-      (db, di, dsz, dclr, dff)
+      let dff_raw = child_attr(drpr_ch, "a:latin", "typeface")
+      let dff = resolve_font_theme(dff_raw, theme)
+      let dea_raw = child_attr(drpr_ch, "a:ea", "typeface")
+      let dea = resolve_ea_font_theme(dea_raw, theme)
+      (db, di, dsz, dclr, dff, dea)
     }
   }
-  { font_size, bold, italic, color, font_face, align, mar_l, indent, bullet: bu_char, bullet_none: bu_none }
+  { font_size, bold, italic, color, font_face, ea_font, align, mar_l, indent, bullet: bu_char, bullet_none: bu_none }
 }
 
 ///| Parse a text style group (e.g. p:titleStyle) into TextStyleGroup.

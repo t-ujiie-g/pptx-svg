@@ -18,7 +18,12 @@
 - [x] スライド背景色 (`p:bg` → `p:bgPr` → solidFill)
 - [x] テーマ解決 (theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod)
 - [x] Round-trip パイプライン (data-ooxml-* SVG ↔ SlideData ↔ OOXML ↔ ZIP)
-- [x] スライドマスター / レイアウト継承 (背景 / テキストスタイル / placeholder transform)
+- [x] スライドマスター / レイアウト継承 (背景 / テキストスタイル / placeholder transform / master shapes)
+- [x] フォントテーマ参照 (`+mj-lt`/`+mn-lt`/`+mj-ea`/`+mn-ea`)
+- [x] 東アジアフォント (`a:ea typeface`) + round-trip
+- [x] 行間 (`a:lnSpc`) EMU / 百分率
+- [x] 文字間隔 (`a:rPr spc`) + letter-spacing
+- [x] `a:lstStyle` シェイプ固有リストスタイル継承
 
 ---
 
@@ -33,10 +38,10 @@
 - [x] マスター/レイアウトからの背景継承 (slide に `p:bg` がなければ親を参照)
 - [ ] `p:clrMapOvr` カラーマップオーバーライド
 - [x] デフォルトテキストスタイル (`p:txStyles` titleStyle/bodyStyle/otherStyle レベル 0-8)
-- [ ] `a:lstStyle` (シェイプ/プレースホルダ固有のリストスタイル) レベル継承
+- [x] `a:lstStyle` (シェイプ/プレースホルダ固有のリストスタイル) レベル継承
 - [x] プレースホルダの transform 継承 (slide → layout → master)
 - [x] プレースホルダの bodyProps 継承 (anchor 等)
-- [ ] マスター上のシェイプ描画 (ロゴ・フッター等)
+- [x] マスター/レイアウト上のシェイプ描画 (ロゴ・フッター等 — 非PHのみ)
 
 ---
 
@@ -44,7 +49,7 @@
 
 ### 2.1 段落プロパティ
 - [x] スペーシング: `a:spcBef` (前) / `a:spcAft` (後) — パース + レンダリング
-- [ ] 行間 (`a:lnSpc`) — パースのみ（レンダリング未完）
+- [x] 行間 (`a:lnSpc`) — パース + レンダリング (EMU / 百分率)
 - [x] インデント: `a:pPr marL/indent` — 左マージン、ぶら下げインデント
 - [ ] タブストップ (`a:tabLst`)
 - [ ] RTL / BiDi (`a:pPr rtl`)
@@ -62,15 +67,15 @@
 - [x] 下線 (`a:rPr u="sng/dbl/heavy/dotted/dash/wavy/..."` — 18 種)
 - [x] 取り消し線 (`a:rPr strike="sngStrike/dblStrike"`)
 - [x] 上付き / 下付き (`a:rPr baseline="30000/-25000"`)
-- [ ] 文字間隔 (`a:rPr spc`)
+- [x] 文字間隔 (`a:rPr spc`) — パース + letter-spacing レンダリング
 - [ ] カーニング (`a:rPr kern`)
 - [ ] キャピタライズ (`a:rPr cap="all/small"`)
 
 ### 2.4 フォント
-- [ ] 東アジアフォント (`a:ea typeface`)
+- [x] 東アジアフォント (`a:ea typeface`) — パース + font-family レンダリング + round-trip
 - [ ] 複合スクリプト (`a:cs typeface`)
 - [ ] シンボルフォント (`a:sym typeface`)
-- [ ] フォントテーマ参照 (`a:latin typeface="+mj-lt"/"+mn-lt"`)
+- [x] フォントテーマ参照 (`+mj-lt`/`+mn-lt`/`+mj-ea`/`+mn-ea` → theme font 解決)
 
 ### 2.5 テキストボディ
 - [x] `a:bodyPr` — アンカー (`anchor="ctr/b/t"`) 垂直位置合わせ
