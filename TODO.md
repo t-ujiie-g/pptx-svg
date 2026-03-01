@@ -18,6 +18,7 @@
 - [x] スライド背景色 (`p:bg` → `p:bgPr` → solidFill)
 - [x] テーマ解決 (theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod)
 - [x] Round-trip パイプライン (data-ooxml-* SVG ↔ SlideData ↔ OOXML ↔ ZIP)
+- [x] スライドマスター / レイアウト継承 (背景 / テキストスタイル / placeholder transform)
 
 ---
 
@@ -25,13 +26,16 @@
 
 ほぼ全ての PPTX で必要。マスター/レイアウトがないと背景・デフォルト書式・プレースホルダが再現できない。
 
-- [ ] slideMaster*.xml パース — デフォルトスタイル / 背景 / シェイプ
-- [ ] slideLayout*.xml パース — レイアウトテンプレート
-- [ ] スタイル継承チェーン: slide → layout → master → theme
-- [ ] プレースホルダタイプ解決 (`<p:ph type="title/body/..." idx="N">`)
-- [ ] マスター/レイアウトからの背景継承 (slide に `p:bg` がなければ親を参照)
+- [x] slideMaster*.xml パース — デフォルトスタイル / 背景 / シェイプ
+- [x] slideLayout*.xml パース — レイアウトテンプレート
+- [x] スタイル継承チェーン: slide → layout → master → theme
+- [x] プレースホルダタイプ解決 (`<p:ph type="title/body/..." idx="N">`)
+- [x] マスター/レイアウトからの背景継承 (slide に `p:bg` がなければ親を参照)
 - [ ] `p:clrMapOvr` カラーマップオーバーライド
-- [ ] デフォルトテキストスタイル (`a:lstStyle` レベル 0-8 の継承)
+- [x] デフォルトテキストスタイル (`p:txStyles` titleStyle/bodyStyle/otherStyle レベル 0-8)
+- [ ] `a:lstStyle` (シェイプ/プレースホルダ固有のリストスタイル) レベル継承
+- [x] プレースホルダの transform 継承 (slide → layout → master)
+- [x] プレースホルダの bodyProps 継承 (anchor 等)
 - [ ] マスター上のシェイプ描画 (ロゴ・フッター等)
 
 ---

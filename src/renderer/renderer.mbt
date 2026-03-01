@@ -18,7 +18,6 @@ let default_font_size_emu_ : Int = 228600  // 18 pt
 let default_l_inset : Int = 91440          // 0.1 in (left / right)
 let default_t_inset : Int = 45720          // 0.05 in (top / bottom)
 let level_indent_emu : Int = 342900        // indent per bullet level
-let default_stroke_w : Int = 12700         // 1 pt
 let svg_target_width : Int = 960           // output SVG width in px
 let default_emu_per_px : Int = 9525        // EMU per pixel at 96 DPI
 let line_height_numer : Int = 12           // line-height = font-size * line_height_numer / line_height_denom
@@ -124,16 +123,7 @@ fn resolve_image_path(target : String) -> String {
   }
 }
 
-fn suffix(s : String, from : Int) -> String {
-  let len = s.length()
-  let mut result = ""
-  let mut i = from
-  while i < len {
-    result = result + @ffi.ffi_char_code_to_str(Char::to_int(s.get_char(i).unwrap()))
-    i = i + 1
-  }
-  result
-}
+fn suffix(s : String, from : Int) -> String { @xml.str_suffix(s, from) }
 
 fn mime_from_ext(path : String) -> String {
   let len = path.length()
@@ -508,6 +498,8 @@ fn render_shape(
     a("data-ooxml-stroke", shape.stroke.to_hex()) +
     ai("data-ooxml-stroke-w", shape.stroke_w) +
     ai("data-ooxml-shape-idx", shape_idx) +
+    a("data-ooxml-ph-type", shape.ph_type) +
+    ai("data-ooxml-ph-idx", shape.ph_idx) +
     a("data-ooxml-anchor", shape.body_props.anchor) +
     ai("data-ooxml-l-ins", shape.body_props.l_ins) +
     ai("data-ooxml-t-ins", shape.body_props.t_ins) +
@@ -523,7 +515,7 @@ fn render_shape(
       } else {
         a("stroke", shape.stroke.to_css()) +
         ai("stroke-width",
-          px(if shape.stroke_w > 0 { shape.stroke_w } else { default_stroke_w }, scale))
+          px(if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }, scale))
       }
       let rect_svg = match geom {
         @ooxml.ShapeGeom::Ellipse => {

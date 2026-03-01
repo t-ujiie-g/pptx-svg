@@ -5,6 +5,11 @@
 //   1 inch = 914400 EMU,  1 pt = 12700 EMU,  1 cm = 360000 EMU
 // Standard slide: 9144000 x 6858000 EMU (10in x 7.5in)
 
+// ── Shared constants ─────────────────────────────────────────────────────────
+
+///| Default stroke width: 1 pt in EMU.
+pub let default_stroke_w : Int = 12700
+
 // ── Color ─────────────────────────────────────────────────────────────────────
 
 pub(all) struct Color {
@@ -461,6 +466,60 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   }
 }
 
+// ── Master / Layout types ────────────────────────────────────────────────────
+
+pub(all) struct LevelTextDefaults {
+  font_size   : Int      // hundredths-of-pt (sz); 0 = unset
+  bold        : Bool
+  italic      : Bool
+  color       : Color    // Color::none() = unset
+  font_face   : String   // "" = inherit
+  align       : String   // "" = inherit
+  mar_l       : Int      // EMU; -1 = unset
+  indent      : Int      // EMU; 0 = unset
+  bullet      : String   // "" = none
+  bullet_none : Bool
+}
+
+pub fn LevelTextDefaults::empty() -> LevelTextDefaults {
+  { font_size: 0, bold: false, italic: false, color: Color::none(), font_face: "", align: "", mar_l: -1, indent: 0, bullet: "", bullet_none: false }
+}
+
+pub(all) struct TextStyleGroup {
+  levels : Array[LevelTextDefaults]  // 9 elements (lvl1pPr–lvl9pPr)
+}
+
+pub fn TextStyleGroup::empty() -> TextStyleGroup {
+  let levels : Array[LevelTextDefaults] = []
+  let mut i = 0
+  while i < 9 {
+    levels.push(LevelTextDefaults::empty())
+    i = i + 1
+  }
+  { levels, }
+}
+
+pub(all) struct MasterTextStyles {
+  title_style : TextStyleGroup
+  body_style  : TextStyleGroup
+  other_style : TextStyleGroup
+}
+
+pub fn MasterTextStyles::empty() -> MasterTextStyles {
+  { title_style: TextStyleGroup::empty(), body_style: TextStyleGroup::empty(), other_style: TextStyleGroup::empty() }
+}
+
+pub(all) struct SlideMasterData {
+  background  : Color
+  shapes      : Array[Shape]
+  text_styles : MasterTextStyles
+}
+
+pub(all) struct SlideLayoutData {
+  background  : Color   // Color::none() = inherit from master
+  shapes      : Array[Shape]
+}
+
 // ── Text model ────────────────────────────────────────────────────────────────
 
 pub(all) struct TextRun {
@@ -587,6 +646,8 @@ pub(all) struct Shape {
   stroke_w    : Int            // stroke width in EMU (0 = default ~12700)
   paragraphs  : Array[TextParagraph]
   body_props  : BodyProps      // text body properties (anchor, insets)
+  ph_type     : String         // "title","body","ctrTitle","subTitle","dt","ftr","sldNum","" (non-PH)
+  ph_idx      : Int            // -1 = none
 }
 
 // ── Slide data ────────────────────────────────────────────────────────────────
@@ -873,6 +934,28 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
 
 fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(sp)
+  // Extract placeholder info from p:nvSpPr/p:nvPr/p:ph
+  let mut ph_type = ""
+  let mut ph_idx = -1
+  match @xml.find_child(ch, "p:nvSpPr") {
+    None => ()
+    Some(nvsp) => {
+      let nvsp_ch = @xml.get_children(nvsp)
+      match @xml.find_child(nvsp_ch, "p:nvPr") {
+        None => ()
+        Some(nvpr) => {
+          let nvpr_ch = @xml.get_children(nvpr)
+          match @xml.find_child(nvpr_ch, "p:ph") {
+            None => ()
+            Some(ph) => {
+              ph_type = match @xml.get_attr(ph, "type") { Some(v) => v; None => "body" }
+              ph_idx = match @xml.get_attr(ph, "idx") { Some(v) => @xml.parse_int(v); None => -1 }
+            }
+          }
+        }
+      }
+    }
+  }
   let sppr = match @xml.find_child(ch, "p:spPr") {
     None => return empty_shape()
     Some(n) => n
@@ -910,6 +993,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     stroke_w,
     paragraphs: paras,
     body_props,
+    ph_type,
+    ph_idx,
   }
 }
 
@@ -941,6 +1026,8 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     stroke_w: 0,
     paragraphs: [],
     body_props: BodyProps::default(),
+    ph_type: "",
+    ph_idx: -1,
   }
 }
 
@@ -1033,6 +1120,8 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         stroke_w: 0,
         paragraphs: [],
         body_props: BodyProps::default(),
+        ph_type: "",
+        ph_idx: -1,
       }
     }
   }
@@ -1047,6 +1136,8 @@ fn empty_shape() -> Shape {
     stroke_w: 0,
     paragraphs: [],
     body_props: BodyProps::default(),
+    ph_type: "",
+    ph_idx: -1,
   }
 }
 
@@ -1141,19 +1232,20 @@ pub fn parse_slide(
   // Navigate p:sld → p:cSld
   let csld = @xml.find_path(nodes, ["p:sld", "p:cSld"])
   match csld {
-    None => { slide_size, background: Color::white(), shapes }
+    None => { slide_size, background: Color::none(), shapes }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
       // Parse background: p:bg → p:bgPr → solidFill
+      // Color::none() = no explicit bg (inherit from layout/master)
       let bg = match @xml.find_child(csld_ch, "p:bg") {
-        None => Color::white()
+        None => Color::none()
         Some(bg_node) => {
           let bg_ch = @xml.get_children(bg_node)
           match @xml.find_child(bg_ch, "p:bgPr") {
-            None => Color::white()
+            None => Color::none()
             Some(bgpr) => {
               let c = parse_solid_fill(@xml.get_children(bgpr), theme)
-              if c.is_none() { Color::white() } else { c }
+              c  // may be Color::none() if no solidFill found
             }
           }
         }
@@ -1185,6 +1277,171 @@ pub fn parse_slide(
       }
     }
   }
+}
+
+// ── Background parsing (shared) ──────────────────────────────────────────────
+
+///| Parse background color from p:cSld children. Returns Color::none() if no bg.
+fn parse_bg_from_csld(csld_ch : Array[@xml.XmlNode], theme : ThemeData) -> Color {
+  match @xml.find_child(csld_ch, "p:bg") {
+    None => Color::none()
+    Some(bg_node) => {
+      let bg_ch = @xml.get_children(bg_node)
+      match @xml.find_child(bg_ch, "p:bgPr") {
+        None => Color::none()
+        Some(bgpr) => parse_solid_fill(@xml.get_children(bgpr), theme)
+      }
+    }
+  }
+}
+
+///| Parse shapes from p:spTree children.
+fn parse_shapes_from_tree(tree : @xml.XmlNode, theme : ThemeData) -> Array[Shape] {
+  let shapes : Array[Shape] = []
+  let tree_ch = @xml.get_children(tree)
+  let n = tree_ch.length()
+  let mut i = 0
+  while i < n {
+    match tree_ch[i] {
+      @xml.XmlNode::Element(tag, _, _) => {
+        if tag == "p:sp" {
+          shapes.push(parse_sp(tree_ch[i], theme))
+        } else if tag == "p:pic" {
+          shapes.push(parse_pic(tree_ch[i]))
+        } else if tag == "p:graphicFrame" {
+          shapes.push(parse_graphic_frame(tree_ch[i], theme))
+        }
+      }
+      _ => ()
+    }
+    i = i + 1
+  }
+  shapes
+}
+
+// ── Level text defaults parsing ──────────────────────────────────────────────
+
+///| Parse a level paragraph properties node (e.g. a:lvl1pPr) into LevelTextDefaults.
+fn parse_level_defaults(ppr : @xml.XmlNode, theme : ThemeData) -> LevelTextDefaults {
+  let align = match @xml.get_attr(ppr, "algn") { Some(v) => v; None => "" }
+  let mar_l = match @xml.get_attr(ppr, "marL") { Some(v) => @xml.parse_int(v); None => -1 }
+  let indent = attr_int(ppr, "indent")
+  let ppr_ch = @xml.get_children(ppr)
+  // Bullet
+  let bu_char = match @xml.find_child(ppr_ch, "a:buChar") {
+    None => ""
+    Some(bc) => match @xml.get_attr(bc, "char") { Some(v) => v; None => "" }
+  }
+  let bu_none = match @xml.find_child(ppr_ch, "a:buNone") { Some(_) => true; None => false }
+  // Default run properties from a:defRPr
+  let (bold, italic, font_size, color, font_face) = match @xml.find_child(ppr_ch, "a:defRPr") {
+    None => (false, false, 0, Color::none(), "")
+    Some(drpr) => {
+      let db = match @xml.get_attr(drpr, "b") { Some(v) => v == "1" || v == "true"; None => false }
+      let di = match @xml.get_attr(drpr, "i") { Some(v) => v == "1" || v == "true"; None => false }
+      let dsz = attr_int(drpr, "sz")
+      let drpr_ch = @xml.get_children(drpr)
+      let dclr = parse_solid_fill(drpr_ch, theme)
+      let dff = child_attr(drpr_ch, "a:latin", "typeface")
+      (db, di, dsz, dclr, dff)
+    }
+  }
+  { font_size, bold, italic, color, font_face, align, mar_l, indent, bullet: bu_char, bullet_none: bu_none }
+}
+
+///| Parse a text style group (e.g. p:titleStyle) into TextStyleGroup.
+fn parse_text_style_group(node : @xml.XmlNode, theme : ThemeData) -> TextStyleGroup {
+  let ch = @xml.get_children(node)
+  let levels : Array[LevelTextDefaults] = []
+  let mut i = 0
+  while i < 9 {
+    let tag = "a:lvl" + int_to_str(i + 1) + "pPr"
+    let lvl = match @xml.find_child(ch, tag) {
+      None => LevelTextDefaults::empty()
+      Some(ppr) => parse_level_defaults(ppr, theme)
+    }
+    levels.push(lvl)
+    i = i + 1
+  }
+  { levels, }
+}
+
+///| Parse p:txStyles from slide master.
+fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
+  let ch = @xml.get_children(node)
+  let title_style = match @xml.find_child(ch, "p:titleStyle") {
+    None => TextStyleGroup::empty()
+    Some(ts) => parse_text_style_group(ts, theme)
+  }
+  let body_style = match @xml.find_child(ch, "p:bodyStyle") {
+    None => TextStyleGroup::empty()
+    Some(bs) => parse_text_style_group(bs, theme)
+  }
+  let other_style = match @xml.find_child(ch, "p:otherStyle") {
+    None => TextStyleGroup::empty()
+    Some(os) => parse_text_style_group(os, theme)
+  }
+  { title_style, body_style, other_style }
+}
+
+// ── Slide master parser ──────────────────────────────────────────────────────
+
+///| Parse a slide master XML string into SlideMasterData.
+pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : ThemeData) -> SlideMasterData {
+  let nodes = @xml.parse_xml(xml_str)
+  let csld = @xml.find_path(nodes, ["p:sldMaster", "p:cSld"])
+  let background = match csld {
+    None => Color::none()
+    Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), theme)
+  }
+  let shapes : Array[Shape] = match csld {
+    None => []
+    Some(csld_node) => {
+      let csld_ch = @xml.get_children(csld_node)
+      match @xml.find_child(csld_ch, "p:spTree") {
+        None => []
+        Some(tree) => parse_shapes_from_tree(tree, theme)
+      }
+    }
+  }
+  // Parse p:txStyles
+  let text_styles = match @xml.find_child(nodes, "p:sldMaster") {
+    None => MasterTextStyles::empty()
+    Some(master_node) => {
+      let master_ch = @xml.get_children(master_node)
+      match @xml.find_child(master_ch, "p:txStyles") {
+        None => MasterTextStyles::empty()
+        Some(txs) => parse_tx_styles(txs, theme)
+      }
+    }
+  }
+  // ignore slide_size parameter (just used for shape parsing context)
+  ignore(slide_size)
+  { background, shapes, text_styles }
+}
+
+// ── Slide layout parser ──────────────────────────────────────────────────────
+
+///| Parse a slide layout XML string into SlideLayoutData.
+pub fn parse_slide_layout(xml_str : String, slide_size : SlideSize, theme : ThemeData) -> SlideLayoutData {
+  let nodes = @xml.parse_xml(xml_str)
+  let csld = @xml.find_path(nodes, ["p:sldLayout", "p:cSld"])
+  let background = match csld {
+    None => Color::none()
+    Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), theme)
+  }
+  let shapes : Array[Shape] = match csld {
+    None => []
+    Some(csld_node) => {
+      let csld_ch = @xml.get_children(csld_node)
+      match @xml.find_child(csld_ch, "p:spTree") {
+        None => []
+        Some(tree) => parse_shapes_from_tree(tree, theme)
+      }
+    }
+  }
+  ignore(slide_size)
+  { background, shapes }
 }
 
 // ── Integer→string (needed here too) ─────────────────────────────────────────

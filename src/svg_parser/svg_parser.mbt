@@ -173,7 +173,9 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     b_ins: if bp_b_ins == 0 { -1 } else { bp_b_ins },
     auto_fit: bp_auto_fit,
   }
-  { kind, transform, fill, stroke, stroke_w, paragraphs, body_props }
+  let ph_type = get_data_attr(g_node, "data-ooxml-ph-type")
+  let ph_idx = get_data_int(g_node, "data-ooxml-ph-idx")
+  { kind, transform, fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
 }
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {

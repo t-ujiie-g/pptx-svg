@@ -477,3 +477,55 @@ pub fn int_to_str(n : Int) -> String {
     int_to_str(n / 10) + digit_str(n % 10)
   }
 }
+
+// ── String helpers ──────────────────────────────────────────────────────────
+
+///| Extract a substring from index `from` to the end.
+pub fn str_suffix(s : String, from : Int) -> String {
+  let len = s.length()
+  let mut result = ""
+  let mut i = from
+  while i < len {
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(s.get_char(i).unwrap()))
+    i = i + 1
+  }
+  result
+}
+
+///| Check if string `s` starts with `pat`.
+pub fn str_starts_with(s : String, pat : String) -> Bool {
+  let slen = s.length()
+  let plen = pat.length()
+  if slen < plen { return false }
+  for j = 0; j < plen; j = j + 1 {
+    if s.get_char(j).unwrap() != pat.get_char(j).unwrap() {
+      return false
+    }
+  }
+  true
+}
+
+///| Check if string `s` ends with `pat`.
+pub fn str_ends_with(s : String, pat : String) -> Bool {
+  let slen = s.length()
+  let plen = pat.length()
+  if slen < plen { return false }
+  let start = slen - plen
+  for j = 0; j < plen; j = j + 1 {
+    if s.get_char(start + j).unwrap() != pat.get_char(j).unwrap() {
+      return false
+    }
+  }
+  true
+}
+
+///| Extract substring from `from` (inclusive) to `to` (exclusive).
+pub fn str_substring(s : String, from : Int, to : Int) -> String {
+  let mut result = ""
+  let mut i = from
+  while i < to {
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(s.get_char(i).unwrap()))
+    i = i + 1
+  }
+  result
+}

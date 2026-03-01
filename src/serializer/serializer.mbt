@@ -5,10 +5,6 @@
 //
 // NOTE: No StringBuilder — all strings built via `+` (wasm:js-string "concat").
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
-let default_stroke_w : Int = 12700  // 1 pt in EMU
-
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
@@ -247,11 +243,19 @@ fn serialize_transform(t : @ooxml.ShapeTransform) -> String {
 
 fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
   let mut out = "<p:sp>"
-  // Non-visual properties (minimal)
+  // Non-visual properties
   out = out + "<p:nvSpPr>"
   out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
   out = out + "<p:cNvSpPr/>"
-  out = out + "<p:nvPr/>"
+  if not(shape.ph_type.is_empty()) {
+    let mut ph = "<p:nvPr><p:ph type=\"" + shape.ph_type + "\""
+    if shape.ph_idx >= 0 {
+      ph = ph + " idx=\"" + int_to_str(shape.ph_idx) + "\""
+    }
+    out = out + ph + "/></p:nvPr>"
+  } else {
+    out = out + "<p:nvPr/>"
+  }
   out = out + "</p:nvSpPr>"
   // Shape properties
   out = out + "<p:spPr>"
@@ -265,7 +269,7 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   }
   // Stroke
   if not(shape.stroke.is_none()) {
-    let w = if shape.stroke_w > 0 { shape.stroke_w } else { default_stroke_w }
+    let w = if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }
     out = out + "<a:ln w=\"" + int_to_str(w) + "\">"
     out = out + serialize_color(shape.stroke)
     out = out + "</a:ln>"
