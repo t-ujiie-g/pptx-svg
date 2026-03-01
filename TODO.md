@@ -1,6 +1,6 @@
 # pptx-render — PPTX 完全互換レンダリングライブラリ
 
-**目標**: OOXML PresentationML (ECMA-376 / ISO 29500) 準拠の PPTX → SVG レンダリング + PPTX エクスポート
+**目標**: OOXML PresentationML (ECMA-376 / ISO 29500) 準拠の PPTX → SVG レンダリング + PPTX エクスポート  
 **スコープ外**: アニメーション (`p:timing`)、トランジション (`p:transition`)、マクロ/VBA
 
 ---
