@@ -36,15 +36,17 @@ python3 -m http.server 8765 --directory .
 
 **Module dependency (no cycles):**
 ```
-main → renderer   → ooxml → xml
-     → svg_parser → ooxml → xml
-     → serializer → ooxml
+main → renderer   → xml, ooxml, ffi
+     → svg_parser → xml, ooxml
+     → serializer → xml, ooxml, ffi
      → ffi
+xml (shared: int_to_str, parse_int, XML parser)
+ooxml → xml (types, PPTX parser, parse_hex_color)
 ```
 
 ## Critical MoonBit constraints
 
-**No integer string interpolation.** `"\{n}"` for integer `n` calls `fromCharCodeArray` internally, which requires `{ builtins: ['js-string'] }` browser support (Chrome 117+). The codebase uses `int_to_str(n)` helper instead, which only uses `concat` + string literals and works in all wasm-gc browsers (Chrome 111+).
+**No integer string interpolation.** `"\{n}"` for integer `n` calls `fromCharCodeArray` internally, which requires `{ builtins: ['js-string'] }` browser support (Chrome 117+). The codebase uses `@xml.int_to_str(n)` (defined in `xml.mbt`, aliased locally as `fn int_to_str(n) -> String { @xml.int_to_str(n) }`) which only uses `concat` + string literals and works in all wasm-gc browsers (Chrome 111+).
 
 **String API:** Use `s.get_char(i).unwrap()` (not deprecated `unsafe_char_at`). Avoid `s[i:j]` in non-error functions — it raises `CreatingViewError`.
 
@@ -71,14 +73,15 @@ main → renderer   → ooxml → xml
 
 ```
 SlideData { slide_size: SlideSize, background: Color, shapes: Array[Shape] }
-Shape { kind: ShapeKind, transform: ShapeTransform, fill, stroke, stroke_w, paragraphs }
+Shape { kind: ShapeKind, transform: ShapeTransform, fill, stroke, stroke_w, paragraphs, body_props }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape | Other
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Other(String)
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
 
-TextParagraph { runs: Array[TextRun], align: String, level: Int }
-TextRun { text, bold, italic, font_size, color, font_face }
+TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, bullet, bullet_auto, bullet_none }
+TextRun { text, bold, italic, font_size, color, font_face, underline, strike, baseline }
+BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit }
 
 TableData { col_widths: Array[Int], rows: Array[TableRow] }
 TableRow { height: Int, cells: Array[TableCell] }

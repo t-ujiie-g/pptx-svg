@@ -13,31 +13,11 @@ fn parse_int(s : String) -> Int {
 
 // ── Color parsing ────────────────────────────────────────────────────────────
 
-fn hex_digit(c : Char) -> Int {
-  let v = Char::to_int(c)
-  if v >= 48 && v <= 57 {
-    v - 48
-  } else if v >= 65 && v <= 70 {
-    v - 55
-  } else if v >= 97 && v <= 102 {
-    v - 87
-  } else {
-    0
-  }
-}
-
-fn parse_hex2(s : String, offset : Int) -> Int {
-  hex_digit(s.get_char(offset).unwrap()) * 16 +
-  hex_digit(s.get_char(offset + 1).unwrap())
-}
-
 fn parse_hex_color(s : String) -> @ooxml.Color {
   if s == "none" {
     @ooxml.Color::none()
-  } else if s.length() >= 6 {
-    { r: parse_hex2(s, 0), g: parse_hex2(s, 2), b: parse_hex2(s, 4) }
   } else {
-    @ooxml.Color::black()
+    @ooxml.parse_hex_color(s)
   }
 }
 
@@ -93,7 +73,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   let italic_s = get_data_attr(run_node, "font-style")
                   let italic = italic_s == "italic"
                   let font_face = get_data_attr(run_node, "data-ooxml-run-font")
-                  runs.push({ text, bold, italic, font_size, color, font_face })
+                  runs.push({ text, bold, italic, font_size, color, font_face, underline: "", strike: "", baseline: 0 })
                 }
               }
               @xml.XmlNode::Text(text) => {
@@ -107,6 +87,9 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                       font_size: 0,
                       color: @ooxml.Color::none(),
                       font_face: "",
+                      underline: "",
+                      strike: "",
+                      baseline: 0,
                     },
                   )
                 }
@@ -114,7 +97,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             }
             j = j + 1
           }
-          paras.push({ runs, align, level })
+          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false })
         }
       }
       _ => ()
@@ -175,7 +158,22 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     i = i + 1
   }
 
-  { kind, transform, fill, stroke, stroke_w, paragraphs }
+  // Parse body props from data attributes
+  let bp_anchor = get_data_attr(g_node, "data-ooxml-anchor")
+  let bp_l_ins = get_data_int(g_node, "data-ooxml-l-ins")
+  let bp_t_ins = get_data_int(g_node, "data-ooxml-t-ins")
+  let bp_r_ins = get_data_int(g_node, "data-ooxml-r-ins")
+  let bp_b_ins = get_data_int(g_node, "data-ooxml-b-ins")
+  let bp_auto_fit = get_data_attr(g_node, "data-ooxml-auto-fit") == "1"
+  let body_props : @ooxml.BodyProps = {
+    anchor: bp_anchor,
+    l_ins: if bp_l_ins == 0 { -1 } else { bp_l_ins },
+    t_ins: if bp_t_ins == 0 { -1 } else { bp_t_ins },
+    r_ins: if bp_r_ins == 0 { -1 } else { bp_r_ins },
+    b_ins: if bp_b_ins == 0 { -1 } else { bp_b_ins },
+    auto_fit: bp_auto_fit,
+  }
+  { kind, transform, fill, stroke, stroke_w, paragraphs, body_props }
 }
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {

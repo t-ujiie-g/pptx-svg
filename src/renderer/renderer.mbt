@@ -11,24 +11,22 @@
 // NOTE: No StringBuilder.  All strings built via `+` (wasm:js-string "concat"),
 // which is polyfillable in Tier-2/3 browsers.
 
-// ── Integer → String ──────────────────────────────────────────────────────────
+// ── EMU constants ────────────────────────────────────────────────────────────
+// 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
-fn digit_str(d : Int) -> String {
-  match d {
-    0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4"
-    5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; _ => "9"
-  }
-}
+let default_font_size_emu_ : Int = 228600  // 18 pt
+let default_l_inset : Int = 91440          // 0.1 in (left / right)
+let default_t_inset : Int = 45720          // 0.05 in (top / bottom)
+let level_indent_emu : Int = 342900        // indent per bullet level
+let default_stroke_w : Int = 12700         // 1 pt
+let svg_target_width : Int = 960           // output SVG width in px
+let default_emu_per_px : Int = 9525        // EMU per pixel at 96 DPI
+let line_height_numer : Int = 12           // line-height = font-size * line_height_numer / line_height_denom
+let line_height_denom : Int = 10
 
-fn int_to_str(n : Int) -> String {
-  if n < 0 {
-    "-" + int_to_str(-n)
-  } else if n < 10 {
-    digit_str(n)
-  } else {
-    int_to_str(n / 10) + digit_str(n % 10)
-  }
-}
+// ── Shared helpers (from @xml) ───────────────────────────────────────────────
+
+fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
 
 // ── SVG attribute helpers ─────────────────────────────────────────────────────
 
@@ -91,7 +89,7 @@ fn hundredth_pt_to_emu(sz : Int) -> Int {
 }
 
 fn default_font_size_emu() -> Int {
-  228600 // 18 pt
+  default_font_size_emu_
 }
 
 // ── Rotation transform ────────────────────────────────────────────────────────
@@ -172,21 +170,155 @@ fn geom_str(kind : @ooxml.ShapeKind) -> String {
   }
 }
 
+// ── Bullet auto-numbering ─────────────────────────────────────────────────────
+
+fn auto_number_text(type_ : String, idx : Int) -> String {
+  let n = idx + 1
+  if type_ == "arabicPeriod" {
+    int_to_str(n) + "."
+  } else if type_ == "arabicParenR" {
+    int_to_str(n) + ")"
+  } else if type_ == "alphaLcPeriod" {
+    alpha_lower(n) + "."
+  } else if type_ == "alphaLcParenR" {
+    alpha_lower(n) + ")"
+  } else if type_ == "alphaUcPeriod" {
+    alpha_upper(n) + "."
+  } else if type_ == "alphaUcParenR" {
+    alpha_upper(n) + ")"
+  } else if type_ == "romanLcPeriod" {
+    roman_lower(n) + "."
+  } else if type_ == "romanUcPeriod" {
+    roman_upper(n) + "."
+  } else {
+    int_to_str(n) + "."
+  }
+}
+
+fn alpha_lower(n : Int) -> String {
+  if n >= 1 && n <= 26 {
+    @ffi.ffi_char_code_to_str(96 + n)
+  } else {
+    int_to_str(n)
+  }
+}
+
+fn alpha_upper(n : Int) -> String {
+  if n >= 1 && n <= 26 {
+    @ffi.ffi_char_code_to_str(64 + n)
+  } else {
+    int_to_str(n)
+  }
+}
+
+fn roman_lower(n : Int) -> String {
+  roman_convert(n, true)
+}
+
+fn roman_upper(n : Int) -> String {
+  roman_convert(n, false)
+}
+
+fn roman_convert(n : Int, lower : Bool) -> String {
+  if n <= 0 || n > 3999 { return int_to_str(n) }
+  let vals  = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
+  let syms  = ["M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"]
+  let syml  = ["m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"]
+  let mut result = ""
+  let mut rem = n
+  let mut i = 0
+  while i < 13 {
+    while rem >= vals[i] {
+      result = result + (if lower { syml[i] } else { syms[i] })
+      rem = rem - vals[i]
+    }
+    i = i + 1
+  }
+  result
+}
+
 // ── Text rendering ────────────────────────────────────────────────────────────
+
+fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
+  let nr = para.runs.length()
+  let mut max_fs = 0
+  let mut i = 0
+  while i < nr {
+    let fs = para.runs[i].font_size
+    if fs > max_fs { max_fs = fs }
+    i = i + 1
+  }
+  if max_fs > 0 { hundredth_pt_to_emu(max_fs) } else { 0 }
+}
+
+fn para_font_size(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> Int {
+  let emu = para_max_font_emu(para)
+  if emu > 0 { px(emu, scale) } else { def_sz }
+}
+
+fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) -> Int {
+  let emu = para_max_font_emu(para)
+  if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+}
 
 fn render_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
   scale : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
+  body_props : @ooxml.BodyProps
 ) -> String {
   if paragraphs.length() == 0 { return "" }
-  let pad_x   = px(t.cx / 20, scale)
-  let pad_y   = px(t.cy / 20, scale)
-  let text_x  = px(t.x, scale) + pad_x
-  let text_w  = px(t.cx, scale) - pad_x * 2
+  // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
+  let l_ins = if body_props.l_ins >= 0 { body_props.l_ins } else { default_l_inset }
+  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
+  let r_ins = if body_props.r_ins >= 0 { body_props.r_ins } else { default_l_inset }
+
+  let pad_l   = px(l_ins, scale)
+  let pad_t   = px(t_ins, scale)
+  let pad_r   = px(r_ins, scale)
+  let text_x  = px(t.x, scale) + pad_l
+  let text_w  = px(t.cx, scale) - pad_l - pad_r
   let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides
-  let line_h  = def_sz * 12 / 10
+  let def_line_h  = def_sz * line_height_numer / line_height_denom
+
+  // Calculate total text height for vertical alignment
+  let np = paragraphs.length()
+  let mut total_text_h = 0
+  let mut ti = 0
+  while ti < np {
+    let para = paragraphs[ti]
+    let nr = para.runs.length()
+    let para_line_h = para_line_height(para, scale, def_line_h)
+    if nr == 0 {
+      total_text_h = total_text_h + para_line_h
+    } else {
+      // Add spacing before
+      if para.spc_before > 0 && ti > 0 {
+        total_text_h = total_text_h + px(para.spc_before, scale)
+      }
+      total_text_h = total_text_h + para_line_h
+      // Add spacing after
+      if para.spc_after > 0 {
+        total_text_h = total_text_h + px(para.spc_after, scale)
+      }
+    }
+    ti = ti + 1
+  }
+
+  // Vertical anchor offset
+  let shape_h = px(t.cy, scale)
+  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let pad_b = px(b_ins, scale)
+  let avail_h = shape_h - pad_t - pad_b
+  let anchor_offset = if body_props.anchor == "ctr" {
+    (avail_h - total_text_h) / 2
+  } else if body_props.anchor == "b" {
+    avail_h - total_text_h
+  } else {
+    0
+  }
+  let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
 
   let font_face = theme.minor_font + ", sans-serif"
   let mut out = "<text" +
@@ -198,23 +330,42 @@ fn render_text(
     a("data-ooxml-font-face", theme.minor_font) +
     ">"
 
-  let mut cur_y = px(t.y, scale) + pad_y + def_sz
-  let np = paragraphs.length()
+  let mut cur_y = px(t.y, scale) + pad_t + anchor_offset_clamped
   let mut pi = 0
   while pi < np {
     let para = paragraphs[pi]
     let nr = para.runs.length()
+    let p_line_h = para_line_height(para, scale, def_line_h)
+    let p_font_sz = para_font_size(para, scale, def_sz)
+    // Apply spacing before paragraph
+    if para.spc_before > 0 && pi > 0 {
+      cur_y = cur_y + px(para.spc_before, scale)
+    }
+    // Advance to baseline (ascent ≈ font_size)
+    cur_y = cur_y + p_font_sz
     if nr == 0 {
-      cur_y = cur_y + line_h
+      cur_y = cur_y + (p_line_h - p_font_sz)
       pi = pi + 1
     } else {
-      let indent = para.level * 30
+      // Indent: use marL from paragraph if set, otherwise use level-based
+      let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
+      let indent = px(indent_emu, scale)
       let (anchor_x, anchor_attr) = if para.align == "ctr" || para.align == "c" {
         (text_x + indent + (text_w - indent) / 2, " text-anchor=\"middle\"")
       } else if para.align == "r" {
         (text_x + text_w, " text-anchor=\"end\"")
       } else {
         (text_x + indent, " text-anchor=\"start\"")
+      }
+      // Determine bullet text
+      let bullet_text = if para.bullet_none {
+        ""
+      } else if not(para.bullet.is_empty()) {
+        para.bullet
+      } else if not(para.bullet_auto.is_empty()) {
+        auto_number_text(para.bullet_auto, pi)
+      } else {
+        ""
       }
       // Paragraph-level tspan with data-ooxml-* attributes
       let para_align = if para.align.is_empty() { "l" } else { para.align }
@@ -226,6 +377,10 @@ fn render_text(
         a("data-ooxml-para-align", para_align) +
         ai("data-ooxml-para-lvl", para.level) +
         ">"
+      // Render bullet if present
+      if not(bullet_text.is_empty()) {
+        out = out + "<tspan>" + svg_escape(bullet_text) + " </tspan>"
+      }
       let mut ri = 0
       while ri < nr {
         let run = para.runs[ri]
@@ -242,22 +397,77 @@ fn render_text(
         if not(run.color.is_none()) {
           span = span + a("fill", run.color.to_css())
         }
+        // Text decorations
+        let mut deco = ""
+        if not(run.underline.is_empty()) && run.underline != "none" {
+          deco = "underline"
+        }
+        if run.strike == "sngStrike" || run.strike == "dblStrike" {
+          if deco.is_empty() { deco = "line-through" } else { deco = deco + " line-through" }
+        }
+        if not(deco.is_empty()) {
+          span = span + a("text-decoration", deco)
+        }
+        // Superscript / subscript via baseline-shift
+        if run.baseline > 0 {
+          span = span + a("baseline-shift", "super")
+          span = span + a("font-size", "70%")
+        } else if run.baseline < 0 {
+          span = span + a("baseline-shift", "sub")
+          span = span + a("font-size", "70%")
+        }
         // data-ooxml-* attributes for round-trip
         span = span +
           a("data-ooxml-run-idx", int_to_str(ri)) +
           a("data-ooxml-bold", bool_str(run.bold)) +
           a("data-ooxml-font-size", int_to_str(run.font_size)) +
           a("data-ooxml-color", run.color.to_hex()) +
-          a("data-ooxml-run-font", run.font_face)
+          a("data-ooxml-run-font", run.font_face) +
+          a("data-ooxml-underline", run.underline) +
+          a("data-ooxml-strike", run.strike) +
+          ai("data-ooxml-baseline", run.baseline)
         out = out + span + ">" + svg_escape(run.text) + "</tspan>"
         ri = ri + 1
       }
       out = out + "</tspan>"
-      cur_y = cur_y + line_h
+      cur_y = cur_y + (p_line_h - p_font_sz)
+      // Apply spacing after paragraph
+      if para.spc_after > 0 {
+        cur_y = cur_y + px(para.spc_after, scale)
+      }
       pi = pi + 1
     }
   }
   out + "</text>"
+}
+
+// ── Text height estimation ──────────────────────────────────────────────────
+
+fn estimate_text_height(
+  paragraphs : Array[@ooxml.TextParagraph],
+  scale : Int,
+  body_props : @ooxml.BodyProps
+) -> Int {
+  let def_sz = px(default_font_size_emu(), scale)
+  let def_line_h = def_sz * line_height_numer / line_height_denom
+  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
+  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let np = paragraphs.length()
+  let mut total = 0
+  let mut i = 0
+  while i < np {
+    let para = paragraphs[i]
+    let plh = para_line_height(para, scale, def_line_h)
+    if para.spc_before > 0 && i > 0 {
+      total = total + px(para.spc_before, scale)
+    }
+    total = total + plh
+    if para.spc_after > 0 {
+      total = total + px(para.spc_after, scale)
+    }
+    i = i + 1
+  }
+  total + px(t_ins, scale) + px(b_ins, scale)
 }
 
 // ── Shape rendering ───────────────────────────────────────────────────────────
@@ -274,7 +484,14 @@ fn render_shape(
   let x_p  = px(t.x,  scale)
   let y_p  = px(t.y,  scale)
   let cx_p = px(t.cx, scale)
-  let cy_p = px(t.cy, scale)
+  let mut cy_p = px(t.cy, scale)
+  // Apply autoFit: expand shape height if text overflows (never shrink)
+  if shape.body_props.auto_fit && shape.paragraphs.length() > 0 {
+    let text_h = estimate_text_height(shape.paragraphs, scale, shape.body_props)
+    if text_h > cy_p {
+      cy_p = text_h
+    }
+  }
   if cx_p <= 0 || cy_p <= 0 { return "" }
   let rot = rotation_attr(t, scale)
 
@@ -290,7 +507,13 @@ fn render_shape(
     a("data-ooxml-fill", shape.fill.to_hex()) +
     a("data-ooxml-stroke", shape.stroke.to_hex()) +
     ai("data-ooxml-stroke-w", shape.stroke_w) +
-    ai("data-ooxml-shape-idx", shape_idx)
+    ai("data-ooxml-shape-idx", shape_idx) +
+    a("data-ooxml-anchor", shape.body_props.anchor) +
+    ai("data-ooxml-l-ins", shape.body_props.l_ins) +
+    ai("data-ooxml-t-ins", shape.body_props.t_ins) +
+    ai("data-ooxml-r-ins", shape.body_props.r_ins) +
+    ai("data-ooxml-b-ins", shape.body_props.b_ins) +
+    a("data-ooxml-auto-fit", bool_str(shape.body_props.auto_fit))
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
@@ -300,7 +523,7 @@ fn render_shape(
       } else {
         a("stroke", shape.stroke.to_css()) +
         ai("stroke-width",
-          px(if shape.stroke_w > 0 { shape.stroke_w } else { 12700 }, scale))
+          px(if shape.stroke_w > 0 { shape.stroke_w } else { default_stroke_w }, scale))
       }
       let rect_svg = match geom {
         @ooxml.ShapeGeom::Ellipse => {
@@ -325,7 +548,13 @@ fn render_shape(
           }
         }
       }
-      rect_svg + render_text(shape.paragraphs, t, scale, theme)
+      // For autoFit, use adjusted cy for text rendering if shape was expanded
+      let text_t : @ooxml.ShapeTransform = if shape.body_props.auto_fit && cy_p > px(t.cy, scale) {
+        { x: t.x, y: t.y, cx: t.cx, cy: cy_p * scale, rot: t.rot, flip_h: t.flip_h, flip_v: t.flip_v }
+      } else {
+        t
+      }
+      rect_svg + render_text(shape.paragraphs, text_t, scale, theme, shape.body_props)
     }
     @ooxml.ShapeKind::Picture(rid) => {
       let target = @ooxml.find_rel_target(rels, rid)
@@ -380,7 +609,7 @@ fn render_table_cell_text(
   let tx = cell_x + pad
   let def_sz = px(default_font_size_emu(), scale)
   let font_sz = if def_sz > cell_h - pad * 2 { cell_h - pad * 2 } else { def_sz }
-  let line_h = font_sz * 12 / 10
+  let line_h = font_sz * line_height_numer / line_height_denom
   let font_face = theme.minor_font + ", sans-serif"
   let mut out = "<text" +
     ai("x", tx) +
@@ -487,9 +716,9 @@ pub fn render_slide_svg(
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
-  let w = 960
-  let scale = if sw > 0 { sw / w } else { 9525 }
-  let h = if scale > 0 { sh / scale } else { 540 }
+  let w = svg_target_width
+  let scale = if sw > 0 { sw / w } else { default_emu_per_px }
+  let h = if scale > 0 { sh / scale } else { svg_target_width * 9 / 16 }
   let header = "<svg" +
     " xmlns=\"http://www.w3.org/2000/svg\"" +
     " xmlns:xlink=\"http://www.w3.org/1999/xlink\"" +

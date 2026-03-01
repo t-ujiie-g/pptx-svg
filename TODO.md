@@ -12,6 +12,8 @@
 - [x] AutoShape (rect / ellipse / roundRect / line) + 回転 / フリップ
 - [x] Picture (PNG / JPEG / GIF / SVG → data URI base64)
 - [x] テキスト (段落 / ラン / bold / italic / fontSize / color / fontFace / level)
+- [x] `a:defRPr` デフォルトランプロパティ (bold / italic / fontSize / color / fontFace のフォールバック)
+- [x] XML エンティティデコード (`&amp;` → `&` テキストノード)
 - [x] テーブル (`p:graphicFrame` + `a:tbl` — セル背景 / テキスト)
 - [x] スライド背景色 (`p:bg` → `p:bgPr` → solidFill)
 - [x] テーマ解決 (theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod)
@@ -37,24 +39,25 @@
 ## 2. テキスト — 完全対応 [P0]
 
 ### 2.1 段落プロパティ
-- [ ] スペーシング: `a:spcBef` (前) / `a:spcAft` (後) / `a:lnSpc` (行間)
-- [ ] インデント: `a:pPr marL/marR/indent` — 左/右マージン、ぶら下げ
+- [x] スペーシング: `a:spcBef` (前) / `a:spcAft` (後) — パース + レンダリング
+- [ ] 行間 (`a:lnSpc`) — パースのみ（レンダリング未完）
+- [x] インデント: `a:pPr marL/indent` — 左マージン、ぶら下げインデント
 - [ ] タブストップ (`a:tabLst`)
 - [ ] RTL / BiDi (`a:pPr rtl`)
 
 ### 2.2 箇条書き / 番号付きリスト
-- [ ] 文字バレット (`a:buChar char="●"`)
-- [ ] 自動番号 (`a:buAutoNum type="arabicPeriod/alphaLcParenR/..."`)
+- [x] 文字バレット (`a:buChar char="●"`)
+- [x] 自動番号 (`a:buAutoNum type="arabicPeriod/alphaLcParenR/..."`)
 - [ ] バレットフォント (`a:buFont typeface`)
 - [ ] バレットサイズ (`a:buSzPct` / `a:buSzPts`)
 - [ ] バレット色 (`a:buClr`)
-- [ ] バレット非表示 (`a:buNone`)
+- [x] バレット非表示 (`a:buNone`)
 - [ ] 画像バレット (`a:buBlip`)
 
 ### 2.3 ラン装飾
-- [ ] 下線 (`a:rPr u="sng/dbl/heavy/dotted/dash/wavy/..."` — 18 種)
-- [ ] 取り消し線 (`a:rPr strike="sngStrike/dblStrike"`)
-- [ ] 上付き / 下付き (`a:rPr baseline="30000/-25000"`)
+- [x] 下線 (`a:rPr u="sng/dbl/heavy/dotted/dash/wavy/..."` — 18 種)
+- [x] 取り消し線 (`a:rPr strike="sngStrike/dblStrike"`)
+- [x] 上付き / 下付き (`a:rPr baseline="30000/-25000"`)
 - [ ] 文字間隔 (`a:rPr spc`)
 - [ ] カーニング (`a:rPr kern`)
 - [ ] キャピタライズ (`a:rPr cap="all/small"`)
@@ -66,9 +69,10 @@
 - [ ] フォントテーマ参照 (`a:latin typeface="+mj-lt"/"+mn-lt"`)
 
 ### 2.5 テキストボディ
-- [ ] `a:bodyPr` — アンカー (`anchor="ctr/b/t"`) 垂直位置合わせ
-- [ ] 内部マージン (`lIns/tIns/rIns/bIns`)
-- [ ] 自動フィット (`a:normAutofit fontScale/lnSpcReduction`, `a:spAutoFit`)
+- [x] `a:bodyPr` — アンカー (`anchor="ctr/b/t"`) 垂直位置合わせ
+- [x] 内部マージン (`lIns/tIns/rIns/bIns`)
+- [x] シェイプ自動フィット (`a:spAutoFit`) — テキスト溢れ時にシェイプ拡大
+- [ ] テキスト自動フィット (`a:normAutofit fontScale/lnSpcReduction`)
 - [ ] テキスト折り返し (`wrap="square/none"`)
 - [ ] カラム数 (`numCol`) / カラム間隔 (`spcCol`)
 - [ ] 縦書き (`vert="eaVert/vert/vert270/wordArtVert/..."`)
@@ -278,27 +282,27 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 ### 12.1 TypeScript ライブラリ化
 - [x] `host.js` → TypeScript 分離 (`lib/`)
-- [ ] `lib/pptx-renderer.ts` — PptxRenderer クラス (コア API)
-- [ ] `lib/wasm-compat.ts` — 3-tier Wasm インスタンス化
-- [ ] `lib/zip.ts` — ZIP 解凍 / 構築
-- [ ] `lib/utils.ts` — CRC-32, base64
-- [ ] `lib/index.ts` — 公開 API re-export
-- [ ] `web/` — デモ UI (ライブラリをインポートして使う)
+- [x] `lib/pptx-renderer.ts` — PptxRenderer クラス (コア API)
+- [x] `lib/wasm-compat.ts` — 3-tier Wasm インスタンス化
+- [x] `lib/zip.ts` — ZIP 解凍 / 構築
+- [x] `lib/utils.ts` — CRC-32, base64
+- [x] `lib/index.ts` — 公開 API re-export
+- [x] `web/` — デモ UI (ライブラリをインポートして使う)
 
 ### 12.2 ビルド / パッケージング
-- [ ] `tsconfig.json` — ESM 出力 (`dist/`)
-- [ ] `package.json` — name, version, exports, types, files
-- [ ] `dist/pptx-render.js` + `dist/pptx-render.d.ts`
-- [ ] `dist/pptx-render.wasm` — ビルド成果物コピー
+- [x] `tsconfig.json` — ESM 出力 (`dist/`)
+- [x] `package.json` — name, version, exports, types, files
+- [x] `dist/` — JS + `.d.ts` + source maps 出力
+- [ ] `dist/pptx-render.wasm` — ビルド成果物コピー (ビルドスクリプト)
 - [ ] npm publish ワークフロー
 
 ### 12.3 API 設計
-- [ ] `PptxRenderer.init(wasmUrl | wasmBytes)` — Wasm 初期化
-- [ ] `PptxRenderer.loadPptx(ArrayBuffer)` — PPTX ロード
-- [ ] `PptxRenderer.renderSlide(idx) → string (SVG)`
-- [ ] `PptxRenderer.getSlideCount() → number`
-- [ ] `PptxRenderer.exportPptx() → Promise<ArrayBuffer>`
-- [ ] `PptxRenderer.getSlideXml(idx) → string` — デバッグ用
+- [x] `PptxRenderer.init(wasmUrl | wasmBytes)` — Wasm 初期化
+- [x] `PptxRenderer.loadPptx(ArrayBuffer)` — PPTX ロード
+- [x] `PptxRenderer.renderSlideSvg(idx) → string (SVG)`
+- [x] `PptxRenderer.getSlideCount() → number`
+- [x] `PptxRenderer.exportPptx() → Promise<ArrayBuffer>`
+- [x] `PptxRenderer.getSlideXmlRaw(idx) → string` — デバッグ用
 - [ ] エラーハンドリング (例外 vs Result 型)
 
 ### 12.4 テスト

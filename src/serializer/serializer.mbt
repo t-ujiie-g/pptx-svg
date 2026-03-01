@@ -5,24 +5,13 @@
 //
 // NOTE: No StringBuilder — all strings built via `+` (wasm:js-string "concat").
 
-// ── Integer → String ──────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
-fn digit_str(d : Int) -> String {
-  match d {
-    0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4"
-    5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; _ => "9"
-  }
-}
+let default_stroke_w : Int = 12700  // 1 pt in EMU
 
-fn int_to_str(n : Int) -> String {
-  if n < 0 {
-    "-" + int_to_str(-n)
-  } else if n < 10 {
-    digit_str(n)
-  } else {
-    int_to_str(n / 10) + digit_str(n % 10)
-  }
-}
+// ── Shared helpers (from @xml) ───────────────────────────────────────────────
+
+fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
 
 // ── XML helpers ──────────────────────────────────────────────────────────────
 
@@ -73,14 +62,62 @@ fn serialize_color(color : @ooxml.Color) -> String {
 
 // ── Text body serialization ──────────────────────────────────────────────────
 
+///| Serialize a:bodyPr element.
+fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
+  let has_attrs = not(bp.anchor.is_empty()) || bp.l_ins >= 0 || bp.t_ins >= 0 ||
+    bp.r_ins >= 0 || bp.b_ins >= 0
+  if not(has_attrs) {
+    return "<a:bodyPr/>"
+  }
+  let mut out = "<a:bodyPr"
+  if not(bp.anchor.is_empty()) {
+    out = out + " anchor=\"" + bp.anchor + "\""
+  }
+  if bp.l_ins >= 0 {
+    out = out + " lIns=\"" + int_to_str(bp.l_ins) + "\""
+  }
+  if bp.t_ins >= 0 {
+    out = out + " tIns=\"" + int_to_str(bp.t_ins) + "\""
+  }
+  if bp.r_ins >= 0 {
+    out = out + " rIns=\"" + int_to_str(bp.r_ins) + "\""
+  }
+  if bp.b_ins >= 0 {
+    out = out + " bIns=\"" + int_to_str(bp.b_ins) + "\""
+  }
+  if bp.auto_fit {
+    out + "><a:spAutoFit/></a:bodyPr>"
+  } else {
+    out + "/>"
+  }
+}
+
+///| Serialize spacing as a:spcBef or a:spcAft child element.
+fn serialize_spacing(tag : String, val : Int) -> String {
+  if val == 0 {
+    return ""
+  }
+  let mut out = "<" + tag + ">"
+  if val < 0 {
+    // Negative = percentage (stored as negated value)
+    out = out + "<a:spcPct val=\"" + int_to_str(-val) + "\"/>"
+  } else {
+    // Positive = EMU → convert back to hundredths-of-a-point
+    let hpt = val / 127
+    out = out + "<a:spcPts val=\"" + int_to_str(hpt) + "\"/>"
+  }
+  out + "</" + tag + ">"
+}
+
 ///| Serialize paragraphs as OOXML text body content (shared by shapes and table cells).
 ///  `wrapper` is the outer tag: "p:txBody" for shapes, "a:txBody" for table cells.
 fn serialize_text_body_inner(
   paragraphs : Array[@ooxml.TextParagraph],
-  wrapper : String
+  wrapper : String,
+  body_props : @ooxml.BodyProps
 ) -> String {
   let mut out = "<" + wrapper + ">"
-  out = out + "<a:bodyPr/><a:lstStyle/>"
+  out = out + serialize_body_pr(body_props) + "<a:lstStyle/>"
   let np = paragraphs.length()
   let mut pi = 0
   while pi < np {
@@ -89,7 +126,12 @@ fn serialize_text_body_inner(
     // Paragraph properties
     let has_align = not(para.align.is_empty())
     let has_level = para.level > 0
-    if has_align || has_level {
+    let has_mar_l = para.mar_l > 0
+    let has_indent = para.indent != 0
+    let has_spc = para.spc_before != 0 || para.spc_after != 0
+    let has_bullet = not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) || para.bullet_none
+    let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_bullet
+    if has_ppr {
       let mut ppr = "<a:pPr"
       if has_align {
         ppr = ppr + " algn=\"" + para.align + "\""
@@ -97,7 +139,28 @@ fn serialize_text_body_inner(
       if has_level {
         ppr = ppr + " lvl=\"" + int_to_str(para.level) + "\""
       }
-      out = out + ppr + "/>"
+      if has_mar_l {
+        ppr = ppr + " marL=\"" + int_to_str(para.mar_l) + "\""
+      }
+      if has_indent {
+        ppr = ppr + " indent=\"" + int_to_str(para.indent) + "\""
+      }
+      let has_children = has_spc || has_bullet
+      if has_children {
+        ppr = ppr + ">"
+        ppr = ppr + serialize_spacing("a:spcBef", para.spc_before)
+        ppr = ppr + serialize_spacing("a:spcAft", para.spc_after)
+        if para.bullet_none {
+          ppr = ppr + "<a:buNone/>"
+        } else if not(para.bullet.is_empty()) {
+          ppr = ppr + "<a:buChar char=\"" + xml_escape(para.bullet) + "\"/>"
+        } else if not(para.bullet_auto.is_empty()) {
+          ppr = ppr + "<a:buAutoNum type=\"" + para.bullet_auto + "\"/>"
+        }
+        out = out + ppr + "</a:pPr>"
+      } else {
+        out = out + ppr + "/>"
+      }
     }
     // Runs
     let nr = para.runs.length()
@@ -132,6 +195,15 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if run.font_size > 0 {
     rpr = rpr + " sz=\"" + int_to_str(run.font_size) + "\""
   }
+  if not(run.underline.is_empty()) {
+    rpr = rpr + " u=\"" + run.underline + "\""
+  }
+  if not(run.strike.is_empty()) {
+    rpr = rpr + " strike=\"" + run.strike + "\""
+  }
+  if run.baseline != 0 {
+    rpr = rpr + " baseline=\"" + int_to_str(run.baseline) + "\""
+  }
   let has_children = not(run.color.is_none()) || not(run.font_face.is_empty())
   if has_children {
     rpr = rpr + ">"
@@ -147,11 +219,11 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   }
 }
 
-fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
+fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph], body_props : @ooxml.BodyProps) -> String {
   if paragraphs.length() == 0 {
     return ""
   }
-  serialize_text_body_inner(paragraphs, "p:txBody")
+  serialize_text_body_inner(paragraphs, "p:txBody", body_props)
 }
 
 // ── Shape serialization ──────────────────────────────────────────────────────
@@ -193,14 +265,14 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   }
   // Stroke
   if not(shape.stroke.is_none()) {
-    let w = if shape.stroke_w > 0 { shape.stroke_w } else { 12700 }
+    let w = if shape.stroke_w > 0 { shape.stroke_w } else { default_stroke_w }
     out = out + "<a:ln w=\"" + int_to_str(w) + "\">"
     out = out + serialize_color(shape.stroke)
     out = out + "</a:ln>"
   }
   out = out + "</p:spPr>"
   // Text body
-  out = out + serialize_text_body(shape.paragraphs)
+  out = out + serialize_text_body(shape.paragraphs, shape.body_props)
   out + "</p:sp>"
 }
 
@@ -243,7 +315,7 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
 }
 
 fn serialize_table_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
-  serialize_text_body_inner(paragraphs, "a:txBody")
+  serialize_text_body_inner(paragraphs, "a:txBody", @ooxml.BodyProps::default())
 }
 
 fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {

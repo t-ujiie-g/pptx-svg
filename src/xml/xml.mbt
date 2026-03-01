@@ -317,7 +317,7 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
       } else {
         let text = self.read_until_char('<')
         if not(is_all_whitespace(text)) {
-          children.push(XmlNode::Text(text))
+          children.push(XmlNode::Text(decode_entities(text)))
         }
       }
     }
@@ -457,4 +457,23 @@ pub fn parse_int(s : String) -> Int {
     i = i + 1
   }
   if neg { -result } else { result }
+}
+
+///| Convert a single digit (0–9) to its string representation.
+pub fn digit_str(d : Int) -> String {
+  match d {
+    0 => "0"; 1 => "1"; 2 => "2"; 3 => "3"; 4 => "4"
+    5 => "5"; 6 => "6"; 7 => "7"; 8 => "8"; _ => "9"
+  }
+}
+
+///| Convert an integer to its decimal string representation.
+pub fn int_to_str(n : Int) -> String {
+  if n < 0 {
+    "-" + int_to_str(-n)
+  } else if n < 10 {
+    digit_str(n)
+  } else {
+    int_to_str(n / 10) + digit_str(n % 10)
+  }
 }

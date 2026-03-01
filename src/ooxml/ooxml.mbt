@@ -29,8 +29,8 @@ pub fn Color::is_none(self : Color) -> Bool {
   self.r < 0
 }
 
-// Parse a 6-char hex color string "RRGGBB" → Color
-fn parse_hex_color(s : String) -> Color {
+///| Parse a 6-char hex color string "RRGGBB" → Color.
+pub fn parse_hex_color(s : String) -> Color {
   if s.length() < 6 {
     return Color::black()
   }
@@ -467,15 +467,40 @@ pub(all) struct TextRun {
   text      : String
   bold      : Bool
   italic    : Bool
-  font_size : Int   // in half-points (sz attr); 0 = inherit
+  font_size : Int      // in hundredths-of-a-point (sz attr); 0 = inherit
   color     : Color
-  font_face : String  // explicit typeface from <a:latin>; "" = use theme font
+  font_face : String   // explicit typeface from <a:latin>; "" = use theme font
+  underline : String   // "sng", "dbl", "heavy", etc.; "" = none
+  strike    : String   // "sngStrike", "dblStrike"; "" = none
+  baseline  : Int      // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
 }
 
 pub(all) struct TextParagraph {
-  runs      : Array[TextRun]
-  align     : String  // "l", "c", "r", "just" or ""
-  level     : Int     // indent level (0 = top-level, from a:pPr lvl="N")
+  runs       : Array[TextRun]
+  align      : String  // "l", "c", "r", "just" or ""
+  level      : Int     // indent level (0 = top-level, from a:pPr lvl="N")
+  spc_before : Int     // spacing before in EMU (from a:spcBef); 0 = default
+  spc_after  : Int     // spacing after in EMU (from a:spcAft); 0 = default
+  mar_l      : Int     // left margin in EMU (from marL attr in a:pPr); 0 = default
+  indent     : Int     // first-line indent in EMU (from indent attr in a:pPr); 0 = default
+  bullet     : String  // bullet char (from a:buChar); "" = none/inherit
+  bullet_auto : String // auto-number type (from a:buAutoNum); "" = none
+  bullet_none : Bool   // explicitly no bullet (a:buNone)
+}
+
+// ── Text body properties ────────────────────────────────────────────────────
+
+pub(all) struct BodyProps {
+  anchor  : String  // vertical alignment: "t", "ctr", "b", "" = default (top)
+  l_ins   : Int     // left inset in EMU (-1 = default 91440 ≈ 0.1in)
+  t_ins   : Int     // top inset in EMU (-1 = default 45720 ≈ 0.05in)
+  r_ins   : Int     // right inset in EMU (-1 = default 91440)
+  b_ins   : Int     // bottom inset in EMU (-1 = default 45720)
+  auto_fit : Bool   // <a:spAutoFit/> — shrink shape to fit text
+}
+
+pub fn BodyProps::default() -> BodyProps {
+  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false }
 }
 
 // ── Table model ──────────────────────────────────────────────────────────────
@@ -561,6 +586,7 @@ pub(all) struct Shape {
   stroke      : Color          // Color::none() = no stroke
   stroke_w    : Int            // stroke width in EMU (0 = default ~12700)
   paragraphs  : Array[TextParagraph]
+  body_props  : BodyProps      // text body properties (anchor, insets)
 }
 
 // ── Slide data ────────────────────────────────────────────────────────────────
@@ -695,28 +721,128 @@ fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> (Colo
 
 // ── Text body parsing ─────────────────────────────────────────────────────────
 
-fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> Array[TextParagraph] {
+///| Parse spacing value from <a:spcBef>/<a:spcAft>/<a:lnSpc> children.
+///  Returns EMU. Supports <a:spcPts val="N"> (N in hundredths of a point).
+fn parse_spacing(parent : @xml.XmlNode) -> Int {
+  let ch = @xml.get_children(parent)
+  match @xml.find_child(ch, "a:spcPts") {
+    Some(pts) => {
+      // val is in hundredths of a point → convert to EMU (1 pt = 12700 EMU)
+      let v = attr_int(pts, "val")
+      v * 127 // hundredths-of-pt * 12700/100 = * 127
+    }
+    None =>
+      // a:spcPct (percentage of line height) — store raw for now as negative sentinel
+      match @xml.find_child(ch, "a:spcPct") {
+        Some(pct) => {
+          let v = attr_int(pct, "val") // e.g. 100000 = 100%
+          -(v) // negative = percentage marker
+        }
+        None => 0
+      }
+  }
+}
+
+///| Parse <a:bodyPr> element into BodyProps.
+fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
+  match @xml.find_child(ch, "a:bodyPr") {
+    None => BodyProps::default()
+    Some(bpr) => {
+      let anchor = match @xml.get_attr(bpr, "anchor") { Some(v) => v; None => "" }
+      let l_ins = match @xml.get_attr(bpr, "lIns") { Some(v) => @xml.parse_int(v); None => -1 }
+      let t_ins = match @xml.get_attr(bpr, "tIns") { Some(v) => @xml.parse_int(v); None => -1 }
+      let r_ins = match @xml.get_attr(bpr, "rIns") { Some(v) => @xml.parse_int(v); None => -1 }
+      let b_ins = match @xml.get_attr(bpr, "bIns") { Some(v) => @xml.parse_int(v); None => -1 }
+      let bpr_ch = @xml.get_children(bpr)
+      let auto_fit = match @xml.find_child(bpr_ch, "a:spAutoFit") { Some(_) => true; None => false }
+      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit }
+    }
+  }
+}
+
+///| Parse paragraph-level properties from <a:pPr>.
+fn parse_para_props(
+  ppr : @xml.XmlNode
+) -> (String, Int, Int, Int, Int, Int, String, String, Bool) {
+  let a = match @xml.get_attr(ppr, "algn") { Some(v) => v; None => "" }
+  let l = attr_int(ppr, "lvl")
+  let ml = attr_int(ppr, "marL")
+  let ind = attr_int(ppr, "indent")
+  let ppr_ch = @xml.get_children(ppr)
+  let sb = match @xml.find_child(ppr_ch, "a:spcBef") { None => 0; Some(n) => parse_spacing(n) }
+  let sa = match @xml.find_child(ppr_ch, "a:spcAft") { None => 0; Some(n) => parse_spacing(n) }
+  let bu_char = match @xml.find_child(ppr_ch, "a:buChar") {
+    None => ""
+    Some(bc) => match @xml.get_attr(bc, "char") { Some(v) => v; None => "" }
+  }
+  let bu_auto = match @xml.find_child(ppr_ch, "a:buAutoNum") {
+    None => ""
+    Some(ba) => match @xml.get_attr(ba, "type") { Some(v) => v; None => "" }
+  }
+  let bu_none = match @xml.find_child(ppr_ch, "a:buNone") { Some(_) => true; None => false }
+  (a, l, sb, sa, ml, ind, bu_char, bu_auto, bu_none)
+}
+
+///| Parse <a:defRPr> defaults from a <a:pPr> node.
+fn parse_def_rpr(
+  ppr : @xml.XmlNode,
+  theme : ThemeData
+) -> (Bool, Bool, Int, Color, String) {
+  let ppr_ch = @xml.get_children(ppr)
+  match @xml.find_child(ppr_ch, "a:defRPr") {
+    None => (false, false, 0, Color::none(), "")
+    Some(drpr) => {
+      let db = match @xml.get_attr(drpr, "b") { Some(v) => v == "1" || v == "true"; None => false }
+      let di = match @xml.get_attr(drpr, "i") { Some(v) => v == "1" || v == "true"; None => false }
+      let dsz = attr_int(drpr, "sz")
+      let drpr_ch = @xml.get_children(drpr)
+      let dclr = parse_solid_fill(drpr_ch, theme)
+      let dff = child_attr(drpr_ch, "a:latin", "typeface")
+      (db, di, dsz, dclr, dff)
+    }
+  }
+}
+
+///| Parse run properties from <a:rPr> with defRPr fallback.
+fn parse_run_props(
+  rpr : @xml.XmlNode,
+  def_bold : Bool, def_italic : Bool, def_font_size : Int,
+  def_color : Color, def_font_face : String,
+  theme : ThemeData
+) -> (Bool, Bool, Int, Color, String, String, String, Int) {
+  let b = match @xml.get_attr(rpr, "b") { Some(v) => v == "1" || v == "true"; None => def_bold }
+  let it = match @xml.get_attr(rpr, "i") { Some(v) => v == "1" || v == "true"; None => def_italic }
+  let sz_raw = attr_int(rpr, "sz")
+  let sz = if sz_raw > 0 { sz_raw } else { def_font_size }
+  let u = match @xml.get_attr(rpr, "u") { Some(v) => v; None => "" }
+  let st = match @xml.get_attr(rpr, "strike") { Some(v) => v; None => "" }
+  let bl = attr_int(rpr, "baseline")
+  let rpr_ch = @xml.get_children(rpr)
+  let clr_raw = parse_solid_fill(rpr_ch, theme)
+  let clr = if clr_raw.is_none() { def_color } else { clr_raw }
+  let ff_raw = child_attr(rpr_ch, "a:latin", "typeface")
+  let ff = if ff_raw.is_empty() { def_font_face } else { ff_raw }
+  (b, it, sz, clr, ff, u, st, bl)
+}
+
+fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParagraph], BodyProps) {
   let paras : Array[TextParagraph] = []
   let ch = @xml.get_children(txbody)
+  let body_props = parse_body_props(ch)
   let pnodes = @xml.find_children(ch, "a:p")
   let np = pnodes.length()
   let mut pi = 0
   while pi < np {
     let p = pnodes[pi]
     let p_ch = @xml.get_children(p)
-    // Paragraph-level properties from <a:pPr algn="..." lvl="N">
-    let (align, level) = match @xml.find_child(p_ch, "a:pPr") {
-      None => ("", 0)
-      Some(ppr) => {
-        let a = match @xml.get_attr(ppr, "algn") {
-          Some(v) => v
-          None => ""
-        }
-        let l = attr_int(ppr, "lvl")
-        (a, l)
-      }
+    let (align, level, spc_before, spc_after, mar_l, indent, bullet, bullet_auto, bullet_none) = match @xml.find_child(p_ch, "a:pPr") {
+      None => ("", 0, 0, 0, 0, 0, "", "", false)
+      Some(ppr) => parse_para_props(ppr)
     }
-    // Collect runs from <a:r> elements
+    let (def_bold, def_italic, def_font_size, def_color, def_font_face) = match @xml.find_child(p_ch, "a:pPr") {
+      None => (false, false, 0, Color::none(), "")
+      Some(ppr) => parse_def_rpr(ppr, theme)
+    }
     let rnodes = @xml.find_children(p_ch, "a:r")
     let runs : Array[TextRun] = []
     let nr = rnodes.length()
@@ -728,39 +854,19 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> Array[TextParagr
         None => ""
         Some(t_node) => @xml.get_text_content(t_node)
       }
-      let (bold, italic, font_size, run_color, font_face) = match @xml.find_child(
-        r_ch,
-        "a:rPr",
-      ) {
-        None => (false, false, 0, Color::none(), "")
-        Some(rpr) => {
-          let b = match @xml.get_attr(rpr, "b") {
-            Some(v) => v == "1" || v == "true"
-            None => false
-          }
-          let it = match @xml.get_attr(rpr, "i") {
-            Some(v) => v == "1" || v == "true"
-            None => false
-          }
-          let sz = attr_int(rpr, "sz") // half-points
-          let rpr_ch = @xml.get_children(rpr)
-          let clr = parse_solid_fill(rpr_ch, theme)
-          // Parse <a:latin typeface="...">
-          let ff = child_attr(rpr_ch, "a:latin", "typeface")
-          (b, it, sz, clr, ff)
-        }
+      let (bold, italic, font_size, run_color, font_face, underline, strike, baseline) = match @xml.find_child(r_ch, "a:rPr") {
+        None => (def_bold, def_italic, def_font_size, def_color, def_font_face, "", "", 0)
+        Some(rpr) => parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, theme)
       }
       if not(text.is_empty()) {
-        runs.push(
-          { text, bold, italic, font_size, color: run_color, font_face },
-        )
+        runs.push({ text, bold, italic, font_size, color: run_color, font_face, underline, strike, baseline })
       }
       ri = ri + 1
     }
-    paras.push({ runs, align, level })
+    paras.push({ runs, align, level, spc_before, spc_after, mar_l, indent, bullet, bullet_auto, bullet_none })
     pi = pi + 1
   }
-  paras
+  (paras, body_props)
 }
 
 // ── Shape parsers ─────────────────────────────────────────────────────────────
@@ -792,8 +898,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   let (stroke, stroke_w) = parse_stroke(sppr_ch, theme)
   // Text
-  let paras = match @xml.find_child(ch, "p:txBody") {
-    None => []
+  let (paras, body_props) = match @xml.find_child(ch, "p:txBody") {
+    None => ([], BodyProps::default())
     Some(txb) => parse_text_body(txb, theme)
   }
   {
@@ -803,6 +909,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     stroke,
     stroke_w,
     paragraphs: paras,
+    body_props,
   }
 }
 
@@ -833,14 +940,15 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     stroke: Color::none(),
     stroke_w: 0,
     paragraphs: [],
+    body_props: BodyProps::default(),
   }
 }
 
 fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let ch = @xml.get_children(tc)
   // Parse cell text from <a:txBody>
-  let paragraphs = match @xml.find_child(ch, "a:txBody") {
-    None => []
+  let (paragraphs, _) = match @xml.find_child(ch, "a:txBody") {
+    None => ([], BodyProps::default())
     Some(txb) => parse_text_body(txb, theme)
   }
   // Parse cell fill from <a:tcPr> → solidFill
@@ -924,6 +1032,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         stroke: Color::none(),
         stroke_w: 0,
         paragraphs: [],
+        body_props: BodyProps::default(),
       }
     }
   }
@@ -937,6 +1046,7 @@ fn empty_shape() -> Shape {
     stroke: Color::none(),
     stroke_w: 0,
     paragraphs: [],
+    body_props: BodyProps::default(),
   }
 }
 
@@ -1079,27 +1189,4 @@ pub fn parse_slide(
 
 // ── Integer→string (needed here too) ─────────────────────────────────────────
 
-fn int_digit_str(d : Int) -> String {
-  match d {
-    0 => "0"
-    1 => "1"
-    2 => "2"
-    3 => "3"
-    4 => "4"
-    5 => "5"
-    6 => "6"
-    7 => "7"
-    8 => "8"
-    _ => "9"
-  }
-}
-
-fn int_to_str(n : Int) -> String {
-  if n < 0 {
-    "-" + int_to_str(-n)
-  } else if n < 10 {
-    int_digit_str(n)
-  } else {
-    int_to_str(n / 10) + int_digit_str(n % 10)
-  }
-}
+fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
