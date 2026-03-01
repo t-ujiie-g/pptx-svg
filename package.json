@@ -1,7 +1,11 @@
 {
-  "name": "pptx-render",
+  "name": "pptx-svg",
   "version": "0.1.0",
-  "description": "PPTX rendering library powered by MoonBit + Wasm-GC",
+  "description": "PPTX ↔ SVG conversion library powered by MoonBit + Wasm-GC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/t-ujiie-g/pptx-svg.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

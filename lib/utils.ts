@@ -1,5 +1,5 @@
 /**
- * Utility functions for pptx-render.
+ * Utility functions for pptx-svg.
  */
 
 /** Encode a Uint8Array as a base64 string. */

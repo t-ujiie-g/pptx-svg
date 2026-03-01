@@ -1,5 +1,5 @@
 /**
- * pptx-render host.js
+ * pptx-svg host.js
  *
  * JavaScript host layer for the MoonBit Wasm module.
  *

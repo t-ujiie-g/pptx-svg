@@ -1,4 +1,4 @@
-// pptx-render: Round-trip PPTX ↔ SVG engine
+// pptx-svg: Round-trip PPTX ↔ SVG engine
 //
 // Architecture:
 //   JavaScript host:

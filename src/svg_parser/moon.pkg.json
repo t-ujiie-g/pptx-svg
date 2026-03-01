@@ -1,6 +1,6 @@
 {
   "import": [
-    { "path": "pptx-render/xml",   "alias": "xml"   },
-    { "path": "pptx-render/ooxml", "alias": "ooxml" }
+    { "path": "pptx-svg/xml",   "alias": "xml"   },
+    { "path": "pptx-svg/ooxml", "alias": "ooxml" }
   ]
 }

@@ -1,4 +1,4 @@
-# pptx-render — PPTX 完全互換レンダリングライブラリ
+# pptx-svg — PPTX 完全互換レンダリングライブラリ
 
 **目標**: OOXML PresentationML (ECMA-376 / ISO 29500) 準拠の PPTX → SVG レンダリング + PPTX エクスポート  
 **スコープ外**: アニメーション (`p:timing`)、トランジション (`p:transition`)、マクロ/VBA
@@ -302,7 +302,7 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 - [x] `tsconfig.json` — ESM 出力 (`dist/`)
 - [x] `package.json` — name, version, exports, types, files
 - [x] `dist/` — JS + `.d.ts` + source maps 出力
-- [ ] `dist/pptx-render.wasm` — ビルド成果物コピー (ビルドスクリプト)
+- [ ] `dist/pptx-svg.wasm` — ビルド成果物コピー (ビルドスクリプト)
 - [ ] npm publish ワークフロー
 
 ### 12.3 API 設計

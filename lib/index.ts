@@ -1,9 +1,9 @@
 /**
- * pptx-render — PPTX rendering library
+ * pptx-svg — PPTX ↔ SVG conversion library
  *
  * @example
  * ```ts
- * import { PptxRenderer } from 'pptx-render';
+ * import { PptxRenderer } from 'pptx-svg';
  *
  * const renderer = new PptxRenderer();
  * await renderer.init('./main.wasm');

@@ -1,4 +1,4 @@
-// FFI declarations for pptx-render Wasm module
+// FFI declarations for pptx-svg Wasm module
 // These are host function imports provided by the JavaScript host layer.
 //
 // Architecture:

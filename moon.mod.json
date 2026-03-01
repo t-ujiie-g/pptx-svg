@@ -1,9 +1,9 @@
 {
-  "name": "pptx-render",
+  "name": "pptx-svg",
   "version": "0.1.0",
   "deps": {},
   "readme": "README.md",
-  "repository": "",
+  "repository": "https://github.com/t-ujiie-g/pptx-svg",
   "license": "MIT",
   "keywords": [],
   "description": "PPTX viewer/editor compiled to WebAssembly via MoonBit",
