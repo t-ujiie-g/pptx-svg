@@ -246,6 +246,31 @@ fn para_font_size(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> Int
   if emu > 0 { px(emu, scale) } else { def_sz }
 }
 
+///| Apply normAutofit font_scale to a pixel value.
+///| font_scale: -1=inactive, 0-100000=percentage (100000=100%).
+fn apply_font_scale(val : Int, font_scale : Int) -> Int {
+  if font_scale >= 0 && font_scale < @ooxml.pct_100 {
+    val * font_scale / @ooxml.pct_100
+  } else {
+    val
+  }
+}
+
+///| Apply normAutofit lnSpcReduction to a line height.
+///| ln_spc_reduction: -1=inactive, 0-100000=reduction percentage.
+fn apply_ln_spc_reduction(val : Int, ln_spc_reduction : Int) -> Int {
+  if ln_spc_reduction > 0 {
+    val * (@ooxml.pct_100 - ln_spc_reduction) / @ooxml.pct_100
+  } else {
+    val
+  }
+}
+
+///| Apply both normAutofit adjustments: font_scale then lnSpcReduction.
+fn apply_autofit_scale(val : Int, font_scale : Int, ln_spc_reduction : Int) -> Int {
+  apply_ln_spc_reduction(apply_font_scale(val, font_scale), ln_spc_reduction)
+}
+
 fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) -> Int {
   if para.line_spacing > 0 {
     // Positive = EMU absolute value
@@ -282,8 +307,10 @@ fn render_text(
   let pad_r   = px(r_ins, scale)
   let text_x  = px(t.x, scale) + pad_l
   let text_w  = px(t.cx, scale) - pad_l - pad_r
-  let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides
-  let def_line_h  = def_sz * line_height_numer / line_height_denom
+  let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
+  let def_line_h  = def_sz * line_height_numer / line_height_denom // unscaled default line height
+  let fs = body_props.font_scale
+  let lr = body_props.ln_spc_reduction
 
   // Calculate total text height for vertical alignment
   let np = paragraphs.length()
@@ -292,7 +319,7 @@ fn render_text(
   while ti < np {
     let para = paragraphs[ti]
     let nr = para.runs.length()
-    let para_line_h = para_line_height(para, scale, def_line_h)
+    let para_line_h = apply_autofit_scale(para_line_height(para, scale, def_line_h), fs, lr)
     if nr == 0 {
       total_text_h = total_text_h + para_line_h
     } else {
@@ -324,11 +351,12 @@ fn render_text(
   let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
 
   let font_face = theme.minor_font + ", sans-serif"
+  let scaled_def_sz = apply_font_scale(def_sz, fs)
   let mut out = "<text" +
     ai("x", text_x) +
     a("xml:space", "preserve") +
     a("font-family", font_face) +
-    ai("font-size", def_sz) +
+    ai("font-size", scaled_def_sz) +
     a("fill", "black") +
     a("data-ooxml-font-face", theme.minor_font) +
     ">"
@@ -338,8 +366,8 @@ fn render_text(
   while pi < np {
     let para = paragraphs[pi]
     let nr = para.runs.length()
-    let p_line_h = para_line_height(para, scale, def_line_h)
-    let p_font_sz = para_font_size(para, scale, def_sz)
+    let p_line_h = apply_autofit_scale(para_line_height(para, scale, def_line_h), fs, lr)
+    let p_font_sz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
     // Apply spacing before paragraph
     if para.spc_before > 0 && pi > 0 {
       cur_y = cur_y + px(para.spc_before, scale)
@@ -392,7 +420,7 @@ fn render_text(
         if run.bold   { span = span + " font-weight=\"bold\""  }
         if run.italic { span = span + " font-style=\"italic\"" }
         if run.font_size > 0 {
-          span = span + ai("font-size", px(hundredth_pt_to_emu(run.font_size), scale))
+          span = span + ai("font-size", apply_font_scale(px(hundredth_pt_to_emu(run.font_size), scale), fs))
         }
         // font-family: ea_font, latin_font, sans-serif
         if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
@@ -535,7 +563,9 @@ fn render_shape(
     ai("data-ooxml-t-ins", shape.body_props.t_ins) +
     ai("data-ooxml-r-ins", shape.body_props.r_ins) +
     ai("data-ooxml-b-ins", shape.body_props.b_ins) +
-    a("data-ooxml-auto-fit", bool_str(shape.body_props.auto_fit))
+    a("data-ooxml-auto-fit", bool_str(shape.body_props.auto_fit)) +
+    ai("data-ooxml-font-scale", shape.body_props.font_scale) +
+    ai("data-ooxml-ln-spc-reduction", shape.body_props.ln_spc_reduction)
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {

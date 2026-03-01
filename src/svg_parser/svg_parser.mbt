@@ -169,6 +169,11 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let bp_r_ins = get_data_int(g_node, "data-ooxml-r-ins")
   let bp_b_ins = get_data_int(g_node, "data-ooxml-b-ins")
   let bp_auto_fit = get_data_attr(g_node, "data-ooxml-auto-fit") == "1"
+  // normAutofit: get_data_int returns 0 for missing attrs; 0 maps to -1 (inactive).
+  // This is safe because font_scale=0 (0%) never occurs in practice, and
+  // ln_spc_reduction=0 is functionally identical to -1 (no reduction).
+  let bp_font_scale = get_data_int(g_node, "data-ooxml-font-scale")
+  let bp_ln_spc_reduction = get_data_int(g_node, "data-ooxml-ln-spc-reduction")
   let body_props : @ooxml.BodyProps = {
     anchor: bp_anchor,
     l_ins: if bp_l_ins == 0 { -1 } else { bp_l_ins },
@@ -176,6 +181,8 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     r_ins: if bp_r_ins == 0 { -1 } else { bp_r_ins },
     b_ins: if bp_b_ins == 0 { -1 } else { bp_b_ins },
     auto_fit: bp_auto_fit,
+    font_scale: if bp_font_scale == 0 { -1 } else { bp_font_scale },
+    ln_spc_reduction: if bp_ln_spc_reduction == 0 { -1 } else { bp_ln_spc_reduction },
   }
   let ph_type = get_data_attr(g_node, "data-ooxml-ph-type")
   let ph_idx = get_data_int(g_node, "data-ooxml-ph-idx")

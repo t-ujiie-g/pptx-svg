@@ -62,7 +62,8 @@ fn serialize_color(color : @ooxml.Color) -> String {
 fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   let has_attrs = not(bp.anchor.is_empty()) || bp.l_ins >= 0 || bp.t_ins >= 0 ||
     bp.r_ins >= 0 || bp.b_ins >= 0
-  if not(has_attrs) {
+  let has_children = bp.auto_fit || bp.font_scale >= 0
+  if not(has_attrs) && not(has_children) {
     return "<a:bodyPr/>"
   }
   let mut out = "<a:bodyPr"
@@ -83,6 +84,16 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   }
   if bp.auto_fit {
     out + "><a:spAutoFit/></a:bodyPr>"
+  } else if bp.font_scale >= 0 {
+    let mut naf = "<a:normAutofit"
+    if bp.font_scale != @ooxml.pct_100 {
+      naf = naf + " fontScale=\"" + int_to_str(bp.font_scale) + "\""
+    }
+    if bp.ln_spc_reduction > 0 {
+      naf = naf + " lnSpcReduction=\"" + int_to_str(bp.ln_spc_reduction) + "\""
+    }
+    naf = naf + "/>"
+    out + ">" + naf + "</a:bodyPr>"
   } else {
     out + "/>"
   }

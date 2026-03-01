@@ -14,6 +14,7 @@ Slides:
   9. East Asian fonts + font theme references (+mj-lt/+mn-lt/+mj-ea/+mn-ea)
  10. Line spacing (a:lnSpc) — EMU and percentage
  11. Character spacing (a:rPr spc) + lstStyle
+ 12. normAutofit (fontScale / lnSpcReduction)
 """
 
 from pptx import Presentation
@@ -857,6 +858,104 @@ p11_ls1.text = "lstStyle lvl1: inherits 20pt bold #003366 Meiryo"
 
 p11_ls2 = tf11b.add_paragraph()
 p11_ls2.text = "Second paragraph: should also inherit lstStyle defaults"
+
+# ── Slide 12: normAutofit (fontScale / lnSpcReduction) ───────────────────
+slide12 = prs.slides.add_slide(blank)
+
+title12 = slide12.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title12.text_frame.paragraphs[0].text = "Slide 12: normAutofit (fontScale / lnSpcReduction)"
+title12.text_frame.paragraphs[0].font.size = Pt(24)
+title12.text_frame.paragraphs[0].font.bold = True
+
+def add_normAutofit_box(slide, left, top, width, height, label, lines,
+                         fill_rgb, border_rgb, font_scale=None, ln_spc_reduction=None):
+    """Add a textbox with a:normAutofit in bodyPr."""
+    box = slide.shapes.add_textbox(left, top, width, height)
+    tf = box.text_frame
+    tf.word_wrap = True
+    fill = box.fill
+    fill.solid()
+    fill.fore_color.rgb = RGBColor(*fill_rgb)
+    # Border
+    ns_p = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+    sp_pr = box._element.find(f'{{{ns_a}}}spPr')
+    if sp_pr is None:
+        sp_pr = box._element.find(f'{{{ns_p}}}spPr')
+    if sp_pr is None:
+        # textbox shapes: spPr is direct child of p:sp
+        sp_pr = etree.SubElement(box._element, f'{{{ns_a}}}spPr')
+    ln_elem = etree.SubElement(sp_pr, f'{{{ns_a}}}ln')
+    ln_elem.set('w', '12700')
+    ln_fill = etree.SubElement(ln_elem, f'{{{ns_a}}}solidFill')
+    ln_clr = etree.SubElement(ln_fill, f'{{{ns_a}}}srgbClr')
+    ln_clr.set('val', '%02X%02X%02X' % border_rgb)
+
+    # Title line
+    p0 = tf.paragraphs[0]
+    run0 = p0.add_run()
+    run0.text = label
+    run0.font.size = Pt(20)
+    run0.font.bold = True
+
+    # Content lines
+    for line in lines:
+        p = tf.add_paragraph()
+        run = p.add_run()
+        run.text = line
+        run.font.size = Pt(16)
+
+    # Set bodyPr with normAutofit
+    bodyPr = tf._txBody.find(f'{{{ns_a}}}bodyPr')
+    bodyPr.set('lIns', '91440')
+    bodyPr.set('tIns', '45720')
+    bodyPr.set('rIns', '91440')
+    bodyPr.set('bIns', '45720')
+
+    if font_scale is not None:
+        naf = etree.SubElement(bodyPr, f'{{{ns_a}}}normAutofit')
+        if font_scale != 100000:
+            naf.set('fontScale', str(font_scale))
+        if ln_spc_reduction is not None and ln_spc_reduction > 0:
+            naf.set('lnSpcReduction', str(ln_spc_reduction))
+
+    return box
+
+# Shape 1: fontScale=80000 (80%)
+add_normAutofit_box(slide12, Inches(0.5), Inches(1.2), Inches(4), Inches(1.8),
+    "fontScale=80%",
+    ["Line 2: scaled down", "Line 3: smaller text", "Line 4: fits in box"],
+    (232, 234, 246), (63, 81, 181),
+    font_scale=80000)
+
+# Shape 2: fontScale=62500 + lnSpcReduction=20000
+add_normAutofit_box(slide12, Inches(5), Inches(1.2), Inches(4), Inches(1.8),
+    "62.5% + lnSpc 20%",
+    ["Line 2: even smaller", "Line 3: tighter spacing", "Line 4: compact text"],
+    (255, 243, 224), (255, 152, 0),
+    font_scale=62500, ln_spc_reduction=20000)
+
+# Shape 3: normAutofit default (100%, no fontScale attr)
+add_normAutofit_box(slide12, Inches(0.5), Inches(3.5), Inches(4), Inches(1.8),
+    "normAutofit default",
+    ["Line 2: no scaling", "Line 3: same as original"],
+    (232, 245, 233), (76, 175, 80),
+    font_scale=100000)
+
+# Shape 4: no autofit (reference)
+add_normAutofit_box(slide12, Inches(5), Inches(3.5), Inches(4), Inches(1.8),
+    "No autofit (ref)",
+    ["Line 2: original size", "Line 3: may overflow"],
+    (243, 229, 245), (156, 39, 176),
+    font_scale=None)  # no normAutofit
+
+# Info label at bottom
+info12 = slide12.shapes.add_textbox(Inches(0.5), Inches(5.8), Inches(9), Inches(1))
+tf12info = info12.text_frame
+tf12info.word_wrap = True
+p12info = tf12info.paragraphs[0]
+p12info.text = "Compare: top-left (80%) should be visibly smaller than bottom-right (no autofit). Top-right (62.5%+20%) should be smallest and tightest."
+p12info.font.size = Pt(12)
+p12info.font.color.rgb = RGBColor(100, 100, 100)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 11', slideCount === 11, `got ${slideCount}`);
+  assert('slide count = 12', slideCount === 12, `got ${slideCount}`);
 
-  // Verify all 11 slides exist
-  for (let i = 1; i <= 11; i++) {
+  // Verify all 12 slides exist
+  for (let i = 1; i <= 12; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 11; i++) {
+  for (let i = 1; i <= 12; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -388,6 +388,24 @@ async function testFeaturesPptx() {
     assert('slide10 has spcPts 3600', slide10.includes('3600'));
     // Tight: 80%
     assert('slide10 has spcPct 80000', slide10.includes('80000'));
+  }
+
+  // ── Slide 12: normAutofit ──
+  section('test_features.pptx — Slide 12: normAutofit');
+  const slide12 = textFiles.get('ppt/slides/slide12.xml');
+  if (slide12) {
+    // Shape 1: fontScale=80000 only
+    assert('slide12 has a:normAutofit', hasTag(slide12, 'a:normAutofit'));
+    assert('slide12 has fontScale="80000"', slide12.includes('fontScale="80000"'));
+    // Shape 2: fontScale=62500 + lnSpcReduction=20000
+    assert('slide12 has fontScale="62500"', slide12.includes('fontScale="62500"'));
+    assert('slide12 has lnSpcReduction="20000"', slide12.includes('lnSpcReduction="20000"'));
+    // Shape 3: normAutofit with defaults (no fontScale attr)
+    // Verify there is a bare <a:normAutofit/> (no attributes)
+    assert('slide12 has bare <a:normAutofit/>', slide12.includes('<a:normAutofit/>'));
+    // At least one shape has bodyPr without normAutofit (reference shape)
+    // The reference shape has bodyPr with insets but no normAutofit child
+    assert('slide12 has multiple normAutofit elements', (slide12.match(/normAutofit/g) || []).length >= 3);
   }
 
   // ── Slide 11: Character spacing + lstStyle ──

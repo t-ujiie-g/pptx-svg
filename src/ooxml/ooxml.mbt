@@ -575,17 +575,22 @@ pub(all) struct TextParagraph {
 
 // ── Text body properties ────────────────────────────────────────────────────
 
+///| 100000 = 100% in OOXML percentage units (fontScale, lnSpcReduction, etc.)
+pub let pct_100 : Int = 100000
+
 pub(all) struct BodyProps {
   anchor  : String  // vertical alignment: "t", "ctr", "b", "" = default (top)
   l_ins   : Int     // left inset in EMU (-1 = default 91440 ≈ 0.1in)
   t_ins   : Int     // top inset in EMU (-1 = default 45720 ≈ 0.05in)
   r_ins   : Int     // right inset in EMU (-1 = default 91440)
   b_ins   : Int     // bottom inset in EMU (-1 = default 45720)
-  auto_fit : Bool   // <a:spAutoFit/> — shrink shape to fit text
+  auto_fit : Bool   // <a:spAutoFit/> — expand shape to fit text
+  font_scale : Int       // <a:normAutofit fontScale="..."/> -1=unset, 0-100000=percent
+  ln_spc_reduction : Int // <a:normAutofit lnSpcReduction="..."/> -1=unset, 0-100000=percent
 }
 
 pub fn BodyProps::default() -> BodyProps {
-  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false }
+  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false, font_scale: -1, ln_spc_reduction: -1 }
 }
 
 // ── Table model ──────────────────────────────────────────────────────────────
@@ -842,7 +847,16 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
       let b_ins = match @xml.get_attr(bpr, "bIns") { Some(v) => @xml.parse_int(v); None => -1 }
       let bpr_ch = @xml.get_children(bpr)
       let auto_fit = match @xml.find_child(bpr_ch, "a:spAutoFit") { Some(_) => true; None => false }
-      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit }
+      // Parse <a:normAutofit fontScale="..." lnSpcReduction="..."/>
+      let (font_scale, ln_spc_reduction) = match @xml.find_child(bpr_ch, "a:normAutofit") {
+        Some(naf) => {
+          let fs = match @xml.get_attr(naf, "fontScale") { Some(v) => @xml.parse_int(v); None => pct_100 }
+          let lr = match @xml.get_attr(naf, "lnSpcReduction") { Some(v) => @xml.parse_int(v); None => 0 }
+          (fs, lr)
+        }
+        None => (-1, -1)
+      }
+      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction }
     }
   }
 }
