@@ -532,15 +532,141 @@ pub fn MasterTextStyles::empty() -> MasterTextStyles {
   { title_style: TextStyleGroup::empty(), body_style: TextStyleGroup::empty(), other_style: TextStyleGroup::empty() }
 }
 
+// ── Color map (scheme color remapping) ───────────────────────────────────────
+
+pub(all) struct ColorMap {
+  bg1      : String
+  tx1      : String
+  bg2      : String
+  tx2      : String
+  accent1  : String
+  accent2  : String
+  accent3  : String
+  accent4  : String
+  accent5  : String
+  accent6  : String
+  hlink    : String
+  fol_hlink : String
+}
+
+///| Default color map: bg1→lt1, tx1→dk1, bg2→lt2, tx2→dk2, etc.
+pub fn ColorMap::default() -> ColorMap {
+  {
+    bg1: "lt1", tx1: "dk1", bg2: "lt2", tx2: "dk2",
+    accent1: "accent1", accent2: "accent2", accent3: "accent3",
+    accent4: "accent4", accent5: "accent5", accent6: "accent6",
+    hlink: "hlink", fol_hlink: "folHlink",
+  }
+}
+
+///| Get an XML attribute with a fallback default value.
+fn get_attr_or(node : @xml.XmlNode, name : String, default : String) -> String {
+  match @xml.get_attr(node, name) { Some(v) => v; None => default }
+}
+
+///| Parse a ColorMap from XML node attributes (e.g. `<p:clrMap bg1="dk1" .../>`).
+pub fn parse_clr_map_from_node(node : @xml.XmlNode) -> ColorMap {
+  let d = ColorMap::default()
+  {
+    bg1:      get_attr_or(node, "bg1", d.bg1),
+    tx1:      get_attr_or(node, "tx1", d.tx1),
+    bg2:      get_attr_or(node, "bg2", d.bg2),
+    tx2:      get_attr_or(node, "tx2", d.tx2),
+    accent1:  get_attr_or(node, "accent1", d.accent1),
+    accent2:  get_attr_or(node, "accent2", d.accent2),
+    accent3:  get_attr_or(node, "accent3", d.accent3),
+    accent4:  get_attr_or(node, "accent4", d.accent4),
+    accent5:  get_attr_or(node, "accent5", d.accent5),
+    accent6:  get_attr_or(node, "accent6", d.accent6),
+    hlink:    get_attr_or(node, "hlink", d.hlink),
+    fol_hlink: get_attr_or(node, "folHlink", d.fol_hlink),
+  }
+}
+
+///| Resolve a direct theme slot name (dk1, lt1, accent1, etc.) to a Color.
+///  Unlike `resolve_scheme_color`, this does NOT apply bg1→lt1 / tx1→dk1 aliasing.
+fn resolve_slot(name : String, theme : ThemeData) -> Color {
+  if name == "dk1" {
+    theme.dk1
+  } else if name == "lt1" {
+    theme.lt1
+  } else if name == "dk2" {
+    theme.dk2
+  } else if name == "lt2" {
+    theme.lt2
+  } else if name == "accent1" {
+    theme.accent1
+  } else if name == "accent2" {
+    theme.accent2
+  } else if name == "accent3" {
+    theme.accent3
+  } else if name == "accent4" {
+    theme.accent4
+  } else if name == "accent5" {
+    theme.accent5
+  } else if name == "accent6" {
+    theme.accent6
+  } else if name == "hlink" {
+    theme.hlink
+  } else if name == "folHlink" {
+    theme.fol_hlink
+  } else {
+    Color::black()
+  }
+}
+
+///| Apply a ColorMap to a ThemeData, producing a remapped ThemeData.
+///
+///  `resolve_scheme_color` hard-codes: bg1/lt1→theme.lt1, tx1/dk1→theme.dk1, etc.
+///  This function sets `new.lt1 = resolve_slot(cmap.bg1, original)` so that
+///  `resolve_scheme_color("bg1")` on the remapped theme yields the correct color.
+pub fn apply_color_map(theme : ThemeData, cmap : ColorMap) -> ThemeData {
+  {
+    dk1: resolve_slot(cmap.tx1, theme),
+    lt1: resolve_slot(cmap.bg1, theme),
+    dk2: resolve_slot(cmap.tx2, theme),
+    lt2: resolve_slot(cmap.bg2, theme),
+    accent1: resolve_slot(cmap.accent1, theme),
+    accent2: resolve_slot(cmap.accent2, theme),
+    accent3: resolve_slot(cmap.accent3, theme),
+    accent4: resolve_slot(cmap.accent4, theme),
+    accent5: resolve_slot(cmap.accent5, theme),
+    accent6: resolve_slot(cmap.accent6, theme),
+    hlink: resolve_slot(cmap.hlink, theme),
+    fol_hlink: resolve_slot(cmap.fol_hlink, theme),
+    major_font: theme.major_font,
+    minor_font: theme.minor_font,
+    major_ea_font: theme.major_ea_font,
+    minor_ea_font: theme.minor_ea_font,
+  }
+}
+
+///| Extract `p:clrMapOvr` from already-parsed XML nodes.
+///  Returns `None` if not present or if `<a:masterClrMapping/>` is used (= inherit master).
+pub fn extract_clr_map_ovr_from_nodes(root_ch : Array[@xml.XmlNode]) -> ColorMap? {
+  match @xml.find_child(root_ch, "p:clrMapOvr") {
+    None => None
+    Some(ovr_node) => {
+      let ovr_ch = @xml.get_children(ovr_node)
+      match @xml.find_child(ovr_ch, "a:overrideClrMapping") {
+        Some(mapping_node) => Some(parse_clr_map_from_node(mapping_node))
+        None => None
+      }
+    }
+  }
+}
+
 pub(all) struct SlideMasterData {
   background  : Color
   shapes      : Array[Shape]
   text_styles : MasterTextStyles
+  clr_map     : ColorMap
 }
 
 pub(all) struct SlideLayoutData {
   background  : Color   // Color::none() = inherit from master
   shapes      : Array[Shape]
+  clr_map_ovr : ColorMap?  // None = inherit master's color map
 }
 
 // ── Text model ────────────────────────────────────────────────────────────────
@@ -1504,10 +1630,22 @@ fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
 ///| Parse a slide master XML string into SlideMasterData.
 pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : ThemeData) -> SlideMasterData {
   let nodes = @xml.parse_xml(xml_str)
+  // Parse p:clrMap and apply to theme
+  let clr_map = match @xml.find_child(nodes, "p:sldMaster") {
+    None => ColorMap::default()
+    Some(master_node) => {
+      let master_ch = @xml.get_children(master_node)
+      match @xml.find_child(master_ch, "p:clrMap") {
+        None => ColorMap::default()
+        Some(cm_node) => parse_clr_map_from_node(cm_node)
+      }
+    }
+  }
+  let effective_theme = apply_color_map(theme, clr_map)
   let csld = @xml.find_path(nodes, ["p:sldMaster", "p:cSld"])
   let background = match csld {
     None => Color::none()
-    Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), theme)
+    Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), effective_theme)
   }
   let shapes : Array[Shape] = match csld {
     None => []
@@ -1515,7 +1653,7 @@ pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : Them
       let csld_ch = @xml.get_children(csld_node)
       match @xml.find_child(csld_ch, "p:spTree") {
         None => []
-        Some(tree) => parse_shapes_from_tree(tree, theme)
+        Some(tree) => parse_shapes_from_tree(tree, effective_theme)
       }
     }
   }
@@ -1526,13 +1664,13 @@ pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : Them
       let master_ch = @xml.get_children(master_node)
       match @xml.find_child(master_ch, "p:txStyles") {
         None => MasterTextStyles::empty()
-        Some(txs) => parse_tx_styles(txs, theme)
+        Some(txs) => parse_tx_styles(txs, effective_theme)
       }
     }
   }
   // ignore slide_size parameter (just used for shape parsing context)
   ignore(slide_size)
-  { background, shapes, text_styles }
+  { background, shapes, text_styles, clr_map }
 }
 
 // ── Slide layout parser ──────────────────────────────────────────────────────
@@ -1540,7 +1678,11 @@ pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : Them
 ///| Parse a slide layout XML string into SlideLayoutData.
 pub fn parse_slide_layout(xml_str : String, slide_size : SlideSize, theme : ThemeData) -> SlideLayoutData {
   let nodes = @xml.parse_xml(xml_str)
-  let csld = @xml.find_path(nodes, ["p:sldLayout", "p:cSld"])
+  let root_ch = match @xml.find_child(nodes, "p:sldLayout") {
+    Some(n) => @xml.get_children(n)
+    None => []
+  }
+  let csld = @xml.find_child(root_ch, "p:cSld")
   let background = match csld {
     None => Color::none()
     Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), theme)
@@ -1555,8 +1697,9 @@ pub fn parse_slide_layout(xml_str : String, slide_size : SlideSize, theme : Them
       }
     }
   }
+  let clr_map_ovr = extract_clr_map_ovr_from_nodes(root_ch)
   ignore(slide_size)
-  { background, shapes }
+  { background, shapes, clr_map_ovr }
 }
 
 // ── Integer→string (needed here too) ─────────────────────────────────────────

@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 15', slideCount === 15, `got ${slideCount}`);
+  assert('slide count = 16', slideCount === 16, `got ${slideCount}`);
 
-  // Verify all 15 slides exist
-  for (let i = 1; i <= 15; i++) {
+  // Verify all 16 slides exist
+  for (let i = 1; i <= 16; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 16; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -471,6 +471,22 @@ async function testFeaturesPptx() {
     // Text content should be original (not uppercased in XML)
     assert('slide15 has original text (not uppercased)', slide15.includes('This Should Be All Caps'));
     assert('slide15 has small caps text', slide15.includes('Small Caps Text'));
+  }
+
+  // ── Slide 16: Color map override ──
+  section('test_features.pptx — Slide 16: clrMapOvr');
+  const slide16 = textFiles.get('ppt/slides/slide16.xml');
+  if (slide16) {
+    assert('slide16 has p:clrMapOvr', hasTag(slide16, 'p:clrMapOvr'));
+    assert('slide16 has a:overrideClrMapping', hasTag(slide16, 'a:overrideClrMapping'));
+    // bg1="dk1" swap
+    assert('slide16 has bg1="dk1"', slide16.includes('bg1="dk1"'));
+    // tx1="lt1" swap
+    assert('slide16 has tx1="lt1"', slide16.includes('tx1="lt1"'));
+    // Has scheme color reference tx1
+    assert('slide16 has schemeClr val="tx1"', slide16.includes('val="tx1"'));
+    // Has dark background
+    assert('slide16 has dark bg color', slide16.includes('1A1A2E'));
   }
 }
 

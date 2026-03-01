@@ -18,6 +18,7 @@ Slides:
  13. Text wrapping (long text, CJK, wrap="none")
  14. Bullet formatting (a:buFont, a:buSzPct, a:buSzPts, a:buClr)
  15. Capitalization (a:rPr cap="all" / "small")
+ 16. Color map override (p:clrMapOvr — dark bg + light text via bg1↔dk1 swap)
 """
 
 from pptx import Presentation
@@ -1283,6 +1284,95 @@ p15info = tf15info.paragraphs[0]
 p15info.text = "cap=all: lowercase a-z should display as UPPERCASE A-Z. cap=small: should display with SVG font-variant=small-caps."
 p15info.font.size = Pt(12)
 p15info.font.color.rgb = RGBColor(100, 100, 100)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Slide 16: Color map override (p:clrMapOvr)
+# ═══════════════════════════════════════════════════════════════════════════════
+slide16 = prs.slides.add_slide(prs.slide_layouts[0])
+
+nsmap = {
+    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+    'p': 'http://schemas.openxmlformats.org/presentationml/2006/main',
+    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+}
+
+# Remove existing p:clrMapOvr (python-pptx adds a:masterClrMapping by default)
+existing_ovr = slide16._element.findall(
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}clrMapOvr'
+)
+for ovr in existing_ovr:
+    slide16._element.remove(ovr)
+
+# Add p:clrMapOvr with a:overrideClrMapping that swaps bg1↔tx1 (dk1↔lt1)
+# This makes the slide use dark background + light text
+clrMapOvr = etree.SubElement(
+    slide16._element,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}clrMapOvr'
+)
+overrideMapping = etree.SubElement(
+    clrMapOvr,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}overrideClrMapping',
+    attrib={
+        'bg1': 'dk1',
+        'tx1': 'lt1',
+        'bg2': 'lt2',
+        'tx2': 'dk2',
+        'accent1': 'accent1',
+        'accent2': 'accent2',
+        'accent3': 'accent3',
+        'accent4': 'accent4',
+        'accent5': 'accent5',
+        'accent6': 'accent6',
+        'hlink': 'hlink',
+        'folHlink': 'folHlink',
+    }
+)
+
+# Add a textbox with scheme-colored text (should resolve to light color on dark bg)
+tb16 = slide16.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1.5))
+tf16 = tb16.text_frame
+tf16.word_wrap = True
+p16 = tf16.paragraphs[0]
+p16.text = "Color Map Override: bg1=dk1, tx1=lt1"
+p16.font.size = Pt(28)
+p16.font.bold = True
+# Use scheme color tx1 (which should resolve to lt1 = white on this slide)
+rPr16 = p16.runs[0]._r.find('a:rPr', nsmap)
+if rPr16 is None:
+    rPr16 = etree.SubElement(p16.runs[0]._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    p16.runs[0]._r.insert(0, rPr16)
+solidFill16 = etree.SubElement(rPr16, '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+schemeClr16 = etree.SubElement(solidFill16, '{http://schemas.openxmlformats.org/drawingml/2006/main}schemeClr', attrib={'val': 'tx1'})
+
+# Add a second textbox with explicit description
+tb16b = slide16.shapes.add_textbox(Inches(0.5), Inches(2.5), Inches(9), Inches(2))
+tf16b = tb16b.text_frame
+tf16b.word_wrap = True
+p16b = tf16b.paragraphs[0]
+p16b.text = "This slide has clrMapOvr swapping bg1/tx1. Text using scheme color tx1 should appear light (white) because tx1 maps to lt1."
+p16b.font.size = Pt(16)
+# Also use scheme color for this text
+rPr16b = p16b.runs[0]._r.find('a:rPr', nsmap)
+if rPr16b is None:
+    rPr16b = etree.SubElement(p16b.runs[0]._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    p16b.runs[0]._r.insert(0, rPr16b)
+solidFill16b = etree.SubElement(rPr16b, '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+schemeClr16b = etree.SubElement(solidFill16b, '{http://schemas.openxmlformats.org/drawingml/2006/main}schemeClr', attrib={'val': 'tx1'})
+
+# Add slide background using scheme color bg1 (which maps to dk1 = dark)
+bg16 = slide16._element.find('{http://schemas.openxmlformats.org/presentationml/2006/main}cSld', nsmap)
+if bg16 is None:
+    bg16 = slide16._element.find('p:cSld', nsmap)
+# Insert p:bg before p:cSld
+pBg = etree.Element('{http://schemas.openxmlformats.org/presentationml/2006/main}bg')
+bgPr = etree.SubElement(pBg, '{http://schemas.openxmlformats.org/presentationml/2006/main}bgPr')
+solidFillBg = etree.SubElement(bgPr, '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+# Use a dark solid color for background to make the slide visually dark
+srgbClrBg = etree.SubElement(solidFillBg, '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr', attrib={'val': '1A1A2E'})
+# Insert bg element at the right position in slide XML
+cSld = slide16._element.find('{http://schemas.openxmlformats.org/presentationml/2006/main}cSld')
+if cSld is not None:
+    slide16._element.insert(list(slide16._element).index(cSld), pBg)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

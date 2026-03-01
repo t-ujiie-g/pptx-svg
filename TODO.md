@@ -36,7 +36,7 @@
 - [x] スタイル継承チェーン: slide → layout → master → theme
 - [x] プレースホルダタイプ解決 (`<p:ph type="title/body/..." idx="N">`)
 - [x] マスター/レイアウトからの背景継承 (slide に `p:bg` がなければ親を参照)
-- [ ] `p:clrMapOvr` カラーマップオーバーライド
+- [x] `p:clrMapOvr` カラーマップオーバーライド
 - [x] デフォルトテキストスタイル (`p:txStyles` titleStyle/bodyStyle/otherStyle レベル 0-8)
 - [x] `a:lstStyle` (シェイプ/プレースホルダ固有のリストスタイル) レベル継承
 - [x] プレースホルダの transform 継承 (slide → layout → master)

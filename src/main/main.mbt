@@ -181,6 +181,34 @@ fn get_master(master_path : String) -> @ooxml.SlideMasterData? {
   }
 }
 
+///| Find the owning master's ColorMap for a given layout path.
+fn find_master_clr_map(
+  layout_to_master : Array[(String, String)],
+  masters : Array[(@ooxml.SlideMasterData, String)],
+  layout_path : String
+) -> @ooxml.ColorMap {
+  // Find master path for this layout
+  let mut master_path = ""
+  let lt_len = layout_to_master.length()
+  let mut i = 0
+  while i < lt_len {
+    if layout_to_master[i].0 == layout_path {
+      master_path = layout_to_master[i].1
+    }
+    i = i + 1
+  }
+  // Find master's clr_map
+  let mlen = masters.length()
+  let mut mi = 0
+  while mi < mlen {
+    if masters[mi].1 == master_path {
+      return masters[mi].0.clr_map
+    }
+    mi = mi + 1
+  }
+  @ooxml.ColorMap::default()
+}
+
 ///| Initialize the PPTX processor.
 ///
 /// Reads presentation.xml via FFI and counts the number of slides.
@@ -276,6 +304,7 @@ pub fn initialize_pptx() -> String {
         background: @ooxml.Color::none(),
         shapes: [],
         text_styles: @ooxml.MasterTextStyles::empty(),
+        clr_map: @ooxml.ColorMap::default(),
       }
       masters.push((empty_master, mp))
     }
@@ -289,13 +318,30 @@ pub fn initialize_pptx() -> String {
     let lp = layout_paths[li2]
     let lxml = @ffi.ffi_get_file(lp)
     if not(lxml.is_empty()) {
-      let ldata = @ooxml.parse_slide_layout(lxml, g_slide_size.val, g_theme.val)
+      // Compute effective theme: layout's own clrMapOvr > master's clrMap
+      let layout_effective_theme = {
+        // First, find owning master's clr_map
+        let master_clr_map = find_master_clr_map(layout_to_master, masters, lp)
+        // Pre-parse to check for layout's clrMapOvr (parse_slide_layout will also extract it,
+        // but we need the effective theme before calling it)
+        let lxml_nodes = @xml.parse_xml(lxml)
+        let layout_root_ch = match @xml.find_child(lxml_nodes, "p:sldLayout") {
+          Some(n) => @xml.get_children(n)
+          None => []
+        }
+        match @ooxml.extract_clr_map_ovr_from_nodes(layout_root_ch) {
+          Some(ovr) => @ooxml.apply_color_map(g_theme.val, ovr)
+          None => @ooxml.apply_color_map(g_theme.val, master_clr_map)
+        }
+      }
+      let ldata = @ooxml.parse_slide_layout(lxml, g_slide_size.val, layout_effective_theme)
       layouts.push((ldata, lp))
       @ffi.ffi_log("Parsed layout: " + lp)
     } else {
       let empty_layout : @ooxml.SlideLayoutData = {
         background: @ooxml.Color::none(),
         shapes: [],
+        clr_map_ovr: None,
       }
       layouts.push((empty_layout, lp))
     }
@@ -378,8 +424,6 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   } else {
     @ooxml.parse_rels(rels_xml)
   }
-  // Parse slide and cache it
-  let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val, g_theme.val)
   // ── Resolve layout/master for this slide ──
   let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
     g_slide_layout_paths.val[slide_idx]
@@ -393,6 +437,35 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     ""
   }
   let master_opt = if not(master_path.is_empty()) { get_master(master_path) } else { None }
+  // ── Compute effective theme with color map overrides ──
+  let effective_theme = {
+    // Start with master's clr_map
+    let mut eff = match master_opt {
+      Some(master) => @ooxml.apply_color_map(g_theme.val, master.clr_map)
+      None => g_theme.val
+    }
+    // Apply layout clrMapOvr if present
+    match layout_opt {
+      Some(layout) => match layout.clr_map_ovr {
+        Some(ovr) => eff = @ooxml.apply_color_map(g_theme.val, ovr)
+        None => ()
+      }
+      None => ()
+    }
+    // Apply slide's own clrMapOvr if present
+    let slide_nodes = @xml.parse_xml(slide_xml)
+    let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
+      Some(n) => @xml.get_children(n)
+      None => []
+    }
+    match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
+      Some(ovr) => eff = @ooxml.apply_color_map(g_theme.val, ovr)
+      None => ()
+    }
+    eff
+  }
+  // Parse slide and cache it
+  let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val, effective_theme)
   // ── Placeholder inheritance: resolve transforms from layout/master ──
   resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
   // ── Background inheritance: slide → layout → master → white ──
@@ -468,7 +541,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     None => ()
   }
   // Render to SVG
-  @renderer.render_slide_svg(resolved_slide, rels, slide_num, g_theme.val, bg_shapes)
+  @renderer.render_slide_svg(resolved_slide, rels, slide_num, effective_theme, bg_shapes)
 }
 
 ///| Update a slide's internal data from an edited SVG string.
