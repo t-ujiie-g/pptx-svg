@@ -751,18 +751,11 @@ fn apply_text_defaults(shape : @ooxml.Shape, text_styles : @ooxml.MasterTextStyl
       let need_ea_font = run.ea_font.is_empty() && not(defaults.ea_font.is_empty())
       if need_font_size || need_color || need_font_face || need_ea_font {
         let new_run : @ooxml.TextRun = {
-          text: run.text,
-          bold: run.bold,
-          italic: run.italic,
+          ..run,
           font_size: if need_font_size { defaults.font_size } else { run.font_size },
           color: if need_color { defaults.color } else { run.color },
           font_face: if need_font_face { defaults.font_face } else { run.font_face },
           ea_font: if need_ea_font { defaults.ea_font } else { run.ea_font },
-          underline: run.underline,
-          strike: run.strike,
-          baseline: run.baseline,
-          char_spacing: run.char_spacing,
-          cap: run.cap,
         }
         para.runs[ri] = new_run
       }

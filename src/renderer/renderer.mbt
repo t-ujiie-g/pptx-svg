@@ -97,7 +97,7 @@ fn px(emu : Int, scale : Int) -> Int {
 // ── Font size ─────────────────────────────────────────────────────────────────
 
 fn hundredth_pt_to_emu(sz : Int) -> Int {
-  sz * 127
+  sz * @ooxml.emu_per_hundredth_pt
 }
 
 fn default_font_size_emu() -> Int {
@@ -106,21 +106,28 @@ fn default_font_size_emu() -> Int {
 
 // ── Rotation transform ────────────────────────────────────────────────────────
 
+/// Format rotation in 60000ths of a degree as "D.DD" string (e.g. "45.00").
+/// Handles negative rotations correctly.
+fn format_rotation_deg(rot_60k : Int) -> String {
+  let deg_x100 = rot_60k / @ooxml.rot_to_centideg
+  let deg_int = deg_x100 / @ooxml.centideg_per_deg
+  let deg_frac_raw = deg_x100 % @ooxml.centideg_per_deg
+  let deg_frac = if deg_frac_raw < 0 { -deg_frac_raw } else { deg_frac_raw }
+  let frac_str = if deg_frac < 10 { "0" + int_to_str(deg_frac) } else { int_to_str(deg_frac) }
+  int_to_str(deg_int) + "." + frac_str
+}
+
+/// Build SVG rotate() transform attribute string centered on (cx, cy).
+fn rotation_transform(rot_60k : Int, cx : Int, cy : Int) -> String {
+  if rot_60k == 0 { return "" }
+  " transform=\"rotate(" + format_rotation_deg(rot_60k) + "," +
+  int_to_str(cx) + "," + int_to_str(cy) + ")\""
+}
+
 fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
-  if t.rot == 0 { return "" }
-  let deg_x100 = t.rot / 600
-  let deg_int  = deg_x100 / 100
-  let deg_frac = deg_x100 % 100
-  let frac_str = if deg_frac < 10 {
-    "0" + int_to_str(deg_frac)
-  } else {
-    int_to_str(deg_frac)
-  }
   let cx_p = px(t.x + t.cx / 2, scale)
   let cy_p = px(t.y + t.cy / 2, scale)
-  " transform=\"rotate(" +
-  int_to_str(deg_int) + "." + frac_str + "," +
-  int_to_str(cx_p) + "," + int_to_str(cy_p) + ")\""
+  rotation_transform(t.rot, cx_p, cy_p)
 }
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
@@ -294,7 +301,7 @@ fn wrap_paragraph(
   let mut ri = 0
   while ri < nr {
     let run = para.runs[ri]
-    let fs_raw = if run.font_size > 0 { run.font_size } else { if def_sz > 0 { def_sz * scale / 127 } else { 1800 } }
+    let fs_raw = if run.font_size > 0 { run.font_size } else { if def_sz > 0 { def_sz * scale / @ooxml.emu_per_hundredth_pt } else { 1800 } }
     let fs_pt = apply_font_scale(fs_raw, font_scale).to_double() / 100.0
     let ff = if not(run.ea_font.is_empty()) {
       run.ea_font
@@ -362,6 +369,72 @@ fn str_sub(s : String, start : Int, end_ : Int) -> String {
     i = i + 1
   }
   result
+}
+
+// ── Tab helpers ──────────────────────────────────────────────────────────
+
+///| Check if a string contains a tab character.
+fn contains_tab(s : String) -> Bool {
+  let len = s.length()
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == '\t' { return true }
+    i = i + 1
+  }
+  false
+}
+
+///| Split a string by tab characters. Returns array of parts.
+fn split_by_tab(s : String) -> Array[String] {
+  let parts : Array[String] = []
+  let len = s.length()
+  let mut start = 0
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == '\t' {
+      parts.push(str_sub(s, start, i))
+      start = i + 1
+    }
+    i = i + 1
+  }
+  parts.push(str_sub(s, start, len))
+  parts
+}
+
+///| Render a run's text, splitting by tab characters and positioning at tab stops.
+///  Returns (svg_output, updated_tab_idx).
+fn render_run_with_tabs(
+  run : @ooxml.TextRun,
+  run_idx : Int,
+  display_text : String,
+  tab_stops : Array[@ooxml.TabStop],
+  tab_idx : Int,
+  text_x : Int,
+  cur_y : Int,
+  scale : Int,
+  fs : Int,
+  rels : Array[@ooxml.Relationship]
+) -> (String, Int) {
+  if tab_stops.length() > 0 && contains_tab(display_text) {
+    let parts = split_by_tab(display_text)
+    let nparts = parts.length()
+    let mut out = ""
+    let mut ti = tab_idx
+    let mut parti = 0
+    while parti < nparts {
+      let part = parts[parti]
+      if parti > 0 && ti < tab_stops.length() {
+        let tab_x = text_x + px(tab_stops[ti].pos, scale)
+        out = out + "</tspan><tspan" + ai("x", tab_x) + ai("y", cur_y) + ">"
+        ti = ti + 1
+      }
+      out = out + render_run_tspan(run, run_idx, part, scale, fs, rels)
+      parti = parti + 1
+    }
+    (out, ti)
+  } else {
+    (render_run_tspan(run, run_idx, display_text, scale, fs, rels), tab_idx)
+  }
 }
 
 // ── Text rendering ────────────────────────────────────────────────────────────
@@ -432,7 +505,8 @@ fn render_run_tspan(
   ri : Int,
   display_text : String,
   scale : Int,
-  font_scale : Int
+  font_scale : Int,
+  rels : Array[@ooxml.Relationship]
 ) -> String {
   let mut span = "<tspan"
   // Visual attributes
@@ -441,10 +515,19 @@ fn render_run_tspan(
   if run.font_size > 0 {
     span = span + ai("font-size", apply_font_scale(px(hundredth_pt_to_emu(run.font_size), scale), font_scale))
   }
-  // font-family: ea_font, latin_font, sans-serif
-  if not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) {
+  // font-family: sym_font, cs_font, ea_font, latin_font, sans-serif
+  let has_ff = not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty())
+  if has_ff {
     let mut ff = ""
-    if not(run.ea_font.is_empty()) { ff = run.ea_font }
+    if not(run.sym_font.is_empty()) { ff = run.sym_font }
+    if not(run.cs_font.is_empty()) {
+      if not(ff.is_empty()) { ff = ff + ", " }
+      ff = ff + run.cs_font
+    }
+    if not(run.ea_font.is_empty()) {
+      if not(ff.is_empty()) { ff = ff + ", " }
+      ff = ff + run.ea_font
+    }
     if not(run.font_face.is_empty()) {
       if not(ff.is_empty()) { ff = ff + ", " }
       ff = ff + run.font_face
@@ -456,7 +539,7 @@ fn render_run_tspan(
   }
   // Character spacing
   if run.char_spacing != 0 {
-    let ls_px = run.char_spacing * 96 / 7200
+    let ls_px = run.char_spacing * @ooxml.char_spc_dpi / @ooxml.hundredth_pt_per_inch
     if ls_px != 0 {
       span = span + ai("letter-spacing", ls_px)
     }
@@ -492,12 +575,27 @@ fn render_run_tspan(
     da("color", run.color.to_hex()) +
     da("run-font", run.font_face) +
     da("ea-font", run.ea_font) +
+    da("cs-font", run.cs_font) +
+    da("sym-font", run.sym_font) +
     da("underline", run.underline) +
     da("strike", run.strike) +
     dai("baseline", run.baseline) +
     dai("char-spacing", run.char_spacing) +
-    da("cap", run.cap)
-  span + ">" + svg_escape(display_text) + "</tspan>"
+    dai("kern", run.kern) +
+    da("cap", run.cap) +
+    da("hlink-rid", run.hlink_rid)
+  // Wrap in hyperlink if present
+  let inner = svg_escape(display_text)
+  if not(run.hlink_rid.is_empty()) {
+    let url = @ooxml.find_rel_target(rels, run.hlink_rid)
+    if not(url.is_empty()) {
+      span + "><a href=\"" + svg_escape(url) + "\">" + inner + "</a></tspan>"
+    } else {
+      span + ">" + inner + "</tspan>"
+    }
+  } else {
+    span + ">" + inner + "</tspan>"
+  }
 }
 
 fn render_text(
@@ -505,7 +603,8 @@ fn render_text(
   t : @ooxml.ShapeTransform,
   scale : Int,
   theme : @ooxml.ThemeData,
-  body_props : @ooxml.BodyProps
+  body_props : @ooxml.BodyProps,
+  rels : Array[@ooxml.Relationship]
 ) -> String {
   if paragraphs.length() == 0 { return "" }
   // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
@@ -573,6 +672,15 @@ fn render_text(
   }
   let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
 
+  // Vertical text mode
+  let is_vert = body_props.vert == "vert" || body_props.vert == "eaVert" || body_props.vert == "vert270" || body_props.vert == "wordArtVert"
+
+  // Text rotation from bodyPr rot (60000ths of a degree)
+  let bp_rot = body_props.rot
+
+  // Image bullets — render before <text> as separate <image> elements, collect them
+  let mut img_bullets_svg = ""
+
   let font_face = theme.minor_font + ", sans-serif"
   let scaled_def_sz = apply_font_scale(def_sz, fs)
   let mut out = "<text" +
@@ -581,8 +689,21 @@ fn render_text(
     a("font-family", font_face) +
     ai("font-size", scaled_def_sz) +
     a("fill", default_text_fill) +
-    da("font-face", theme.minor_font) +
-    ">"
+    da("font-face", theme.minor_font)
+  // Vertical text: apply writing-mode and adjust
+  if is_vert {
+    out = out + a("writing-mode", "tb")
+    if body_props.vert == "vert" || body_props.vert == "eaVert" {
+      out = out + a("glyph-orientation-vertical", "auto")
+    }
+  }
+  // Text rotation
+  if bp_rot != 0 {
+    let txt_cx = px(t.x + t.cx / 2, scale)
+    let txt_cy = px(t.y + t.cy / 2, scale)
+    out = out + rotation_transform(bp_rot, txt_cx, txt_cy)
+  }
+  out = out + ">"
 
   let mut cur_y = px(t.y, scale) + pad_t + anchor_offset_clamped
   let mut pi = 0
@@ -604,13 +725,30 @@ fn render_text(
       // Indent: use marL from paragraph if set, otherwise use level-based
       let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
       let indent = px(indent_emu, scale)
-      let (anchor_x, anchor_attr) = if para.align == "ctr" || para.align == "c" {
+      // RTL: default alignment is right
+      // In SVG with direction="rtl", text-anchor semantics are swapped:
+      //   "start" = right edge (text flows leftward from x)
+      //   "end"   = left edge (text flows rightward from x)
+      let effective_align = if para.rtl && para.align.is_empty() { "r" } else { para.align }
+      let (anchor_x, anchor_attr) = if effective_align == "ctr" || effective_align == "c" {
         (text_x + indent + (text_w - indent) / 2, " text-anchor=\"middle\"")
-      } else if para.align == "r" {
-        (text_x + text_w, " text-anchor=\"end\"")
+      } else if effective_align == "r" || (para.rtl && effective_align != "l") {
+        if para.rtl {
+          // RTL right-aligned: use text-anchor="start" so text flows leftward from right edge
+          (text_x + text_w, " text-anchor=\"start\"")
+        } else {
+          (text_x + text_w, " text-anchor=\"end\"")
+        }
       } else {
-        (text_x + indent, " text-anchor=\"start\"")
+        if para.rtl {
+          // RTL left-aligned: use text-anchor="end" so text ends at left edge
+          (text_x + indent, " text-anchor=\"end\"")
+        } else {
+          (text_x + indent, " text-anchor=\"start\"")
+        }
       }
+      // RTL direction attribute
+      let rtl_attr = if para.rtl { " direction=\"rtl\"" } else { "" }
       // Determine bullet text
       let bullet_text = if para.bullet_none {
         ""
@@ -621,18 +759,39 @@ fn render_text(
       } else {
         ""
       }
+      // Image bullet: render <image> element before text
+      if not(para.bullet_img_rid.is_empty()) {
+        let bu_target = @ooxml.find_rel_target(rels, para.bullet_img_rid)
+        if not(bu_target.is_empty()) {
+          let bu_img_path = resolve_image_path(bu_target)
+          let bu_b64 = @ffi.ffi_get_file_base64(bu_img_path)
+          if not(bu_b64.is_empty()) {
+            let bu_mime = mime_from_ext(bu_img_path)
+            let bu_img_sz = p_font_sz // size bullet image to font size
+            let bu_img_x = if para.rtl { anchor_x + 4 } else { anchor_x - bu_img_sz - 4 }
+            let bu_img_y = cur_y - bu_img_sz + 2
+            img_bullets_svg = img_bullets_svg + "<image" +
+              ai("x", bu_img_x) + ai("y", bu_img_y) +
+              ai("width", bu_img_sz) + ai("height", bu_img_sz) +
+              a("href", "data:" + bu_mime + ";base64," + bu_b64) +
+              "/>"
+          }
+        }
+      }
       // Paragraph-level tspan with data-ooxml-* attributes
       let para_align = if para.align.is_empty() { "l" } else { para.align }
       out = out + "<tspan" +
         ai("x", anchor_x) +
         ai("y", cur_y) +
         anchor_attr +
+        rtl_attr +
         da("para-idx", int_to_str(pi)) +
         da("para-align", para_align) +
         dai("para-lvl", para.level) +
         da("bu-font", para.bullet_font) +
         dai("bu-size", para.bullet_size) +
         da("bu-color", para.bullet_color.to_hex()) +
+        da("rtl", bool_str(para.rtl)) +
         ">"
       // Render bullet if present
       if not(bullet_text.is_empty()) {
@@ -661,6 +820,7 @@ fn render_text(
         let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
         let nvl = vlines.length()
         let mut vli = 0
+        let mut tab_idx = 0
         while vli < nvl {
           let vline = vlines[vli]
           // For wrapped lines after the first, emit a new positioning tspan
@@ -670,6 +830,7 @@ fn render_text(
               ai("x", anchor_x) +
               ai("y", cur_y) +
               anchor_attr +
+              rtl_attr +
               ">"
           }
           // Render fragments in this visual line
@@ -678,18 +839,23 @@ fn render_text(
           while fi < nf {
             let (run_idx, frag_text) = vline[fi]
             let run = para.runs[run_idx]
-            out = out + render_run_tspan(run, run_idx, frag_text, scale, fs)
+            let (tab_svg, new_ti) = render_run_with_tabs(run, run_idx, frag_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels)
+            out = out + tab_svg
+            tab_idx = new_ti
             fi = fi + 1
           }
           vli = vli + 1
         }
       } else {
-        // No wrapping: render runs directly
+        // No wrapping: render runs directly, handling tab stops
+        let mut tab_idx = 0
         let mut ri = 0
         while ri < nr {
           let run = para.runs[ri]
           let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
-          out = out + render_run_tspan(run, ri, display_text, scale, fs)
+          let (tab_svg, new_ti) = render_run_with_tabs(run, ri, display_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels)
+          out = out + tab_svg
+          tab_idx = new_ti
           ri = ri + 1
         }
       }
@@ -702,7 +868,7 @@ fn render_text(
       pi = pi + 1
     }
   }
-  out + "</text>"
+  img_bullets_svg + out + "</text>"
 }
 
 // ── Text height estimation ──────────────────────────────────────────────────
@@ -782,7 +948,11 @@ fn render_shape(
     da("auto-fit", bool_str(shape.body_props.auto_fit)) +
     dai("font-scale", shape.body_props.font_scale) +
     dai("ln-spc-reduction", shape.body_props.ln_spc_reduction) +
-    da("wrap", shape.body_props.wrap)
+    da("wrap", shape.body_props.wrap) +
+    dai("bp-rot", shape.body_props.rot) +
+    da("bp-vert", shape.body_props.vert) +
+    dai("bp-num-cols", shape.body_props.num_cols) +
+    dai("bp-col-spacing", shape.body_props.col_spacing)
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
@@ -823,7 +993,7 @@ fn render_shape(
       } else {
         t
       }
-      rect_svg + render_text(shape.paragraphs, text_t, scale, theme, shape.body_props)
+      rect_svg + render_text(shape.paragraphs, text_t, scale, theme, shape.body_props, rels)
     }
     @ooxml.ShapeKind::Picture(rid) => {
       let target = @ooxml.find_rel_target(rels, rid)
@@ -850,7 +1020,7 @@ fn render_shape(
       }
     }
     @ooxml.ShapeKind::TableShape(table) => {
-      render_table(table, t, scale, theme)
+      render_table(table, t, scale, theme, rels)
     }
     _ => ""
   }
@@ -871,7 +1041,8 @@ fn render_table_cell_text(
   _cell_w : Int,
   cell_h : Int,
   scale : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
+  rels : Array[@ooxml.Relationship]
 ) -> String {
   if paragraphs.length() == 0 { return "" }
   let tx = cell_x + table_cell_pad
@@ -901,7 +1072,7 @@ fn render_table_cell_text(
       while ri < nr {
         let run = para.runs[ri]
         let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
-        out = out + render_run_tspan(run, ri, display_text, scale, -1)
+        out = out + render_run_tspan(run, ri, display_text, scale, -1, rels)
         ri = ri + 1
       }
       out = out + "</tspan>"
@@ -918,7 +1089,8 @@ fn render_table(
   table : @ooxml.TableData,
   t : @ooxml.ShapeTransform,
   scale : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
+  rels : Array[@ooxml.Relationship]
 ) -> String {
   let base_x = px(t.x, scale)
   let base_y = px(t.y, scale)
@@ -955,7 +1127,7 @@ fn render_table(
         a("fill", cell_fill) +
         " stroke=\"" + table_border_color + "\" stroke-width=\"1\"/>"
       // Cell text
-      out = out + render_table_cell_text(cell.paragraphs, cx_px, ry, cw, rh, scale, theme)
+      out = out + render_table_cell_text(cell.paragraphs, cx_px, ry, cw, rh, scale, theme, rels)
       cj = cj + 1
     }
     row_y_emu = row_y_emu + row.height

@@ -83,9 +83,16 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   let italic = italic_s == "italic"
                   let font_face = get_da(run_node, "run-font")
                   let ea_font = get_da(run_node, "ea-font")
+                  let cs_font = get_da(run_node, "cs-font")
+                  let sym_font = get_da(run_node, "sym-font")
                   let char_spacing = get_dai(run_node, "char-spacing")
+                  let kern = get_dai(run_node, "kern")
                   let cap = get_da(run_node, "cap")
-                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, underline: "", strike: "", baseline: 0, char_spacing, cap })
+                  let hlink_rid = get_da(run_node, "hlink-rid")
+                  let underline = get_da(run_node, "underline")
+                  let strike = get_da(run_node, "strike")
+                  let baseline = get_dai(run_node, "baseline")
+                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid })
                 }
               }
               @xml.XmlNode::Text(text) => {
@@ -100,11 +107,15 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                       color: @ooxml.Color::none(),
                       font_face: "",
                       ea_font: "",
+                      cs_font: "",
+                      sym_font: "",
                       underline: "",
                       strike: "",
                       baseline: 0,
                       char_spacing: 0,
+                      kern: 0,
                       cap: "",
+                      hlink_rid: "",
                     },
                   )
                 }
@@ -116,7 +127,8 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
           let bu_size = get_dai(child, "bu-size")
           let bu_color_hex = get_da(child, "bu-color")
           let bu_color = if bu_color_hex.is_empty() { @ooxml.Color::none() } else { parse_hex_color(bu_color_hex) }
-          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, line_spacing: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false, bullet_font: bu_font, bullet_size: bu_size, bullet_color: bu_color })
+          let rtl = get_da(child, "rtl") == "1"
+          paras.push({ runs, align, level, spc_before: 0, spc_after: 0, line_spacing: 0, mar_l: 0, indent: 0, bullet: "", bullet_auto: "", bullet_none: false, bullet_font: bu_font, bullet_size: bu_size, bullet_color: bu_color, bullet_img_rid: "", tab_stops: [], rtl })
         }
       }
       _ => ()
@@ -190,6 +202,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let bp_font_scale = get_dai(g_node, "font-scale")
   let bp_ln_spc_reduction = get_dai(g_node, "ln-spc-reduction")
   let bp_wrap = get_da(g_node, "wrap")
+  let bp_rot = get_dai(g_node, "bp-rot")
+  let bp_vert = get_da(g_node, "bp-vert")
+  let bp_num_cols = get_dai(g_node, "bp-num-cols")
+  let bp_col_spacing = get_dai(g_node, "bp-col-spacing")
   let body_props : @ooxml.BodyProps = {
     anchor: bp_anchor,
     l_ins: if bp_l_ins == 0 { -1 } else { bp_l_ins },
@@ -200,6 +216,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     font_scale: if bp_font_scale == 0 { -1 } else { bp_font_scale },
     ln_spc_reduction: if bp_ln_spc_reduction == 0 { -1 } else { bp_ln_spc_reduction },
     wrap: bp_wrap,
+    rot: bp_rot,
+    vert: bp_vert,
+    num_cols: bp_num_cols,
+    col_spacing: bp_col_spacing,
   }
   let ph_type = get_da(g_node, "ph-type")
   let ph_idx = get_dai(g_node, "ph-idx")

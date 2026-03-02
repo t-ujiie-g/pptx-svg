@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 16', slideCount === 16, `got ${slideCount}`);
+  assert('slide count = 21', slideCount === 21, `got ${slideCount}`);
 
-  // Verify all 16 slides exist
-  for (let i = 1; i <= 16; i++) {
+  // Verify all 21 slides exist
+  for (let i = 1; i <= 21; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 16; i++) {
+  for (let i = 1; i <= 21; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -487,6 +487,70 @@ async function testFeaturesPptx() {
     assert('slide16 has schemeClr val="tx1"', slide16.includes('val="tx1"'));
     // Has dark background
     assert('slide16 has dark bg color', slide16.includes('1A1A2E'));
+  }
+
+  // ── Slide 17: CS/Sym fonts + kerning ──
+  section('test_features.pptx — Slide 17: CS/Sym fonts + kern');
+  const slide17 = textFiles.get('ppt/slides/slide17.xml');
+  if (slide17) {
+    assert('slide17 has a:cs element', hasTag(slide17, 'a:cs'));
+    assert('slide17 has Arial CS font', slide17.includes('Arial'));
+    assert('slide17 has a:sym element', hasTag(slide17, 'a:sym'));
+    assert('slide17 has Wingdings sym font', slide17.includes('Wingdings'));
+    assert('slide17 has kern attribute', slide17.includes('kern="1200"'));
+    assert('slide17 has CS text content', slide17.includes('Complex Script'));
+    assert('slide17 has Symbol text content', slide17.includes('Symbol Font'));
+  }
+
+  // ── Slide 18: Text rotation + tab stops ──
+  section('test_features.pptx — Slide 18: rotation + tabs');
+  const slide18 = textFiles.get('ppt/slides/slide18.xml');
+  if (slide18) {
+    assert('slide18 has bodyPr rot', slide18.includes('rot="2700000"'));
+    assert('slide18 has a:tabLst', hasTag(slide18, 'a:tabLst'));
+    assert('slide18 has a:tab element', hasTag(slide18, 'a:tab'));
+    assert('slide18 has tab pos', slide18.includes('pos="2743200"'));
+    assert('slide18 has tab algn', slide18.includes('algn="r"'));
+    assert('slide18 has rotated text', slide18.includes('Rotated text'));
+    assert('slide18 has tab content', slide18.includes('Col1'));
+  }
+
+  // ── Slide 19: Vertical text + columns ──
+  section('test_features.pptx — Slide 19: vert text + columns');
+  const slide19 = textFiles.get('ppt/slides/slide19.xml');
+  if (slide19) {
+    assert('slide19 has vert="vert"', slide19.includes('vert="vert"'));
+    assert('slide19 has vert="eaVert"', slide19.includes('vert="eaVert"'));
+    assert('slide19 has numCol="2"', slide19.includes('numCol="2"'));
+    assert('slide19 has spcCol', slide19.includes('spcCol="457200"'));
+    assert('slide19 has vertical text content', slide19.includes('Vertical text'));
+  }
+
+  // ── Slide 20: Hyperlink + RTL ──
+  section('test_features.pptx — Slide 20: hyperlink + RTL');
+  const slide20 = textFiles.get('ppt/slides/slide20.xml');
+  if (slide20) {
+    assert('slide20 has a:hlinkClick', hasTag(slide20, 'a:hlinkClick'));
+    assert('slide20 has r:id on hlinkClick', slide20.includes('r:id='));
+    assert('slide20 has hyperlink text', slide20.includes('Click here'));
+    assert('slide20 has rtl="1"', slide20.includes('rtl="1"'));
+    assert('slide20 has RTL text', slide20.includes('RTL paragraph'));
+  }
+  // Check slide20 rels for hyperlink target
+  const slide20Rels = textFiles.get('ppt/slides/_rels/slide20.xml.rels');
+  if (slide20Rels) {
+    assert('slide20 rels has hyperlink', slide20Rels.includes('hyperlink'));
+    assert('slide20 rels has example.com', slide20Rels.includes('example.com'));
+  }
+
+  // ── Slide 21: Image bullet ──
+  section('test_features.pptx — Slide 21: image bullet');
+  const slide21 = textFiles.get('ppt/slides/slide21.xml');
+  if (slide21) {
+    assert('slide21 has a:buBlip', hasTag(slide21, 'a:buBlip'));
+    assert('slide21 has a:blip in buBlip', hasTag(slide21, 'a:blip'));
+    assert('slide21 has r:embed on blip', slide21.includes('r:embed='));
+    assert('slide21 has bullet text', slide21.includes('Image bullet'));
   }
 }
 

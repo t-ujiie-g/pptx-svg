@@ -19,6 +19,11 @@ Slides:
  14. Bullet formatting (a:buFont, a:buSzPct, a:buSzPts, a:buClr)
  15. Capitalization (a:rPr cap="all" / "small")
  16. Color map override (p:clrMapOvr — dark bg + light text via bg1↔dk1 swap)
+ 17. CS/Sym fonts + kerning (a:cs, a:sym, kern attr)
+ 18. Text rotation (bodyPr rot) + tab stops (a:tabLst)
+ 19. Vertical text (bodyPr vert) + text columns (numCol/spcCol)
+ 20. Hyperlink (a:hlinkClick) + RTL (a:pPr rtl)
+ 21. Image bullet (a:buBlip)
 """
 
 from pptx import Presentation
@@ -1373,6 +1378,208 @@ srgbClrBg = etree.SubElement(solidFillBg, '{http://schemas.openxmlformats.org/dr
 cSld = slide16._element.find('{http://schemas.openxmlformats.org/presentationml/2006/main}cSld')
 if cSld is not None:
     slide16._element.insert(list(slide16._element).index(cSld), pBg)
+
+# ── Slide 17: CS/Sym fonts + kerning ─────────────────────────────────────────
+
+slide17 = prs.slides.add_slide(blank)
+
+# Textbox with Complex Script font (a:cs)
+tb17a = slide17.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1.5))
+tf17a = tb17a.text_frame
+tf17a.word_wrap = True
+p17a = tf17a.paragraphs[0]
+p17a.text = "Complex Script Font (Arabic style)"
+p17a.font.size = Pt(24)
+p17a.font.bold = True
+# Add a:cs element to rPr
+rPr17a = p17a.runs[0]._r.find('a:rPr', nsmap)
+if rPr17a is None:
+    rPr17a = etree.SubElement(p17a.runs[0]._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    p17a.runs[0]._r.insert(0, rPr17a)
+etree.SubElement(rPr17a, '{http://schemas.openxmlformats.org/drawingml/2006/main}cs', attrib={'typeface': 'Arial'})
+
+# Textbox with Symbol font (a:sym)
+tb17b = slide17.shapes.add_textbox(Inches(0.5), Inches(2.5), Inches(9), Inches(1.5))
+tf17b = tb17b.text_frame
+p17b = tf17b.paragraphs[0]
+p17b.text = "Symbol Font Text"
+p17b.font.size = Pt(24)
+rPr17b = p17b.runs[0]._r.find('a:rPr', nsmap)
+if rPr17b is None:
+    rPr17b = etree.SubElement(p17b.runs[0]._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    p17b.runs[0]._r.insert(0, rPr17b)
+etree.SubElement(rPr17b, '{http://schemas.openxmlformats.org/drawingml/2006/main}sym', attrib={'typeface': 'Wingdings'})
+
+# Textbox with kerning
+tb17c = slide17.shapes.add_textbox(Inches(0.5), Inches(4.5), Inches(9), Inches(1.5))
+tf17c = tb17c.text_frame
+p17c = tf17c.paragraphs[0]
+p17c.text = "Kerning enabled at 1200 hundredths-pt"
+p17c.font.size = Pt(24)
+rPr17c = p17c.runs[0]._r.find('a:rPr', nsmap)
+if rPr17c is None:
+    rPr17c = etree.SubElement(p17c.runs[0]._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    p17c.runs[0]._r.insert(0, rPr17c)
+rPr17c.set('kern', '1200')
+
+# ── Slide 18: Text rotation + tab stops ──────────────────────────────────────
+
+slide18 = prs.slides.add_slide(blank)
+
+# Textbox with rotated text (bodyPr rot)
+tb18a = slide18.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(4), Inches(2))
+tf18a = tb18a.text_frame
+p18a = tf18a.paragraphs[0]
+p18a.text = "Rotated text (45 degrees)"
+p18a.font.size = Pt(20)
+# Set rot on bodyPr (45 degrees = 2700000 in 60000ths)
+bodyPr18a = tb18a._element.find('.//a:bodyPr', nsmap)
+bodyPr18a.set('rot', '2700000')
+
+# Textbox with tab stops
+tb18b = slide18.shapes.add_textbox(Inches(0.5), Inches(3), Inches(9), Inches(3))
+tf18b = tb18b.text_frame
+tf18b.word_wrap = True
+p18b = tf18b.paragraphs[0]
+p18b.text = "Col1\tCol2\tCol3"
+p18b.font.size = Pt(18)
+# Add tab stops via XML
+pPr18b = p18b._pPr
+if pPr18b is None:
+    pPr18b = etree.SubElement(p18b._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+    p18b._p.insert(0, pPr18b)
+tabLst = etree.SubElement(pPr18b, '{http://schemas.openxmlformats.org/drawingml/2006/main}tabLst')
+etree.SubElement(tabLst, '{http://schemas.openxmlformats.org/drawingml/2006/main}tab', attrib={'pos': '2743200', 'algn': 'l'})  # 3 inches
+etree.SubElement(tabLst, '{http://schemas.openxmlformats.org/drawingml/2006/main}tab', attrib={'pos': '5486400', 'algn': 'r'})  # 6 inches
+
+# ── Slide 19: Vertical text + text columns ──────────────────────────────────
+
+slide19 = prs.slides.add_slide(blank)
+
+# Textbox with vertical text (vert="vert")
+tb19a = slide19.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(2), Inches(5))
+tf19a = tb19a.text_frame
+p19a = tf19a.paragraphs[0]
+p19a.text = "Vertical text"
+p19a.font.size = Pt(20)
+bodyPr19a = tb19a._element.find('.//a:bodyPr', nsmap)
+bodyPr19a.set('vert', 'vert')
+
+# Textbox with eaVert
+tb19b = slide19.shapes.add_textbox(Inches(3), Inches(0.5), Inches(2), Inches(5))
+tf19b = tb19b.text_frame
+p19b = tf19b.paragraphs[0]
+p19b.text = "EA Vertical"
+p19b.font.size = Pt(20)
+bodyPr19b = tb19b._element.find('.//a:bodyPr', nsmap)
+bodyPr19b.set('vert', 'eaVert')
+
+# Textbox with text columns (numCol + spcCol)
+tb19c = slide19.shapes.add_textbox(Inches(5.5), Inches(0.5), Inches(4), Inches(5))
+tf19c = tb19c.text_frame
+tf19c.word_wrap = True
+p19c = tf19c.paragraphs[0]
+p19c.text = "This is column text that spans multiple columns. The text should flow from the first column to the second column when it reaches the bottom."
+p19c.font.size = Pt(14)
+bodyPr19c = tb19c._element.find('.//a:bodyPr', nsmap)
+bodyPr19c.set('numCol', '2')
+bodyPr19c.set('spcCol', '457200')  # 0.5 inch spacing
+
+# ── Slide 20: Hyperlink + RTL ────────────────────────────────────────────────
+
+slide20 = prs.slides.add_slide(blank)
+
+# Textbox with hyperlink
+tb20a = slide20.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(2))
+tf20a = tb20a.text_frame
+tf20a.word_wrap = True
+p20a = tf20a.paragraphs[0]
+r20a = p20a.runs[0] if len(p20a.runs) > 0 else p20a.add_run()
+r20a.text = "Click here to visit example.com"
+r20a.font.size = Pt(20)
+r20a.font.color.rgb = RGBColor(0x00, 0x66, 0xCC)
+r20a.font.underline = True
+# Add hlinkClick via XML — need to add a relationship first
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+rel = slide20.part.relate_to('https://example.com', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', is_external=True)
+rPr20a = r20a._r.find('a:rPr', nsmap)
+if rPr20a is None:
+    rPr20a = etree.SubElement(r20a._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    r20a._r.insert(0, rPr20a)
+etree.SubElement(rPr20a, '{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rel})
+
+# RTL paragraph
+tb20b = slide20.shapes.add_textbox(Inches(0.5), Inches(3), Inches(9), Inches(2))
+tf20b = tb20b.text_frame
+tf20b.word_wrap = True
+p20b = tf20b.paragraphs[0]
+p20b.text = "RTL paragraph text (right-to-left)"
+p20b.font.size = Pt(20)
+pPr20b = p20b._pPr
+if pPr20b is None:
+    pPr20b = etree.SubElement(p20b._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+    p20b._p.insert(0, pPr20b)
+pPr20b.set('rtl', '1')
+
+# ── Slide 21: Image bullet (a:buBlip) ───────────────────────────────────────
+
+slide21 = prs.slides.add_slide(blank)
+
+# For image bullets, we need a small embedded image
+# We'll create a tiny 1x1 red PNG in memory
+import struct, zlib, io
+def make_tiny_png(r, g, b):
+    """Create a minimal 1x1 PNG."""
+    # IHDR
+    ihdr_data = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
+    ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data) & 0xffffffff
+    ihdr = struct.pack('>I', 13) + b'IHDR' + ihdr_data + struct.pack('>I', ihdr_crc)
+    # IDAT
+    raw = bytes([0, r, g, b])
+    compressed = zlib.compress(raw)
+    idat_crc = zlib.crc32(b'IDAT' + compressed) & 0xffffffff
+    idat = struct.pack('>I', len(compressed)) + b'IDAT' + compressed + struct.pack('>I', idat_crc)
+    # IEND
+    iend_crc = zlib.crc32(b'IEND') & 0xffffffff
+    iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
+    return b'\x89PNG\r\n\x1a\n' + ihdr + idat + iend
+
+png_data = make_tiny_png(255, 0, 0)  # red dot
+png_stream = io.BytesIO(png_data)
+
+# Add image as a relationship to the slide
+from pptx.opc.package import Part
+from pptx.opc.constants import CONTENT_TYPE as CT
+image_part, rId_img = slide21.part.get_or_add_image_part(png_stream)
+
+# Create textbox with bullet paragraphs
+tb21 = slide21.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(5))
+tf21 = tb21.text_frame
+tf21.word_wrap = True
+p21 = tf21.paragraphs[0]
+p21.text = "Image bullet paragraph 1"
+p21.font.size = Pt(20)
+
+# Add image bullet via XML: <a:buBlip><a:blip r:embed="rIdN"/></a:buBlip>
+pPr21 = p21._pPr
+if pPr21 is None:
+    pPr21 = etree.SubElement(p21._p, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+    p21._p.insert(0, pPr21)
+buBlip = etree.SubElement(pPr21, '{http://schemas.openxmlformats.org/drawingml/2006/main}buBlip')
+etree.SubElement(buBlip, '{http://schemas.openxmlformats.org/drawingml/2006/main}blip',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed': rId_img})
+
+# Add second paragraph with same image bullet
+p21b_elem = etree.SubElement(tf21._txBody, '{http://schemas.openxmlformats.org/drawingml/2006/main}p')
+pPr21b = etree.SubElement(p21b_elem, '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr')
+buBlip21b = etree.SubElement(pPr21b, '{http://schemas.openxmlformats.org/drawingml/2006/main}buBlip')
+etree.SubElement(buBlip21b, '{http://schemas.openxmlformats.org/drawingml/2006/main}blip',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed': rId_img})
+r21b = etree.SubElement(p21b_elem, '{http://schemas.openxmlformats.org/drawingml/2006/main}r')
+rPr21b = etree.SubElement(r21b, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr', attrib={'lang': 'en-US', 'sz': '2000'})
+t21b = etree.SubElement(r21b, '{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+t21b.text = "Image bullet paragraph 2"
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

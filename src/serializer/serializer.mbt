@@ -61,7 +61,8 @@ fn serialize_color(color : @ooxml.Color) -> String {
 ///| Serialize a:bodyPr element.
 fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   let has_attrs = not(bp.anchor.is_empty()) || bp.l_ins >= 0 || bp.t_ins >= 0 ||
-    bp.r_ins >= 0 || bp.b_ins >= 0 || bp.wrap == "none"
+    bp.r_ins >= 0 || bp.b_ins >= 0 || bp.wrap == "none" || bp.rot != 0 ||
+    not(bp.vert.is_empty()) || bp.num_cols > 1 || bp.col_spacing > 0
   let has_children = bp.auto_fit || bp.font_scale >= 0
   if not(has_attrs) && not(has_children) {
     return "<a:bodyPr/>"
@@ -72,6 +73,18 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   }
   if bp.wrap == "none" {
     out = out + " wrap=\"none\""
+  }
+  if bp.rot != 0 {
+    out = out + " rot=\"" + int_to_str(bp.rot) + "\""
+  }
+  if not(bp.vert.is_empty()) {
+    out = out + " vert=\"" + bp.vert + "\""
+  }
+  if bp.num_cols > 1 {
+    out = out + " numCol=\"" + int_to_str(bp.num_cols) + "\""
+  }
+  if bp.col_spacing > 0 {
+    out = out + " spcCol=\"" + int_to_str(bp.col_spacing) + "\""
   }
   if bp.l_ins >= 0 {
     out = out + " lIns=\"" + int_to_str(bp.l_ins) + "\""
@@ -113,7 +126,7 @@ fn serialize_spacing(tag : String, val : Int) -> String {
     out = out + "<a:spcPct val=\"" + int_to_str(-val) + "\"/>"
   } else {
     // Positive = EMU → convert back to hundredths-of-a-point
-    let hpt = val / 127
+    let hpt = val / @ooxml.emu_per_hundredth_pt
     out = out + "<a:spcPts val=\"" + int_to_str(hpt) + "\"/>"
   }
   out + "</" + tag + ">"
@@ -141,8 +154,11 @@ fn serialize_text_body_inner(
     let has_spc = para.spc_before != 0 || para.spc_after != 0
     let has_lnspc = para.line_spacing != 0
     let has_bullet = not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) || para.bullet_none ||
-      not(para.bullet_font.is_empty()) || para.bullet_size != 0 || not(para.bullet_color.is_none())
-    let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_lnspc || has_bullet
+      not(para.bullet_font.is_empty()) || para.bullet_size != 0 || not(para.bullet_color.is_none()) ||
+      not(para.bullet_img_rid.is_empty())
+    let has_tabs = para.tab_stops.length() > 0
+    let has_rtl = para.rtl
+    let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_lnspc || has_bullet || has_tabs || has_rtl
     if has_ppr {
       let mut ppr = "<a:pPr"
       if has_align {
@@ -157,7 +173,10 @@ fn serialize_text_body_inner(
       if has_indent {
         ppr = ppr + " indent=\"" + int_to_str(para.indent) + "\""
       }
-      let has_children = has_spc || has_lnspc || has_bullet
+      if has_rtl {
+        ppr = ppr + " rtl=\"1\""
+      }
+      let has_children = has_spc || has_lnspc || has_bullet || has_tabs
       if has_children {
         ppr = ppr + ">"
         if has_lnspc {
@@ -183,6 +202,24 @@ fn serialize_text_body_inner(
           ppr = ppr + "<a:buChar char=\"" + xml_escape(para.bullet) + "\"/>"
         } else if not(para.bullet_auto.is_empty()) {
           ppr = ppr + "<a:buAutoNum type=\"" + para.bullet_auto + "\"/>"
+        } else if not(para.bullet_img_rid.is_empty()) {
+          ppr = ppr + "<a:buBlip><a:blip r:embed=\"" + para.bullet_img_rid + "\"/></a:buBlip>"
+        }
+        // Tab stops
+        if has_tabs {
+          ppr = ppr + "<a:tabLst>"
+          let nt = para.tab_stops.length()
+          let mut ti = 0
+          while ti < nt {
+            let ts = para.tab_stops[ti]
+            ppr = ppr + "<a:tab pos=\"" + int_to_str(ts.pos) + "\""
+            if not(ts.algn.is_empty()) {
+              ppr = ppr + " algn=\"" + ts.algn + "\""
+            }
+            ppr = ppr + "/>"
+            ti = ti + 1
+          }
+          ppr = ppr + "</a:tabLst>"
         }
         out = out + ppr + "</a:pPr>"
       } else {
@@ -237,7 +274,10 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if not(run.cap.is_empty()) {
     rpr = rpr + " cap=\"" + run.cap + "\""
   }
-  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty())
+  if run.kern > 0 {
+    rpr = rpr + " kern=\"" + int_to_str(run.kern) + "\""
+  }
+  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty()) || not(run.hlink_rid.is_empty())
   if has_children {
     rpr = rpr + ">"
     if not(run.color.is_none()) {
@@ -248,6 +288,15 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     }
     if not(run.ea_font.is_empty()) {
       rpr = rpr + "<a:ea typeface=\"" + xml_escape(run.ea_font) + "\"/>"
+    }
+    if not(run.cs_font.is_empty()) {
+      rpr = rpr + "<a:cs typeface=\"" + xml_escape(run.cs_font) + "\"/>"
+    }
+    if not(run.sym_font.is_empty()) {
+      rpr = rpr + "<a:sym typeface=\"" + xml_escape(run.sym_font) + "\"/>"
+    }
+    if not(run.hlink_rid.is_empty()) {
+      rpr = rpr + "<a:hlinkClick r:id=\"" + run.hlink_rid + "\"/>"
     }
     rpr + "</a:rPr>"
   } else {

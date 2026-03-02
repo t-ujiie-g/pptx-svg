@@ -24,6 +24,7 @@
 - [x] 行間 (`a:lnSpc`) EMU / 百分率
 - [x] 文字間隔 (`a:rPr spc`) + letter-spacing
 - [x] `a:lstStyle` シェイプ固有リストスタイル継承
+- [x] テキスト完全対応 (タブ / RTL / 画像バレット / kern / cs・sym フォント / 縦書き / 回転 / ハイパーリンク)
 
 ---
 
@@ -51,8 +52,8 @@
 - [x] スペーシング: `a:spcBef` (前) / `a:spcAft` (後) — パース + レンダリング
 - [x] 行間 (`a:lnSpc`) — パース + レンダリング (EMU / 百分率)
 - [x] インデント: `a:pPr marL/indent` — 左マージン、ぶら下げインデント
-- [ ] タブストップ (`a:tabLst`)
-- [ ] RTL / BiDi (`a:pPr rtl`)
+- [x] タブストップ (`a:tabLst`) — パース + タブ位置レンダリング
+- [x] RTL / BiDi (`a:pPr rtl`) — 右→左テキスト方向 + SVG direction/text-anchor
 
 ### 2.2 箇条書き / 番号付きリスト
 - [x] 文字バレット (`a:buChar char="●"`)
@@ -61,20 +62,20 @@
 - [x] バレットサイズ (`a:buSzPct` / `a:buSzPts`)
 - [x] バレット色 (`a:buClr`)
 - [x] バレット非表示 (`a:buNone`)
-- [ ] 画像バレット (`a:buBlip`)
+- [x] 画像バレット (`a:buBlip`) — Relationship 経由で画像解決 + `<image>` 要素レンダリング
 
 ### 2.3 ラン装飾
 - [x] 下線 (`a:rPr u="sng/dbl/heavy/dotted/dash/wavy/..."` — 18 種)
 - [x] 取り消し線 (`a:rPr strike="sngStrike/dblStrike"`)
 - [x] 上付き / 下付き (`a:rPr baseline="30000/-25000"`)
 - [x] 文字間隔 (`a:rPr spc`) — パース + letter-spacing レンダリング
-- [ ] カーニング (`a:rPr kern`)
+- [x] カーニング (`a:rPr kern`) — パース + data 属性保持
 - [x] キャピタライズ (`a:rPr cap="all/small"`)
 
 ### 2.4 フォント
 - [x] 東アジアフォント (`a:ea typeface`) — パース + font-family レンダリング + round-trip
-- [ ] 複合スクリプト (`a:cs typeface`)
-- [ ] シンボルフォント (`a:sym typeface`)
+- [x] 複合スクリプト (`a:cs typeface`) — パース + font-family + round-trip
+- [x] シンボルフォント (`a:sym typeface`) — パース + font-family + round-trip
 - [x] フォントテーマ参照 (`+mj-lt`/`+mn-lt`/`+mj-ea`/`+mn-ea` → theme font 解決)
 
 ### 2.5 テキストボディ
@@ -83,12 +84,12 @@
 - [x] シェイプ自動フィット (`a:spAutoFit`) — テキスト溢れ時にシェイプ拡大
 - [x] テキスト自動フィット (`a:normAutofit fontScale/lnSpcReduction`)
 - [x] テキスト折り返し (`wrap="square/none"`)
-- [ ] カラム数 (`numCol`) / カラム間隔 (`spcCol`)
-- [ ] 縦書き (`vert="eaVert/vert/vert270/wordArtVert/..."`)
-- [ ] テキスト回転 (`rot`)
+- [x] 縦書き (`vert="eaVert/vert/vert270/wordArtVert/..."`) — `writing-mode="tb"` レンダリング
+- [x] テキスト回転 (`rot`) — SVG `transform="rotate()"` レンダリング
+- [ ] カラム数 (`numCol`) / カラム間隔 (`spcCol`) — パース + round-trip 済み、視覚的カラム分割未実装
 
 ### 2.6 ハイパーリンク
-- [ ] `a:hlinkClick r:id` → Relationship 経由で URL 解決
+- [x] `a:hlinkClick r:id` → Relationship 経由で URL 解決 + `<a>` ラップ
 - [ ] `a:hlinkMouseOver` — ホバーリンク
 - [ ] リンク色 (hlink / folHlink テーマカラー)
 

@@ -7,8 +7,26 @@
 
 // ── Shared constants ─────────────────────────────────────────────────────────
 
+///| 1 pt = 12700 EMU.
+pub let emu_per_pt : Int = 12700
+
 ///| Default stroke width: 1 pt in EMU.
 pub let default_stroke_w : Int = 12700
+
+///| EMU per hundredth-of-a-point (12700 / 100).
+pub let emu_per_hundredth_pt : Int = 127
+
+///| Rotation units: 60000ths of a degree per centidegree.
+pub let rot_to_centideg : Int = 600
+
+///| Centidegrees per degree.
+pub let centideg_per_deg : Int = 100
+
+///| Hundredths-of-a-point per EMU for char spacing (100ths-pt → px at 96 DPI).
+pub let char_spc_dpi : Int = 96
+
+///| Hundredths-of-a-point per inch (for char spacing conversion).
+pub let hundredth_pt_per_inch : Int = 7200
 
 // ── Color ─────────────────────────────────────────────────────────────────────
 
@@ -679,11 +697,20 @@ pub(all) struct TextRun {
   color     : Color
   font_face : String   // explicit typeface from <a:latin>; "" = use theme font
   ea_font   : String   // East Asian typeface from <a:ea>; "" = use theme ea font
+  cs_font   : String   // Complex Script typeface from <a:cs>; "" = use theme cs font
+  sym_font  : String   // Symbol typeface from <a:sym>; "" = none
   underline : String   // "sng", "dbl", "heavy", etc.; "" = none
   strike    : String   // "sngStrike", "dblStrike"; "" = none
   baseline  : Int      // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
   char_spacing : Int   // character spacing in hundredths-of-a-point (spc attr); 0 = default
+  kern      : Int      // kerning in hundredths-of-a-point (kern attr); 0 = default
   cap       : String   // "all", "small"; "" = none
+  hlink_rid : String   // hyperlink relationship ID from <a:hlinkClick r:id="...">; "" = none
+}
+
+pub(all) struct TabStop {
+  pos  : Int     // position in EMU
+  algn : String  // "l", "ctr", "r", "dec"; "" = left (default)
 }
 
 pub(all) struct TextParagraph {
@@ -701,6 +728,9 @@ pub(all) struct TextParagraph {
   bullet_font  : String // a:buFont typeface; "" = run font
   bullet_size  : Int    // a:buSzPct (percentage 100000=100%) or negative for a:buSzPts; 0 = inherit
   bullet_color : Color  // a:buClr; Color::none() = inherit
+  bullet_img_rid : String // a:buBlip r:embed; "" = none
+  tab_stops  : Array[TabStop] // a:tabLst/a:tab
+  rtl        : Bool   // right-to-left paragraph direction (a:pPr rtl="1")
 }
 
 // ── Text body properties ────────────────────────────────────────────────────
@@ -718,10 +748,14 @@ pub(all) struct BodyProps {
   font_scale : Int       // <a:normAutofit fontScale="..."/> -1=unset, 0-100000=percent
   ln_spc_reduction : Int // <a:normAutofit lnSpcReduction="..."/> -1=unset, 0-100000=percent
   wrap : String          // "square" (default=wrap) or "none"; "" = default (square)
+  rot  : Int             // text rotation in 60000ths of a degree; 0 = default
+  vert : String          // vertical text: "vert"/"eaVert"/"vert270"/"wordArtVert"; "" = horizontal
+  num_cols : Int         // number of text columns; 0 = default (1)
+  col_spacing : Int      // spacing between columns in EMU; 0 = default
 }
 
 pub fn BodyProps::default() -> BodyProps {
-  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false, font_scale: -1, ln_spc_reduction: -1, wrap: "" }
+  { anchor: "", l_ins: -1, t_ins: -1, r_ins: -1, b_ins: -1, auto_fit: false, font_scale: -1, ln_spc_reduction: -1, wrap: "", rot: 0, vert: "", num_cols: 0, col_spacing: 0 }
 }
 
 // ── Table model ──────────────────────────────────────────────────────────────
@@ -953,7 +987,7 @@ fn parse_spacing(parent : @xml.XmlNode) -> Int {
     Some(pts) => {
       // val is in hundredths of a point → convert to EMU (1 pt = 12700 EMU)
       let v = attr_int(pts, "val")
-      v * 127 // hundredths-of-pt * 12700/100 = * 127
+      v * emu_per_hundredth_pt
     }
     None =>
       // a:spcPct (percentage of line height) — store raw for now as negative sentinel
@@ -989,7 +1023,11 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
         None => (-1, -1)
       }
       let wrap = match @xml.get_attr(bpr, "wrap") { Some(v) => v; None => "" }
-      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap }
+      let rot = attr_int(bpr, "rot")
+      let vert = match @xml.get_attr(bpr, "vert") { Some(v) => v; None => "" }
+      let num_cols = match @xml.get_attr(bpr, "numCol") { Some(v) => @xml.parse_int(v); None => 0 }
+      let col_spacing = match @xml.get_attr(bpr, "spcCol") { Some(v) => @xml.parse_int(v); None => 0 }
+      { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap, rot, vert, num_cols, col_spacing }
     }
   }
 }
@@ -1020,11 +1058,12 @@ fn resolve_ea_font_theme(typeface : String, theme : ThemeData) -> String {
 fn parse_para_props(
   ppr : @xml.XmlNode,
   theme : ThemeData
-) -> (String, Int, Int, Int, Int, Int, Int, String, String, Bool, String, Int, Color) {
+) -> (String, Int, Int, Int, Int, Int, Int, String, String, Bool, String, Int, Color, String, Array[TabStop], Bool) {
   let a = match @xml.get_attr(ppr, "algn") { Some(v) => v; None => "" }
   let l = attr_int(ppr, "lvl")
   let ml = attr_int(ppr, "marL")
   let ind = attr_int(ppr, "indent")
+  let rtl = match @xml.get_attr(ppr, "rtl") { Some(v) => v == "1" || v == "true"; None => false }
   let ppr_ch = @xml.get_children(ppr)
   let sb = match @xml.find_child(ppr_ch, "a:spcBef") { None => 0; Some(n) => parse_spacing(n) }
   let sa = match @xml.find_child(ppr_ch, "a:spcAft") { None => 0; Some(n) => parse_spacing(n) }
@@ -1054,11 +1093,37 @@ fn parse_para_props(
     None => Color::none()
     Some(bc) => {
       let bc_ch = @xml.get_children(bc)
-      // a:buClr contains color child directly (a:srgbClr, a:schemeClr) without a:solidFill wrapper
       parse_color_from_children(bc_ch, theme)
     }
   }
-  (a, l, sb, sa, lnspc, ml, ind, bu_char, bu_auto, bu_none, bu_font, bu_size, bu_color)
+  // Image bullet: <a:buBlip><a:blip r:embed="rIdN"/></a:buBlip>
+  let bu_img_rid = match @xml.find_child(ppr_ch, "a:buBlip") {
+    None => ""
+    Some(bub) => {
+      let bub_ch = @xml.get_children(bub)
+      match @xml.find_child(bub_ch, "a:blip") {
+        None => ""
+        Some(blip) => match @xml.get_attr(blip, "r:embed") { Some(v) => v; None => "" }
+      }
+    }
+  }
+  // Tab stops: <a:tabLst><a:tab pos="N" algn="l"/></a:tabLst>
+  let tab_stops : Array[TabStop] = []
+  match @xml.find_child(ppr_ch, "a:tabLst") {
+    None => ()
+    Some(tl) => {
+      let tabs = @xml.find_children(@xml.get_children(tl), "a:tab")
+      let nt = tabs.length()
+      let mut ti = 0
+      while ti < nt {
+        let pos = attr_int(tabs[ti], "pos")
+        let algn = match @xml.get_attr(tabs[ti], "algn") { Some(v) => v; None => "" }
+        tab_stops.push({ pos, algn })
+        ti = ti + 1
+      }
+    }
+  }
+  (a, l, sb, sa, lnspc, ml, ind, bu_char, bu_auto, bu_none, bu_font, bu_size, bu_color, bu_img_rid, tab_stops, rtl)
 }
 
 ///| Parse <a:defRPr> defaults from a <a:pPr> node.
@@ -1084,32 +1149,40 @@ fn parse_def_rpr(
   }
 }
 
-///| Parse run properties from <a:rPr> with defRPr fallback.
+///| Parse run properties from <a:rPr> with defRPr fallback. Returns a TextRun (text field set to "").
 fn parse_run_props(
   rpr : @xml.XmlNode,
   def_bold : Bool, def_italic : Bool, def_font_size : Int,
   def_color : Color, def_font_face : String, def_ea_font : String,
   theme : ThemeData
-) -> (Bool, Bool, Int, Color, String, String, String, String, Int, Int, String) {
-  let b = match @xml.get_attr(rpr, "b") { Some(v) => v == "1" || v == "true"; None => def_bold }
-  let it = match @xml.get_attr(rpr, "i") { Some(v) => v == "1" || v == "true"; None => def_italic }
+) -> TextRun {
+  let bold = match @xml.get_attr(rpr, "b") { Some(v) => v == "1" || v == "true"; None => def_bold }
+  let italic = match @xml.get_attr(rpr, "i") { Some(v) => v == "1" || v == "true"; None => def_italic }
   let sz_raw = attr_int(rpr, "sz")
-  let sz = if sz_raw > 0 { sz_raw } else { def_font_size }
-  let u = match @xml.get_attr(rpr, "u") { Some(v) => v; None => "" }
-  let st = match @xml.get_attr(rpr, "strike") { Some(v) => v; None => "" }
-  let bl = attr_int(rpr, "baseline")
-  let spc = attr_int(rpr, "spc")
+  let font_size = if sz_raw > 0 { sz_raw } else { def_font_size }
+  let underline = match @xml.get_attr(rpr, "u") { Some(v) => v; None => "" }
+  let strike = match @xml.get_attr(rpr, "strike") { Some(v) => v; None => "" }
+  let baseline = attr_int(rpr, "baseline")
+  let char_spacing = attr_int(rpr, "spc")
+  let kern = attr_int(rpr, "kern")
   let rpr_ch = @xml.get_children(rpr)
   let clr_raw = parse_solid_fill(rpr_ch, theme)
-  let clr = if clr_raw.is_none() { def_color } else { clr_raw }
+  let color = if clr_raw.is_none() { def_color } else { clr_raw }
   let ff_raw = child_attr(rpr_ch, "a:latin", "typeface")
   let ff_resolved = resolve_font_theme(ff_raw, theme)
-  let ff = if ff_resolved.is_empty() { def_font_face } else { ff_resolved }
+  let font_face = if ff_resolved.is_empty() { def_font_face } else { ff_resolved }
   let ea_raw = child_attr(rpr_ch, "a:ea", "typeface")
   let ea_resolved = resolve_ea_font_theme(ea_raw, theme)
-  let ea = if ea_resolved.is_empty() { def_ea_font } else { ea_resolved }
+  let ea_font = if ea_resolved.is_empty() { def_ea_font } else { ea_resolved }
+  let cs_font = child_attr(rpr_ch, "a:cs", "typeface")
+  let sym_font = child_attr(rpr_ch, "a:sym", "typeface")
   let cap = match @xml.get_attr(rpr, "cap") { Some(v) => v; None => "" }
-  (b, it, sz, clr, ff, ea, u, st, bl, spc, cap)
+  // Hyperlink: <a:hlinkClick r:id="rIdN"/>
+  let hlink_rid = match @xml.find_child(rpr_ch, "a:hlinkClick") {
+    None => ""
+    Some(hl) => match @xml.get_attr(hl, "r:id") { Some(v) => v; None => "" }
+  }
+  { text: "", bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid }
 }
 
 fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParagraph], BodyProps) {
@@ -1127,8 +1200,8 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
   while pi < np {
     let p = pnodes[pi]
     let p_ch = @xml.get_children(p)
-    let (align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color) = match @xml.find_child(p_ch, "a:pPr") {
-      None => ("", 0, 0, 0, 0, 0, 0, "", "", false, "", 0, Color::none())
+    let (align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, bullet_img_rid, tab_stops, rtl) = match @xml.find_child(p_ch, "a:pPr") {
+      None => ("", 0, 0, 0, 0, 0, 0, "", "", false, "", 0, Color::none(), "", ([] : Array[TabStop]), false)
       Some(ppr) => parse_para_props(ppr, theme)
     }
     let (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font) = match @xml.find_child(p_ch, "a:pPr") {
@@ -1153,16 +1226,19 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
         None => ""
         Some(t_node) => @xml.get_text_content(t_node)
       }
-      let (bold, italic, font_size, run_color, font_face, ea_font, underline, strike, baseline, char_spacing, cap) = match @xml.find_child(r_ch, "a:rPr") {
-        None => (def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, "", "", 0, 0, "")
-        Some(rpr) => parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, theme)
+      let run = match @xml.find_child(r_ch, "a:rPr") {
+        None => { text, bold: def_bold, italic: def_italic, font_size: def_font_size, color: def_color, font_face: def_font_face, ea_font: def_ea_font, cs_font: "", sym_font: "", underline: "", strike: "", baseline: 0, char_spacing: 0, kern: 0, cap: "", hlink_rid: "" }
+        Some(rpr) => {
+          let rp = parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, theme)
+          { ..rp, text }
+        }
       }
       if not(text.is_empty()) {
-        runs.push({ text, bold, italic, font_size, color: run_color, font_face, ea_font, underline, strike, baseline, char_spacing, cap })
+        runs.push(run)
       }
       ri = ri + 1
     }
-    paras.push({ runs, align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color })
+    paras.push({ runs, align, level, spc_before, spc_after, line_spacing, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, bullet_img_rid, tab_stops, rtl })
     pi = pi + 1
   }
   (paras, body_props)
