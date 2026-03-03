@@ -89,10 +89,11 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   let kern = get_dai(run_node, "kern")
                   let cap = get_da(run_node, "cap")
                   let hlink_rid = get_da(run_node, "hlink-rid")
+                  let hlink_mouse_over_rid = get_da(run_node, "hlink-hover-rid")
                   let underline = get_da(run_node, "underline")
                   let strike = get_da(run_node, "strike")
                   let baseline = get_dai(run_node, "baseline")
-                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid })
+                  runs.push({ text, bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid })
                 }
               }
               @xml.XmlNode::Text(text) => {
@@ -116,6 +117,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                       kern: 0,
                       cap: "",
                       hlink_rid: "",
+                      hlink_mouse_over_rid: "",
                     },
                   )
                 }

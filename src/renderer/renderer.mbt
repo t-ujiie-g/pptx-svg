@@ -205,17 +205,24 @@ fn auto_number_text(type_ : String, idx : Int) -> String {
   }
 }
 
+let alpha_count : Int = 26        // number of letters in alphabet
+let ascii_lower_a_minus1 : Int = 96  // 'a' - 1
+let ascii_upper_a_minus1 : Int = 64  // 'A' - 1
+let ascii_lower_a : Int = 97
+let ascii_lower_z : Int = 122
+let ascii_case_shift : Int = 32   // 'a' - 'A'
+
 fn alpha_lower(n : Int) -> String {
-  if n >= 1 && n <= 26 {
-    @ffi.ffi_char_code_to_str(96 + n)
+  if n >= 1 && n <= alpha_count {
+    @ffi.ffi_char_code_to_str(ascii_lower_a_minus1 + n)
   } else {
     int_to_str(n)
   }
 }
 
 fn alpha_upper(n : Int) -> String {
-  if n >= 1 && n <= 26 {
-    @ffi.ffi_char_code_to_str(64 + n)
+  if n >= 1 && n <= alpha_count {
+    @ffi.ffi_char_code_to_str(ascii_upper_a_minus1 + n)
   } else {
     int_to_str(n)
   }
@@ -236,8 +243,9 @@ fn roman_convert(n : Int, lower : Bool) -> String {
   let syml  = ["m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"]
   let mut result = ""
   let mut rem = n
+  let n_pairs = vals.length()
   let mut i = 0
-  while i < 13 {
+  while i < n_pairs {
     while rem >= vals[i] {
       result = result + (if lower { syml[i] } else { syms[i] })
       rem = rem - vals[i]
@@ -257,9 +265,9 @@ fn to_upper_ascii(s : String) -> String {
   while i < len {
     let c = s.get_char(i).unwrap()
     let code = Char::to_int(c)
-    if code >= 97 && code <= 122 {
+    if code >= ascii_lower_a && code <= ascii_lower_z {
       // a-z → A-Z
-      result = result + @ffi.ffi_char_code_to_str(code - 32)
+      result = result + @ffi.ffi_char_code_to_str(code - ascii_case_shift)
     } else {
       result = result + @ffi.ffi_char_code_to_str(code)
     }
@@ -413,7 +421,8 @@ fn render_run_with_tabs(
   cur_y : Int,
   scale : Int,
   fs : Int,
-  rels : Array[@ooxml.Relationship]
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData
 ) -> (String, Int) {
   if tab_stops.length() > 0 && contains_tab(display_text) {
     let parts = split_by_tab(display_text)
@@ -428,12 +437,12 @@ fn render_run_with_tabs(
         out = out + "</tspan><tspan" + ai("x", tab_x) + ai("y", cur_y) + ">"
         ti = ti + 1
       }
-      out = out + render_run_tspan(run, run_idx, part, scale, fs, rels)
+      out = out + render_run_tspan(run, run_idx, part, scale, fs, rels, theme)
       parti = parti + 1
     }
     (out, ti)
   } else {
-    (render_run_tspan(run, run_idx, display_text, scale, fs, rels), tab_idx)
+    (render_run_tspan(run, run_idx, display_text, scale, fs, rels, theme), tab_idx)
   }
 }
 
@@ -506,7 +515,8 @@ fn render_run_tspan(
   display_text : String,
   scale : Int,
   font_scale : Int,
-  rels : Array[@ooxml.Relationship]
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData
 ) -> String {
   let mut span = "<tspan"
   // Visual attributes
@@ -534,8 +544,11 @@ fn render_run_tspan(
     }
     span = span + a("font-family", ff + ", sans-serif")
   }
+  // Color: explicit color, or theme hlink/folHlink color for hyperlinks
   if not(run.color.is_none()) {
     span = span + a("fill", run.color.to_css())
+  } else if not(run.hlink_rid.is_empty()) && not(theme.hlink.is_none()) {
+    span = span + a("fill", theme.hlink.to_css())
   }
   // Character spacing
   if run.char_spacing != 0 {
@@ -583,7 +596,8 @@ fn render_run_tspan(
     dai("char-spacing", run.char_spacing) +
     dai("kern", run.kern) +
     da("cap", run.cap) +
-    da("hlink-rid", run.hlink_rid)
+    da("hlink-rid", run.hlink_rid) +
+    da("hlink-hover-rid", run.hlink_mouse_over_rid)
   // Wrap in hyperlink if present
   let inner = svg_escape(display_text)
   if not(run.hlink_rid.is_empty()) {
@@ -615,14 +629,24 @@ fn render_text(
   let pad_l   = px(l_ins, scale)
   let pad_t   = px(t_ins, scale)
   let pad_r   = px(r_ins, scale)
-  let text_x  = px(t.x, scale) + pad_l
-  let text_w  = px(t.cx, scale) - pad_l - pad_r
+  let base_text_x  = px(t.x, scale) + pad_l
+  let full_text_w  = px(t.cx, scale) - pad_l - pad_r
+  let mut text_x = base_text_x
+  let mut text_w = full_text_w
   let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
   let def_line_h  = def_sz * line_height_numer / line_height_denom // unscaled default line height
   let fs = body_props.font_scale
   let lr = body_props.ln_spc_reduction
 
   let do_wrap = body_props.wrap != "none"
+
+  // Multi-column support
+  let num_cols = if body_props.num_cols > 1 { body_props.num_cols } else { 1 }
+  let col_spacing_px = if num_cols > 1 { px(body_props.col_spacing, scale) } else { 0 }
+  let col_w = if num_cols > 1 { (full_text_w - col_spacing_px * (num_cols - 1)) / num_cols } else { full_text_w }
+  if num_cols > 1 {
+    text_w = col_w
+  }
 
   // Calculate total text height for vertical alignment
   let np = paragraphs.length()
@@ -639,11 +663,11 @@ fn render_text(
       if para.spc_before > 0 && ti > 0 {
         total_text_h = total_text_h + px(para.spc_before, scale)
       }
-      // Count visual lines for wrapped text
+      // Count visual lines for wrapped text (uses col_w for multi-col)
       let num_visual_lines = if do_wrap {
         let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
         let indent_px = px(indent_emu, scale)
-        let wrap_w = text_w - indent_px
+        let wrap_w = col_w - indent_px
         let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
         vlines.length()
       } else {
@@ -681,31 +705,39 @@ fn render_text(
   // Image bullets — render before <text> as separate <image> elements, collect them
   let mut img_bullets_svg = ""
 
+  let max_col_h = if num_cols > 1 { total_text_h / num_cols + 1 } else { 0 }
+
   let font_face = theme.minor_font + ", sans-serif"
   let scaled_def_sz = apply_font_scale(def_sz, fs)
-  let mut out = "<text" +
-    ai("x", text_x) +
-    a("xml:space", "preserve") +
-    a("font-family", font_face) +
-    ai("font-size", scaled_def_sz) +
-    a("fill", default_text_fill) +
-    da("font-face", theme.minor_font)
-  // Vertical text: apply writing-mode and adjust
-  if is_vert {
-    out = out + a("writing-mode", "tb")
-    if body_props.vert == "vert" || body_props.vert == "eaVert" {
-      out = out + a("glyph-orientation-vertical", "auto")
-    }
-  }
-  // Text rotation
-  if bp_rot != 0 {
-    let txt_cx = px(t.x + t.cx / 2, scale)
-    let txt_cy = px(t.y + t.cy / 2, scale)
-    out = out + rotation_transform(bp_rot, txt_cx, txt_cy)
-  }
-  out = out + ">"
 
-  let mut cur_y = px(t.y, scale) + pad_t + anchor_offset_clamped
+  fn make_text_header(tx : Int) -> String {
+    let mut h = "<text" +
+      ai("x", tx) +
+      a("xml:space", "preserve") +
+      a("font-family", font_face) +
+      ai("font-size", scaled_def_sz) +
+      a("fill", default_text_fill) +
+      da("font-face", theme.minor_font)
+    if is_vert {
+      h = h + a("writing-mode", "tb")
+      if body_props.vert == "vert" || body_props.vert == "eaVert" {
+        h = h + a("glyph-orientation-vertical", "auto")
+      }
+    }
+    if bp_rot != 0 {
+      let txt_cx = px(t.x + t.cx / 2, scale)
+      let txt_cy = px(t.y + t.cy / 2, scale)
+      h = h + rotation_transform(bp_rot, txt_cx, txt_cy)
+    }
+    h + ">"
+  }
+
+  let mut out = make_text_header(text_x)
+
+  let base_y = px(t.y, scale) + pad_t + anchor_offset_clamped
+  let mut cur_y = base_y
+  let mut cur_col = 0
+
   let mut pi = 0
   while pi < np {
     let para = paragraphs[pi]
@@ -715,6 +747,15 @@ fn render_text(
     // Apply spacing before paragraph
     if para.spc_before > 0 && pi > 0 {
       cur_y = cur_y + px(para.spc_before, scale)
+    }
+    // Multi-column: check if we need to move to the next column (paragraph boundary)
+    if num_cols > 1 && cur_col < num_cols - 1 && (cur_y - base_y) >= max_col_h {
+      out = out + "</text>"
+      cur_col = cur_col + 1
+      text_x = base_text_x + (col_w + col_spacing_px) * cur_col
+      cur_y = base_y
+
+      out = out + make_text_header(text_x)
     }
     // Advance to baseline (ascent ≈ font_size)
     cur_y = cur_y + p_font_sz
@@ -821,17 +862,43 @@ fn render_text(
         let nvl = vlines.length()
         let mut vli = 0
         let mut tab_idx = 0
+        let mut anchor_x = anchor_x
         while vli < nvl {
           let vline = vlines[vli]
           // For wrapped lines after the first, emit a new positioning tspan
           if vli > 0 {
             cur_y = cur_y + p_line_h
-            out = out + "</tspan><tspan" +
-              ai("x", anchor_x) +
-              ai("y", cur_y) +
-              anchor_attr +
-              rtl_attr +
-              ">"
+            // Multi-column: check if this line overflows to next column
+            if num_cols > 1 && cur_col < num_cols - 1 && (cur_y - base_y) >= max_col_h {
+              // Close current paragraph tspan and <text>
+              out = out + "</tspan></text>"
+              cur_col = cur_col + 1
+              text_x = base_text_x + (col_w + col_spacing_px) * cur_col
+              cur_y = base_y + p_font_sz
+              // Recompute anchor_x for new column
+              anchor_x = if effective_align == "ctr" || effective_align == "c" {
+                text_x + indent + (text_w - indent) / 2
+              } else if effective_align == "r" {
+                text_x + text_w
+              } else {
+                text_x + indent
+              }
+              // Open new <text> and paragraph tspan
+              out = out + make_text_header(text_x)
+              out = out + "<tspan" +
+                ai("x", anchor_x) +
+                ai("y", cur_y) +
+                anchor_attr +
+                rtl_attr +
+                ">"
+            } else {
+              out = out + "</tspan><tspan" +
+                ai("x", anchor_x) +
+                ai("y", cur_y) +
+                anchor_attr +
+                rtl_attr +
+                ">"
+            }
           }
           // Render fragments in this visual line
           let nf = vline.length()
@@ -839,7 +906,7 @@ fn render_text(
           while fi < nf {
             let (run_idx, frag_text) = vline[fi]
             let run = para.runs[run_idx]
-            let (tab_svg, new_ti) = render_run_with_tabs(run, run_idx, frag_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels)
+            let (tab_svg, new_ti) = render_run_with_tabs(run, run_idx, frag_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels, theme)
             out = out + tab_svg
             tab_idx = new_ti
             fi = fi + 1
@@ -853,7 +920,7 @@ fn render_text(
         while ri < nr {
           let run = para.runs[ri]
           let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
-          let (tab_svg, new_ti) = render_run_with_tabs(run, ri, display_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels)
+          let (tab_svg, new_ti) = render_run_with_tabs(run, ri, display_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels, theme)
           out = out + tab_svg
           tab_idx = new_ti
           ri = ri + 1
@@ -1072,7 +1139,7 @@ fn render_table_cell_text(
       while ri < nr {
         let run = para.runs[ri]
         let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
-        out = out + render_run_tspan(run, ri, display_text, scale, -1, rels)
+        out = out + render_run_tspan(run, ri, display_text, scale, -1, rels, theme)
         ri = ri + 1
       }
       out = out + "</tspan>"

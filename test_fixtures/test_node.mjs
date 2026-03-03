@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 21', slideCount === 21, `got ${slideCount}`);
+  assert('slide count = 22', slideCount === 22, `got ${slideCount}`);
 
-  // Verify all 21 slides exist
-  for (let i = 1; i <= 21; i++) {
+  // Verify all 22 slides exist
+  for (let i = 1; i <= 22; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 21; i++) {
+  for (let i = 1; i <= 22; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -551,6 +551,18 @@ async function testFeaturesPptx() {
     assert('slide21 has a:blip in buBlip', hasTag(slide21, 'a:blip'));
     assert('slide21 has r:embed on blip', slide21.includes('r:embed='));
     assert('slide21 has bullet text', slide21.includes('Image bullet'));
+  }
+
+  // ── Slide 22: Hover link + link color ──
+  {
+    section('test_features.pptx — slide 22 (hover link)');
+    const slide22 = textFiles.get('ppt/slides/slide22.xml');
+    assert('slide22 exists', !!slide22);
+    assert('slide22 has a:hlinkClick', hasTag(slide22, 'a:hlinkClick'));
+    assert('slide22 has a:hlinkHover', hasTag(slide22, 'a:hlinkHover'));
+    assert('slide22 has Click link text', slide22.includes('Click link'));
+    assert('slide22 has Hover link text', slide22.includes('Hover link'));
+    assert('slide22 has Both links text', slide22.includes('Both links'));
   }
 }
 

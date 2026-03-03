@@ -267,6 +267,7 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
         } else {
           let nc = self.peek_char()
           if nc == '/' {
+            // Closing tag: skip content to '>' (result unused, advances position)
             self.advance()
             let _ = self.read_until_char('>')
             if not(self.at_end()) { self.advance() }
@@ -274,6 +275,7 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
           } else if nc == '!' {
             self.advance()
             if self.starts_with("--") {
+              // HTML comment: skip to end marker
               self.skip_str("--")
               let _ = self.read_until_str("-->")
               if not(self.at_end()) { self.skip_str("-->") }
@@ -285,10 +287,12 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
                 children.push(XmlNode::Text(text))
               }
             } else {
+              // DOCTYPE or other declaration: skip to '>'
               let _ = self.read_until_char('>')
               if not(self.at_end()) { self.advance() }
             }
           } else if nc == '?' {
+            // Processing instruction: skip to end marker
             self.advance()
             let _ = self.read_until_str("?>")
             if not(self.at_end()) { self.skip_str("?>") }

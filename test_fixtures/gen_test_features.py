@@ -1581,6 +1581,58 @@ rPr21b = etree.SubElement(r21b, '{http://schemas.openxmlformats.org/drawingml/20
 t21b = etree.SubElement(r21b, '{http://schemas.openxmlformats.org/drawingml/2006/main}t')
 t21b.text = "Image bullet paragraph 2"
 
+# ── Slide 22: Hover link + link color ──────────────────────────────────────────
+slide22 = prs.slides.add_slide(blank)
+tb22 = slide22.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(5))
+tf22 = tb22.text_frame
+tf22.word_wrap = True
+
+# Paragraph 1: hlinkClick (normal hyperlink)
+p22a = tf22.paragraphs[0]
+p22a.text = ""
+r22a = p22a.add_run()
+r22a.text = "Click link"
+r22a.font.size = Pt(24)
+# Add hlinkClick via XML
+rPr22a = r22a._r.find('{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+if rPr22a is None:
+    rPr22a = etree.SubElement(r22a._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    r22a._r.insert(0, rPr22a)
+# Add relationship for click link
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+rId_click = slide22.part.relate_to('https://example.com/click', RT.HYPERLINK, is_external=True)
+etree.SubElement(rPr22a, '{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rId_click})
+
+# Paragraph 2: hlinkHover (mouse-over hyperlink)
+p22b = tf22.add_paragraph()
+r22b = p22b.add_run()
+r22b.text = "Hover link"
+r22b.font.size = Pt(24)
+rPr22b = r22b._r.find('{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+if rPr22b is None:
+    rPr22b = etree.SubElement(r22b._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    r22b._r.insert(0, rPr22b)
+rId_hover = slide22.part.relate_to('https://example.com/hover', RT.HYPERLINK, is_external=True)
+etree.SubElement(rPr22b, '{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkHover',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rId_hover})
+
+# Paragraph 3: both hlinkClick + hlinkHover
+p22c = tf22.add_paragraph()
+r22c = p22c.add_run()
+r22c.text = "Both links"
+r22c.font.size = Pt(24)
+rPr22c = r22c._r.find('{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+if rPr22c is None:
+    rPr22c = etree.SubElement(r22c._r, '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr')
+    r22c._r.insert(0, rPr22c)
+rId_click2 = slide22.part.relate_to('https://example.com/both-click', RT.HYPERLINK, is_external=True)
+rId_hover2 = slide22.part.relate_to('https://example.com/both-hover', RT.HYPERLINK, is_external=True)
+etree.SubElement(rPr22c, '{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rId_click2})
+etree.SubElement(rPr22c, '{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkHover',
+                 attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rId_hover2})
+
 # Save
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)

@@ -60,14 +60,22 @@ pub fn parse_hex_color(s : String) -> Color {
   { r: parse_hex2(s, 0), g: parse_hex2(s, 2), b: parse_hex2(s, 4) }
 }
 
+// ASCII code points for hex digit parsing
+let ascii_0 : Int = 48    // '0'
+let ascii_9 : Int = 57    // '9'
+let ascii_A : Int = 65    // 'A'
+let ascii_F : Int = 70    // 'F'
+let ascii_a : Int = 97    // 'a'
+let ascii_f : Int = 102   // 'f'
+
 fn hex_digit(c : Char) -> Int {
   let v = Char::to_int(c)
-  if v >= 48 && v <= 57 {
-    v - 48
-  } else if v >= 65 && v <= 70 {
-    v - 55
-  } else if v >= 97 && v <= 102 {
-    v - 87
+  if v >= ascii_0 && v <= ascii_9 {
+    v - ascii_0
+  } else if v >= ascii_A && v <= ascii_F {
+    v - (ascii_A - 10)
+  } else if v >= ascii_a && v <= ascii_f {
+    v - (ascii_a - 10)
   } else {
     0
   }
@@ -193,69 +201,80 @@ fn max3(a : Int, b : Int, c : Int) -> Int {
   if m > c { m } else { c }
 }
 
+// ── HSL color space constants (integer-scaled) ──────────────────────────────
+// Hue: 0-3600 (tenths of a degree), Saturation/Lightness: 0-1000 (tenths of %)
+
+let rgb_max : Int = 255          // max RGB component value
+let hsl_scale : Int = 1000       // saturation/lightness precision (0.1% units)
+let hsl_half : Int = 500         // hsl_scale / 2
+let hue_full : Int = 3600        // full hue circle in tenths of degree
+let hue_sextant : Int = 600      // hue_full / 6 — one sixth of hue circle
+let hue_third : Int = 1200       // hue_full / 3
+let hue_two_thirds : Int = 2400  // hue_full * 2 / 3
+let rgb_sum_max : Int = 510      // rgb_max * 2
+
 ///| Convert RGB (0-255) to HSL (h: 0-3600, s: 0-1000, l: 0-1000).
 ///  Uses integer arithmetic scaled by 1000 to avoid floating point.
 fn rgb_to_hsl(r : Int, g : Int, b : Int) -> (Int, Int, Int) {
   let max_c = max3(r, g, b)
   let min_c = min3(r, g, b)
-  let l = (max_c + min_c) * 1000 / 510 // 0-1000
+  let l = (max_c + min_c) * hsl_scale / rgb_sum_max
   if max_c == min_c {
     return (0, 0, l)
   }
   let d = max_c - min_c
-  let s = if l > 500 {
-    d * 1000 / (510 - max_c - min_c)
+  let s = if l > hsl_half {
+    d * hsl_scale / (rgb_sum_max - max_c - min_c)
   } else {
-    d * 1000 / (max_c + min_c)
+    d * hsl_scale / (max_c + min_c)
   }
   let h = if r == max_c {
-    (g - b) * 600 / d
+    (g - b) * hue_sextant / d
   } else if g == max_c {
-    1200 + (b - r) * 600 / d
+    hue_third + (b - r) * hue_sextant / d
   } else {
-    2400 + (r - g) * 600 / d
+    hue_two_thirds + (r - g) * hue_sextant / d
   }
-  let h2 = if h < 0 { h + 3600 } else { h }
+  let h2 = if h < 0 { h + hue_full } else { h }
   (h2, s, l)
 }
 
 fn hue_to_rgb(p : Int, q : Int, t_in : Int) -> Int {
   let t = if t_in < 0 {
-    t_in + 3600
-  } else if t_in > 3600 {
-    t_in - 3600
+    t_in + hue_full
+  } else if t_in > hue_full {
+    t_in - hue_full
   } else {
     t_in
   }
-  if t < 600 {
-    (p + (q - p) * t / 600) * 255 / 1000
-  } else if t < 1800 {
-    q * 255 / 1000
-  } else if t < 2400 {
-    (p + (q - p) * (2400 - t) / 600) * 255 / 1000
+  if t < hue_sextant {
+    (p + (q - p) * t / hue_sextant) * rgb_max / hsl_scale
+  } else if t < hue_full / 2 {
+    q * rgb_max / hsl_scale
+  } else if t < hue_two_thirds {
+    (p + (q - p) * (hue_two_thirds - t) / hue_sextant) * rgb_max / hsl_scale
   } else {
-    p * 255 / 1000
+    p * rgb_max / hsl_scale
   }
 }
 
 ///| Convert HSL (h: 0-3600, s: 0-1000, l: 0-1000) to RGB Color.
 fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
   if s == 0 {
-    let v = l * 255 / 1000
+    let v = l * rgb_max / hsl_scale
     return { r: v, g: v, b: v }
   }
-  let q = if l < 500 {
-    l * (1000 + s) / 1000
+  let q = if l < hsl_half {
+    l * (hsl_scale + s) / hsl_scale
   } else {
-    l + s - l * s / 1000
+    l + s - l * s / hsl_scale
   }
   let p = 2 * l - q
-  let r = hue_to_rgb(p, q, h + 1200)
+  let r = hue_to_rgb(p, q, h + hue_third)
   let g = hue_to_rgb(p, q, h)
-  let b = hue_to_rgb(p, q, h - 1200)
-  // Clamp 0-255
+  let b = hue_to_rgb(p, q, h - hue_third)
   let clamp = fn(v : Int) -> Int {
-    if v < 0 { 0 } else if v > 255 { 255 } else { v }
+    if v < 0 { 0 } else if v > rgb_max { rgb_max } else { v }
   }
   { r: clamp(r), g: clamp(g), b: clamp(b) }
 }
@@ -288,10 +307,10 @@ pub fn apply_color_modifiers(
           g = g * val / pct_100
           b = b * val / pct_100
         } else if tag == "a:tint" {
-          // tint: move each component toward 255
-          r = r + (255 - r) * val / pct_100
-          g = g + (255 - g) * val / pct_100
-          b = b + (255 - b) * val / pct_100
+          // tint: move each component toward rgb_max
+          r = r + (rgb_max - r) * val / pct_100
+          g = g + (rgb_max - g) * val / pct_100
+          b = b + (rgb_max - b) * val / pct_100
         } else if tag == "a:lumMod" {
           lum_mod = val
         } else if tag == "a:lumOff" {
@@ -300,7 +319,7 @@ pub fn apply_color_modifiers(
           // Saturation modification via HSL
           let (h, s, l) = rgb_to_hsl(r, g, b)
           let new_s = s * val / pct_100
-          let ns = if new_s > 1000 { 1000 } else { new_s }
+          let ns = if new_s > hsl_scale { hsl_scale } else { new_s }
           let c2 = hsl_to_rgb(h, ns, l)
           r = c2.r
           g = c2.g
@@ -317,18 +336,18 @@ pub fn apply_color_modifiers(
   // Apply lumMod/lumOff together (they work as a pair)
   if lum_mod >= 0 {
     let (h, s, l) = rgb_to_hsl(r, g, b)
-    let mut new_l = l * lum_mod / pct_100 + lum_off * 1000 / pct_100
+    let mut new_l = l * lum_mod / pct_100 + lum_off * hsl_scale / pct_100
     if new_l < 0 { new_l = 0 }
-    if new_l > 1000 { new_l = 1000 }
+    if new_l > hsl_scale { new_l = hsl_scale }
     let c2 = hsl_to_rgb(h, s, new_l)
     r = c2.r
     g = c2.g
     b = c2.b
   }
   // Clamp
-  if r < 0 { r = 0 } else if r > 255 { r = 255 }
-  if g < 0 { g = 0 } else if g > 255 { g = 255 }
-  if b < 0 { b = 0 } else if b > 255 { b = 255 }
+  if r < 0 { r = 0 } else if r > rgb_max { r = rgb_max }
+  if g < 0 { g = 0 } else if g > rgb_max { g = rgb_max }
+  if b < 0 { b = 0 } else if b > rgb_max { b = rgb_max }
   { r, g, b }
 }
 
@@ -527,13 +546,13 @@ pub fn LevelTextDefaults::empty() -> LevelTextDefaults {
 }
 
 pub(all) struct TextStyleGroup {
-  levels : Array[LevelTextDefaults]  // 9 elements (lvl1pPr–lvl9pPr)
+  levels : Array[LevelTextDefaults]  // max_outline_levels elements (lvl1pPr–lvl9pPr)
 }
 
 pub fn TextStyleGroup::empty() -> TextStyleGroup {
   let levels : Array[LevelTextDefaults] = []
   let mut i = 0
-  while i < 9 {
+  while i < max_outline_levels {
     levels.push(LevelTextDefaults::empty())
     i = i + 1
   }
@@ -706,6 +725,7 @@ pub(all) struct TextRun {
   kern      : Int      // kerning in hundredths-of-a-point (kern attr); 0 = default
   cap       : String   // "all", "small"; "" = none
   hlink_rid : String   // hyperlink relationship ID from <a:hlinkClick r:id="...">; "" = none
+  hlink_mouse_over_rid : String  // hover hyperlink from <a:hlinkHover r:id="...">; "" = none
 }
 
 pub(all) struct TabStop {
@@ -737,6 +757,9 @@ pub(all) struct TextParagraph {
 
 ///| 100000 = 100% in OOXML percentage units (fontScale, lnSpcReduction, etc.)
 pub let pct_100 : Int = 100000
+
+///| Maximum outline levels in OOXML (lvl1pPr through lvl9pPr).
+pub let max_outline_levels : Int = 9
 
 pub(all) struct BodyProps {
   anchor  : String  // vertical alignment: "t", "ctr", "b", "" = default (top)
@@ -1182,7 +1205,11 @@ fn parse_run_props(
     None => ""
     Some(hl) => match @xml.get_attr(hl, "r:id") { Some(v) => v; None => "" }
   }
-  { text: "", bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid }
+  let hlink_mouse_over_rid = match @xml.find_child(rpr_ch, "a:hlinkHover") {
+    None => ""
+    Some(hl) => match @xml.get_attr(hl, "r:id") { Some(v) => v; None => "" }
+  }
+  { text: "", bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid }
 }
 
 fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParagraph], BodyProps) {
@@ -1209,7 +1236,7 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
       Some(ppr) => parse_def_rpr(ppr, theme)
     }
     // Apply lstStyle level defaults as fallback
-    let lvl_idx = if level >= 0 && level < 9 { level } else { 0 }
+    let lvl_idx = if level >= 0 && level < max_outline_levels { level } else { 0 }
     let lst_def = lst_style.levels[lvl_idx]
     let def_font_size = if def_font_size == 0 && lst_def.font_size > 0 { lst_def.font_size } else { def_font_size }
     let def_color = if def_color.is_none() && not(lst_def.color.is_none()) { lst_def.color } else { def_color }
@@ -1227,7 +1254,7 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
         Some(t_node) => @xml.get_text_content(t_node)
       }
       let run = match @xml.find_child(r_ch, "a:rPr") {
-        None => { text, bold: def_bold, italic: def_italic, font_size: def_font_size, color: def_color, font_face: def_font_face, ea_font: def_ea_font, cs_font: "", sym_font: "", underline: "", strike: "", baseline: 0, char_spacing: 0, kern: 0, cap: "", hlink_rid: "" }
+        None => { text, bold: def_bold, italic: def_italic, font_size: def_font_size, color: def_color, font_face: def_font_face, ea_font: def_ea_font, cs_font: "", sym_font: "", underline: "", strike: "", baseline: 0, char_spacing: 0, kern: 0, cap: "", hlink_rid: "", hlink_mouse_over_rid: "" }
         Some(rpr) => {
           let rp = parse_run_props(rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font, theme)
           { ..rp, text }
@@ -1671,7 +1698,7 @@ fn parse_text_style_group(node : @xml.XmlNode, theme : ThemeData) -> TextStyleGr
   let ch = @xml.get_children(node)
   let levels : Array[LevelTextDefaults] = []
   let mut i = 0
-  while i < 9 {
+  while i < max_outline_levels {
     let tag = "a:lvl" + int_to_str(i + 1) + "pPr"
     let lvl = match @xml.find_child(ch, tag) {
       None => LevelTextDefaults::empty()
@@ -1704,7 +1731,7 @@ fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
 // ── Slide master parser ──────────────────────────────────────────────────────
 
 ///| Parse a slide master XML string into SlideMasterData.
-pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : ThemeData) -> SlideMasterData {
+pub fn parse_slide_master(xml_str : String, theme : ThemeData) -> SlideMasterData {
   let nodes = @xml.parse_xml(xml_str)
   // Parse p:clrMap and apply to theme
   let clr_map = match @xml.find_child(nodes, "p:sldMaster") {
@@ -1744,15 +1771,13 @@ pub fn parse_slide_master(xml_str : String, slide_size : SlideSize, theme : Them
       }
     }
   }
-  // ignore slide_size parameter (just used for shape parsing context)
-  ignore(slide_size)
   { background, shapes, text_styles, clr_map }
 }
 
 // ── Slide layout parser ──────────────────────────────────────────────────────
 
 ///| Parse a slide layout XML string into SlideLayoutData.
-pub fn parse_slide_layout(xml_str : String, slide_size : SlideSize, theme : ThemeData) -> SlideLayoutData {
+pub fn parse_slide_layout(xml_str : String, theme : ThemeData) -> SlideLayoutData {
   let nodes = @xml.parse_xml(xml_str)
   let root_ch = match @xml.find_child(nodes, "p:sldLayout") {
     Some(n) => @xml.get_children(n)
@@ -1774,7 +1799,6 @@ pub fn parse_slide_layout(xml_str : String, slide_size : SlideSize, theme : Them
     }
   }
   let clr_map_ovr = extract_clr_map_ovr_from_nodes(root_ch)
-  ignore(slide_size)
   { background, shapes, clr_map_ovr }
 }
 

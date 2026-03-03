@@ -24,7 +24,7 @@
 - [x] 行間 (`a:lnSpc`) EMU / 百分率
 - [x] 文字間隔 (`a:rPr spc`) + letter-spacing
 - [x] `a:lstStyle` シェイプ固有リストスタイル継承
-- [x] テキスト完全対応 (タブ / RTL / 画像バレット / kern / cs・sym フォント / 縦書き / 回転 / ハイパーリンク)
+- [x] テキスト完全対応 (タブ / RTL / 画像バレット / kern / cs・sym フォント / 縦書き / 回転 / ハイパーリンク / ホバーリンク / リンク色 / テキストカラム)
 
 ---
 
@@ -86,12 +86,12 @@
 - [x] テキスト折り返し (`wrap="square/none"`)
 - [x] 縦書き (`vert="eaVert/vert/vert270/wordArtVert/..."`) — `writing-mode="tb"` レンダリング
 - [x] テキスト回転 (`rot`) — SVG `transform="rotate()"` レンダリング
-- [ ] カラム数 (`numCol`) / カラム間隔 (`spcCol`) — パース + round-trip 済み、視覚的カラム分割未実装
+- [x] カラム数 (`numCol`) / カラム間隔 (`spcCol`) — 行レベルカラム分割レンダリング
 
 ### 2.6 ハイパーリンク
 - [x] `a:hlinkClick r:id` → Relationship 経由で URL 解決 + `<a>` ラップ
-- [ ] `a:hlinkMouseOver` — ホバーリンク
-- [ ] リンク色 (hlink / folHlink テーマカラー)
+- [x] `a:hlinkHover r:id` — ホバーリンク (data 属性 + round-trip)
+- [x] リンク色 (hlink テーマカラー — 明示色なし時に自動適用)
 
 ---
 
@@ -332,7 +332,7 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 | 優先度 | 内容 | 理由 |
 |--------|------|------|
-| **P0** | 1. マスター/レイアウト継承, 2. テキスト完全対応 | ほぼ全 PPTX で必要 |
+| **P0** | ~~1. マスター/レイアウト継承, 2. テキスト完全対応~~ ✅ 完了 | ほぼ全 PPTX で必要 |
 | **P1** | 3-6. 塗り/線/シェイプ/テーブル, 12. ライブラリ公開 | ビジネス文書の 90% をカバー |
 | **P2** | 7-9. 画像高度/エフェクト/チャート | 完全互換に必要 |
 | **P3** | 10-11. SmartArt/OLE/メディア/数式 | 特殊ケース |

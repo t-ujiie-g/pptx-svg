@@ -296,7 +296,7 @@ pub fn initialize_pptx() -> String {
     let mp = master_paths[mi]
     let mxml = @ffi.ffi_get_file(mp)
     if not(mxml.is_empty()) {
-      let mdata = @ooxml.parse_slide_master(mxml, g_slide_size.val, g_theme.val)
+      let mdata = @ooxml.parse_slide_master(mxml, g_theme.val)
       masters.push((mdata, mp))
       @ffi.ffi_log("Parsed master: " + mp)
     } else {
@@ -334,7 +334,7 @@ pub fn initialize_pptx() -> String {
           None => @ooxml.apply_color_map(g_theme.val, master_clr_map)
         }
       }
-      let ldata = @ooxml.parse_slide_layout(lxml, g_slide_size.val, layout_effective_theme)
+      let ldata = @ooxml.parse_slide_layout(lxml, layout_effective_theme)
       layouts.push((ldata, lp))
       @ffi.ffi_log("Parsed layout: " + lp)
     } else {
@@ -737,7 +737,7 @@ fn apply_text_defaults(shape : @ooxml.Shape, text_styles : @ooxml.MasterTextStyl
   while pi < np {
     let para = shape.paragraphs[pi]
     let lvl = para.level
-    let lvl_idx = if lvl >= 0 && lvl < 9 { lvl } else { 0 }
+    let lvl_idx = if lvl >= 0 && lvl < @ooxml.max_outline_levels { lvl } else { 0 }
     let defaults = style.levels[lvl_idx]
     // Apply defaults to each run
     let nr = para.runs.length()

@@ -277,7 +277,7 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if run.kern > 0 {
     rpr = rpr + " kern=\"" + int_to_str(run.kern) + "\""
   }
-  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty()) || not(run.hlink_rid.is_empty())
+  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty()) || not(run.hlink_rid.is_empty()) || not(run.hlink_mouse_over_rid.is_empty())
   if has_children {
     rpr = rpr + ">"
     if not(run.color.is_none()) {
@@ -297,6 +297,9 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     }
     if not(run.hlink_rid.is_empty()) {
       rpr = rpr + "<a:hlinkClick r:id=\"" + run.hlink_rid + "\"/>"
+    }
+    if not(run.hlink_mouse_over_rid.is_empty()) {
+      rpr = rpr + "<a:hlinkHover r:id=\"" + run.hlink_mouse_over_rid + "\"/>"
     }
     rpr + "</a:rPr>"
   } else {
