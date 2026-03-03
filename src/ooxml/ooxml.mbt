@@ -116,6 +116,32 @@ fn hex_nibble(n : Int) -> String {
   }
 }
 
+// ── Gradient fill ────────────────────────────────────────────────────────────
+
+pub(all) struct GradientStop {
+  pos   : Int    // 0-100000 (1/1000%)
+  color : Color  // resolved RGB
+}
+
+pub(all) struct GradientFill {
+  stops          : Array[GradientStop]  // empty = none
+  angle          : Int    // lin: 60000ths of degree; -1 = path gradient
+  path_type      : String // "circle","rect","shape"; "" = linear
+  rot_with_shape : Bool
+  fill_to_l      : Int    // path gradient fillToRect; -1 = unset
+  fill_to_t      : Int
+  fill_to_r      : Int
+  fill_to_b      : Int
+}
+
+pub fn GradientFill::none() -> GradientFill {
+  { stops: [], angle: 0, path_type: "", rot_with_shape: true, fill_to_l: -1, fill_to_t: -1, fill_to_r: -1, fill_to_b: -1 }
+}
+
+pub fn GradientFill::is_none(self : GradientFill) -> Bool {
+  self.stops.length() == 0
+}
+
 // ── Theme data ───────────────────────────────────────────────────────────────
 
 pub(all) struct ThemeData {
@@ -786,6 +812,7 @@ pub fn BodyProps::default() -> BodyProps {
 pub(all) struct TableCell {
   paragraphs : Array[TextParagraph]
   fill : Color
+  grad_fill : GradientFill
 }
 
 pub(all) struct TableRow {
@@ -861,6 +888,7 @@ pub(all) struct Shape {
   kind        : ShapeKind
   transform   : ShapeTransform
   fill        : Color          // Color::none() = no fill
+  grad_fill   : GradientFill   // GradientFill::none() = no gradient
   stroke      : Color          // Color::none() = no stroke
   stroke_w    : Int            // stroke width in EMU (0 = default ~12700)
   paragraphs  : Array[TextParagraph]
@@ -884,6 +912,7 @@ pub fn SlideSize::default() -> SlideSize {
 pub(all) struct SlideData {
   slide_size : SlideSize
   background : Color
+  bg_grad    : GradientFill  // background gradient; GradientFill::none() = solid
   shapes     : Array[Shape]
 }
 
@@ -945,6 +974,77 @@ fn parse_solid_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Color {
   match @xml.find_child(nodes, "a:solidFill") {
     None => Color::none()
     Some(fill_node) => parse_color_from_children(@xml.get_children(fill_node), theme)
+  }
+}
+
+// ── Gradient fill parsing ────────────────────────────────────────────────────
+
+///| Parse <a:gradFill> from child nodes. Returns GradientFill::none() if absent.
+fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> GradientFill {
+  match @xml.find_child(nodes, "a:gradFill") {
+    None => GradientFill::none()
+    Some(gf_node) => {
+      let rot_with_shape = match @xml.get_attr(gf_node, "rotWithShape") {
+        Some(v) => v != "0"
+        None => true
+      }
+      let gf_ch = @xml.get_children(gf_node)
+      // Parse gradient stops
+      let stops : Array[GradientStop] = []
+      match @xml.find_child(gf_ch, "a:gsLst") {
+        None => ()
+        Some(gs_lst) => {
+          let gs_nodes = @xml.find_children(@xml.get_children(gs_lst), "a:gs")
+          let ngs = gs_nodes.length()
+          let mut gi = 0
+          while gi < ngs {
+            let pos = attr_int(gs_nodes[gi], "pos")
+            let color = parse_color_from_children(@xml.get_children(gs_nodes[gi]), theme)
+            stops.push({ pos, color })
+            gi = gi + 1
+          }
+        }
+      }
+      if stops.length() == 0 {
+        return GradientFill::none()
+      }
+      // Parse linear gradient: <a:lin ang="N" scaled="0|1"/>
+      let mut angle = 0
+      let mut path_type = ""
+      let mut fill_to_l = -1
+      let mut fill_to_t = -1
+      let mut fill_to_r = -1
+      let mut fill_to_b = -1
+      match @xml.find_child(gf_ch, "a:lin") {
+        Some(lin) => {
+          angle = attr_int(lin, "ang")
+        }
+        None => {
+          // Parse path gradient: <a:path path="circle|rect|shape">
+          match @xml.find_child(gf_ch, "a:path") {
+            Some(path_node) => {
+              angle = -1
+              path_type = match @xml.get_attr(path_node, "path") {
+                Some(v) => v
+                None => "circle"
+              }
+              // Parse <a:fillToRect l="N" t="N" r="N" b="N"/>
+              match @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
+                Some(ftr) => {
+                  fill_to_l = attr_int(ftr, "l")
+                  fill_to_t = attr_int(ftr, "t")
+                  fill_to_r = attr_int(ftr, "r")
+                  fill_to_b = attr_int(ftr, "b")
+                }
+                None => ()
+              }
+            }
+            None => ()
+          }
+        }
+      }
+      { stops, angle, path_type, rot_with_shape, fill_to_l, fill_to_t, fill_to_r, fill_to_b }
+    }
   }
 }
 
@@ -1320,6 +1420,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
       if c.is_none() { Color::none() } else { c }
     }
   }
+  let grad_fill = parse_gradient_fill(sppr_ch, theme)
   let (stroke, stroke_w) = parse_stroke(sppr_ch, theme)
   // Text
   let (paras, body_props) = match @xml.find_child(ch, "p:txBody") {
@@ -1330,6 +1431,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     kind: ShapeKind::AutoShape(geom),
     transform,
     fill,
+    grad_fill,
     stroke,
     stroke_w,
     paragraphs: paras,
@@ -1363,6 +1465,7 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     kind: ShapeKind::Picture(rid),
     transform,
     fill: Color::none(),
+    grad_fill: GradientFill::none(),
     stroke: Color::none(),
     stroke_w: 0,
     paragraphs: [],
@@ -1387,7 +1490,7 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
       c
     }
   }
-  { paragraphs, fill }
+  { paragraphs, fill, grad_fill: GradientFill::none() }
 }
 
 ///| Parse transform from either a:xfrm or p:xfrm (graphicFrame uses p:xfrm).
@@ -1457,6 +1560,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         kind: ShapeKind::TableShape(table_data),
         transform,
         fill: Color::none(),
+        grad_fill: GradientFill::none(),
         stroke: Color::none(),
         stroke_w: 0,
         paragraphs: [],
@@ -1473,6 +1577,7 @@ fn empty_shape() -> Shape {
     kind: ShapeKind::Other,
     transform: ShapeTransform::default(),
     fill: Color::none(),
+    grad_fill: GradientFill::none(),
     stroke: Color::none(),
     stroke_w: 0,
     paragraphs: [],
@@ -1573,27 +1678,29 @@ pub fn parse_slide(
   // Navigate p:sld → p:cSld
   let csld = @xml.find_path(nodes, ["p:sld", "p:cSld"])
   match csld {
-    None => { slide_size, background: Color::none(), shapes }
+    None => { slide_size, background: Color::none(), bg_grad: GradientFill::none(), shapes }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
-      // Parse background: p:bg → p:bgPr → solidFill
+      // Parse background: p:bg → p:bgPr → solidFill / gradFill
       // Color::none() = no explicit bg (inherit from layout/master)
-      let bg = match @xml.find_child(csld_ch, "p:bg") {
-        None => Color::none()
+      let (bg, bg_grad) = match @xml.find_child(csld_ch, "p:bg") {
+        None => (Color::none(), GradientFill::none())
         Some(bg_node) => {
           let bg_ch = @xml.get_children(bg_node)
           match @xml.find_child(bg_ch, "p:bgPr") {
-            None => Color::none()
+            None => (Color::none(), GradientFill::none())
             Some(bgpr) => {
-              let c = parse_solid_fill(@xml.get_children(bgpr), theme)
-              c  // may be Color::none() if no solidFill found
+              let bgpr_ch = @xml.get_children(bgpr)
+              let c = parse_solid_fill(bgpr_ch, theme)
+              let gf = parse_gradient_fill(bgpr_ch, theme)
+              (c, gf)
             }
           }
         }
       }
       // Navigate to p:spTree
       match @xml.find_child(csld_ch, "p:spTree") {
-        None => { slide_size, background: bg, shapes }
+        None => { slide_size, background: bg, bg_grad, shapes }
         Some(tree) => {
           let tree_ch = @xml.get_children(tree)
           let n = tree_ch.length()
@@ -1613,7 +1720,7 @@ pub fn parse_slide(
             }
             i = i + 1
           }
-          { slide_size, background: bg, shapes }
+          { slide_size, background: bg, bg_grad, shapes }
         }
       }
     }

@@ -363,6 +363,7 @@ pub fn initialize_pptx() -> String {
       {
         slide_size: g_slide_size.val,
         background: @ooxml.Color::none(),
+        bg_grad: @ooxml.GradientFill::none(),
         shapes: [],
       },
     )
@@ -507,6 +508,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   let resolved_slide : @ooxml.SlideData = {
     slide_size: slide_data.slide_size,
     background: bg,
+    bg_grad: slide_data.bg_grad,
     shapes: slide_data.shapes,
   }
   g_slides.val[slide_idx] = resolved_slide
@@ -667,6 +669,7 @@ fn resolve_placeholder_inheritance(
                 kind: shape.kind,
                 transform: layout_ph.transform,
                 fill: shape.fill,
+                grad_fill: shape.grad_fill,
                 stroke: shape.stroke,
                 stroke_w: shape.stroke_w,
                 paragraphs: shape.paragraphs,
@@ -696,6 +699,7 @@ fn resolve_placeholder_inheritance(
                   kind: shape.kind,
                   transform: master_ph.transform,
                   fill: shape.fill,
+                  grad_fill: shape.grad_fill,
                   stroke: shape.stroke,
                   stroke_w: shape.stroke_w,
                   paragraphs: shape.paragraphs,

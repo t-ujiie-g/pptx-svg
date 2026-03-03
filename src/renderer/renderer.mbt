@@ -27,6 +27,22 @@ let default_text_fill : String = "black"
 let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999"
 
+// ── OOXML gradient unit constants ────────────────────────────────────────────
+let ooxml_angle_unit : Int = 60000   // 1 degree = 60000 units in OOXML
+let ooxml_stop_pct : Int = 1000     // stop pos 0-100000 → percentage: divide by 1000
+let ooxml_fill_to_pct : Int = 2000  // fillToRect 0-100000 → center%: divide by 2000
+
+// ── Gradient ID helper ──────────────────────────────────────────────────────
+
+///| Build a gradient definition ID. Negative shape_idx uses "-n" prefix.
+fn grad_id(slide_num : Int, shape_idx : Int) -> String {
+  if shape_idx >= 0 {
+    "grad-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+  } else {
+    "grad-s" + int_to_str(slide_num) + "-n" + int_to_str(-(shape_idx))
+  }
+}
+
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
@@ -972,7 +988,7 @@ fn estimate_text_height(
 fn render_shape(
   shape : @ooxml.Shape,
   rels : Array[@ooxml.Relationship],
-  _slide_num : Int,
+  slide_num : Int,
   scale : Int,
   shape_idx : Int,
   theme : @ooxml.ThemeData
@@ -1019,11 +1035,26 @@ fn render_shape(
     dai("bp-rot", shape.body_props.rot) +
     da("bp-vert", shape.body_props.vert) +
     dai("bp-num-cols", shape.body_props.num_cols) +
-    dai("bp-col-spacing", shape.body_props.col_spacing)
+    dai("bp-col-spacing", shape.body_props.col_spacing) +
+    // Gradient fill attributes
+    (if not(shape.grad_fill.is_none()) {
+      da("grad-stops", grad_stops_attr(shape.grad_fill)) +
+      dai("grad-angle", shape.grad_fill.angle) +
+      da("grad-path", shape.grad_fill.path_type) +
+      da("grad-rot", if shape.grad_fill.rot_with_shape { "1" } else { "0" }) +
+      dai("grad-ftl", shape.grad_fill.fill_to_l) +
+      dai("grad-ftt", shape.grad_fill.fill_to_t) +
+      dai("grad-ftr", shape.grad_fill.fill_to_r) +
+      dai("grad-ftb", shape.grad_fill.fill_to_b)
+    } else { "" })
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
-      let fill   = a("fill", shape.fill.to_css())
+      let fill = if not(shape.grad_fill.is_none()) {
+        " fill=\"url(#" + grad_id(slide_num, shape_idx) + ")\""
+      } else {
+        a("fill", shape.fill.to_css())
+      }
       let stroke = if shape.stroke.is_none() {
         " stroke=\"none\""
       } else {
@@ -1203,6 +1234,57 @@ fn render_table(
   out
 }
 
+// ── Gradient helpers ─────────────────────────────────────────────────────────
+
+///| Render a single gradient <defs> definition.
+///  Returns a <linearGradient> or <radialGradient> element string.
+fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
+  // Build stop elements
+  let mut stops_svg = ""
+  let ns = gf.stops.length()
+  let mut si = 0
+  while si < ns {
+    let stop = gf.stops[si]
+    // pos is 0..100000 → percentage 0..100
+    let pct = stop.pos / ooxml_stop_pct
+    stops_svg = stops_svg + "<stop offset=\"" + int_to_str(pct) + "%\" stop-color=\"" + stop.color.to_css() + "\"/>"
+    si = si + 1
+  }
+  if gf.angle >= 0 && gf.path_type.is_empty() {
+    // Linear gradient
+    // OOXML angle is in 60000ths of a degree. SVG gradientTransform rotate()
+    // uses degrees centered at (0.5, 0.5). Direct division gives the SVG angle.
+    let deg = gf.angle / ooxml_angle_unit
+    "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\" gradientTransform=\"rotate(" + int_to_str(deg) + ", 0.5, 0.5)\">" + stops_svg + "</linearGradient>"
+  } else if not(gf.path_type.is_empty()) {
+    // Radial / path gradient
+    let cx_s = if gf.fill_to_l >= 0 && gf.fill_to_r >= 0 {
+      int_to_str((gf.fill_to_l + (100000 - gf.fill_to_r)) / ooxml_fill_to_pct)
+    } else { "50" }
+    let cy_s = if gf.fill_to_t >= 0 && gf.fill_to_b >= 0 {
+      int_to_str((gf.fill_to_t + (100000 - gf.fill_to_b)) / ooxml_fill_to_pct)
+    } else { "50" }
+    "<radialGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" cx=\"" + cx_s + "%\" cy=\"" + cy_s + "%\" r=\"50%\">" + stops_svg + "</radialGradient>"
+  } else {
+    // Fallback linear
+    "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\">" + stops_svg + "</linearGradient>"
+  }
+}
+
+///| Serialize gradient stop data for data-ooxml-grad-stops attribute.
+///  Format: "pos,RRGGBB;pos,RRGGBB;..."
+fn grad_stops_attr(gf : @ooxml.GradientFill) -> String {
+  let mut out = ""
+  let ns = gf.stops.length()
+  let mut si = 0
+  while si < ns {
+    if si > 0 { out = out + ";" }
+    out = out + int_to_str(gf.stops[si].pos) + "," + gf.stops[si].color.to_hex()
+    si = si + 1
+  }
+  out
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 ///| Render a SlideData to an SVG string with data-ooxml-* attributes.
@@ -1229,13 +1311,43 @@ pub fn render_slide_svg(
     da("bg", slide.background.to_hex()) +
     dai("scale", scale) +
     ">"
+  // Collect gradient <defs>
+  let mut defs = ""
+  // Background gradient
+  if not(slide.bg_grad.is_none()) {
+    defs = defs + render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
+  }
+  // Shape gradients
+  let n = slide.shapes.length()
+  let mut di = 0
+  while di < n {
+    if not(slide.shapes[di].grad_fill.is_none()) {
+      defs = defs + render_gradient_def(slide.shapes[di].grad_fill, grad_id(slide_num, di))
+    }
+    di = di + 1
+  }
+  // Background shape gradients
+  let nbg = bg_shapes.length()
+  let mut bdi = 0
+  while bdi < nbg {
+    if not(bg_shapes[bdi].grad_fill.is_none()) {
+      defs = defs + render_gradient_def(bg_shapes[bdi].grad_fill, grad_id(slide_num, -(bdi + 1)))
+    }
+    bdi = bdi + 1
+  }
+  let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
+
+  let bg_fill = if not(slide.bg_grad.is_none()) {
+    "url(#grad-bg-s" + int_to_str(slide_num) + ")"
+  } else {
+    slide.background.to_css()
+  }
   let bg_rect = "<rect" +
     ai("width", w) + ai("height", h) +
-    a("fill", slide.background.to_css()) +
+    a("fill", bg_fill) +
     "/>"
   // Render master/layout background shapes (non-placeholder)
   let mut bg_shapes_svg = ""
-  let nbg = bg_shapes.length()
   let mut bi = 0
   while bi < nbg {
     bg_shapes_svg = bg_shapes_svg + render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme)
@@ -1243,11 +1355,10 @@ pub fn render_slide_svg(
   }
   // Render slide shapes
   let mut shapes_svg = ""
-  let n = slide.shapes.length()
   let mut i = 0
   while i < n {
     shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale, i, theme)
     i = i + 1
   }
-  header + bg_rect + bg_shapes_svg + shapes_svg + "</svg>"
+  header + defs_section + bg_rect + bg_shapes_svg + shapes_svg + "</svg>"
 }

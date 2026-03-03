@@ -24,6 +24,10 @@ Slides:
  19. Vertical text (bodyPr vert) + text columns (numCol/spcCol)
  20. Hyperlink (a:hlinkClick) + RTL (a:pPr rtl)
  21. Image bullet (a:buBlip)
+ 22. Hover link + link color (a:hlinkHover)
+ 23. Linear gradient fills (a:gradFill + a:lin at 0°/90°/45°)
+ 24. Radial/path gradient fills (a:path circle/rect) + gradient on ellipse
+ 25. Gradient background (p:bg → p:bgPr → a:gradFill)
 """
 
 from pptx import Presentation
@@ -1632,6 +1636,156 @@ etree.SubElement(rPr22c, '{http://schemas.openxmlformats.org/drawingml/2006/main
                  attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rId_click2})
 etree.SubElement(rPr22c, '{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkHover',
                  attrib={'{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id': rId_hover2})
+
+# ── Slide 23: Linear gradient fills ──────────────────────────────────────────
+
+slide23 = prs.slides.add_slide(blank)
+
+# Helper to inject gradFill XML into a shape's spPr (after prstGeom, replacing solidFill)
+def set_gradient_fill(shape, grad_xml_str):
+    """Replace any existing fill with a:gradFill in the shape's spPr."""
+    ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+    ns_p = '{http://schemas.openxmlformats.org/presentationml/2006/main}'
+    # spPr can be under a: or p: namespace depending on context
+    spPr = shape._element.find(f'{ns_p}spPr')
+    if spPr is None:
+        spPr = shape._element.find(f'.//{ns_a}spPr')
+    if spPr is None:
+        print(f"WARNING: spPr not found on shape")
+        return
+    # Remove existing fills (always a: namespace children)
+    for tag in ('solidFill', 'noFill', 'gradFill'):
+        for el in spPr.findall(f'{ns_a}{tag}'):
+            spPr.remove(el)
+    # Insert after prstGeom (a: namespace child)
+    prstGeom = spPr.find(f'{ns_a}prstGeom')
+    grad_el = etree.fromstring(grad_xml_str)
+    if prstGeom is not None:
+        prstGeom.addnext(grad_el)
+    else:
+        spPr.append(grad_el)
+
+# Shape 1: 3-stop linear gradient (left→right, ang=0)
+s23a = slide23.shapes.add_shape(1, Inches(0.5), Inches(0.5), Inches(3), Inches(2))
+s23a.text = "Linear 0deg"
+s23a.text_frame.paragraphs[0].font.size = Pt(18)
+s23a.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+set_gradient_fill(s23a, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>
+    <a:gs pos="50000"><a:srgbClr val="FFFF00"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="0" scaled="1"/>
+</a:gradFill>''')
+
+# Shape 2: 2-stop linear gradient (top→bottom, ang=5400000 = 90°)
+s23b = slide23.shapes.add_shape(1, Inches(4), Inches(0.5), Inches(3), Inches(2))
+s23b.text = "Linear 90deg"
+s23b.text_frame.paragraphs[0].font.size = Pt(18)
+s23b.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+set_gradient_fill(s23b, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="003366"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="66CCFF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="5400000" scaled="1"/>
+</a:gradFill>''')
+
+# Shape 3: Diagonal linear gradient (45° = 2700000), rotWithShape="0"
+s23c = slide23.shapes.add_shape(1, Inches(7.5), Inches(0.5), Inches(2), Inches(2))
+s23c.text = "Linear 45deg"
+s23c.text_frame.paragraphs[0].font.size = Pt(14)
+set_gradient_fill(s23c, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="0">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="00FF00"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="006600"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="2700000" scaled="1"/>
+</a:gradFill>''')
+
+
+# ── Slide 24: Radial/path gradient fills + gradient on ellipse ───────────────
+
+slide24 = prs.slides.add_slide(blank)
+
+# Shape 1: Radial circle gradient
+s24a = slide24.shapes.add_shape(1, Inches(0.5), Inches(0.5), Inches(3), Inches(2.5))
+s24a.text = "Radial circle"
+s24a.text_frame.paragraphs[0].font.size = Pt(18)
+s24a.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+set_gradient_fill(s24a, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="FFFFFF"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="FF6600"/></a:gs>
+  </a:gsLst>
+  <a:path path="circle">
+    <a:fillToRect l="50000" t="50000" r="50000" b="50000"/>
+  </a:path>
+</a:gradFill>''')
+
+# Shape 2: Radial rect gradient with off-center fillToRect
+s24b = slide24.shapes.add_shape(1, Inches(4), Inches(0.5), Inches(3), Inches(2.5))
+s24b.text = "Radial rect"
+s24b.text_frame.paragraphs[0].font.size = Pt(18)
+set_gradient_fill(s24b, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="FFFF00"/></a:gs>
+    <a:gs pos="50000"><a:srgbClr val="FF0000"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="660000"/></a:gs>
+  </a:gsLst>
+  <a:path path="rect">
+    <a:fillToRect l="25000" t="25000" r="75000" b="75000"/>
+  </a:path>
+</a:gradFill>''')
+
+# Shape 3: Gradient on ellipse (oval)
+from pptx.enum.shapes import MSO_SHAPE
+s24c = slide24.shapes.add_shape(MSO_SHAPE.OVAL, Inches(7.5), Inches(0.5), Inches(2), Inches(2.5))
+s24c.text = "Ellipse grad"
+s24c.text_frame.paragraphs[0].font.size = Pt(14)
+s24c.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+set_gradient_fill(s24c, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="9933FF"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="330066"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="16200000" scaled="1"/>
+</a:gradFill>''')
+
+
+# ── Slide 25: Gradient background ────────────────────────────────────────────
+
+slide25 = prs.slides.add_slide(blank)
+
+# Inject gradient background via XML
+ns_p = '{http://schemas.openxmlformats.org/presentationml/2006/main}'
+ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+cSld25 = slide25._element.find(f'{ns_p}cSld')
+spTree25 = cSld25.find(f'{ns_p}spTree')
+bg_xml = f'''<p:bg xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:bgPr>
+    <a:gradFill>
+      <a:gsLst>
+        <a:gs pos="0"><a:srgbClr val="1B2838"/></a:gs>
+        <a:gs pos="50000"><a:srgbClr val="2A475E"/></a:gs>
+        <a:gs pos="100000"><a:srgbClr val="66C0F4"/></a:gs>
+      </a:gsLst>
+      <a:lin ang="5400000" scaled="0"/>
+    </a:gradFill>
+    <a:effectLst/>
+  </p:bgPr>
+</p:bg>'''
+bg_el = etree.fromstring(bg_xml)
+cSld25.insert(list(cSld25).index(spTree25), bg_el)
+
+# Text shape on gradient background (noFill)
+s25a = slide25.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(3))
+s25a.text = "Gradient Background"
+s25a.text_frame.paragraphs[0].font.size = Pt(36)
+s25a.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+s25a.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

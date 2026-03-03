@@ -43,6 +43,81 @@ fn get_dai(node : @xml.XmlNode, name : String) -> Int {
   get_data_int(node, "data-ooxml-" + name)
 }
 
+// ── Gradient parsing from SVG data attributes ───────────────────────────────
+
+///| Extract substring by building char-by-char (avoids deprecated substring / CreatingViewError).
+fn extract_sub(s : String, from : Int, to : Int) -> String {
+  let mut out = ""
+  let mut k = from
+  while k < to {
+    let c = s.get_char(k).unwrap()
+    out = out + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    k = k + 1
+  }
+  out
+}
+
+///| Parse gradient stops from "pos,RRGGBB;pos,RRGGBB;..." string.
+fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
+  let stops : Array[@ooxml.GradientStop] = []
+  if s.is_empty() { return stops }
+  let len = s.length()
+  let mut start = 0
+  let mut i = 0
+  while i <= len {
+    let at_end = i == len
+    let is_semi = if at_end { false } else { s.get_char(i).unwrap() == ';' }
+    if is_semi || at_end {
+      if i > start {
+        let mut ci = start
+        let mut comma = -1
+        while ci < i {
+          if s.get_char(ci).unwrap() == ',' {
+            comma = ci
+          }
+          ci = ci + 1
+        }
+        if comma > start {
+          let pos_str = extract_sub(s, start, comma)
+          let hex_str = extract_sub(s, comma + 1, i)
+          let pos = parse_int(pos_str)
+          let color = @ooxml.parse_hex_color(hex_str)
+          stops.push({ pos, color })
+        }
+      }
+      start = i + 1
+    }
+    i = i + 1
+  }
+  stops
+}
+
+///| Parse GradientFill from data-ooxml-grad-* attributes on a <g> node.
+fn parse_grad_fill_from_g(g_node : @xml.XmlNode) -> @ooxml.GradientFill {
+  let stops_str = get_da(g_node, "grad-stops")
+  if stops_str.is_empty() {
+    return @ooxml.GradientFill::none()
+  }
+  let stops = parse_grad_stops(stops_str)
+  if stops.length() == 0 {
+    return @ooxml.GradientFill::none()
+  }
+  let angle = get_dai(g_node, "grad-angle")
+  let path_type = get_da(g_node, "grad-path")
+  let rot_s = get_da(g_node, "grad-rot")
+  let rot_with_shape = rot_s != "0"
+  let fill_to_l = get_dai(g_node, "grad-ftl")
+  let fill_to_t = get_dai(g_node, "grad-ftt")
+  let fill_to_r = get_dai(g_node, "grad-ftr")
+  let fill_to_b = get_dai(g_node, "grad-ftb")
+  { stops, angle, path_type, rot_with_shape,
+    fill_to_l: if fill_to_l == 0 { -1 } else { fill_to_l },
+    fill_to_t: if fill_to_t == 0 { -1 } else { fill_to_t },
+    fill_to_r: if fill_to_r == 0 { -1 } else { fill_to_r },
+    fill_to_b: if fill_to_b == 0 { -1 } else { fill_to_b },
+  }
+}
+
 // ── Text parsing from SVG ────────────────────────────────────────────────────
 
 fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] {
@@ -225,7 +300,8 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   }
   let ph_type = get_da(g_node, "ph-type")
   let ph_idx = get_dai(g_node, "ph-idx")
-  { kind, transform, fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
+  let grad_fill = parse_grad_fill_from_g(g_node)
+  { kind, transform, fill, grad_fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
 }
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {
@@ -254,6 +330,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
       return {
         slide_size: @ooxml.SlideSize::default(),
         background: @ooxml.Color::white(),
+        bg_grad: @ooxml.GradientFill::none(),
         shapes: [],
       }
     }
@@ -295,5 +372,5 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     i = i + 1
   }
 
-  { slide_size, background, shapes }
+  { slide_size, background, bg_grad: @ooxml.GradientFill::none(), shapes }
 }

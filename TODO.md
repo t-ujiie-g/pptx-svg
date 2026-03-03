@@ -25,6 +25,7 @@
 - [x] 文字間隔 (`a:rPr spc`) + letter-spacing
 - [x] `a:lstStyle` シェイプ固有リストスタイル継承
 - [x] テキスト完全対応 (タブ / RTL / 画像バレット / kern / cs・sym フォント / 縦書き / 回転 / ハイパーリンク / ホバーリンク / リンク色 / テキストカラム)
+- [x] グラデーション塗りつぶし (`a:gradFill` — リニア / パス型 / ストップ色解決 + round-trip)
 
 ---
 
@@ -98,9 +99,9 @@
 ## 3. 塗りつぶし — 完全対応 [P1]
 
 ### 3.1 グラデーション (`a:gradFill`)
-- [ ] リニア (`a:lin ang="..." scaled="1"`) → SVG `<linearGradient>`
-- [ ] パス型 (`a:path path="circle/rect/shape"`) → SVG `<radialGradient>`
-- [ ] グラデーションストップ (`a:gs pos`) の色解決 (schemeClr / srgbClr + モディファイア)
+- [x] リニア (`a:lin ang="..." scaled="1"`) → SVG `<linearGradient>`
+- [x] パス型 (`a:path path="circle/rect/shape"`) → SVG `<radialGradient>`
+- [x] グラデーションストップ (`a:gs pos`) の色解決 (schemeClr / srgbClr + モディファイア)
 - [ ] タイルフリップ (`tileFlip`)
 
 ### 3.2 パターンフィル (`a:pattFill`)

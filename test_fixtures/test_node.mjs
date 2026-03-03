@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 22', slideCount === 22, `got ${slideCount}`);
+  assert('slide count = 25', slideCount === 25, `got ${slideCount}`);
 
-  // Verify all 22 slides exist
-  for (let i = 1; i <= 22; i++) {
+  // Verify all 25 slides exist
+  for (let i = 1; i <= 25; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 22; i++) {
+  for (let i = 1; i <= 25; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -563,6 +563,70 @@ async function testFeaturesPptx() {
     assert('slide22 has Click link text', slide22.includes('Click link'));
     assert('slide22 has Hover link text', slide22.includes('Hover link'));
     assert('slide22 has Both links text', slide22.includes('Both links'));
+  }
+
+  // ── Slide 23: Linear gradient fills ──
+  {
+    section('test_features.pptx — Slide 23: linear gradient fills');
+    const slide23 = textFiles.get('ppt/slides/slide23.xml');
+    assert('slide23 exists', !!slide23);
+    assert('slide23 has a:gradFill', hasTag(slide23, 'a:gradFill'));
+    assert('slide23 has a:gsLst', hasTag(slide23, 'a:gsLst'));
+    assert('slide23 has a:gs stops', hasTag(slide23, 'a:gs'));
+    assert('slide23 has a:lin', hasTag(slide23, 'a:lin'));
+    // 3-stop gradient: red→yellow→blue
+    assert('slide23 has FF0000 (red)', slide23.includes('FF0000'));
+    assert('slide23 has FFFF00 (yellow)', slide23.includes('FFFF00'));
+    assert('slide23 has 0000FF (blue)', slide23.includes('0000FF'));
+    // Various angles
+    assert('slide23 has ang="0" (0°)', slide23.includes('ang="0"'));
+    assert('slide23 has ang="5400000" (90°)', slide23.includes('ang="5400000"'));
+    assert('slide23 has ang="2700000" (45°)', slide23.includes('ang="2700000"'));
+    // rotWithShape attribute
+    assert('slide23 has rotWithShape="1"', slide23.includes('rotWithShape="1"'));
+    assert('slide23 has rotWithShape="0"', slide23.includes('rotWithShape="0"'));
+    assert('slide23 has Linear 0deg text', slide23.includes('Linear 0deg'));
+  }
+
+  // ── Slide 24: Radial/path gradient fills ──
+  {
+    section('test_features.pptx — Slide 24: radial/path gradient fills');
+    const slide24 = textFiles.get('ppt/slides/slide24.xml');
+    assert('slide24 exists', !!slide24);
+    assert('slide24 has a:gradFill', hasTag(slide24, 'a:gradFill'));
+    assert('slide24 has a:path (path gradient)', hasTag(slide24, 'a:path'));
+    assert('slide24 has path="circle"', slide24.includes('path="circle"'));
+    assert('slide24 has path="rect"', slide24.includes('path="rect"'));
+    assert('slide24 has a:fillToRect', hasTag(slide24, 'a:fillToRect'));
+    // Verify fillToRect values for centered circle
+    assert('slide24 has l="50000" (center)', slide24.includes('l="50000"'));
+    assert('slide24 has t="50000" (center)', slide24.includes('t="50000"'));
+    // Off-center rect gradient
+    assert('slide24 has l="25000" (off-center)', slide24.includes('l="25000"'));
+    assert('slide24 has b="75000" (off-center)', slide24.includes('b="75000"'));
+    // Ellipse shape with gradient
+    assert('slide24 has ellipse geometry', slide24.includes('prst="ellipse"'));
+    assert('slide24 has 9933FF (purple)', slide24.includes('9933FF'));
+    assert('slide24 has Radial circle text', slide24.includes('Radial circle'));
+    assert('slide24 has Ellipse grad text', slide24.includes('Ellipse grad'));
+  }
+
+  // ── Slide 25: Gradient background ──
+  {
+    section('test_features.pptx — Slide 25: gradient background');
+    const slide25 = textFiles.get('ppt/slides/slide25.xml');
+    assert('slide25 exists', !!slide25);
+    assert('slide25 has p:bg', hasTag(slide25, 'p:bg'));
+    assert('slide25 has p:bgPr', hasTag(slide25, 'p:bgPr'));
+    assert('slide25 bg has a:gradFill', hasTag(slide25, 'a:gradFill'));
+    assert('slide25 bg has a:gsLst', hasTag(slide25, 'a:gsLst'));
+    assert('slide25 bg has a:lin', hasTag(slide25, 'a:lin'));
+    // Background gradient colors
+    assert('slide25 bg has 1B2838 (dark)', slide25.includes('1B2838'));
+    assert('slide25 bg has 2A475E (mid)', slide25.includes('2A475E'));
+    assert('slide25 bg has 66C0F4 (light)', slide25.includes('66C0F4'));
+    assert('slide25 bg has ang="5400000" (90°)', slide25.includes('ang="5400000"'));
+    assert('slide25 has Gradient Background text', slide25.includes('Gradient Background'));
   }
 }
 

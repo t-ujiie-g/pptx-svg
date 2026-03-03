@@ -56,6 +56,41 @@ fn serialize_color(color : @ooxml.Color) -> String {
   }
 }
 
+// ── Gradient fill serialization ──────────────────────────────────────────────
+
+fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
+  let rot_attr = if gf.rot_with_shape { " rotWithShape=\"1\"" } else { " rotWithShape=\"0\"" }
+  let mut out = "<a:gradFill" + rot_attr + ">"
+  // Gradient stops
+  out = out + "<a:gsLst>"
+  let ns = gf.stops.length()
+  let mut si = 0
+  while si < ns {
+    let stop = gf.stops[si]
+    out = out + "<a:gs pos=\"" + int_to_str(stop.pos) + "\"><a:srgbClr val=\"" + stop.color.to_hex() + "\"/></a:gs>"
+    si = si + 1
+  }
+  out = out + "</a:gsLst>"
+  // Direction
+  if gf.angle >= 0 && gf.path_type.is_empty() {
+    // Linear
+    out = out + "<a:lin ang=\"" + int_to_str(gf.angle) + "\" scaled=\"1\"/>"
+  } else if not(gf.path_type.is_empty()) {
+    // Path gradient
+    out = out + "<a:path path=\"" + gf.path_type + "\">"
+    if gf.fill_to_l >= 0 || gf.fill_to_t >= 0 || gf.fill_to_r >= 0 || gf.fill_to_b >= 0 {
+      out = out + "<a:fillToRect"
+      if gf.fill_to_l >= 0 { out = out + " l=\"" + int_to_str(gf.fill_to_l) + "\"" }
+      if gf.fill_to_t >= 0 { out = out + " t=\"" + int_to_str(gf.fill_to_t) + "\"" }
+      if gf.fill_to_r >= 0 { out = out + " r=\"" + int_to_str(gf.fill_to_r) + "\"" }
+      if gf.fill_to_b >= 0 { out = out + " b=\"" + int_to_str(gf.fill_to_b) + "\"" }
+      out = out + "/>"
+    }
+    out = out + "</a:path>"
+  }
+  out + "</a:gradFill>"
+}
+
 // ── Text body serialization ──────────────────────────────────────────────────
 
 ///| Serialize a:bodyPr element.
@@ -354,7 +389,9 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out = out + serialize_transform(shape.transform)
   out = out + "<a:prstGeom prst=\"" + geom.to_prst() + "\"><a:avLst/></a:prstGeom>"
   // Fill
-  if shape.fill.is_none() {
+  if not(shape.grad_fill.is_none()) {
+    out = out + serialize_gradient_fill(shape.grad_fill)
+  } else if shape.fill.is_none() {
     out = out + "<a:noFill/>"
   } else {
     out = out + serialize_color(shape.fill)
@@ -403,7 +440,9 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   }
   // Cell properties
   out = out + "<a:tcPr>"
-  if not(cell.fill.is_none()) {
+  if not(cell.grad_fill.is_none()) {
+    out = out + serialize_gradient_fill(cell.grad_fill)
+  } else if not(cell.fill.is_none()) {
     out = out + serialize_color(cell.fill)
   }
   out = out + "</a:tcPr>"
@@ -476,7 +515,11 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out + " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
   out = out + "<p:cSld>"
   // Background
-  if not(slide.background.is_none()) && not(
+  if not(slide.bg_grad.is_none()) {
+    out = out + "<p:bg><p:bgPr>"
+    out = out + serialize_gradient_fill(slide.bg_grad)
+    out = out + "<a:effectLst/></p:bgPr></p:bg>"
+  } else if not(slide.background.is_none()) && not(
     slide.background.r == 255 && slide.background.g == 255 && slide.background.b == 255
   ) {
     out = out + "<p:bg><p:bgPr>"

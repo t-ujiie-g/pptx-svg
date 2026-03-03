@@ -37,7 +37,7 @@ python3 -m http.server 8765 --directory .
 **Module dependency (no cycles):**
 ```
 main → renderer   → xml, ooxml, ffi
-     → svg_parser → xml, ooxml
+     → svg_parser → xml, ooxml, ffi
      → serializer → xml, ooxml, ffi
      → ffi
 xml (shared: int_to_str, parse_int, XML parser)
@@ -72,12 +72,16 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 ## Data model (ooxml.mbt)
 
 ```
-SlideData { slide_size: SlideSize, background: Color, shapes: Array[Shape] }
-Shape { kind: ShapeKind, transform: ShapeTransform, fill, stroke, stroke_w, paragraphs, body_props }
+SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, shapes: Array[Shape] }
+Shape { kind: ShapeKind, transform: ShapeTransform, fill, grad_fill: GradientFill, stroke, stroke_w, paragraphs, body_props }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape | Other
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Other(String)
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
+
+GradientStop { pos: Int, color: Color }  // pos: 0-100000
+GradientFill { stops: Array[GradientStop], angle: Int, path_type: String, rot_with_shape: Bool, fill_to_l/t/r/b: Int }
+  // angle: 60000ths deg (-1=path grad), path_type: "circle"/"rect"/"shape"/""(linear)
 
 TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color }
 TextRun { text, bold, italic, font_size, color, font_face, ea_font, underline, strike, baseline, char_spacing, cap }
@@ -85,7 +89,7 @@ BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_red
 
 TableData { col_widths: Array[Int], rows: Array[TableRow] }
 TableRow { height: Int, cells: Array[TableCell] }
-TableCell { paragraphs: Array[TextParagraph], fill: Color }
+TableCell { paragraphs: Array[TextParagraph], fill: Color, grad_fill: GradientFill }
 
 Color { r, g, b }  // -1 = none (sentinel)
 ThemeData { dk1..fol_hlink: Color, major_font, minor_font: String }
@@ -111,3 +115,39 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font: String }
 | `web/host.js` | Legacy JS host (kept for reference; demo uses `dist/`) |
 | `web/index.html` | Browser demo UI |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |
+| `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |
+| `test_fixtures/gen_test_features.py` | Python script to regenerate test_features.pptx |
+| `test_fixtures/test_node.mjs` | Node.js test suite (ZIP + XML structure assertions) |
+
+## Adding new OOXML features — required workflow
+
+When implementing a new OOXML feature (e.g. gradient fill, shadow, connector), **always** update all three layers and add tests:
+
+### 1. Implementation (MoonBit)
+Follow the round-trip pipeline — all 5 files must be updated:
+- `ooxml.mbt`: Data model (struct/field) + XML parser (`parse_*`)
+- `renderer.mbt`: SlideData → SVG rendering + `data-ooxml-*` attributes
+- `svg_parser.mbt`: `data-ooxml-*` → SlideData round-trip parsing
+- `serializer.mbt`: SlideData → OOXML XML serialization
+- `main.mbt`: Update all Shape/SlideData construction sites (placeholder inheritance etc.)
+
+### 2. Test fixture (`gen_test_features.py`)
+- Add new slide(s) to `gen_test_features.py` exercising the feature
+- Update the docstring at the top of the file with the new slide number/description
+- Run `python3 test_fixtures/gen_test_features.py` to regenerate `test_features.pptx`
+- The `set_gradient_fill()` helper shows how to inject raw XML into shapes via lxml
+
+### 3. Test assertions (`test_node.mjs`)
+- Update `slide count = N` assertion to match new total
+- Update iteration bounds (`for (let i = 1; i <= N; ...)`) for slide existence and .rels checks
+- Add a new test section verifying the XML structure of the new slides
+- Run `node test_fixtures/test_node.mjs` to confirm all tests pass
+
+### 4. Verification checklist
+```bash
+python3 test_fixtures/gen_test_features.py  # Regenerate PPTX
+moon build --target wasm-gc --release       # Wasm build (0 errors)
+npm run build                               # Full build (Wasm + TypeScript)
+node test_fixtures/test_node.mjs            # All tests pass
+# Browser: http://localhost:8765/web/index.html  # Visual check
+```
