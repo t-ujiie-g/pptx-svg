@@ -1,0 +1,715 @@
+// SVG renderer — Text rendering
+//
+// Same package as renderer.mbt — all constants and helpers are shared.
+
+// ── Text helpers ─────────────────────────────────────────────────────────────
+
+///| Convert ASCII lowercase letters to uppercase.
+fn to_upper_ascii(s : String) -> String {
+  let len = s.length()
+  let mut result = ""
+  let mut i = 0
+  while i < len {
+    let c = s.get_char(i).unwrap()
+    let code = Char::to_int(c)
+    if code >= ascii_lower_a && code <= ascii_lower_z {
+      // a-z → A-Z
+      result = result + @ffi.ffi_char_code_to_str(code - ascii_case_shift)
+    } else {
+      result = result + @ffi.ffi_char_code_to_str(code)
+    }
+    i = i + 1
+  }
+  result
+}
+
+///| Check if a character is CJK (Chinese/Japanese/Korean).
+fn is_cjk(c : Char) -> Bool {
+  let code = Char::to_int(c)
+  // CJK Unified Ideographs, CJK Compat Ideographs, Fullwidth forms, CJK Ext-B+
+  (code >= 0x3000 && code <= 0x9FFF) ||
+  (code >= 0xF900 && code <= 0xFAFF) ||
+  (code >= 0xFF00 && code <= 0xFFEF) ||
+  (code >= 0x20000 && code <= 0x2FA1F)
+}
+
+// ── Text wrapping ────────────────────────────────────────────────────────────
+
+///| A visual line fragment: (run_index, text_fragment)
+///  Used to split paragraph runs into wrapped lines.
+
+///| Split paragraph runs into visual lines that fit within max_width pixels.
+///| Returns Array of lines, each line being Array of (run_idx, text).
+fn wrap_paragraph(
+  para : @ooxml.TextParagraph,
+  max_width : Int,
+  scale : Int,
+  def_sz : Int,
+  font_scale : Int,
+  theme : @ooxml.ThemeData
+) -> Array[Array[(Int, String)]] {
+  let lines : Array[Array[(Int, String)]] = []
+  let mut cur_line : Array[(Int, String)] = []
+  let mut cur_width : Double = 0.0
+  let max_w : Double = max_width.to_double()
+  let nr = para.runs.length()
+  let mut ri = 0
+  while ri < nr {
+    let run = para.runs[ri]
+    let fs_raw = if run.font_size > 0 { run.font_size } else { if def_sz > 0 { def_sz * scale / @ooxml.emu_per_hundredth_pt } else { 1800 } }
+    let fs_pt = apply_font_scale(fs_raw, font_scale).to_double() / 100.0
+    let ff = if not(run.ea_font.is_empty()) {
+      run.ea_font
+    } else if not(run.font_face.is_empty()) {
+      run.font_face
+    } else {
+      theme.minor_font
+    }
+    let text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
+    let text_len = text.length()
+    // Split text into segments (words for Latin, chars for CJK)
+    let mut seg_start = 0
+    while seg_start < text_len {
+      let c = text.get_char(seg_start).unwrap()
+      let mut seg_end = seg_start
+      if is_cjk(c) {
+        // Single CJK character as one segment
+        seg_end = seg_start + 1
+      } else {
+        // Collect word (non-CJK chars until space/CJK)
+        seg_end = seg_start
+        while seg_end < text_len {
+          let sc = text.get_char(seg_end).unwrap()
+          if is_cjk(sc) { break }
+          seg_end = seg_end + 1
+          // Break after whitespace
+          if sc == ' ' || sc == '\t' { break }
+        }
+      }
+      // Extract segment text
+      let seg_text = str_sub(text, seg_start, seg_end)
+      let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_pt)
+      // Check if adding this segment would overflow
+      if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
+        // Start new line
+        if cur_line.length() > 0 {
+          lines.push(cur_line)
+        }
+        cur_line = []
+        cur_width = 0.0
+      }
+      cur_line.push((ri, seg_text))
+      cur_width = cur_width + seg_w
+      seg_start = seg_end
+    }
+    ri = ri + 1
+  }
+  if cur_line.length() > 0 {
+    lines.push(cur_line)
+  }
+  if lines.length() == 0 {
+    // Empty paragraph - one empty line
+    lines.push([])
+  }
+  lines
+}
+
+///| Extract substring from start (inclusive) to end (exclusive).
+fn str_sub(s : String, start : Int, end_ : Int) -> String {
+  let mut result = ""
+  let mut i = start
+  while i < end_ {
+    let c = s.get_char(i).unwrap()
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    i = i + 1
+  }
+  result
+}
+
+// ── Tab helpers ──────────────────────────────────────────────────────────
+
+///| Check if a string contains a tab character.
+fn contains_tab(s : String) -> Bool {
+  let len = s.length()
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == '\t' { return true }
+    i = i + 1
+  }
+  false
+}
+
+///| Split a string by tab characters. Returns array of parts.
+fn split_by_tab(s : String) -> Array[String] {
+  let parts : Array[String] = []
+  let len = s.length()
+  let mut start = 0
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == '\t' {
+      parts.push(str_sub(s, start, i))
+      start = i + 1
+    }
+    i = i + 1
+  }
+  parts.push(str_sub(s, start, len))
+  parts
+}
+
+///| Render a run's text, splitting by tab characters and positioning at tab stops.
+///  Returns (svg_output, updated_tab_idx).
+fn render_run_with_tabs(
+  run : @ooxml.TextRun,
+  run_idx : Int,
+  display_text : String,
+  tab_stops : Array[@ooxml.TabStop],
+  tab_idx : Int,
+  text_x : Int,
+  cur_y : Int,
+  scale : Int,
+  fs : Int,
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData
+) -> (String, Int) {
+  if tab_stops.length() > 0 && contains_tab(display_text) {
+    let parts = split_by_tab(display_text)
+    let nparts = parts.length()
+    let mut out = ""
+    let mut ti = tab_idx
+    let mut parti = 0
+    while parti < nparts {
+      let part = parts[parti]
+      if parti > 0 && ti < tab_stops.length() {
+        let tab_x = text_x + px(tab_stops[ti].pos, scale)
+        out = out + "</tspan><tspan" + ai("x", tab_x) + ai("y", cur_y) + ">"
+        ti = ti + 1
+      }
+      out = out + render_run_tspan(run, run_idx, part, scale, fs, rels, theme)
+      parti = parti + 1
+    }
+    (out, ti)
+  } else {
+    (render_run_tspan(run, run_idx, display_text, scale, fs, rels, theme), tab_idx)
+  }
+}
+
+// ── Text rendering ────────────────────────────────────────────────────────────
+
+fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
+  let nr = para.runs.length()
+  let mut max_fs = 0
+  let mut i = 0
+  while i < nr {
+    let fs = para.runs[i].font_size
+    if fs > max_fs { max_fs = fs }
+    i = i + 1
+  }
+  if max_fs > 0 { hundredth_pt_to_emu(max_fs) } else { 0 }
+}
+
+fn para_font_size(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> Int {
+  let emu = para_max_font_emu(para)
+  if emu > 0 { px(emu, scale) } else { def_sz }
+}
+
+///| Apply normAutofit font_scale to a pixel value.
+///| font_scale: -1=inactive, 0-100000=percentage (100000=100%).
+fn apply_font_scale(val : Int, font_scale : Int) -> Int {
+  if font_scale >= 0 && font_scale < @ooxml.pct_100 {
+    val * font_scale / @ooxml.pct_100
+  } else {
+    val
+  }
+}
+
+///| Apply normAutofit lnSpcReduction to a line height.
+///| ln_spc_reduction: -1=inactive, 0-100000=reduction percentage.
+fn apply_ln_spc_reduction(val : Int, ln_spc_reduction : Int) -> Int {
+  if ln_spc_reduction > 0 {
+    val * (@ooxml.pct_100 - ln_spc_reduction) / @ooxml.pct_100
+  } else {
+    val
+  }
+}
+
+///| Apply both normAutofit adjustments: font_scale then lnSpcReduction.
+fn apply_autofit_scale(val : Int, font_scale : Int, ln_spc_reduction : Int) -> Int {
+  apply_ln_spc_reduction(apply_font_scale(val, font_scale), ln_spc_reduction)
+}
+
+fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) -> Int {
+  if para.line_spacing > 0 {
+    // Positive = EMU absolute value
+    px(para.line_spacing, scale)
+  } else if para.line_spacing < 0 {
+    // Negative = percentage (-100000 = 100% = single spacing)
+    // In OOXML, 100% means the default single-line spacing (font_size * 1.2)
+    let pct = -(para.line_spacing) // e.g. 150000 for 150%
+    let emu = para_max_font_emu(para)
+    let base_line_h = if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+    base_line_h * pct / @ooxml.pct_100
+  } else {
+    // Default: use font size * line_height ratio
+    let emu = para_max_font_emu(para)
+    if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+  }
+}
+
+///| Render a single text run as a <tspan> element.
+fn render_run_tspan(
+  run : @ooxml.TextRun,
+  ri : Int,
+  display_text : String,
+  scale : Int,
+  font_scale : Int,
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData
+) -> String {
+  let mut span = "<tspan"
+  // Visual attributes
+  if run.bold   { span = span + " font-weight=\"bold\""  }
+  if run.italic { span = span + " font-style=\"italic\"" }
+  if run.font_size > 0 {
+    span = span + ai("font-size", apply_font_scale(px(hundredth_pt_to_emu(run.font_size), scale), font_scale))
+  }
+  // font-family: sym_font, cs_font, ea_font, latin_font, sans-serif
+  let has_ff = not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty())
+  if has_ff {
+    let mut ff = ""
+    if not(run.sym_font.is_empty()) { ff = run.sym_font }
+    if not(run.cs_font.is_empty()) {
+      if not(ff.is_empty()) { ff = ff + ", " }
+      ff = ff + run.cs_font
+    }
+    if not(run.ea_font.is_empty()) {
+      if not(ff.is_empty()) { ff = ff + ", " }
+      ff = ff + run.ea_font
+    }
+    if not(run.font_face.is_empty()) {
+      if not(ff.is_empty()) { ff = ff + ", " }
+      ff = ff + run.font_face
+    }
+    span = span + a("font-family", ff + ", sans-serif")
+  }
+  // Color: explicit color, or theme hlink/folHlink color for hyperlinks
+  if not(run.color.is_none()) {
+    span = span + a("fill", run.color.to_css())
+  } else if not(run.hlink_rid.is_empty()) && not(theme.hlink.is_none()) {
+    span = span + a("fill", theme.hlink.to_css())
+  }
+  // Character spacing
+  if run.char_spacing != 0 {
+    let ls_px = run.char_spacing * @ooxml.char_spc_dpi / @ooxml.hundredth_pt_per_inch
+    if ls_px != 0 {
+      span = span + ai("letter-spacing", ls_px)
+    }
+  }
+  // Text decorations
+  let mut deco = ""
+  if not(run.underline.is_empty()) && run.underline != "none" {
+    deco = "underline"
+  }
+  if run.strike == "sngStrike" || run.strike == "dblStrike" {
+    if deco.is_empty() { deco = "line-through" } else { deco = deco + " line-through" }
+  }
+  if not(deco.is_empty()) {
+    span = span + a("text-decoration", deco)
+  }
+  // Superscript / subscript via baseline-shift
+  if run.baseline > 0 {
+    span = span + a("baseline-shift", "super")
+    span = span + a("font-size", "70%")
+  } else if run.baseline < 0 {
+    span = span + a("baseline-shift", "sub")
+    span = span + a("font-size", "70%")
+  }
+  // Capitalization
+  if run.cap == "small" {
+    span = span + a("font-variant", "small-caps")
+  }
+  // data-ooxml-* attributes for round-trip
+  span = span +
+    da("run-idx", int_to_str(ri)) +
+    da("bold", bool_str(run.bold)) +
+    da("font-size", int_to_str(run.font_size)) +
+    da("color", run.color.to_hex()) +
+    da("run-font", run.font_face) +
+    da("ea-font", run.ea_font) +
+    da("cs-font", run.cs_font) +
+    da("sym-font", run.sym_font) +
+    da("underline", run.underline) +
+    da("strike", run.strike) +
+    dai("baseline", run.baseline) +
+    dai("char-spacing", run.char_spacing) +
+    dai("kern", run.kern) +
+    da("cap", run.cap) +
+    da("hlink-rid", run.hlink_rid) +
+    da("hlink-hover-rid", run.hlink_mouse_over_rid)
+  // Wrap in hyperlink if present
+  let inner = svg_escape(display_text)
+  if not(run.hlink_rid.is_empty()) {
+    let url = @ooxml.find_rel_target(rels, run.hlink_rid)
+    if not(url.is_empty()) {
+      span + "><a href=\"" + svg_escape(url) + "\">" + inner + "</a></tspan>"
+    } else {
+      span + ">" + inner + "</tspan>"
+    }
+  } else {
+    span + ">" + inner + "</tspan>"
+  }
+}
+
+fn render_text(
+  paragraphs : Array[@ooxml.TextParagraph],
+  t : @ooxml.ShapeTransform,
+  scale : Int,
+  theme : @ooxml.ThemeData,
+  body_props : @ooxml.BodyProps,
+  rels : Array[@ooxml.Relationship]
+) -> String {
+  if paragraphs.length() == 0 { return "" }
+  // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
+  let l_ins = if body_props.l_ins >= 0 { body_props.l_ins } else { default_l_inset }
+  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
+  let r_ins = if body_props.r_ins >= 0 { body_props.r_ins } else { default_l_inset }
+
+  let pad_l   = px(l_ins, scale)
+  let pad_t   = px(t_ins, scale)
+  let pad_r   = px(r_ins, scale)
+  let base_text_x  = px(t.x, scale) + pad_l
+  let full_text_w  = px(t.cx, scale) - pad_l - pad_r
+  let mut text_x = base_text_x
+  let mut text_w = full_text_w
+  let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
+  let def_line_h  = def_sz * line_height_numer / line_height_denom // unscaled default line height
+  let fs = body_props.font_scale
+  let lr = body_props.ln_spc_reduction
+
+  let do_wrap = body_props.wrap != "none"
+
+  // Multi-column support
+  let num_cols = if body_props.num_cols > 1 { body_props.num_cols } else { 1 }
+  let col_spacing_px = if num_cols > 1 { px(body_props.col_spacing, scale) } else { 0 }
+  let col_w = if num_cols > 1 { (full_text_w - col_spacing_px * (num_cols - 1)) / num_cols } else { full_text_w }
+  if num_cols > 1 {
+    text_w = col_w
+  }
+
+  // Calculate total text height for vertical alignment
+  let np = paragraphs.length()
+  let mut total_text_h = 0
+  let mut ti = 0
+  while ti < np {
+    let para = paragraphs[ti]
+    let nr = para.runs.length()
+    let para_line_h = apply_autofit_scale(para_line_height(para, scale, def_line_h), fs, lr)
+    if nr == 0 {
+      total_text_h = total_text_h + para_line_h
+    } else {
+      // Add spacing before
+      if para.spc_before > 0 && ti > 0 {
+        total_text_h = total_text_h + px(para.spc_before, scale)
+      }
+      // Count visual lines for wrapped text (uses col_w for multi-col)
+      let num_visual_lines = if do_wrap {
+        let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
+        let indent_px = px(indent_emu, scale)
+        let wrap_w = col_w - indent_px
+        let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
+        vlines.length()
+      } else {
+        1
+      }
+      total_text_h = total_text_h + para_line_h * num_visual_lines
+      // Add spacing after
+      if para.spc_after > 0 {
+        total_text_h = total_text_h + px(para.spc_after, scale)
+      }
+    }
+    ti = ti + 1
+  }
+
+  // Vertical anchor offset
+  let shape_h = px(t.cy, scale)
+  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let pad_b = px(b_ins, scale)
+  let avail_h = shape_h - pad_t - pad_b
+  let anchor_offset = if body_props.anchor == "ctr" {
+    (avail_h - total_text_h) / 2
+  } else if body_props.anchor == "b" {
+    avail_h - total_text_h
+  } else {
+    0
+  }
+  let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
+
+  // Vertical text mode
+  let is_vert = body_props.vert == "vert" || body_props.vert == "eaVert" || body_props.vert == "vert270" || body_props.vert == "wordArtVert"
+
+  // Text rotation from bodyPr rot (60000ths of a degree)
+  let bp_rot = body_props.rot
+
+  // Image bullets — render before <text> as separate <image> elements, collect them
+  let mut img_bullets_svg = ""
+
+  let max_col_h = if num_cols > 1 { total_text_h / num_cols + 1 } else { 0 }
+
+  let font_face = theme.minor_font + ", sans-serif"
+  let scaled_def_sz = apply_font_scale(def_sz, fs)
+
+  fn make_text_header(tx : Int) -> String {
+    let mut h = "<text" +
+      ai("x", tx) +
+      a("xml:space", "preserve") +
+      a("font-family", font_face) +
+      ai("font-size", scaled_def_sz) +
+      a("fill", default_text_fill) +
+      da("font-face", theme.minor_font)
+    if is_vert {
+      h = h + a("writing-mode", "tb")
+      if body_props.vert == "vert" || body_props.vert == "eaVert" {
+        h = h + a("glyph-orientation-vertical", "auto")
+      }
+    }
+    if bp_rot != 0 {
+      let txt_cx = px(t.x + t.cx / 2, scale)
+      let txt_cy = px(t.y + t.cy / 2, scale)
+      h = h + rotation_transform(bp_rot, txt_cx, txt_cy)
+    }
+    h + ">"
+  }
+
+  let mut out = make_text_header(text_x)
+
+  let base_y = px(t.y, scale) + pad_t + anchor_offset_clamped
+  let mut cur_y = base_y
+  let mut cur_col = 0
+
+  let mut pi = 0
+  while pi < np {
+    let para = paragraphs[pi]
+    let nr = para.runs.length()
+    let p_line_h = apply_autofit_scale(para_line_height(para, scale, def_line_h), fs, lr)
+    let p_font_sz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
+    // Apply spacing before paragraph
+    if para.spc_before > 0 && pi > 0 {
+      cur_y = cur_y + px(para.spc_before, scale)
+    }
+    // Multi-column: check if we need to move to the next column (paragraph boundary)
+    if num_cols > 1 && cur_col < num_cols - 1 && (cur_y - base_y) >= max_col_h {
+      out = out + "</text>"
+      cur_col = cur_col + 1
+      text_x = base_text_x + (col_w + col_spacing_px) * cur_col
+      cur_y = base_y
+
+      out = out + make_text_header(text_x)
+    }
+    // Advance to baseline (ascent ≈ font_size)
+    cur_y = cur_y + p_font_sz
+    if nr == 0 {
+      cur_y = cur_y + (p_line_h - p_font_sz)
+      pi = pi + 1
+    } else {
+      // Indent: use marL from paragraph if set, otherwise use level-based
+      let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
+      let indent = px(indent_emu, scale)
+      // RTL: default alignment is right
+      // In SVG with direction="rtl", text-anchor semantics are swapped:
+      //   "start" = right edge (text flows leftward from x)
+      //   "end"   = left edge (text flows rightward from x)
+      let effective_align = if para.rtl && para.align.is_empty() { "r" } else { para.align }
+      let (anchor_x, anchor_attr) = if effective_align == "ctr" || effective_align == "c" {
+        (text_x + indent + (text_w - indent) / 2, " text-anchor=\"middle\"")
+      } else if effective_align == "r" || (para.rtl && effective_align != "l") {
+        if para.rtl {
+          // RTL right-aligned: use text-anchor="start" so text flows leftward from right edge
+          (text_x + text_w, " text-anchor=\"start\"")
+        } else {
+          (text_x + text_w, " text-anchor=\"end\"")
+        }
+      } else {
+        if para.rtl {
+          // RTL left-aligned: use text-anchor="end" so text ends at left edge
+          (text_x + indent, " text-anchor=\"end\"")
+        } else {
+          (text_x + indent, " text-anchor=\"start\"")
+        }
+      }
+      // RTL direction attribute
+      let rtl_attr = if para.rtl { " direction=\"rtl\"" } else { "" }
+      // Determine bullet text
+      let bullet_text = if para.bullet_none {
+        ""
+      } else if not(para.bullet.is_empty()) {
+        para.bullet
+      } else if not(para.bullet_auto.is_empty()) {
+        auto_number_text(para.bullet_auto, pi)
+      } else {
+        ""
+      }
+      // Image bullet: render <image> element before text
+      if not(para.bullet_img_rid.is_empty()) {
+        let bu_target = @ooxml.find_rel_target(rels, para.bullet_img_rid)
+        if not(bu_target.is_empty()) {
+          let bu_img_path = resolve_image_path(bu_target)
+          let bu_b64 = @ffi.ffi_get_file_base64(bu_img_path)
+          if not(bu_b64.is_empty()) {
+            let bu_mime = mime_from_ext(bu_img_path)
+            let bu_img_sz = p_font_sz // size bullet image to font size
+            let bu_img_x = if para.rtl { anchor_x + 4 } else { anchor_x - bu_img_sz - 4 }
+            let bu_img_y = cur_y - bu_img_sz + 2
+            img_bullets_svg = img_bullets_svg + "<image" +
+              ai("x", bu_img_x) + ai("y", bu_img_y) +
+              ai("width", bu_img_sz) + ai("height", bu_img_sz) +
+              a("href", "data:" + bu_mime + ";base64," + bu_b64) +
+              "/>"
+          }
+        }
+      }
+      // Paragraph-level tspan with data-ooxml-* attributes
+      let para_align = if para.align.is_empty() { "l" } else { para.align }
+      out = out + "<tspan" +
+        ai("x", anchor_x) +
+        ai("y", cur_y) +
+        anchor_attr +
+        rtl_attr +
+        da("para-idx", int_to_str(pi)) +
+        da("para-align", para_align) +
+        dai("para-lvl", para.level) +
+        da("bu-font", para.bullet_font) +
+        dai("bu-size", para.bullet_size) +
+        da("bu-color", para.bullet_color.to_hex()) +
+        da("rtl", bool_str(para.rtl)) +
+        ">"
+      // Render bullet if present
+      if not(bullet_text.is_empty()) {
+        let mut bu_span = "<tspan"
+        if not(para.bullet_font.is_empty()) {
+          bu_span = bu_span + a("font-family", para.bullet_font + ", sans-serif")
+        }
+        if para.bullet_size > 0 {
+          // Percentage of run font size
+          let run_fs = if p_font_sz > 0 { p_font_sz } else { scaled_def_sz }
+          let bu_fs = run_fs * para.bullet_size / @ooxml.pct_100
+          bu_span = bu_span + ai("font-size", bu_fs)
+        } else if para.bullet_size < 0 {
+          // Absolute size in hundredths-of-a-point (negated)
+          let bu_fs_emu = hundredth_pt_to_emu(-(para.bullet_size))
+          bu_span = bu_span + ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
+        }
+        if not(para.bullet_color.is_none()) {
+          bu_span = bu_span + a("fill", para.bullet_color.to_css())
+        }
+        out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
+      }
+      // Text wrapping: split runs into visual lines
+      if do_wrap {
+        let wrap_w = text_w - indent
+        let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
+        let nvl = vlines.length()
+        let mut vli = 0
+        let mut tab_idx = 0
+        let mut anchor_x = anchor_x
+        while vli < nvl {
+          let vline = vlines[vli]
+          // For wrapped lines after the first, emit a new positioning tspan
+          if vli > 0 {
+            cur_y = cur_y + p_line_h
+            // Multi-column: check if this line overflows to next column
+            if num_cols > 1 && cur_col < num_cols - 1 && (cur_y - base_y) >= max_col_h {
+              // Close current paragraph tspan and <text>
+              out = out + "</tspan></text>"
+              cur_col = cur_col + 1
+              text_x = base_text_x + (col_w + col_spacing_px) * cur_col
+              cur_y = base_y + p_font_sz
+              // Recompute anchor_x for new column
+              anchor_x = if effective_align == "ctr" || effective_align == "c" {
+                text_x + indent + (text_w - indent) / 2
+              } else if effective_align == "r" {
+                text_x + text_w
+              } else {
+                text_x + indent
+              }
+              // Open new <text> and paragraph tspan
+              out = out + make_text_header(text_x)
+              out = out + "<tspan" +
+                ai("x", anchor_x) +
+                ai("y", cur_y) +
+                anchor_attr +
+                rtl_attr +
+                ">"
+            } else {
+              out = out + "</tspan><tspan" +
+                ai("x", anchor_x) +
+                ai("y", cur_y) +
+                anchor_attr +
+                rtl_attr +
+                ">"
+            }
+          }
+          // Render fragments in this visual line
+          let nf = vline.length()
+          let mut fi = 0
+          while fi < nf {
+            let (run_idx, frag_text) = vline[fi]
+            let run = para.runs[run_idx]
+            let (tab_svg, new_ti) = render_run_with_tabs(run, run_idx, frag_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels, theme)
+            out = out + tab_svg
+            tab_idx = new_ti
+            fi = fi + 1
+          }
+          vli = vli + 1
+        }
+      } else {
+        // No wrapping: render runs directly, handling tab stops
+        let mut tab_idx = 0
+        let mut ri = 0
+        while ri < nr {
+          let run = para.runs[ri]
+          let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
+          let (tab_svg, new_ti) = render_run_with_tabs(run, ri, display_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels, theme)
+          out = out + tab_svg
+          tab_idx = new_ti
+          ri = ri + 1
+        }
+      }
+      out = out + "</tspan>"
+      cur_y = cur_y + (p_line_h - p_font_sz)
+      // Apply spacing after paragraph
+      if para.spc_after > 0 {
+        cur_y = cur_y + px(para.spc_after, scale)
+      }
+      pi = pi + 1
+    }
+  }
+  img_bullets_svg + out + "</text>"
+}
+
+// ── Text height estimation ──────────────────────────────────────────────────
+
+fn estimate_text_height(
+  paragraphs : Array[@ooxml.TextParagraph],
+  scale : Int,
+  body_props : @ooxml.BodyProps
+) -> Int {
+  let def_sz = px(default_font_size_emu(), scale)
+  let def_line_h = def_sz * line_height_numer / line_height_denom
+  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
+  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let np = paragraphs.length()
+  let mut total = 0
+  let mut i = 0
+  while i < np {
+    let para = paragraphs[i]
+    let plh = para_line_height(para, scale, def_line_h)
+    if para.spc_before > 0 && i > 0 {
+      total = total + px(para.spc_before, scale)
+    }
+    total = total + plh
+    if para.spc_after > 0 {
+      total = total + px(para.spc_after, scale)
+    }
+    i = i + 1
+  }
+  total + px(t_ins, scale) + px(b_ins, scale)
+}
