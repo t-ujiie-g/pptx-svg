@@ -105,17 +105,17 @@
 - [x] リニア (`a:lin ang="..." scaled="1"`) → SVG `<linearGradient>`
 - [x] パス型 (`a:path path="circle/rect/shape"`) → SVG `<radialGradient>`
 - [x] グラデーションストップ (`a:gs pos`) の色解決 (schemeClr / srgbClr + モディファイア)
-- [ ] タイルフリップ (`tileFlip`)
+- [x] タイルフリップ (`tileFlip`)
 
 ### 3.2 パターンフィル (`a:pattFill`)
 - [x] 主要12種のプリセットパターン (`prst="pct5/pct10/ltDnDiag/..."`) — SVG `<pattern>` レンダリング
 - [x] 前景色 / 背景色
 - [x] SVG `<pattern>` へマッピング + round-trip
-- [ ] 残り36種のプリセットパターン (現在は fg_color ソリッドフォールバック)
+- [x] 残り36種のプリセットパターン (→ 全48種実装済み)
 
 ### 3.3 画像フィル (`a:blipFill` in shapes)
 - [x] ストレッチ (`a:stretch` + `a:fillRect`)
-- [ ] タイル (`a:tile tx/ty/sx/sy/flip/algn`)
+- [x] タイル (`a:tile tx/ty/sx/sy/flip/algn`)
 - [x] ソースRect (`a:srcRect l/t/r/b`) — クロッピング
 - [x] round-trip (data-ooxml-blip-* 属性)
 

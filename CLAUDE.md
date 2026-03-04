@@ -73,26 +73,27 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 ```
 SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, shapes: Array[Shape] }
-Shape { kind: ShapeKind, transform: ShapeTransform, fill, grad_fill: GradientFill, stroke, stroke_w, paragraphs, body_props }
+Shape { kind: ShapeKind, transform: ShapeTransform, fill, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape | Other
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Other(String)
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
 
 GradientStop { pos: Int, color: Color }  // pos: 0-100000
-GradientFill { stops: Array[GradientStop], angle: Int, path_type: String, rot_with_shape: Bool, fill_to_l/t/r/b: Int }
-  // angle: 60000ths deg (-1=path grad), path_type: "circle"/"rect"/"shape"/""(linear)
+GradientFill { stops, angle, path_type, rot_with_shape, fill_to_l/t/r/b, tile_flip }
+BlipFill { rid, stretch, src_l/t/r/b, tile_tx/ty/sx/sy, tile_flip, tile_algn }
+PatternFill { prst, fg_color: Color, bg_color: Color }
 
-TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color }
-TextRun { text, bold, italic, font_size, color, font_face, ea_font, underline, strike, baseline, char_spacing, cap }
-BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap }
+TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, bullet_img_rid, tab_stops, rtl }
+TextRun { text, bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid }
+BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap, rot, vert, num_cols, col_spacing }
 
 TableData { col_widths: Array[Int], rows: Array[TableRow] }
 TableRow { height: Int, cells: Array[TableCell] }
 TableCell { paragraphs: Array[TextParagraph], fill: Color, grad_fill: GradientFill }
 
-Color { r, g, b }  // -1 = none (sentinel)
-ThemeData { dk1..fol_hlink: Color, major_font, minor_font: String }
+Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
+ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }
 ```
 
 ## Key files
@@ -101,11 +102,17 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font: String }
 |------|---------|
 | `src/ffi/ffi.mbt` | All JS→Wasm import declarations |
 | `src/xml/xml.mbt` | Generic XML parser (DOM tree) |
-| `src/ooxml/ooxml.mbt` | OOXML types (`SlideData`, `Shape`, etc.) + PPTX slide XML parser |
-| `src/renderer/renderer.mbt` | SlideData → SVG with `data-ooxml-*` attributes |
+| `src/ooxml/ooxml.mbt` | OOXML types (`SlideData`, `Shape`, etc.) + Color/HSL/modifier utilities |
+| `src/ooxml/ooxml_theme.mbt` | Theme parser + ColorMap + master/layout parsers |
+| `src/ooxml/ooxml_text.mbt` | Text body parsing (paragraphs, runs, bodyPr) |
+| `src/ooxml/ooxml_parse.mbt` | Shape/Slide/Fill parsing + rels + slide size |
+| `src/renderer/renderer.mbt` | Constants + helpers + Shape/Table rendering + public API |
+| `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
+| `src/renderer/renderer_fill.mbt` | Gradient/pattern fill SVG rendering |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
-| `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), round-trip orchestration |
+| `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), global state |
+| `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults |
 | `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
 | `lib/pptx-renderer.ts` | `PptxRenderer` class (core API) |
@@ -124,12 +131,18 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font: String }
 When implementing a new OOXML feature (e.g. gradient fill, shadow, connector), **always** update all three layers and add tests:
 
 ### 1. Implementation (MoonBit)
-Follow the round-trip pipeline — all 5 files must be updated:
-- `ooxml.mbt`: Data model (struct/field) + XML parser (`parse_*`)
-- `renderer.mbt`: SlideData → SVG rendering + `data-ooxml-*` attributes
-- `svg_parser.mbt`: `data-ooxml-*` → SlideData round-trip parsing
-- `serializer.mbt`: SlideData → OOXML XML serialization
-- `main.mbt`: Update all Shape/SlideData construction sites (placeholder inheritance etc.)
+Follow the round-trip pipeline — update each relevant file:
+- `src/ooxml/ooxml.mbt`: Data model (struct/field definitions)
+- `src/ooxml/ooxml_parse.mbt`: XML parser for shapes, fills, transforms
+- `src/ooxml/ooxml_text.mbt`: Text body/paragraph/run parsing (if text-related)
+- `src/ooxml/ooxml_theme.mbt`: Theme/master/layout parsing (if theme-related)
+- `src/renderer/renderer.mbt`: Shape/table SVG rendering + `data-ooxml-*` attributes
+- `src/renderer/renderer_text.mbt`: Text SVG rendering (if text-related)
+- `src/renderer/renderer_fill.mbt`: Gradient/pattern/blip fill rendering (if fill-related)
+- `src/svg_parser/svg_parser.mbt`: `data-ooxml-*` → SlideData round-trip parsing
+- `src/serializer/serializer.mbt`: SlideData → OOXML XML serialization
+- `src/main/main.mbt`: Wasm exports, global state
+- `src/main/main_inherit.mbt`: Placeholder inheritance + text style defaults
 
 ### 2. Test fixture (`gen_test_features.py`)
 - Add new slide(s) to `gen_test_features.py` exercising the feature

@@ -1,130 +1,151 @@
 # pptx-svg
 
-MoonBit (wasm-gc) で構築した、ブラウザで動作する PPTX ビューア／エディタ。
-ZIP 解凍・OOXML 処理・SVG レンダリング・PPTX エクスポートをすべてクライアントサイドで完結させます。
+A browser-based PPTX viewer/editor built with MoonBit (wasm-gc).
+ZIP extraction, OOXML processing, SVG rendering, and PPTX export — all client-side, no server required.
 
-## 特徴
+[Japanese / 日本語](README.ja.md)
 
-- **双方向変換**: PPTX → SVG → 編集 → PPTX エクスポート
-- **サーバー不要**: ZIP 解凍・OOXML パース・SVG 生成・ZIP 再構築すべてブラウザ内で完結
-- **ロスレス往復**: SVG に `data-ooxml-*` 属性を埋め込み、OOXML メタデータを保持
-- **軽量**: Wasm バイナリ約 24KB、外部依存なし
+## Features
 
-## 技術スタック
+- **Round-trip conversion**: PPTX → SVG → edit → PPTX export
+- **No server required**: ZIP extraction, OOXML parsing, SVG generation, ZIP rebuilding all run in the browser
+- **Lossless round-trip**: `data-ooxml-*` attributes embedded in SVG preserve OOXML metadata
+- **Lightweight**: ~24KB Wasm binary, zero external dependencies
 
-| レイヤー | 技術 |
-|---------|------|
-| ロジック | [MoonBit](https://moonbitlang.com/) → WebAssembly GC (wasm-gc) |
-| レンダリング | SVG (data-ooxml-* 属性付き) |
-| ZIP 解凍/生成 | ブラウザ標準 `DecompressionStream` / `CompressionStream` API (JS 側) |
-| 文字列 FFI | `use-js-builtin-string: true` (MoonBit String = JS String, ゼロコスト) |
-| ホスト層 | 素の JavaScript ES Modules |
+## Tech Stack
 
-## アーキテクチャ
+| Layer | Technology |
+|-------|-----------|
+| Logic | [MoonBit](https://moonbitlang.com/) → WebAssembly GC (wasm-gc) |
+| Rendering | SVG (with `data-ooxml-*` attributes) |
+| ZIP handling | Browser-native `DecompressionStream` / `CompressionStream` API (JS) |
+| String FFI | `use-js-builtin-string: true` (MoonBit String = JS String, zero-cost) |
+| Host layer | Plain JavaScript ES Modules |
+
+## Architecture
 
 ```
-[ブラウザ]
+[Browser]
   ┌─────────────────────────────────────────────────┐
   │  web/index.html                                 │
-  │  lib/ → dist/  ← PptxRenderer クラス           │
+  │  lib/ → dist/  ← PptxRenderer class            │
   │    │                                            │
-  │    ├─ ZIP 解凍 (DecompressionStream)            │
-  │    ├─ ZIP 生成 (CompressionStream + CRC-32)     │
+  │    ├─ ZIP extraction (DecompressionStream)       │
+  │    ├─ ZIP building (CompressionStream + CRC-32)  │
   │    │                                            │
   │    └─ FFI ──────────────────────────────┐      │
   │                                          │      │
   │  [WebAssembly GC]                        │      │
   │  _build/.../main.wasm                    │      │
-  │    src/ffi/         ← FFI 宣言          │      │
-  │    src/xml/         ← 汎用 XML パーサー  │      │
-  │    src/ooxml/       ← OOXML 型+パーサー  │      │
+  │    src/ffi/         ← FFI declarations   │      │
+  │    src/xml/         ← Generic XML parser │      │
+  │    src/ooxml/       ← OOXML types+parser │      │
   │    src/renderer/    ← SlideData → SVG    │      │
   │    src/svg_parser/  ← SVG → SlideData    │      │
   │    src/serializer/  ← SlideData → XML    │      │
-  │    src/main/        ← 公開 API ──────────┘      │
+  │    src/main/        ← Public API ────────┘      │
   └─────────────────────────────────────────────────┘
 ```
 
-**データフロー (Round-trip):**
-1. ユーザーが .pptx ファイルをドロップ
-2. JS が ZIP をパース・解凍し、エントリを Map に保存
-3. `render_slide_svg(idx)` → data-ooxml-* 属性付き SVG
-4. (ブラウザ側で SVG を編集)
-5. `update_slide_from_svg(idx, svg)` → SlideData をキャッシュに更新
-6. `exportPptx()` → 変更された slide XML で ZIP を再構築 → .pptx ダウンロード
+**Data flow (Round-trip):**
+1. User drops a .pptx file
+2. JS parses and decompresses the ZIP, storing entries in a Map
+3. `render_slide_svg(idx)` → SVG with `data-ooxml-*` attributes
+4. (Edit SVG in browser)
+5. `update_slide_from_svg(idx, svg)` → update cached SlideData
+6. `exportPptx()` → rebuild ZIP with modified slide XML → download .pptx
 
-## ブラウザ互換性
+## Browser Compatibility
 
-| ブラウザ | wasm-gc | js-string builtins | 動作 |
-|---------|---------|-------------------|------|
-| Chrome 117+ | ✓ | Tier-1 (builtins) | ✓ |
-| Edge 117+ | ✓ | Tier-1 (builtins) | ✓ |
-| Chrome 115–116 | ✓ | Tier-2 (importedStringConstants) | ✓ |
-| Chrome 111–114 | ✓ | Tier-3 (full manual) | ✓ |
-| Firefox 120+ | ✓ | Tier-1 (builtins) | ✓ |
-| Safari 17+ | ✓ | Tier-1 (builtins) | ✓ |
-| Chrome < 111 | ✗ | — | ✗ (wasm-gc 未対応) |
+| Browser | wasm-gc | js-string builtins | Status |
+|---------|---------|-------------------|--------|
+| Chrome 117+ | Yes | Tier-1 (builtins) | Supported |
+| Edge 117+ | Yes | Tier-1 (builtins) | Supported |
+| Chrome 115–116 | Yes | Tier-2 (importedStringConstants) | Supported |
+| Chrome 111–114 | Yes | Tier-3 (full manual) | Supported |
+| Firefox 120+ | Yes | Tier-1 (builtins) | Supported |
+| Safari 17+ | Yes | Tier-1 (builtins) | Supported |
+| Chrome < 111 | No | — | Not supported (no wasm-gc) |
 
-> `lib/wasm-compat.ts` は 3 段階フォールバックで Wasm を初期化します。
+> `lib/wasm-compat.ts` initializes Wasm with a 3-tier fallback strategy.
 
-## クイックスタート
+## Quick Start
 
-### 前提条件
+### Prerequisites
 
-- [MoonBit toolchain](https://moonbitlang.com/download/) (`moon` コマンド)
-- Python 3.9+ (HTTP サーバー用)
+- [MoonBit toolchain](https://moonbitlang.com/download/) (`moon` command)
+- Node.js 18+ (for building TypeScript and running tests)
 - Chrome 111+ / Firefox 120+ / Safari 17+
 
-### ビルド
+### Build
 
 ```bash
+# Build Wasm
 moon build --target wasm-gc --release
 # → _build/wasm-gc/release/build/main/main.wasm (~24KB)
+
+# Build TypeScript library
+tsc
+# → dist/
+
+# Build everything (Wasm + TypeScript)
+npm run build
 ```
 
-### 開発サーバー起動
+### Development Server
 
 ```bash
 python3 -m http.server 8765 --directory .
 # → http://localhost:8765/web/index.html
 ```
 
-### テスト (JS ホスト層)
+### Tests
 
 ```bash
 node test_fixtures/test_node.mjs
 ```
 
-## プロジェクト構造
+## Project Structure
 
 ```
 pptx-svg/
-├── moon.mod.json              # MoonBit プロジェクト設定（外部依存なし）
-├── package.json               # npm パッケージ定義
-├── src/                       # MoonBit (Wasm-GC)
-│   ├── ffi/ffi.mbt            # JS host 関数の FFI 宣言
-│   ├── xml/xml.mbt            # 汎用 XML パーサー（DOM ツリー）
-│   ├── ooxml/ooxml.mbt        # OOXML 型定義 + PPTX slide XML パーサー
-│   ├── renderer/renderer.mbt  # SlideData → SVG (data-ooxml-* 属性付き)
-│   ├── svg_parser/svg_parser.mbt  # SVG → SlideData (逆変換)
-│   ├── serializer/serializer.mbt  # SlideData → OOXML slide XML
-│   └── main/main.mbt          # Wasm エクスポート API + スライドキャッシュ
-├── lib/                       # TypeScript ライブラリソース
-│   ├── index.ts               # 公開 API re-exports
-│   ├── pptx-renderer.ts       # PptxRenderer クラス (コア API)
-│   ├── wasm-compat.ts         # 3-tier Wasm js-string フォールバック
-│   ├── zip.ts                 # ZIP 解凍 / 構築
-│   └── utils.ts               # bytesToBase64, crc32
-├── dist/                      # コンパイル済み JS + .d.ts (tsc 出力)
+├── moon.mod.json                  # MoonBit project config (no external deps)
+├── package.json                   # npm package definition
+├── src/                           # MoonBit (Wasm-GC)
+│   ├── ffi/ffi.mbt               # JS host FFI declarations
+│   ├── xml/xml.mbt               # Generic XML parser (DOM tree)
+│   ├── ooxml/
+│   │   ├── ooxml.mbt             # OOXML types + Color/HSL utilities
+│   │   ├── ooxml_theme.mbt       # Theme parser + ColorMap + master/layout
+│   │   ├── ooxml_text.mbt        # Text body/paragraph/run parsing
+│   │   └── ooxml_parse.mbt       # Shape/Slide/Fill parsing + rels
+│   ├── renderer/
+│   │   ├── renderer.mbt          # Shape/Table SVG rendering + public API
+│   │   ├── renderer_text.mbt     # Text SVG rendering (bullets, wrapping, tabs)
+│   │   └── renderer_fill.mbt     # Gradient/pattern fill SVG rendering
+│   ├── svg_parser/svg_parser.mbt # SVG → SlideData (reverse transform)
+│   ├── serializer/serializer.mbt # SlideData → OOXML slide XML
+│   └── main/
+│       ├── main.mbt              # Wasm export API + slide cache
+│       └── main_inherit.mbt      # Placeholder inheritance + text defaults
+├── lib/                           # TypeScript library source
+│   ├── index.ts                   # Public API re-exports
+│   ├── pptx-renderer.ts          # PptxRenderer class (core API)
+│   ├── wasm-compat.ts            # 3-tier Wasm js-string fallback
+│   ├── zip.ts                    # ZIP extraction / building
+│   └── utils.ts                  # bytesToBase64, crc32
+├── dist/                          # Compiled JS + .d.ts (tsc output)
 ├── web/
-│   ├── host.js                # レガシー JS ホスト (参考用)
-│   └── index.html             # デモ UI (dist/ をインポート)
+│   ├── host.js                   # Legacy JS host (reference only)
+│   └── index.html                # Demo UI (imports from dist/)
 └── test_fixtures/
-    ├── minimal.pptx           # 2 スライドのテスト用最小 PPTX
-    └── test_node.mjs          # Node.js テスト (JS レイヤーのみ)
+    ├── minimal.pptx              # 2-slide minimal test PPTX
+    ├── test_features.pptx        # Feature regression test fixture
+    ├── gen_test_features.py      # Python script to regenerate test fixture
+    └── test_node.mjs             # Node.js test suite (JS layer)
 ```
 
-**モジュール依存関係 (サイクルなし):**
+**Module dependencies (no cycles):**
 ```
 main → renderer   → ooxml → xml
      → svg_parser → ooxml → xml
@@ -132,45 +153,39 @@ main → renderer   → ooxml → xml
      → ffi
 ```
 
-## API リファレンス
+## API Reference
 
-### Wasm エクスポート関数
+### Wasm Exports
 
-| 関数 | 戻り値 | 説明 |
-|------|--------|------|
-| `initialize_pptx()` | `"OK:<count>"` or `"ERROR:..."` | PPTX を初期化しスライド数を取得 |
-| `get_slide_count()` | `Int` | スライド数 |
-| `get_slide_xml_raw(idx)` | `String` | 生の slide XML |
-| `get_entry_list()` | `String` | ZIP エントリ一覧 (改行区切り) |
-| `render_slide_svg(idx)` | `String` | data-ooxml-* 属性付き SVG |
-| `update_slide_from_svg(idx, svg)` | `"OK"` or `"ERROR:..."` | SVG から SlideData を更新 |
-| `get_slide_ooxml(idx)` | `String` | OOXML slide XML (変更済みなら再生成) |
-| `get_modified_entries()` | `String` | 変更エントリ (path\tcontent\n 形式) |
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `initialize_pptx()` | `"OK:<count>"` or `"ERROR:..."` | Initialize PPTX and get slide count |
+| `get_slide_count()` | `Int` | Number of slides |
+| `get_slide_xml_raw(idx)` | `String` | Raw slide XML |
+| `get_entry_list()` | `String` | ZIP entry list (newline-separated) |
+| `render_slide_svg(idx)` | `String` | SVG with `data-ooxml-*` attributes |
+| `update_slide_from_svg(idx, svg)` | `"OK"` or `"ERROR:..."` | Update SlideData from SVG |
+| `get_slide_ooxml(idx)` | `String` | OOXML slide XML (regenerated if modified) |
+| `get_modified_entries()` | `String` | Modified entries (`path\tcontent\n` format) |
 
-### JS API (PptxRenderer クラス)
+### JS API (PptxRenderer class)
 
 ```javascript
-await renderer.init(wasmUrl)              // Wasm モジュール初期化
-await renderer.loadPptx(arrayBuffer)      // PPTX ロード → { slideCount }
-renderer.renderSlideSvg(slideIdx)         // SVG 文字列取得
-renderer.updateSlideFromSvg(idx, svg)     // SVG → 内部データ更新
-renderer.getSlideOoxml(idx)               // OOXML XML 取得
-await renderer.exportPptx()               // PPTX ArrayBuffer エクスポート
+await renderer.init(wasmUrl)              // Initialize Wasm module
+await renderer.loadPptx(arrayBuffer)      // Load PPTX → { slideCount }
+renderer.renderSlideSvg(slideIdx)         // Get SVG string
+renderer.updateSlideFromSvg(idx, svg)     // Update internal data from SVG
+renderer.getSlideOoxml(idx)               // Get OOXML XML
+await renderer.exportPptx()               // Export as PPTX ArrayBuffer
 ```
 
-## 開発ノート
+## Known Limitations
 
-### MoonBit 制約事項
+- SmartArt / Charts render as gray fallback
+- EMF/WMF images not supported
+- Animations and transitions are ignored
+- Does not run in Node.js (wasm-gc is browser-only)
 
-- **整数補間禁止**: `"\{n}"` は `fromCharCodeArray` を使うため Chrome 117+ 未満で動かない → `int_to_str(n)` ヘルパーで代替
-- **StringBuilder 禁止**: `to_string()` が `fromCharCodeArray` を呼ぶ → `+` (concat) で文字列を組み立てる
-- **Char→String**: `@ffi.ffi_char_code_to_str(Char::to_int(c))` を使用
-- **外部パッケージ不使用**: 現在のコンパイラ (2026年版) と非互換のため全て自前実装
-- **pub(all)**: 外部パッケージから構造体を構築するには `pub(all) struct` が必要
+## License
 
-## 既知の制限
-
-- SmartArt / チャートはグレーフォールバック
-- EMF/WMF 画像は非対応
-- アニメーション・トランジションは無視
-- Node.js では動作しない（wasm-gc はブラウザのみ）
+MIT
