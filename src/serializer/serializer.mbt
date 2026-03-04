@@ -72,7 +72,8 @@ fn serialize_color(color : @ooxml.Color) -> String {
 
 fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   let rot_attr = if gf.rot_with_shape { " rotWithShape=\"1\"" } else { " rotWithShape=\"0\"" }
-  let mut out = "<a:gradFill" + rot_attr + ">"
+  let flip_attr = if gf.tile_flip.is_empty() || gf.tile_flip == "none" { "" } else { " tileFlip=\"" + gf.tile_flip + "\"" }
+  let mut out = "<a:gradFill" + rot_attr + flip_attr + ">"
   // Gradient stops
   out = out + "<a:gsLst>"
   let ns = gf.stops.length()
@@ -118,6 +119,15 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
   }
   if bf.stretch {
     out = out + "<a:stretch><a:fillRect/></a:stretch>"
+  } else if bf.tile_sx > 0 || bf.tile_sy > 0 {
+    out = out + "<a:tile"
+    if bf.tile_tx != 0 { out = out + " tx=\"" + int_to_str(bf.tile_tx) + "\"" }
+    if bf.tile_ty != 0 { out = out + " ty=\"" + int_to_str(bf.tile_ty) + "\"" }
+    if bf.tile_sx != 0 { out = out + " sx=\"" + int_to_str(bf.tile_sx) + "\"" }
+    if bf.tile_sy != 0 { out = out + " sy=\"" + int_to_str(bf.tile_sy) + "\"" }
+    if not(bf.tile_flip.is_empty()) && bf.tile_flip != "none" { out = out + " flip=\"" + bf.tile_flip + "\"" }
+    if not(bf.tile_algn.is_empty()) { out = out + " algn=\"" + bf.tile_algn + "\"" }
+    out = out + "/>"
   }
   out + "</a:blipFill>"
 }

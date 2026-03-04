@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 28', slideCount === 28, `got ${slideCount}`);
+  assert('slide count = 31', slideCount === 31, `got ${slideCount}`);
 
   // Verify all 28 slides exist
-  for (let i = 1; i <= 28; i++) {
+  for (let i = 1; i <= 31; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 28; i++) {
+  for (let i = 1; i <= 31; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -670,6 +670,44 @@ async function testFeaturesPptx() {
     // Pattern colors
     assert('slide28 has 003366 (navy fg)', slide28.includes('003366'));
     assert('slide28 has CCCCCC (gray bg)', slide28.includes('CCCCCC'));
+  }
+
+  // ── Slide 29: Gradient tileFlip ──────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 29: gradient tileFlip');
+    const slide29 = textFiles.get('ppt/slides/slide29.xml');
+    assert('slide29 exists', !!slide29);
+    assert('slide29 has a:gradFill', hasTag(slide29, 'a:gradFill'));
+    assert('slide29 has tileFlip="x"', slide29.includes('tileFlip="x"'));
+    assert('slide29 has tileFlip="y"', slide29.includes('tileFlip="y"'));
+    assert('slide29 has tileFlip="xy"', slide29.includes('tileFlip="xy"'));
+  }
+
+  // ── Slide 30: Additional pattern fills ───────────────────────────────────
+  {
+    section('test_features.pptx — Slide 30: additional pattern fills');
+    const slide30 = textFiles.get('ppt/slides/slide30.xml');
+    assert('slide30 exists', !!slide30);
+    assert('slide30 has a:pattFill', hasTag(slide30, 'a:pattFill'));
+    assert('slide30 has prst="pct50"', slide30.includes('prst="pct50"'));
+    assert('slide30 has prst="dnDiag"', slide30.includes('prst="dnDiag"'));
+    assert('slide30 has prst="cross"', slide30.includes('prst="cross"'));
+    assert('slide30 has prst="lgCheck"', slide30.includes('prst="lgCheck"'));
+    assert('slide30 has prst="solidDmnd"', slide30.includes('prst="solidDmnd"'));
+    assert('slide30 has prst="trellis"', slide30.includes('prst="trellis"'));
+  }
+
+  // ── Slide 31: Image fill tile ────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 31: image fill tile');
+    const slide31 = textFiles.get('ppt/slides/slide31.xml');
+    assert('slide31 exists', !!slide31);
+    assert('slide31 has a:blipFill', hasTag(slide31, 'a:blipFill'));
+    assert('slide31 has a:tile', hasTag(slide31, 'a:tile'));
+    assert('slide31 has sx="50000"', slide31.includes('sx="50000"'));
+    assert('slide31 has sy="50000"', slide31.includes('sy="50000"'));
+    assert('slide31 has flip="xy"', slide31.includes('flip="xy"'));
+    assert('slide31 has algn="tl"', slide31.includes('algn="tl"'));
   }
 }
 

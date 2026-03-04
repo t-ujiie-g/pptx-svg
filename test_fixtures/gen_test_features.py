@@ -31,6 +31,9 @@ Slides:
  26. Alpha/transparency (semi-transparent solid fill, semi-transparent gradient stop)
  27. Image fill on AutoShape (a:blipFill inside p:spPr)
  28. Pattern fill (a:pattFill — ltDnDiag / smCheck / dkHorz)
+ 29. Gradient tileFlip (tileFlip="x" / "y" / "xy")
+ 30. Additional pattern fills (pct50 / dnDiag / cross / lgCheck / solidDmnd / trellis)
+ 31. Image fill tile (a:tile with sx/sy/flip/algn)
 """
 
 from pptx import Presentation
@@ -1900,6 +1903,96 @@ set_fill_xml(s28c, '''<a:pattFill xmlns:a="http://schemas.openxmlformats.org/dra
   <a:fgClr><a:srgbClr val="003366"/></a:fgClr>
   <a:bgClr><a:srgbClr val="CCCCCC"/></a:bgClr>
 </a:pattFill>''')
+
+# ── Slide 29: Gradient tileFlip ──────────────────────────────────────────────
+
+slide29 = prs.slides.add_slide(blank)
+
+# Shape 1: tileFlip="x"
+s29a = slide29.shapes.add_shape(1, Inches(0.5), Inches(0.5), Inches(2.5), Inches(2))
+s29a.text = "tileFlip=x"
+s29a.text_frame.paragraphs[0].font.size = Pt(14)
+set_gradient_fill(s29a, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1" tileFlip="x">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="0" scaled="1"/>
+</a:gradFill>''')
+
+# Shape 2: tileFlip="y"
+s29b = slide29.shapes.add_shape(1, Inches(3.5), Inches(0.5), Inches(2.5), Inches(2))
+s29b.text = "tileFlip=y"
+s29b.text_frame.paragraphs[0].font.size = Pt(14)
+set_gradient_fill(s29b, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1" tileFlip="y">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="00FF00"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="FF00FF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="5400000" scaled="1"/>
+</a:gradFill>''')
+
+# Shape 3: tileFlip="xy"
+s29c = slide29.shapes.add_shape(1, Inches(6.5), Inches(0.5), Inches(2.5), Inches(2))
+s29c.text = "tileFlip=xy"
+s29c.text_frame.paragraphs[0].font.size = Pt(14)
+set_gradient_fill(s29c, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1" tileFlip="xy">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="FFFF00"/></a:gs>
+    <a:gs pos="50000"><a:srgbClr val="FF6600"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="0066FF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="2700000" scaled="1"/>
+</a:gradFill>''')
+
+# ── Slide 30: Additional pattern fills ──────────────────────────────────────
+
+slide30 = prs.slides.add_slide(blank)
+
+patterns_30 = [
+    ("pct50", "333333", "CCCCCC"),
+    ("dnDiag", "000080", "FFFFFF"),
+    ("cross", "FF0000", "FFFFCC"),
+    ("lgCheck", "008000", "FFFFFF"),
+    ("solidDmnd", "800080", "FFE0FF"),
+    ("trellis", "004040", "E0FFFF"),
+]
+
+for idx, (prst, fg_c, bg_c) in enumerate(patterns_30):
+    col = idx % 3
+    row = idx // 3
+    left = Inches(0.5 + col * 3.0)
+    top = Inches(0.5 + row * 2.5)
+    sh = slide30.shapes.add_shape(1, left, top, Inches(2.5), Inches(2))
+    sh.text = prst
+    sh.text_frame.paragraphs[0].font.size = Pt(14)
+    set_fill_xml(sh, f'''<a:pattFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="{prst}">
+  <a:fgClr><a:srgbClr val="{fg_c}"/></a:fgClr>
+  <a:bgClr><a:srgbClr val="{bg_c}"/></a:bgClr>
+</a:pattFill>''')
+
+# ── Slide 31: Image fill tile ───────────────────────────────────────────────
+
+slide31 = prs.slides.add_slide(blank)
+
+# Re-create temp image for tile test
+tmp_img2 = os.path.join(tempfile.gettempdir(), '_test_blip_tile.png')
+with open(tmp_img2, 'wb') as f:
+    f.write(mini_png)
+
+img_part2, img_rid2 = slide31.part.get_or_add_image_part(tmp_img2)
+
+# Shape with tile fill
+s31a = slide31.shapes.add_shape(1, Inches(0.5), Inches(0.5), Inches(4), Inches(3))
+s31a.text = "Tile fill"
+s31a.text_frame.paragraphs[0].font.size = Pt(14)
+set_fill_xml(s31a, f'''<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <a:blip r:embed="{img_rid2}"/>
+  <a:tile tx="0" ty="0" sx="50000" sy="50000" flip="xy" algn="tl"/>
+</a:blipFill>''')
+
+os.unlink(tmp_img2)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

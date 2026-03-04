@@ -1050,7 +1050,8 @@ fn render_shape(
       dai("grad-ftl", shape.grad_fill.fill_to_l) +
       dai("grad-ftt", shape.grad_fill.fill_to_t) +
       dai("grad-ftr", shape.grad_fill.fill_to_r) +
-      dai("grad-ftb", shape.grad_fill.fill_to_b)
+      dai("grad-ftb", shape.grad_fill.fill_to_b) +
+      da("grad-tile-flip", shape.grad_fill.tile_flip)
     } else { "" }) +
     // Blip fill attributes
     (if not(shape.blip_fill.is_none()) {
@@ -1059,7 +1060,13 @@ fn render_shape(
       dai("blip-src-l", shape.blip_fill.src_l) +
       dai("blip-src-t", shape.blip_fill.src_t) +
       dai("blip-src-r", shape.blip_fill.src_r) +
-      dai("blip-src-b", shape.blip_fill.src_b)
+      dai("blip-src-b", shape.blip_fill.src_b) +
+      dai("blip-tile-tx", shape.blip_fill.tile_tx) +
+      dai("blip-tile-ty", shape.blip_fill.tile_ty) +
+      dai("blip-tile-sx", shape.blip_fill.tile_sx) +
+      dai("blip-tile-sy", shape.blip_fill.tile_sy) +
+      da("blip-tile-flip", shape.blip_fill.tile_flip) +
+      da("blip-tile-algn", shape.blip_fill.tile_algn)
     } else { "" }) +
     // Pattern fill attributes
     (if not(shape.patt_fill.is_none()) {
@@ -1070,8 +1077,12 @@ fn render_shape(
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
-      let fill = if not(shape.blip_fill.is_none()) {
-        // BlipFill: image fill rendered as separate <image> below
+      let blip_tile_id = "bliptile_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+      let fill = if not(shape.blip_fill.is_none()) && not(shape.blip_fill.stretch) && shape.blip_fill.tile_sx > 0 {
+        // BlipFill tile: filled via <pattern> defined in defs
+        " fill=\"url(#" + blip_tile_id + ")\""
+      } else if not(shape.blip_fill.is_none()) {
+        // BlipFill stretch: image fill rendered as separate <image> below
         a("fill", "none")
       } else if not(shape.patt_fill.is_none()) {
         " fill=\"url(#" + patt_id(slide_num, shape_idx) + ")\""
@@ -1129,10 +1140,24 @@ fn render_shape(
             ""
           } else {
             let mime = mime_from_ext(img_path)
-            "<image" + ai("x", x_p) + ai("y", y_p) + ai("width", cx_p) + ai("height", cy_p) +
-            " preserveAspectRatio=\"none\"" +
-            a("href", "data:" + mime + ";base64," + b64) +
-            rot + "/>"
+            if not(bf.stretch) && bf.tile_sx > 0 {
+              // Tile mode: create <pattern> definition (will be added to defs)
+              let tile_w = cx_p * bf.tile_sx / 100000
+              let tile_h = cy_p * bf.tile_sy / 100000
+              let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
+              let th = int_to_str(if tile_h > 0 { tile_h } else { cy_p })
+              "<defs><pattern id=\"" + blip_tile_id + "\" patternUnits=\"userSpaceOnUse\"" +
+              ai("x", x_p) + ai("y", y_p) +
+              " width=\"" + tw + "\" height=\"" + th + "\">" +
+              "<image width=\"" + tw + "\" height=\"" + th + "\" preserveAspectRatio=\"none\"" +
+              a("href", "data:" + mime + ";base64," + b64) + "/>" +
+              "</pattern></defs>"
+            } else {
+              "<image" + ai("x", x_p) + ai("y", y_p) + ai("width", cx_p) + ai("height", cy_p) +
+              " preserveAspectRatio=\"none\"" +
+              a("href", "data:" + mime + ";base64," + b64) +
+              rot + "/>"
+            }
           }
         }
       } else {
@@ -1308,12 +1333,16 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     stops_svg = stops_svg + "<stop offset=\"" + int_to_str(pct) + "%\" stop-color=\"" + stop_css + "\"" + stop_opacity + "/>"
     si = si + 1
   }
+  // tileFlip → SVG spreadMethod="reflect" (x, y, or xy all map to reflect)
+  let spread_attr = if gf.tile_flip == "x" || gf.tile_flip == "y" || gf.tile_flip == "xy" {
+    " spreadMethod=\"reflect\""
+  } else { "" }
   if gf.angle >= 0 && gf.path_type.is_empty() {
     // Linear gradient
     // OOXML angle is in 60000ths of a degree. SVG gradientTransform rotate()
     // uses degrees centered at (0.5, 0.5). Direct division gives the SVG angle.
     let deg = gf.angle / ooxml_angle_unit
-    "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\" gradientTransform=\"rotate(" + int_to_str(deg) + ", 0.5, 0.5)\">" + stops_svg + "</linearGradient>"
+    "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\" gradientTransform=\"rotate(" + int_to_str(deg) + ", 0.5, 0.5)\"" + spread_attr + ">" + stops_svg + "</linearGradient>"
   } else if not(gf.path_type.is_empty()) {
     // Radial / path gradient
     let cx_s = if gf.fill_to_l >= 0 && gf.fill_to_r >= 0 {
@@ -1322,10 +1351,10 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     let cy_s = if gf.fill_to_t >= 0 && gf.fill_to_b >= 0 {
       int_to_str((gf.fill_to_t + (100000 - gf.fill_to_b)) / ooxml_fill_to_pct)
     } else { "50" }
-    "<radialGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" cx=\"" + cx_s + "%\" cy=\"" + cy_s + "%\" r=\"50%\">" + stops_svg + "</radialGradient>"
+    "<radialGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" cx=\"" + cx_s + "%\" cy=\"" + cy_s + "%\" r=\"50%\"" + spread_attr + ">" + stops_svg + "</radialGradient>"
   } else {
     // Fallback linear
-    "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\">" + stops_svg + "</linearGradient>"
+    "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\"" + spread_attr + ">" + stops_svg + "</linearGradient>"
   }
 }
 
@@ -1347,33 +1376,159 @@ fn grad_stops_attr(gf : @ooxml.GradientFill) -> String {
 
 ///| Generate SVG content for a pattern preset. Returns SVG shapes to place inside <pattern>.
 fn patt_svg_content(prst : String, fg : String, bg : String, sz : Int) -> String {
+  let s = int_to_str(sz)
+  let h = int_to_str(sz / 2)
+  let q = int_to_str(sz / 4)
+  let q3 = int_to_str(sz * 3 / 4)
   // Background rect
-  let bg_rect = "<rect width=\"" + int_to_str(sz) + "\" height=\"" + int_to_str(sz) + "\" fill=\"" + bg + "\"/>"
-  if prst == "pct5" || prst == "pct10" || prst == "pct20" || prst == "pct25" {
-    let r = if prst == "pct5" { 1 } else if prst == "pct10" { 1 } else { 2 }
-    bg_rect + "<circle cx=\"" + int_to_str(sz / 2) + "\" cy=\"" + int_to_str(sz / 2) + "\" r=\"" + int_to_str(r) + "\" fill=\"" + fg + "\"/>"
+  let bg_rect = "<rect width=\"" + s + "\" height=\"" + s + "\" fill=\"" + bg + "\"/>"
+  // Helper: dot at center
+  fn dot(cx : String, cy : String, r : String) -> String {
+    "<circle cx=\"" + cx + "\" cy=\"" + cy + "\" r=\"" + r + "\" fill=\"" + fg + "\"/>"
+  }
+  // Helper: line
+  fn line(x1 : String, y1 : String, x2 : String, y2 : String, sw : String) -> String {
+    "<line x1=\"" + x1 + "\" y1=\"" + y1 + "\" x2=\"" + x2 + "\" y2=\"" + y2 + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+  }
+  // Helper: rect
+  fn frect(x : String, y : String, w : String, h : String) -> String {
+    "<rect x=\"" + x + "\" y=\"" + y + "\" width=\"" + w + "\" height=\"" + h + "\" fill=\"" + fg + "\"/>"
+  }
+
+  // ── Percentage fills (dots/squares scaled by density) ──
+  if prst == "pct5" {
+    bg_rect + dot(h, h, "1")
+  } else if prst == "pct10" {
+    bg_rect + dot(h, h, "1")
+  } else if prst == "pct20" || prst == "pct25" {
+    bg_rect + dot(h, h, "2")
+  } else if prst == "pct30" {
+    bg_rect + dot(q, q, "1") + dot(q3, q3, "1")
+  } else if prst == "pct40" {
+    bg_rect + dot(q, q, "1") + dot(q3, q, "1") + dot(h, q3, "1")
+  } else if prst == "pct50" {
+    let half = sz / 2
+    bg_rect + frect("0", "0", int_to_str(half), int_to_str(half))
+  } else if prst == "pct60" {
+    let half = sz / 2
+    bg_rect + frect("0", "0", int_to_str(half), int_to_str(half)) + dot(q3, q3, "1")
+  } else if prst == "pct70" || prst == "pct75" {
+    // Invert: mostly foreground with background dots
+    "<rect width=\"" + s + "\" height=\"" + s + "\" fill=\"" + fg + "\"/>" +
+    "<circle cx=\"" + h + "\" cy=\"" + h + "\" r=\"2\" fill=\"" + bg + "\"/>"
+  } else if prst == "pct80" {
+    "<rect width=\"" + s + "\" height=\"" + s + "\" fill=\"" + fg + "\"/>" +
+    "<circle cx=\"" + h + "\" cy=\"" + h + "\" r=\"1\" fill=\"" + bg + "\"/>"
+  } else if prst == "pct90" {
+    "<rect width=\"" + s + "\" height=\"" + s + "\" fill=\"" + fg + "\"/>" +
+    "<circle cx=\"" + h + "\" cy=\"" + q + "\" r=\"1\" fill=\"" + bg + "\"/>"
+
+  // ── Diagonal lines ──
   } else if prst == "ltDnDiag" || prst == "dkDnDiag" {
     let sw = if prst == "ltDnDiag" { "1" } else { "2" }
-    bg_rect + "<line x1=\"0\" y1=\"0\" x2=\"" + int_to_str(sz) + "\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+    bg_rect + line("0", "0", s, s, sw)
   } else if prst == "ltUpDiag" || prst == "dkUpDiag" {
     let sw = if prst == "ltUpDiag" { "1" } else { "2" }
-    bg_rect + "<line x1=\"" + int_to_str(sz) + "\" y1=\"0\" x2=\"0\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+    bg_rect + line(s, "0", "0", s, sw)
+  } else if prst == "dnDiag" {
+    bg_rect + line("0", "0", s, s, "1") + line(int_to_str(-sz), "0", "0", s, "1") + line(s, "0", int_to_str(sz * 2), s, "1")
+  } else if prst == "upDiag" {
+    bg_rect + line(s, "0", "0", s, "1") + line(int_to_str(sz * 2), "0", s, s, "1") + line("0", "0", int_to_str(-sz), s, "1")
+  } else if prst == "wdDnDiag" {
+    bg_rect + line("0", "0", s, s, "3")
+  } else if prst == "wdUpDiag" {
+    bg_rect + line(s, "0", "0", s, "3")
+  } else if prst == "dashDnDiag" {
+    bg_rect + "<line x1=\"0\" y1=\"0\" x2=\"" + h + "\" y2=\"" + h + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else if prst == "dashUpDiag" {
+    bg_rect + "<line x1=\"" + s + "\" y1=\"0\" x2=\"" + h + "\" y2=\"" + h + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+
+  // ── Horizontal / Vertical lines ──
   } else if prst == "ltHorz" || prst == "dkHorz" {
     let sw = if prst == "ltHorz" { "1" } else { "2" }
-    bg_rect + "<line x1=\"0\" y1=\"" + int_to_str(sz / 2) + "\" x2=\"" + int_to_str(sz) + "\" y2=\"" + int_to_str(sz / 2) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+    bg_rect + line("0", h, s, h, sw)
   } else if prst == "ltVert" || prst == "dkVert" {
     let sw = if prst == "ltVert" { "1" } else { "2" }
-    bg_rect + "<line x1=\"" + int_to_str(sz / 2) + "\" y1=\"0\" x2=\"" + int_to_str(sz / 2) + "\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+    bg_rect + line(h, "0", h, s, sw)
+  } else if prst == "horz" {
+    bg_rect + line("0", h, s, h, "1") + line("0", "0", s, "0", "1")
+  } else if prst == "vert" {
+    bg_rect + line(h, "0", h, s, "1") + line("0", "0", "0", s, "1")
+  } else if prst == "narHorz" {
+    bg_rect + line("0", q, s, q, "1") + line("0", q3, s, q3, "1")
+  } else if prst == "narVert" {
+    bg_rect + line(q, "0", q, s, "1") + line(q3, "0", q3, s, "1")
+  } else if prst == "dashHorz" {
+    bg_rect + "<line x1=\"0\" y1=\"" + h + "\" x2=\"" + h + "\" y2=\"" + h + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else if prst == "dashVert" {
+    bg_rect + "<line x1=\"" + h + "\" y1=\"0\" x2=\"" + h + "\" y2=\"" + h + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+
+  // ── Cross patterns ──
+  } else if prst == "cross" {
+    bg_rect + line(h, "0", h, s, "1") + line("0", h, s, h, "1")
+  } else if prst == "dnCross" {
+    bg_rect + line("0", "0", s, s, "1") + line(s, "0", "0", s, "1")
+
+  // ── Checkerboard / Diamond ──
   } else if prst == "smCheck" {
-    let half = sz / 2
-    bg_rect + "<rect x=\"0\" y=\"0\" width=\"" + int_to_str(half) + "\" height=\"" + int_to_str(half) + "\" fill=\"" + fg + "\"/>" +
-    "<rect x=\"" + int_to_str(half) + "\" y=\"" + int_to_str(half) + "\" width=\"" + int_to_str(half) + "\" height=\"" + int_to_str(half) + "\" fill=\"" + fg + "\"/>"
+    let half = int_to_str(sz / 2)
+    bg_rect + frect("0", "0", half, half) +
+    frect(half, half, half, half)
+  } else if prst == "lgCheck" {
+    let half = int_to_str(sz / 2)
+    bg_rect + frect("0", "0", half, half) +
+    frect(half, half, half, half)
+  } else if prst == "openDmnd" {
+    bg_rect + "<polygon points=\"" + h + ",0 " + s + "," + h + " " + h + "," + s + " 0," + h + "\" fill=\"none\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else if prst == "solidDmnd" {
+    bg_rect + "<polygon points=\"" + h + ",0 " + s + "," + h + " " + h + "," + s + " 0," + h + "\" fill=\"" + fg + "\"/>"
+
+  // ── Grid patterns ──
   } else if prst == "smGrid" {
-    bg_rect + "<line x1=\"" + int_to_str(sz / 2) + "\" y1=\"0\" x2=\"" + int_to_str(sz / 2) + "\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>" +
-    "<line x1=\"0\" y1=\"" + int_to_str(sz / 2) + "\" x2=\"" + int_to_str(sz) + "\" y2=\"" + int_to_str(sz / 2) + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+    bg_rect + line(h, "0", h, s, "1") + line("0", h, s, h, "1")
+  } else if prst == "lgGrid" {
+    bg_rect + line("0", "0", s, "0", "1") + line("0", "0", "0", s, "1")
+  } else if prst == "dotGrid" {
+    bg_rect + dot("0", "0", "1") + dot(h, "0", "1") + dot("0", h, "1") + dot(h, h, "1")
+  } else if prst == "dotDmnd" {
+    bg_rect + dot(h, "0", "1") + dot("0", h, "1") + dot(s, h, "1") + dot(h, s, "1")
+
+  // ── Diagonal cross ──
+  } else if prst == "ltDnDiagCross" {
+    bg_rect + line("0", "0", s, s, "1") + line(s, "0", "0", s, "1")
+  } else if prst == "dkDnDiagCross" {
+    bg_rect + line("0", "0", s, s, "2") + line(s, "0", "0", s, "2")
+
+  // ── Complex patterns (best SVG approximation) ──
+  } else if prst == "trellis" {
+    // Diagonal weave
+    bg_rect + line("0", "0", s, s, "2") + line(s, "0", "0", s, "2")
+  } else if prst == "sphere" {
+    bg_rect + "<circle cx=\"" + h + "\" cy=\"" + h + "\" r=\"" + q + "\" fill=\"" + fg + "\" opacity=\"0.7\"/>" +
+    "<circle cx=\"" + q + "\" cy=\"" + q + "\" r=\"1\" fill=\"" + bg + "\"/>"
+  } else if prst == "weave" {
+    bg_rect + line("0", "0", h, h, "2") + line(s, "0", h, h, "2") +
+    line("0", s, h, h, "2") + line(s, s, h, h, "2")
+  } else if prst == "plaid" {
+    bg_rect + frect("0", "0", h, h) +
+    line("0", q3, s, q3, "1") + line(q3, "0", q3, s, "1")
+  } else if prst == "divot" {
+    bg_rect + "<line x1=\"" + q + "\" y1=\"" + q + "\" x2=\"" + h + "\" y2=\"" + q + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>" +
+    "<line x1=\"" + h + "\" y1=\"" + q3 + "\" x2=\"" + q3 + "\" y2=\"" + q3 + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else if prst == "zigZag" {
+    bg_rect + "<polyline points=\"0," + h + " " + q + ",0 " + h + "," + h + " " + q3 + ",0 " + s + "," + h + "\" fill=\"none\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else if prst == "wave" {
+    bg_rect + "<path d=\"M0," + h + " Q" + q + ",0 " + h + "," + h + " Q" + q3 + "," + s + " " + s + "," + h + "\" fill=\"none\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else if prst == "diagBrick" {
+    bg_rect + line("0", "0", s, s, "1") + line("0", h, h, "0", "1")
+  } else if prst == "horzBrick" {
+    bg_rect + line("0", h, s, h, "1") + line(h, "0", h, h, "1") + line("0", s, "0", h, "1")
+  } else if prst == "shingle" {
+    bg_rect + line("0", s, s, "0", "1") + line("0", h, h, "0", "1")
+
   } else {
     // Fallback: solid foreground color
-    "<rect width=\"" + int_to_str(sz) + "\" height=\"" + int_to_str(sz) + "\" fill=\"" + fg + "\"/>"
+    frect("0", "0", s, s)
   }
 }
 

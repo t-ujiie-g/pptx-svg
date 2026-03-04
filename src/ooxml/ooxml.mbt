@@ -162,10 +162,11 @@ pub(all) struct GradientFill {
   fill_to_t      : Int
   fill_to_r      : Int
   fill_to_b      : Int
+  tile_flip      : String // "none","x","y","xy"; "" = unset
 }
 
 pub fn GradientFill::none() -> GradientFill {
-  { stops: [], angle: 0, path_type: "", rot_with_shape: true, fill_to_l: -1, fill_to_t: -1, fill_to_r: -1, fill_to_b: -1 }
+  { stops: [], angle: 0, path_type: "", rot_with_shape: true, fill_to_l: -1, fill_to_t: -1, fill_to_r: -1, fill_to_b: -1, tile_flip: "" }
 }
 
 pub fn GradientFill::is_none(self : GradientFill) -> Bool {
@@ -176,15 +177,21 @@ pub fn GradientFill::is_none(self : GradientFill) -> Bool {
 
 pub(all) struct BlipFill {
   rid     : String  // r:embed relationship ID; "" = none
-  stretch : Bool    // true = stretch fill, false = tile (not yet implemented)
+  stretch : Bool    // true = stretch fill, false = tile
   src_l   : Int     // a:srcRect crop left (0-100000 千分率); 0 = no crop
   src_t   : Int     // crop top
   src_r   : Int     // crop right
   src_b   : Int     // crop bottom
+  tile_tx : Int     // a:tile tx offset (EMU); 0 = default
+  tile_ty : Int     // a:tile ty offset (EMU)
+  tile_sx : Int     // a:tile sx scale (100000 = 100%); 0 = unset
+  tile_sy : Int     // a:tile sy scale
+  tile_flip : String // "none","x","y","xy"; "" = unset
+  tile_algn : String // alignment: "tl","t","tr","l","ctr","r","bl","b","br"; "" = unset
 }
 
 pub fn BlipFill::none() -> BlipFill {
-  { rid: "", stretch: true, src_l: 0, src_t: 0, src_r: 0, src_b: 0 }
+  { rid: "", stretch: true, src_l: 0, src_t: 0, src_r: 0, src_b: 0, tile_tx: 0, tile_ty: 0, tile_sx: 0, tile_sy: 0, tile_flip: "", tile_algn: "" }
 }
 
 pub fn BlipFill::is_none(self : BlipFill) -> Bool {
@@ -1115,7 +1122,11 @@ fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Gradie
           }
         }
       }
-      { stops, angle, path_type, rot_with_shape, fill_to_l, fill_to_t, fill_to_r, fill_to_b }
+      let tile_flip = match @xml.get_attr(gf_node, "tileFlip") {
+        Some(v) => v
+        None => ""
+      }
+      { stops, angle, path_type, rot_with_shape, fill_to_l, fill_to_t, fill_to_r, fill_to_b, tile_flip }
     }
   }
 }
@@ -1477,7 +1488,31 @@ fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
         }
         None => ()
       }
-      { rid, stretch, src_l, src_t, src_r, src_b }
+      // Parse a:tile element
+      let mut tile_tx = 0
+      let mut tile_ty = 0
+      let mut tile_sx = 0
+      let mut tile_sy = 0
+      let mut tile_flip = ""
+      let mut tile_algn = ""
+      match @xml.find_child(bf_ch, "a:tile") {
+        Some(tile) => {
+          tile_tx = attr_int(tile, "tx")
+          tile_ty = attr_int(tile, "ty")
+          tile_sx = attr_int(tile, "sx")
+          tile_sy = attr_int(tile, "sy")
+          tile_flip = match @xml.get_attr(tile, "flip") {
+            Some(v) => v
+            None => ""
+          }
+          tile_algn = match @xml.get_attr(tile, "algn") {
+            Some(v) => v
+            None => ""
+          }
+        }
+        None => ()
+      }
+      { rid, stretch, src_l, src_t, src_r, src_b, tile_tx, tile_ty, tile_sx, tile_sy, tile_flip, tile_algn }
     }
   }
 }

@@ -110,11 +110,13 @@ fn parse_grad_fill_from_g(g_node : @xml.XmlNode) -> @ooxml.GradientFill {
   let fill_to_t = get_dai(g_node, "grad-ftt")
   let fill_to_r = get_dai(g_node, "grad-ftr")
   let fill_to_b = get_dai(g_node, "grad-ftb")
+  let tile_flip = get_da(g_node, "grad-tile-flip")
   { stops, angle, path_type, rot_with_shape,
     fill_to_l: if fill_to_l == 0 { -1 } else { fill_to_l },
     fill_to_t: if fill_to_t == 0 { -1 } else { fill_to_t },
     fill_to_r: if fill_to_r == 0 { -1 } else { fill_to_r },
     fill_to_b: if fill_to_b == 0 { -1 } else { fill_to_b },
+    tile_flip,
   }
 }
 
@@ -307,11 +309,18 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     @ooxml.BlipFill::none()
   } else {
     let blip_stretch = get_da(g_node, "blip-stretch") != "0"
+    let blip_tile_tx = get_dai(g_node, "blip-tile-tx")
+    let blip_tile_ty = get_dai(g_node, "blip-tile-ty")
+    let blip_tile_sx = get_dai(g_node, "blip-tile-sx")
+    let blip_tile_sy = get_dai(g_node, "blip-tile-sy")
+    let blip_tile_flip = get_da(g_node, "blip-tile-flip")
+    let blip_tile_algn = get_da(g_node, "blip-tile-algn")
     let blip_src_l = get_dai(g_node, "blip-src-l")
     let blip_src_t = get_dai(g_node, "blip-src-t")
     let blip_src_r = get_dai(g_node, "blip-src-r")
     let blip_src_b = get_dai(g_node, "blip-src-b")
-    { rid: blip_rid, stretch: blip_stretch, src_l: blip_src_l, src_t: blip_src_t, src_r: blip_src_r, src_b: blip_src_b }
+    { rid: blip_rid, stretch: blip_stretch, src_l: blip_src_l, src_t: blip_src_t, src_r: blip_src_r, src_b: blip_src_b,
+      tile_tx: blip_tile_tx, tile_ty: blip_tile_ty, tile_sx: blip_tile_sx, tile_sy: blip_tile_sy, tile_flip: blip_tile_flip, tile_algn: blip_tile_algn }
   }
   // PatternFill from data attributes
   let patt_prst = get_da(g_node, "patt-prst")
