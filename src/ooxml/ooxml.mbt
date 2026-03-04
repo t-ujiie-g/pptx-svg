@@ -34,30 +34,35 @@ pub(all) struct Color {
   r : Int
   g : Int
   b : Int
+  alpha : Int  // 0-255, 255 = fully opaque
 }
 
 pub fn Color::white() -> Color {
-  { r: 255, g: 255, b: 255 }
+  { r: 255, g: 255, b: 255, alpha: 255 }
 }
 
 pub fn Color::black() -> Color {
-  { r: 0, g: 0, b: 0 }
+  { r: 0, g: 0, b: 0, alpha: 255 }
 }
 
 pub fn Color::none() -> Color {
-  { r: -1, g: -1, b: -1 }
+  { r: -1, g: -1, b: -1, alpha: 255 }
 }
 
 pub fn Color::is_none(self : Color) -> Bool {
   self.r < 0
 }
 
-///| Parse a 6-char hex color string "RRGGBB" → Color.
+///| Parse a 6-char "RRGGBB" or 8-char "AARRGGBB" hex color string → Color.
 pub fn parse_hex_color(s : String) -> Color {
-  if s.length() < 6 {
-    return Color::black()
+  if s.length() >= 8 {
+    let a = parse_hex2(s, 0)
+    { r: parse_hex2(s, 2), g: parse_hex2(s, 4), b: parse_hex2(s, 6), alpha: a }
+  } else if s.length() >= 6 {
+    { r: parse_hex2(s, 0), g: parse_hex2(s, 2), b: parse_hex2(s, 4), alpha: 255 }
+  } else {
+    Color::black()
   }
-  { r: parse_hex2(s, 0), g: parse_hex2(s, 2), b: parse_hex2(s, 4) }
 }
 
 // ASCII code points for hex digit parsing
@@ -89,13 +94,26 @@ fn parse_hex2(s : String, offset : Int) -> Int {
 pub fn Color::to_css(self : Color) -> String {
   if self.is_none() {
     "none"
+  } else if self.alpha < 255 {
+    "rgba(" + int_to_str(self.r) + "," + int_to_str(self.g) + "," + int_to_str(self.b) + "," + alpha_to_css_str(self.alpha) + ")"
   } else {
     "rgb(" + int_to_str(self.r) + "," + int_to_str(self.g) + "," + int_to_str(self.b) + ")"
   }
 }
 
-///| Convert Color to 6-char hex string "RRGGBB" for data attributes.
+///| Convert Color to hex string: 6-char "RRGGBB" if alpha==255, else 8-char "AARRGGBB".
 pub fn Color::to_hex(self : Color) -> String {
+  if self.is_none() {
+    "none"
+  } else if self.alpha < 255 {
+    hex_byte(self.alpha) + hex_byte(self.r) + hex_byte(self.g) + hex_byte(self.b)
+  } else {
+    hex_byte(self.r) + hex_byte(self.g) + hex_byte(self.b)
+  }
+}
+
+///| Convert Color to 6-char "RRGGBB" (always, ignoring alpha). For OOXML val attributes.
+pub fn Color::to_hex_rgb(self : Color) -> String {
   if self.is_none() {
     "none"
   } else {
@@ -105,6 +123,18 @@ pub fn Color::to_hex(self : Color) -> String {
 
 fn hex_byte(v : Int) -> String {
   hex_nibble(v / 16) + hex_nibble(v % 16)
+}
+
+///| Convert alpha (0-255) to CSS opacity string: "0", "0.XX", or "1".
+pub fn alpha_to_css_str(alpha : Int) -> String {
+  let a100 = alpha * 100 / 255
+  if a100 <= 0 {
+    "0"
+  } else if a100 >= 100 {
+    "1"
+  } else {
+    "0." + (if a100 < 10 { "0" + int_to_str(a100) } else { int_to_str(a100) })
+  }
 }
 
 fn hex_nibble(n : Int) -> String {
@@ -142,6 +172,41 @@ pub fn GradientFill::is_none(self : GradientFill) -> Bool {
   self.stops.length() == 0
 }
 
+// ── Blip (image) fill ───────────────────────────────────────────────────
+
+pub(all) struct BlipFill {
+  rid     : String  // r:embed relationship ID; "" = none
+  stretch : Bool    // true = stretch fill, false = tile (not yet implemented)
+  src_l   : Int     // a:srcRect crop left (0-100000 千分率); 0 = no crop
+  src_t   : Int     // crop top
+  src_r   : Int     // crop right
+  src_b   : Int     // crop bottom
+}
+
+pub fn BlipFill::none() -> BlipFill {
+  { rid: "", stretch: true, src_l: 0, src_t: 0, src_r: 0, src_b: 0 }
+}
+
+pub fn BlipFill::is_none(self : BlipFill) -> Bool {
+  self.rid.is_empty()
+}
+
+// ── Pattern fill ────────────────────────────────────────────────────────
+
+pub(all) struct PatternFill {
+  prst     : String  // preset pattern name; "" = none
+  fg_color : Color
+  bg_color : Color
+}
+
+pub fn PatternFill::none() -> PatternFill {
+  { prst: "", fg_color: Color::none(), bg_color: Color::none() }
+}
+
+pub fn PatternFill::is_none(self : PatternFill) -> Bool {
+  self.prst.is_empty()
+}
+
 // ── Theme data ───────────────────────────────────────────────────────────────
 
 pub(all) struct ThemeData {
@@ -167,16 +232,16 @@ pub fn ThemeData::default() -> ThemeData {
   {
     dk1: Color::black(),
     lt1: Color::white(),
-    dk2: { r: 68, g: 84, b: 106 },
-    lt2: { r: 231, g: 230, b: 230 },
-    accent1: { r: 68, g: 114, b: 196 },
-    accent2: { r: 237, g: 125, b: 49 },
-    accent3: { r: 165, g: 165, b: 165 },
-    accent4: { r: 255, g: 192, b: 0 },
-    accent5: { r: 91, g: 155, b: 213 },
-    accent6: { r: 112, g: 173, b: 71 },
-    hlink: { r: 5, g: 99, b: 193 },
-    fol_hlink: { r: 149, g: 79, b: 163 },
+    dk2: { r: 68, g: 84, b: 106, alpha: 255 },
+    lt2: { r: 231, g: 230, b: 230, alpha: 255 },
+    accent1: { r: 68, g: 114, b: 196, alpha: 255 },
+    accent2: { r: 237, g: 125, b: 49, alpha: 255 },
+    accent3: { r: 165, g: 165, b: 165, alpha: 255 },
+    accent4: { r: 255, g: 192, b: 0, alpha: 255 },
+    accent5: { r: 91, g: 155, b: 213, alpha: 255 },
+    accent6: { r: 112, g: 173, b: 71, alpha: 255 },
+    hlink: { r: 5, g: 99, b: 193, alpha: 255 },
+    fol_hlink: { r: 149, g: 79, b: 163, alpha: 255 },
     major_font: "Calibri Light",
     minor_font: "Calibri",
     major_ea_font: "",
@@ -288,7 +353,7 @@ fn hue_to_rgb(p : Int, q : Int, t_in : Int) -> Int {
 fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
   if s == 0 {
     let v = l * rgb_max / hsl_scale
-    return { r: v, g: v, b: v }
+    return { r: v, g: v, b: v, alpha: 255 }
   }
   let q = if l < hsl_half {
     l * (hsl_scale + s) / hsl_scale
@@ -302,7 +367,7 @@ fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
   let clamp = fn(v : Int) -> Int {
     if v < 0 { 0 } else if v > rgb_max { rgb_max } else { v }
   }
-  { r: clamp(r), g: clamp(g), b: clamp(b) }
+  { r: clamp(r), g: clamp(g), b: clamp(b), alpha: 255 }
 }
 
 // ── Color modifiers ─────────────────────────────────────────────────────────
@@ -320,6 +385,7 @@ pub fn apply_color_modifiers(
   let mut r = color.r
   let mut g = color.g
   let mut b = color.b
+  let mut alpha_val = color.alpha
   let mut lum_mod = -1
   let mut lum_off = 0
   let mut i = 0
@@ -351,8 +417,11 @@ pub fn apply_color_modifiers(
           g = c2.g
           b = c2.b
         } else if tag == "a:alpha" {
-          // alpha does not affect RGB, skip
-          ()
+          // alpha: val is in 1/1000th percent (0-100000)
+          alpha_val = val * 255 / pct_100
+        } else if tag == "a:alphaModFix" {
+          // Fixed alpha modulation
+          alpha_val = alpha_val * val / pct_100
         }
       }
       _ => ()
@@ -374,7 +443,8 @@ pub fn apply_color_modifiers(
   if r < 0 { r = 0 } else if r > rgb_max { r = rgb_max }
   if g < 0 { g = 0 } else if g > rgb_max { g = rgb_max }
   if b < 0 { b = 0 } else if b > rgb_max { b = rgb_max }
-  { r, g, b }
+  if alpha_val < 0 { alpha_val = 0 } else if alpha_val > 255 { alpha_val = 255 }
+  { r, g, b, alpha: alpha_val }
 }
 
 // ── Theme parser ────────────────────────────────────────────────────────────
@@ -835,7 +905,7 @@ pub(all) enum ShapeGeom {
   Other(String)
 }
 
-fn parse_geom(prst : String) -> ShapeGeom {
+pub fn parse_geom(prst : String) -> ShapeGeom {
   if prst == "rect" || prst == "snip1Rect" || prst == "snip2SameRect" {
     ShapeGeom::Rect
   } else if prst == "ellipse" || prst == "oval" {
@@ -889,6 +959,8 @@ pub(all) struct Shape {
   transform   : ShapeTransform
   fill        : Color          // Color::none() = no fill
   grad_fill   : GradientFill   // GradientFill::none() = no gradient
+  blip_fill   : BlipFill       // BlipFill::none() = no image fill
+  patt_fill   : PatternFill    // PatternFill::none() = no pattern fill
   stroke      : Color          // Color::none() = no stroke
   stroke_w    : Int            // stroke width in EMU (0 = default ~12700)
   paragraphs  : Array[TextParagraph]
@@ -1371,6 +1443,71 @@ fn parse_text_body(txbody : @xml.XmlNode, theme : ThemeData) -> (Array[TextParag
   (paras, body_props)
 }
 
+// ── Blip fill parser ──────────────────────────────────────────────────────────
+
+///| Parse a:blipFill from spPr children → BlipFill.
+fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
+  match @xml.find_child(nodes, "a:blipFill") {
+    None => BlipFill::none()
+    Some(bf_node) => {
+      let bf_ch = @xml.get_children(bf_node)
+      let rid = match @xml.find_child(bf_ch, "a:blip") {
+        None => ""
+        Some(blip) =>
+          match @xml.get_attr(blip, "r:embed") {
+            Some(v) => v
+            None => ""
+          }
+      }
+      if rid.is_empty() { return BlipFill::none() }
+      let stretch = match @xml.find_child(bf_ch, "a:stretch") {
+        Some(_) => true
+        None => false
+      }
+      let mut src_l = 0
+      let mut src_t = 0
+      let mut src_r = 0
+      let mut src_b = 0
+      match @xml.find_child(bf_ch, "a:srcRect") {
+        Some(sr) => {
+          src_l = attr_int(sr, "l")
+          src_t = attr_int(sr, "t")
+          src_r = attr_int(sr, "r")
+          src_b = attr_int(sr, "b")
+        }
+        None => ()
+      }
+      { rid, stretch, src_l, src_t, src_r, src_b }
+    }
+  }
+}
+
+// ── Pattern fill parser ──────────────────────────────────────────────────────
+
+///| Parse a:pattFill from spPr children → PatternFill.
+fn parse_pattern_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> PatternFill {
+  match @xml.find_child(nodes, "a:pattFill") {
+    None => PatternFill::none()
+    Some(pf_node) => {
+      let prst = match @xml.get_attr(pf_node, "prst") {
+        Some(v) => v
+        None => ""
+      }
+      if prst.is_empty() { return PatternFill::none() }
+      let pf_ch = @xml.get_children(pf_node)
+      let fg_color = match @xml.find_child(pf_ch, "a:fgClr") {
+        None => Color::black()
+        Some(fg) => parse_color_from_children(@xml.get_children(fg), theme)
+      }
+      let bg_color = match @xml.find_child(pf_ch, "a:bgClr") {
+        None => Color::white()
+        Some(bg) => parse_color_from_children(@xml.get_children(bg), theme)
+      }
+      { prst, fg_color, bg_color }
+    }
+  }
+}
+
 // ── Shape parsers ─────────────────────────────────────────────────────────────
 
 fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
@@ -1422,6 +1559,10 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   let grad_fill = parse_gradient_fill(sppr_ch, theme)
   let (stroke, stroke_w) = parse_stroke(sppr_ch, theme)
+  // Blip fill on AutoShape (a:blipFill inside p:spPr)
+  let blip_fill = parse_blip_fill(sppr_ch)
+  // Pattern fill
+  let patt_fill = parse_pattern_fill(sppr_ch, theme)
   // Text
   let (paras, body_props) = match @xml.find_child(ch, "p:txBody") {
     None => ([], BodyProps::default())
@@ -1432,6 +1573,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     transform,
     fill,
     grad_fill,
+    blip_fill,
+    patt_fill,
     stroke,
     stroke_w,
     paragraphs: paras,
@@ -1466,6 +1609,8 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     transform,
     fill: Color::none(),
     grad_fill: GradientFill::none(),
+    blip_fill: BlipFill::none(),
+    patt_fill: PatternFill::none(),
     stroke: Color::none(),
     stroke_w: 0,
     paragraphs: [],
@@ -1561,6 +1706,8 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         transform,
         fill: Color::none(),
         grad_fill: GradientFill::none(),
+        blip_fill: BlipFill::none(),
+        patt_fill: PatternFill::none(),
         stroke: Color::none(),
         stroke_w: 0,
         paragraphs: [],
@@ -1578,6 +1725,8 @@ fn empty_shape() -> Shape {
     transform: ShapeTransform::default(),
     fill: Color::none(),
     grad_fill: GradientFill::none(),
+    blip_fill: BlipFill::none(),
+    patt_fill: PatternFill::none(),
     stroke: Color::none(),
     stroke_w: 0,
     paragraphs: [],

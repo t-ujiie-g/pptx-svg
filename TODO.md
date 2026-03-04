@@ -26,6 +26,9 @@
 - [x] `a:lstStyle` シェイプ固有リストスタイル継承
 - [x] テキスト完全対応 (タブ / RTL / 画像バレット / kern / cs・sym フォント / 縦書き / 回転 / ハイパーリンク / ホバーリンク / リンク色 / テキストカラム)
 - [x] グラデーション塗りつぶし (`a:gradFill` — リニア / パス型 / ストップ色解決 + round-trip)
+- [x] 透過 / アルファ (`a:alpha` / `a:alphaModFix` → `fill-opacity` / `stop-opacity` + round-trip)
+- [x] 画像フィル (`a:blipFill` in shapes — ストレッチ / クロッピング + round-trip)
+- [x] パターンフィル (`a:pattFill` — 主要12種 SVG `<pattern>` + round-trip)
 
 ---
 
@@ -105,20 +108,22 @@
 - [ ] タイルフリップ (`tileFlip`)
 
 ### 3.2 パターンフィル (`a:pattFill`)
-- [ ] 48 種のプリセットパターン (`prst="pct5/pct10/ltDnDiag/..."`)
-- [ ] 前景色 / 背景色
-- [ ] SVG `<pattern>` へマッピング
+- [x] 主要12種のプリセットパターン (`prst="pct5/pct10/ltDnDiag/..."`) — SVG `<pattern>` レンダリング
+- [x] 前景色 / 背景色
+- [x] SVG `<pattern>` へマッピング + round-trip
+- [ ] 残り36種のプリセットパターン (現在は fg_color ソリッドフォールバック)
 
 ### 3.3 画像フィル (`a:blipFill` in shapes)
-- [ ] ストレッチ (`a:stretch` + `a:fillRect`)
+- [x] ストレッチ (`a:stretch` + `a:fillRect`)
 - [ ] タイル (`a:tile tx/ty/sx/sy/flip/algn`)
-- [ ] ソースRect (`a:srcRect l/t/r/b`) — クロッピング
+- [x] ソースRect (`a:srcRect l/t/r/b`) — クロッピング
+- [x] round-trip (data-ooxml-blip-* 属性)
 
 ### 3.4 透過 / アルファ
-- [ ] Color に alpha フィールド追加
-- [ ] `a:alpha val` → SVG `opacity` / `fill-opacity`
-- [ ] `a:alphaModFix amt` — 固定アルファ変更
-- [ ] グラデーションストップ個別アルファ
+- [x] Color に alpha フィールド追加 (0-255)
+- [x] `a:alpha val` → SVG `fill-opacity` / `stop-opacity`
+- [x] `a:alphaModFix amt` — 固定アルファ変更
+- [x] グラデーションストップ個別アルファ
 
 ---
 

@@ -48,11 +48,23 @@ fn xml_escape(s : String) -> String {
 
 // ── Color serialization ─────────────────────────────────────────────────────
 
+///| Serialize inner color element (a:srgbClr with optional a:alpha child).
+///  No solidFill wrapper — used for gradient stops, pattFill fg/bg, etc.
+fn serialize_color_inner(color : @ooxml.Color) -> String {
+  if color.alpha < 255 {
+    // alpha → OOXML 1/1000th percent: alpha * 100000 / 255
+    let alpha_val = color.alpha * 100000 / 255
+    "<a:srgbClr val=\"" + color.to_hex_rgb() + "\"><a:alpha val=\"" + int_to_str(alpha_val) + "\"/></a:srgbClr>"
+  } else {
+    "<a:srgbClr val=\"" + color.to_hex_rgb() + "\"/>"
+  }
+}
+
 fn serialize_color(color : @ooxml.Color) -> String {
   if color.is_none() {
     "<a:noFill/>"
   } else {
-    "<a:solidFill><a:srgbClr val=\"" + color.to_hex() + "\"/></a:solidFill>"
+    "<a:solidFill>" + serialize_color_inner(color) + "</a:solidFill>"
   }
 }
 
@@ -67,7 +79,7 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   let mut si = 0
   while si < ns {
     let stop = gf.stops[si]
-    out = out + "<a:gs pos=\"" + int_to_str(stop.pos) + "\"><a:srgbClr val=\"" + stop.color.to_hex() + "\"/></a:gs>"
+    out = out + "<a:gs pos=\"" + int_to_str(stop.pos) + "\">" + serialize_color_inner(stop.color) + "</a:gs>"
     si = si + 1
   }
   out = out + "</a:gsLst>"
@@ -89,6 +101,34 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
     out = out + "</a:path>"
   }
   out + "</a:gradFill>"
+}
+
+// ── Blip fill serialization ──────────────────────────────────────────────────
+
+fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
+  let mut out = "<a:blipFill>"
+  out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
+  if bf.src_l > 0 || bf.src_t > 0 || bf.src_r > 0 || bf.src_b > 0 {
+    out = out + "<a:srcRect"
+    if bf.src_l > 0 { out = out + " l=\"" + int_to_str(bf.src_l) + "\"" }
+    if bf.src_t > 0 { out = out + " t=\"" + int_to_str(bf.src_t) + "\"" }
+    if bf.src_r > 0 { out = out + " r=\"" + int_to_str(bf.src_r) + "\"" }
+    if bf.src_b > 0 { out = out + " b=\"" + int_to_str(bf.src_b) + "\"" }
+    out = out + "/>"
+  }
+  if bf.stretch {
+    out = out + "<a:stretch><a:fillRect/></a:stretch>"
+  }
+  out + "</a:blipFill>"
+}
+
+// ── Pattern fill serialization ──────────────────────────────────────────────
+
+fn serialize_pattern_fill(pf : @ooxml.PatternFill) -> String {
+  let mut out = "<a:pattFill prst=\"" + pf.prst + "\">"
+  out = out + "<a:fgClr>" + serialize_color_inner(pf.fg_color) + "</a:fgClr>"
+  out = out + "<a:bgClr>" + serialize_color_inner(pf.bg_color) + "</a:bgClr>"
+  out + "</a:pattFill>"
 }
 
 // ── Text body serialization ──────────────────────────────────────────────────
@@ -229,7 +269,7 @@ fn serialize_text_body_inner(
           ppr = ppr + "<a:buSzPts val=\"" + int_to_str(-(para.bullet_size)) + "\"/>"
         }
         if not(para.bullet_color.is_none()) {
-          ppr = ppr + "<a:buClr><a:srgbClr val=\"" + para.bullet_color.to_hex() + "\"/></a:buClr>"
+          ppr = ppr + "<a:buClr>" + serialize_color_inner(para.bullet_color) + "</a:buClr>"
         }
         if para.bullet_none {
           ppr = ppr + "<a:buNone/>"
@@ -388,8 +428,12 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out = out + "<p:spPr>"
   out = out + serialize_transform(shape.transform)
   out = out + "<a:prstGeom prst=\"" + geom.to_prst() + "\"><a:avLst/></a:prstGeom>"
-  // Fill
-  if not(shape.grad_fill.is_none()) {
+  // Fill (priority: blipFill > pattFill > gradFill > solidFill)
+  if not(shape.blip_fill.is_none()) {
+    out = out + serialize_blip_fill(shape.blip_fill)
+  } else if not(shape.patt_fill.is_none()) {
+    out = out + serialize_pattern_fill(shape.patt_fill)
+  } else if not(shape.grad_fill.is_none()) {
     out = out + serialize_gradient_fill(shape.grad_fill)
   } else if shape.fill.is_none() {
     out = out + "<a:noFill/>"

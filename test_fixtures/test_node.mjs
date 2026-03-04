@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 25', slideCount === 25, `got ${slideCount}`);
+  assert('slide count = 28', slideCount === 28, `got ${slideCount}`);
 
-  // Verify all 25 slides exist
-  for (let i = 1; i <= 25; i++) {
+  // Verify all 28 slides exist
+  for (let i = 1; i <= 28; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 25; i++) {
+  for (let i = 1; i <= 28; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -627,6 +627,49 @@ async function testFeaturesPptx() {
     assert('slide25 bg has 66C0F4 (light)', slide25.includes('66C0F4'));
     assert('slide25 bg has ang="5400000" (90°)', slide25.includes('ang="5400000"'));
     assert('slide25 has Gradient Background text', slide25.includes('Gradient Background'));
+  }
+
+  // ── Slide 26: Alpha/transparency ──
+  {
+    section('test_features.pptx — Slide 26: alpha/transparency');
+    const slide26 = textFiles.get('ppt/slides/slide26.xml');
+    assert('slide26 exists', !!slide26);
+    assert('slide26 has a:alpha', hasTag(slide26, 'a:alpha'));
+    assert('slide26 has alpha val="50000"', slide26.includes('val="50000"'));
+    assert('slide26 has FF0000 (red)', slide26.includes('FF0000'));
+    // Gradient with alpha
+    assert('slide26 has a:gradFill', hasTag(slide26, 'a:gradFill'));
+    assert('slide26 has alpha val="80000"', slide26.includes('val="80000"'));
+    assert('slide26 has alpha val="20000"', slide26.includes('val="20000"'));
+    assert('slide26 has Alpha 50% text', slide26.includes('Alpha 50%'));
+  }
+
+  // ── Slide 27: Image fill on AutoShape ──
+  {
+    section('test_features.pptx — Slide 27: image fill (blipFill)');
+    const slide27 = textFiles.get('ppt/slides/slide27.xml');
+    assert('slide27 exists', !!slide27);
+    // blipFill should be inside p:spPr
+    assert('slide27 has a:blipFill', hasTag(slide27, 'a:blipFill'));
+    assert('slide27 has a:blip', hasTag(slide27, 'a:blip'));
+    assert('slide27 has r:embed on blip', slide27.includes('r:embed='));
+    assert('slide27 has a:stretch', hasTag(slide27, 'a:stretch'));
+  }
+
+  // ── Slide 28: Pattern fill ──
+  {
+    section('test_features.pptx — Slide 28: pattern fill');
+    const slide28 = textFiles.get('ppt/slides/slide28.xml');
+    assert('slide28 exists', !!slide28);
+    assert('slide28 has a:pattFill', hasTag(slide28, 'a:pattFill'));
+    assert('slide28 has prst="ltDnDiag"', slide28.includes('prst="ltDnDiag"'));
+    assert('slide28 has prst="smCheck"', slide28.includes('prst="smCheck"'));
+    assert('slide28 has prst="dkHorz"', slide28.includes('prst="dkHorz"'));
+    assert('slide28 has a:fgClr', hasTag(slide28, 'a:fgClr'));
+    assert('slide28 has a:bgClr', hasTag(slide28, 'a:bgClr'));
+    // Pattern colors
+    assert('slide28 has 003366 (navy fg)', slide28.includes('003366'));
+    assert('slide28 has CCCCCC (gray bg)', slide28.includes('CCCCCC'));
   }
 }
 

@@ -301,21 +301,34 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let ph_type = get_da(g_node, "ph-type")
   let ph_idx = get_dai(g_node, "ph-idx")
   let grad_fill = parse_grad_fill_from_g(g_node)
-  { kind, transform, fill, grad_fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
+  // BlipFill from data attributes
+  let blip_rid = get_da(g_node, "blip-rid")
+  let blip_fill : @ooxml.BlipFill = if blip_rid.is_empty() {
+    @ooxml.BlipFill::none()
+  } else {
+    let blip_stretch = get_da(g_node, "blip-stretch") != "0"
+    let blip_src_l = get_dai(g_node, "blip-src-l")
+    let blip_src_t = get_dai(g_node, "blip-src-t")
+    let blip_src_r = get_dai(g_node, "blip-src-r")
+    let blip_src_b = get_dai(g_node, "blip-src-b")
+    { rid: blip_rid, stretch: blip_stretch, src_l: blip_src_l, src_t: blip_src_t, src_r: blip_src_r, src_b: blip_src_b }
+  }
+  // PatternFill from data attributes
+  let patt_prst = get_da(g_node, "patt-prst")
+  let patt_fill : @ooxml.PatternFill = if patt_prst.is_empty() {
+    @ooxml.PatternFill::none()
+  } else {
+    let patt_fg_hex = get_da(g_node, "patt-fg")
+    let patt_bg_hex = get_da(g_node, "patt-bg")
+    let fg = if patt_fg_hex.is_empty() { @ooxml.Color::black() } else { parse_hex_color(patt_fg_hex) }
+    let bg = if patt_bg_hex.is_empty() { @ooxml.Color::white() } else { parse_hex_color(patt_bg_hex) }
+    { prst: patt_prst, fg_color: fg, bg_color: bg }
+  }
+  { kind, transform, fill, grad_fill, blip_fill, patt_fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
 }
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {
-  if prst == "rect" {
-    @ooxml.ShapeGeom::Rect
-  } else if prst == "ellipse" {
-    @ooxml.ShapeGeom::Ellipse
-  } else if prst == "roundRect" {
-    @ooxml.ShapeGeom::RoundRect
-  } else if prst == "line" {
-    @ooxml.ShapeGeom::Line
-  } else {
-    @ooxml.ShapeGeom::Other(prst)
-  }
+  @ooxml.parse_geom(prst)
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

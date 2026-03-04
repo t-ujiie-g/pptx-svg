@@ -43,6 +43,11 @@ fn grad_id(slide_num : Int, shape_idx : Int) -> String {
   }
 }
 
+///| Build a pattern definition ID.
+fn patt_id(slide_num : Int, shape_idx : Int) -> String {
+  "patt-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+}
+
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
@@ -1046,14 +1051,40 @@ fn render_shape(
       dai("grad-ftt", shape.grad_fill.fill_to_t) +
       dai("grad-ftr", shape.grad_fill.fill_to_r) +
       dai("grad-ftb", shape.grad_fill.fill_to_b)
+    } else { "" }) +
+    // Blip fill attributes
+    (if not(shape.blip_fill.is_none()) {
+      da("blip-rid", shape.blip_fill.rid) +
+      da("blip-stretch", if shape.blip_fill.stretch { "1" } else { "0" }) +
+      dai("blip-src-l", shape.blip_fill.src_l) +
+      dai("blip-src-t", shape.blip_fill.src_t) +
+      dai("blip-src-r", shape.blip_fill.src_r) +
+      dai("blip-src-b", shape.blip_fill.src_b)
+    } else { "" }) +
+    // Pattern fill attributes
+    (if not(shape.patt_fill.is_none()) {
+      da("patt-prst", shape.patt_fill.prst) +
+      da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
+      da("patt-bg", shape.patt_fill.bg_color.to_hex())
     } else { "" })
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
-      let fill = if not(shape.grad_fill.is_none()) {
+      let fill = if not(shape.blip_fill.is_none()) {
+        // BlipFill: image fill rendered as separate <image> below
+        a("fill", "none")
+      } else if not(shape.patt_fill.is_none()) {
+        " fill=\"url(#" + patt_id(slide_num, shape_idx) + ")\""
+      } else if not(shape.grad_fill.is_none()) {
         " fill=\"url(#" + grad_id(slide_num, shape_idx) + ")\""
       } else {
-        a("fill", shape.fill.to_css())
+        let fill_css = "rgb(" + int_to_str(shape.fill.r) + "," + int_to_str(shape.fill.g) + "," + int_to_str(shape.fill.b) + ")"
+        let fill_base = if shape.fill.is_none() { a("fill", "none") } else { a("fill", fill_css) }
+        if shape.fill.alpha < 255 && not(shape.fill.is_none()) {
+          fill_base + " fill-opacity=\"" + @ooxml.alpha_to_css_str(shape.fill.alpha) + "\""
+        } else {
+          fill_base
+        }
       }
       let stroke = if shape.stroke.is_none() {
         " stroke=\"none\""
@@ -1085,13 +1116,35 @@ fn render_shape(
           }
         }
       }
+      // BlipFill: render image inside shape
+      let blip_svg = if not(shape.blip_fill.is_none()) {
+        let bf = shape.blip_fill
+        let target = @ooxml.find_rel_target(rels, bf.rid)
+        if target.is_empty() {
+          ""
+        } else {
+          let img_path = resolve_image_path(target)
+          let b64 = @ffi.ffi_get_file_base64(img_path)
+          if b64.is_empty() {
+            ""
+          } else {
+            let mime = mime_from_ext(img_path)
+            "<image" + ai("x", x_p) + ai("y", y_p) + ai("width", cx_p) + ai("height", cy_p) +
+            " preserveAspectRatio=\"none\"" +
+            a("href", "data:" + mime + ";base64," + b64) +
+            rot + "/>"
+          }
+        }
+      } else {
+        ""
+      }
       // For autoFit, use adjusted cy for text rendering if shape was expanded
       let text_t : @ooxml.ShapeTransform = if shape.body_props.auto_fit && cy_p > px(t.cy, scale) {
         { x: t.x, y: t.y, cx: t.cx, cy: cy_p * scale, rot: t.rot, flip_h: t.flip_h, flip_v: t.flip_v }
       } else {
         t
       }
-      rect_svg + render_text(shape.paragraphs, text_t, scale, theme, shape.body_props, rels)
+      rect_svg + blip_svg + render_text(shape.paragraphs, text_t, scale, theme, shape.body_props, rels)
     }
     @ooxml.ShapeKind::Picture(rid) => {
       let target = @ooxml.find_rel_target(rels, rid)
@@ -1247,7 +1300,12 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     let stop = gf.stops[si]
     // pos is 0..100000 → percentage 0..100
     let pct = stop.pos / ooxml_stop_pct
-    stops_svg = stops_svg + "<stop offset=\"" + int_to_str(pct) + "%\" stop-color=\"" + stop.color.to_css() + "\"/>"
+    let stop_opacity = if stop.color.alpha < 255 {
+      " stop-opacity=\"" + @ooxml.alpha_to_css_str(stop.color.alpha) + "\""
+    } else { "" }
+    // Use rgb() for stop-color (ignoring alpha) and separate stop-opacity
+    let stop_css = "rgb(" + int_to_str(stop.color.r) + "," + int_to_str(stop.color.g) + "," + int_to_str(stop.color.b) + ")"
+    stops_svg = stops_svg + "<stop offset=\"" + int_to_str(pct) + "%\" stop-color=\"" + stop_css + "\"" + stop_opacity + "/>"
     si = si + 1
   }
   if gf.angle >= 0 && gf.path_type.is_empty() {
@@ -1283,6 +1341,49 @@ fn grad_stops_attr(gf : @ooxml.GradientFill) -> String {
     si = si + 1
   }
   out
+}
+
+// ── Pattern fill rendering ────────────────────────────────────────────────────
+
+///| Generate SVG content for a pattern preset. Returns SVG shapes to place inside <pattern>.
+fn patt_svg_content(prst : String, fg : String, bg : String, sz : Int) -> String {
+  // Background rect
+  let bg_rect = "<rect width=\"" + int_to_str(sz) + "\" height=\"" + int_to_str(sz) + "\" fill=\"" + bg + "\"/>"
+  if prst == "pct5" || prst == "pct10" || prst == "pct20" || prst == "pct25" {
+    let r = if prst == "pct5" { 1 } else if prst == "pct10" { 1 } else { 2 }
+    bg_rect + "<circle cx=\"" + int_to_str(sz / 2) + "\" cy=\"" + int_to_str(sz / 2) + "\" r=\"" + int_to_str(r) + "\" fill=\"" + fg + "\"/>"
+  } else if prst == "ltDnDiag" || prst == "dkDnDiag" {
+    let sw = if prst == "ltDnDiag" { "1" } else { "2" }
+    bg_rect + "<line x1=\"0\" y1=\"0\" x2=\"" + int_to_str(sz) + "\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+  } else if prst == "ltUpDiag" || prst == "dkUpDiag" {
+    let sw = if prst == "ltUpDiag" { "1" } else { "2" }
+    bg_rect + "<line x1=\"" + int_to_str(sz) + "\" y1=\"0\" x2=\"0\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+  } else if prst == "ltHorz" || prst == "dkHorz" {
+    let sw = if prst == "ltHorz" { "1" } else { "2" }
+    bg_rect + "<line x1=\"0\" y1=\"" + int_to_str(sz / 2) + "\" x2=\"" + int_to_str(sz) + "\" y2=\"" + int_to_str(sz / 2) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+  } else if prst == "ltVert" || prst == "dkVert" {
+    let sw = if prst == "ltVert" { "1" } else { "2" }
+    bg_rect + "<line x1=\"" + int_to_str(sz / 2) + "\" y1=\"0\" x2=\"" + int_to_str(sz / 2) + "\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"" + sw + "\"/>"
+  } else if prst == "smCheck" {
+    let half = sz / 2
+    bg_rect + "<rect x=\"0\" y=\"0\" width=\"" + int_to_str(half) + "\" height=\"" + int_to_str(half) + "\" fill=\"" + fg + "\"/>" +
+    "<rect x=\"" + int_to_str(half) + "\" y=\"" + int_to_str(half) + "\" width=\"" + int_to_str(half) + "\" height=\"" + int_to_str(half) + "\" fill=\"" + fg + "\"/>"
+  } else if prst == "smGrid" {
+    bg_rect + "<line x1=\"" + int_to_str(sz / 2) + "\" y1=\"0\" x2=\"" + int_to_str(sz / 2) + "\" y2=\"" + int_to_str(sz) + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>" +
+    "<line x1=\"0\" y1=\"" + int_to_str(sz / 2) + "\" x2=\"" + int_to_str(sz) + "\" y2=\"" + int_to_str(sz / 2) + "\" stroke=\"" + fg + "\" stroke-width=\"1\"/>"
+  } else {
+    // Fallback: solid foreground color
+    "<rect width=\"" + int_to_str(sz) + "\" height=\"" + int_to_str(sz) + "\" fill=\"" + fg + "\"/>"
+  }
+}
+
+///| Render a SVG <pattern> definition for a PatternFill.
+fn render_pattern_def(pf : @ooxml.PatternFill, id : String) -> String {
+  let sz = 8
+  let fg = pf.fg_color.to_css()
+  let bg = pf.bg_color.to_css()
+  let content = patt_svg_content(pf.prst, fg, bg, sz)
+  "<pattern id=\"" + id + "\" patternUnits=\"userSpaceOnUse\" width=\"" + int_to_str(sz) + "\" height=\"" + int_to_str(sz) + "\">" + content + "</pattern>"
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -1334,6 +1435,14 @@ pub fn render_slide_svg(
       defs = defs + render_gradient_def(bg_shapes[bdi].grad_fill, grad_id(slide_num, -(bdi + 1)))
     }
     bdi = bdi + 1
+  }
+  // Pattern fill defs
+  let mut pi = 0
+  while pi < n {
+    if not(slide.shapes[pi].patt_fill.is_none()) {
+      defs = defs + render_pattern_def(slide.shapes[pi].patt_fill, patt_id(slide_num, pi))
+    }
+    pi = pi + 1
   }
   let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
 

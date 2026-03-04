@@ -28,6 +28,9 @@ Slides:
  23. Linear gradient fills (a:gradFill + a:lin at 0°/90°/45°)
  24. Radial/path gradient fills (a:path circle/rect) + gradient on ellipse
  25. Gradient background (p:bg → p:bgPr → a:gradFill)
+ 26. Alpha/transparency (semi-transparent solid fill, semi-transparent gradient stop)
+ 27. Image fill on AutoShape (a:blipFill inside p:spPr)
+ 28. Pattern fill (a:pattFill — ltDnDiag / smCheck / dkHorz)
 """
 
 from pptx import Presentation
@@ -1786,6 +1789,117 @@ s25a.text = "Gradient Background"
 s25a.text_frame.paragraphs[0].font.size = Pt(36)
 s25a.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 s25a.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+# ── Slide 26: Alpha/transparency ─────────────────────────────────────────────
+
+slide26 = prs.slides.add_slide(blank)
+
+def set_fill_xml(shape, fill_xml_str):
+    """Replace any existing fill with custom fill XML in the shape's spPr."""
+    ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+    ns_p = '{http://schemas.openxmlformats.org/presentationml/2006/main}'
+    spPr = shape._element.find(f'{ns_p}spPr')
+    if spPr is None:
+        spPr = shape._element.find(f'.//{ns_a}spPr')
+    if spPr is None:
+        return
+    for tag in ('solidFill', 'noFill', 'gradFill', 'blipFill', 'pattFill'):
+        for el in spPr.findall(f'{ns_a}{tag}'):
+            spPr.remove(el)
+    prstGeom = spPr.find(f'{ns_a}prstGeom')
+    fill_el = etree.fromstring(fill_xml_str)
+    if prstGeom is not None:
+        prstGeom.addnext(fill_el)
+    else:
+        spPr.append(fill_el)
+
+# Shape 1: Semi-transparent red solid fill (alpha 50%)
+s26a = slide26.shapes.add_shape(1, Inches(0.5), Inches(0.5), Inches(3), Inches(2))
+s26a.text = "Alpha 50%"
+s26a.text_frame.paragraphs[0].font.size = Pt(18)
+set_fill_xml(s26a, '''<a:solidFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <a:srgbClr val="FF0000"><a:alpha val="50000"/></a:srgbClr>
+</a:solidFill>''')
+
+# Shape 2: Semi-transparent gradient stop
+s26b = slide26.shapes.add_shape(1, Inches(4), Inches(0.5), Inches(3), Inches(2))
+s26b.text = "Alpha Gradient"
+s26b.text_frame.paragraphs[0].font.size = Pt(18)
+s26b.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+set_gradient_fill(s26b, '''<a:gradFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" rotWithShape="1">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="0000FF"><a:alpha val="80000"/></a:srgbClr></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="0000FF"><a:alpha val="20000"/></a:srgbClr></a:gs>
+  </a:gsLst>
+  <a:lin ang="0" scaled="1"/>
+</a:gradFill>''')
+
+# ── Slide 27: Image fill on AutoShape ────────────────────────────────────────
+
+slide27 = prs.slides.add_slide(blank)
+
+# We need to add an image relationship and then inject a:blipFill into p:spPr
+# First, add a simple shape
+s27a = slide27.shapes.add_shape(1, Inches(1), Inches(1), Inches(4), Inches(3))
+s27a.text = ""
+
+# Add image relationship (use slide's existing rels) — use a small 1px PNG
+import base64
+# Minimal 1x1 red PNG
+mini_png = base64.b64decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
+)
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+import os, tempfile
+
+# Write temp image
+tmp_img = os.path.join(tempfile.gettempdir(), '_test_blip.png')
+with open(tmp_img, 'wb') as f:
+    f.write(mini_png)
+
+# Add image as a relationship on the slide's part
+from pptx.opc.package import Part
+img_part, img_rid = slide27.part.get_or_add_image_part(tmp_img)
+
+# Inject a:blipFill into p:spPr
+set_fill_xml(s27a, f'''<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <a:blip r:embed="{img_rid}"/>
+  <a:stretch><a:fillRect/></a:stretch>
+</a:blipFill>''')
+
+os.unlink(tmp_img)
+
+# ── Slide 28: Pattern fill ───────────────────────────────────────────────────
+
+slide28 = prs.slides.add_slide(blank)
+
+# Shape 1: ltDnDiag pattern
+s28a = slide28.shapes.add_shape(1, Inches(0.5), Inches(0.5), Inches(2.5), Inches(2))
+s28a.text = "ltDnDiag"
+s28a.text_frame.paragraphs[0].font.size = Pt(14)
+set_fill_xml(s28a, '''<a:pattFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="ltDnDiag">
+  <a:fgClr><a:srgbClr val="000000"/></a:fgClr>
+  <a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>
+</a:pattFill>''')
+
+# Shape 2: smCheck pattern
+s28b = slide28.shapes.add_shape(1, Inches(3.5), Inches(0.5), Inches(2.5), Inches(2))
+s28b.text = "smCheck"
+s28b.text_frame.paragraphs[0].font.size = Pt(14)
+set_fill_xml(s28b, '''<a:pattFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="smCheck">
+  <a:fgClr><a:srgbClr val="FF0000"/></a:fgClr>
+  <a:bgClr><a:srgbClr val="FFFF00"/></a:bgClr>
+</a:pattFill>''')
+
+# Shape 3: dkHorz pattern
+s28c = slide28.shapes.add_shape(1, Inches(6.5), Inches(0.5), Inches(2.5), Inches(2))
+s28c.text = "dkHorz"
+s28c.text_frame.paragraphs[0].font.size = Pt(14)
+set_fill_xml(s28c, '''<a:pattFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" prst="dkHorz">
+  <a:fgClr><a:srgbClr val="003366"/></a:fgClr>
+  <a:bgClr><a:srgbClr val="CCCCCC"/></a:bgClr>
+</a:pattFill>''')
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'
