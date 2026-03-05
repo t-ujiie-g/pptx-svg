@@ -230,6 +230,18 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let fill_hex = get_da(g_node, "fill")
   let stroke_hex = get_da(g_node, "stroke")
   let stroke_w = get_dai(g_node, "stroke-w")
+  let stroke_dash = get_da(g_node, "stroke-dash")
+  let stroke_cap = get_da(g_node, "stroke-cap")
+  let stroke_join = get_da(g_node, "stroke-join")
+  let stroke_miter_limit = get_dai(g_node, "stroke-miter-lim")
+  let stroke_head_type = get_da(g_node, "stroke-head-type")
+  let stroke_head_w = get_da(g_node, "stroke-head-w")
+  let stroke_head_len = get_da(g_node, "stroke-head-len")
+  let stroke_tail_type = get_da(g_node, "stroke-tail-type")
+  let stroke_tail_w = get_da(g_node, "stroke-tail-w")
+  let stroke_tail_len = get_da(g_node, "stroke-tail-len")
+  let stroke_cmpd = get_da(g_node, "stroke-cmpd")
+  let stroke_no_fill = get_da(g_node, "stroke-no-fill") == "1"
 
   let fill = parse_hex_color(fill_hex)
   let stroke = parse_hex_color(stroke_hex)
@@ -333,7 +345,12 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     let bg = if patt_bg_hex.is_empty() { @ooxml.Color::white() } else { parse_hex_color(patt_bg_hex) }
     { prst: patt_prst, fg_color: fg, bg_color: bg }
   }
-  { kind, transform, fill, grad_fill, blip_fill, patt_fill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
+  { kind, transform, fill, grad_fill, blip_fill, patt_fill, stroke, stroke_w,
+    stroke_dash, stroke_cap, stroke_join, stroke_miter_limit,
+    stroke_head_type, stroke_head_w, stroke_head_len,
+    stroke_tail_type, stroke_tail_w, stroke_tail_len,
+    stroke_cmpd, stroke_no_fill,
+    paragraphs, body_props, ph_type, ph_idx }
 }
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {

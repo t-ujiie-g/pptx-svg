@@ -29,6 +29,8 @@
 - [x] 透過 / アルファ (`a:alpha` / `a:alphaModFix` → `fill-opacity` / `stop-opacity` + round-trip)
 - [x] 画像フィル (`a:blipFill` in shapes — ストレッチ / クロッピング + round-trip)
 - [x] パターンフィル (`a:pattFill` — 主要12種 SVG `<pattern>` + round-trip)
+- [x] 線 / ストローク完全対応 (破線11種 / 矢印5種 / 線結合 / 線端 / 複合線 / noFill + round-trip)
+- [x] Line ジオメトリ SVG `<line>` レンダリング
 
 ---
 
@@ -127,16 +129,17 @@
 
 ---
 
-## 4. 線 / ストローク — 完全対応 [P1]
+## 4. 線 / ストローク — 完全対応 [P1] ✅
 
-- [ ] 破線スタイル (`a:prstDash val="dash/dot/dashDot/lgDash/sysDot/..."`)
+- [x] 破線スタイル (`a:prstDash val="dash/dot/dashDot/lgDash/sysDot/..."` — 全11種)
 - [ ] カスタム破線 (`a:custDash`)
-- [ ] 矢印ヘッド (`a:headEnd type="triangle/stealth/diamond/oval/arrow" w/len`)
-- [ ] 矢印テイル (`a:tailEnd` — 同上)
-- [ ] 線結合 (`a:round` / `a:bevel` / `a:miter lim`)
-- [ ] 線端 (`a:ln cap="flat/rnd/sq"`)
-- [ ] 複合線 (`a:ln cmpd="sng/dbl/thickThin/thinThick/tri"`)
-- [ ] 線なし (`a:noFill` inside `a:ln`)
+- [x] 矢印ヘッド (`a:headEnd type="triangle/stealth/diamond/oval/arrow" w/len`)
+- [x] 矢印テイル (`a:tailEnd` — 同上)
+- [x] 線結合 (`a:round` / `a:bevel` / `a:miter lim`)
+- [x] 線端 (`a:ln cap="flat/rnd/sq"`)
+- [x] 複合線 (`a:ln cmpd="sng/dbl/thickThin/thinThick/tri"`) — データ保持 + round-trip
+- [x] 線なし (`a:noFill` inside `a:ln`)
+- [x] Line ジオメトリの `<line>` SVG レンダリング (矢印マーカー対応)
 
 ---
 
@@ -339,6 +342,6 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 | 優先度 | 内容 | 理由 |
 |--------|------|------|
 | **P0** | ~~1. マスター/レイアウト継承, 2. テキスト完全対応~~ ✅ 完了 | ほぼ全 PPTX で必要 |
-| **P1** | 3-6. 塗り/線/シェイプ/テーブル, 12. ライブラリ公開 | ビジネス文書の 90% をカバー |
+| **P1** | ~~3. 塗り, 4. 線~~ ✅ 完了 / 5. シェイプ, 6. テーブル, 12. ライブラリ公開 | ビジネス文書の 90% をカバー |
 | **P2** | 7-9. 画像高度/エフェクト/チャート | 完全互換に必要 |
 | **P3** | 10-11. SmartArt/OLE/メディア/数式 | 特殊ケース |

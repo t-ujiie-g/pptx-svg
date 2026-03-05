@@ -168,23 +168,77 @@ fn parse_xfrm(sppr_children : Array[@xml.XmlNode]) -> ShapeTransform {
 
 // ── Stroke parsing ────────────────────────────────────────────────────────────
 
-fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> (Color, Int) {
+fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> StrokeProps {
   match @xml.find_child(sppr_children, "a:ln") {
-    None => (Color::none(), 0)
+    None => StrokeProps::default()
     Some(ln) => {
       let w = attr_int(ln, "w")
+      let cap = match @xml.get_attr(ln, "cap") { Some(v) => v; None => "" }
+      let cmpd = match @xml.get_attr(ln, "cmpd") { Some(v) => v; None => "" }
       let ln_ch = @xml.get_children(ln)
-      match @xml.find_child(ln_ch, "a:noFill") {
-        Some(_) => (Color::none(), w)
-        None => {
-          let clr = parse_solid_fill(ln_ch, theme)
-          if clr.is_none() {
-            (Color::black(), w)
-          } else {
-            (clr, w)
-          }
+      let no_fill = match @xml.find_child(ln_ch, "a:noFill") {
+        Some(_) => true
+        None => false
+      }
+      let color = if no_fill {
+        Color::none()
+      } else {
+        let clr = parse_solid_fill(ln_ch, theme)
+        if clr.is_none() { Color::black() } else { clr }
+      }
+      // Preset dash
+      let dash = match @xml.find_child(ln_ch, "a:prstDash") {
+        None => ""
+        Some(d) => match @xml.get_attr(d, "val") { Some(v) => v; None => "" }
+      }
+      // Line join
+      let mut join = ""
+      let mut miter_limit = 0
+      match @xml.find_child(ln_ch, "a:round") {
+        Some(_) => join = "round"
+        None => ()
+      }
+      if join.is_empty() {
+        match @xml.find_child(ln_ch, "a:bevel") {
+          Some(_) => join = "bevel"
+          None => ()
         }
       }
+      if join.is_empty() {
+        match @xml.find_child(ln_ch, "a:miter") {
+          Some(m) => {
+            join = "miter"
+            miter_limit = attr_int(m, "lim")
+          }
+          None => ()
+        }
+      }
+      // Arrow head
+      let mut head_type = ""
+      let mut head_w = ""
+      let mut head_len = ""
+      match @xml.find_child(ln_ch, "a:headEnd") {
+        Some(he) => {
+          head_type = match @xml.get_attr(he, "type") { Some(v) => v; None => "" }
+          head_w = match @xml.get_attr(he, "w") { Some(v) => v; None => "" }
+          head_len = match @xml.get_attr(he, "len") { Some(v) => v; None => "" }
+        }
+        None => ()
+      }
+      // Arrow tail
+      let mut tail_type = ""
+      let mut tail_w = ""
+      let mut tail_len = ""
+      match @xml.find_child(ln_ch, "a:tailEnd") {
+        Some(te) => {
+          tail_type = match @xml.get_attr(te, "type") { Some(v) => v; None => "" }
+          tail_w = match @xml.get_attr(te, "w") { Some(v) => v; None => "" }
+          tail_len = match @xml.get_attr(te, "len") { Some(v) => v; None => "" }
+        }
+        None => ()
+      }
+      { color, width: w, dash, cap, join, miter_limit, head_type, head_w, head_len,
+        tail_type, tail_w, tail_len, cmpd, no_fill }
     }
   }
 }
@@ -328,7 +382,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     }
   }
   let grad_fill = parse_gradient_fill(sppr_ch, theme)
-  let (stroke, stroke_w) = parse_stroke(sppr_ch, theme)
+  let sp = parse_stroke(sppr_ch, theme)
   // Blip fill on AutoShape (a:blipFill inside p:spPr)
   let blip_fill = parse_blip_fill(sppr_ch)
   // Pattern fill
@@ -345,8 +399,20 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     grad_fill,
     blip_fill,
     patt_fill,
-    stroke,
-    stroke_w,
+    stroke: sp.color,
+    stroke_w: sp.width,
+    stroke_dash: sp.dash,
+    stroke_cap: sp.cap,
+    stroke_join: sp.join,
+    stroke_miter_limit: sp.miter_limit,
+    stroke_head_type: sp.head_type,
+    stroke_head_w: sp.head_w,
+    stroke_head_len: sp.head_len,
+    stroke_tail_type: sp.tail_type,
+    stroke_tail_w: sp.tail_w,
+    stroke_tail_len: sp.tail_len,
+    stroke_cmpd: sp.cmpd,
+    stroke_no_fill: sp.no_fill,
     paragraphs: paras,
     body_props,
     ph_type,
@@ -374,20 +440,7 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
           }
       }
   }
-  {
-    kind: ShapeKind::Picture(rid),
-    transform,
-    fill: Color::none(),
-    grad_fill: GradientFill::none(),
-    blip_fill: BlipFill::none(),
-    patt_fill: PatternFill::none(),
-    stroke: Color::none(),
-    stroke_w: 0,
-    paragraphs: [],
-    body_props: BodyProps::default(),
-    ph_type: "",
-    ph_idx: -1,
-  }
+  Shape::default_with(ShapeKind::Picture(rid), transform)
 }
 
 fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
@@ -471,39 +524,13 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         tri = tri + 1
       }
       let table_data : TableData = { col_widths, rows }
-      {
-        kind: ShapeKind::TableShape(table_data),
-        transform,
-        fill: Color::none(),
-        grad_fill: GradientFill::none(),
-        blip_fill: BlipFill::none(),
-        patt_fill: PatternFill::none(),
-        stroke: Color::none(),
-        stroke_w: 0,
-        paragraphs: [],
-        body_props: BodyProps::default(),
-        ph_type: "",
-        ph_idx: -1,
-      }
+      Shape::default_with(ShapeKind::TableShape(table_data), transform)
     }
   }
 }
 
 fn empty_shape() -> Shape {
-  {
-    kind: ShapeKind::Other,
-    transform: ShapeTransform::default(),
-    fill: Color::none(),
-    grad_fill: GradientFill::none(),
-    blip_fill: BlipFill::none(),
-    patt_fill: PatternFill::none(),
-    stroke: Color::none(),
-    stroke_w: 0,
-    paragraphs: [],
-    body_props: BodyProps::default(),
-    ph_type: "",
-    ph_idx: -1,
-  }
+  Shape::default_with(ShapeKind::Other, ShapeTransform::default())
 }
 
 // ── Relationship parsing ──────────────────────────────────────────────────────

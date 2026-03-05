@@ -451,10 +451,63 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     out = out + serialize_color(shape.fill)
   }
   // Stroke
-  if not(shape.stroke.is_none()) {
+  let has_stroke = not(shape.stroke.is_none()) || shape.stroke_no_fill ||
+    not(shape.stroke_dash.is_empty()) || not(shape.stroke_head_type.is_empty()) ||
+    not(shape.stroke_tail_type.is_empty())
+  if has_stroke {
     let w = if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }
-    out = out + "<a:ln w=\"" + int_to_str(w) + "\">"
-    out = out + serialize_color(shape.stroke)
+    let mut ln_attrs = " w=\"" + int_to_str(w) + "\""
+    if not(shape.stroke_cap.is_empty()) {
+      ln_attrs = ln_attrs + " cap=\"" + shape.stroke_cap + "\""
+    }
+    if not(shape.stroke_cmpd.is_empty()) {
+      ln_attrs = ln_attrs + " cmpd=\"" + shape.stroke_cmpd + "\""
+    }
+    out = out + "<a:ln" + ln_attrs + ">"
+    // Fill or noFill
+    if shape.stroke_no_fill {
+      out = out + "<a:noFill/>"
+    } else if not(shape.stroke.is_none()) {
+      out = out + serialize_color(shape.stroke)
+    }
+    // Preset dash
+    if not(shape.stroke_dash.is_empty()) {
+      out = out + "<a:prstDash val=\"" + shape.stroke_dash + "\"/>"
+    }
+    // Line join
+    if shape.stroke_join == "round" {
+      out = out + "<a:round/>"
+    } else if shape.stroke_join == "bevel" {
+      out = out + "<a:bevel/>"
+    } else if shape.stroke_join == "miter" {
+      if shape.stroke_miter_limit > 0 {
+        out = out + "<a:miter lim=\"" + int_to_str(shape.stroke_miter_limit) + "\"/>"
+      } else {
+        out = out + "<a:miter/>"
+      }
+    }
+    // Arrow head
+    if not(shape.stroke_head_type.is_empty()) {
+      let mut he_attrs = " type=\"" + shape.stroke_head_type + "\""
+      if not(shape.stroke_head_w.is_empty()) {
+        he_attrs = he_attrs + " w=\"" + shape.stroke_head_w + "\""
+      }
+      if not(shape.stroke_head_len.is_empty()) {
+        he_attrs = he_attrs + " len=\"" + shape.stroke_head_len + "\""
+      }
+      out = out + "<a:headEnd" + he_attrs + "/>"
+    }
+    // Arrow tail
+    if not(shape.stroke_tail_type.is_empty()) {
+      let mut te_attrs = " type=\"" + shape.stroke_tail_type + "\""
+      if not(shape.stroke_tail_w.is_empty()) {
+        te_attrs = te_attrs + " w=\"" + shape.stroke_tail_w + "\""
+      }
+      if not(shape.stroke_tail_len.is_empty()) {
+        te_attrs = te_attrs + " len=\"" + shape.stroke_tail_len + "\""
+      }
+      out = out + "<a:tailEnd" + te_attrs + "/>"
+    }
     out = out + "</a:ln>"
   }
   out = out + "</p:spPr>"

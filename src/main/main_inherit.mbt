@@ -65,6 +65,11 @@ fn resolve_placeholder_inheritance(
                 patt_fill: shape.patt_fill,
                 stroke: shape.stroke,
                 stroke_w: shape.stroke_w,
+                stroke_dash: shape.stroke_dash, stroke_cap: shape.stroke_cap,
+                stroke_join: shape.stroke_join, stroke_miter_limit: shape.stroke_miter_limit,
+                stroke_head_type: shape.stroke_head_type, stroke_head_w: shape.stroke_head_w, stroke_head_len: shape.stroke_head_len,
+                stroke_tail_type: shape.stroke_tail_type, stroke_tail_w: shape.stroke_tail_w, stroke_tail_len: shape.stroke_tail_len,
+                stroke_cmpd: shape.stroke_cmpd, stroke_no_fill: shape.stroke_no_fill,
                 paragraphs: shape.paragraphs,
                 body_props: if shape.body_props.anchor.is_empty() && not(layout_ph.body_props.anchor.is_empty()) {
                   layout_ph.body_props
@@ -97,6 +102,11 @@ fn resolve_placeholder_inheritance(
                   patt_fill: shape.patt_fill,
                   stroke: shape.stroke,
                   stroke_w: shape.stroke_w,
+                  stroke_dash: shape.stroke_dash, stroke_cap: shape.stroke_cap,
+                  stroke_join: shape.stroke_join, stroke_miter_limit: shape.stroke_miter_limit,
+                  stroke_head_type: shape.stroke_head_type, stroke_head_w: shape.stroke_head_w, stroke_head_len: shape.stroke_head_len,
+                  stroke_tail_type: shape.stroke_tail_type, stroke_tail_w: shape.stroke_tail_w, stroke_tail_len: shape.stroke_tail_len,
+                  stroke_cmpd: shape.stroke_cmpd, stroke_no_fill: shape.stroke_no_fill,
                   paragraphs: shape.paragraphs,
                   body_props: if shape.body_props.anchor.is_empty() && not(master_ph.body_props.anchor.is_empty()) {
                     master_ph.body_props

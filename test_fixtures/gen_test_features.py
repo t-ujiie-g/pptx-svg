@@ -34,6 +34,8 @@ Slides:
  29. Gradient tileFlip (tileFlip="x" / "y" / "xy")
  30. Additional pattern fills (pct50 / dnDiag / cross / lgCheck / solidDmnd / trellis)
  31. Image fill tile (a:tile with sx/sy/flip/algn)
+ 32. Stroke dash styles (dash/dot/dashDot/lgDash/sysDot/sysDash)
+ 33. Arrows (headEnd/tailEnd), line join (round/bevel/miter), line cap (rnd/sq), compound line (dbl), noFill
 """
 
 from pptx import Presentation
@@ -1993,6 +1995,189 @@ set_fill_xml(s31a, f'''<a:blipFill xmlns:a="http://schemas.openxmlformats.org/dr
 </a:blipFill>''')
 
 os.unlink(tmp_img2)
+
+# ── Helper: set line XML on a shape ────────────────────────────────────────
+
+def set_line_xml(shape, ln_xml_str):
+    """Replace any existing a:ln with custom line XML in the shape's spPr."""
+    ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+    ns_p = '{http://schemas.openxmlformats.org/presentationml/2006/main}'
+    spPr = shape._element.find(f'{ns_p}spPr')
+    if spPr is None:
+        spPr = shape._element.find(f'.//{ns_a}spPr')
+    if spPr is None:
+        return
+    for el in spPr.findall(f'{ns_a}ln'):
+        spPr.remove(el)
+    ln_el = etree.fromstring(ln_xml_str)
+    spPr.append(ln_el)
+
+# ── Helper: create a line shape (p:sp with a:prstGeom prst="line") ─────────
+
+def add_line_shape(slide, left, top, width, height, ln_xml_str):
+    """Add a p:sp with line geometry + custom a:ln XML."""
+    ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+    ns_p = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+    ns_r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+    # Create via add_shape(1=rect) then change geometry to line
+    s = slide.shapes.add_shape(1, left, top, width, height)
+    spPr = s._element.find(f'{{{ns_p}}}spPr')
+    if spPr is None:
+        spPr = s._element.find(f'.//{{{ns_a}}}spPr')
+    # Replace prstGeom with line
+    for pg in spPr.findall(f'{{{ns_a}}}prstGeom'):
+        spPr.remove(pg)
+    pg = etree.SubElement(spPr, f'{{{ns_a}}}prstGeom')
+    pg.set('prst', 'line')
+    etree.SubElement(pg, f'{{{ns_a}}}avLst')
+    # Remove fill (lines don't have fill)
+    for tag in ('solidFill', 'noFill', 'gradFill'):
+        for el in spPr.findall(f'{{{ns_a}}}{tag}'):
+            spPr.remove(el)
+    noFill = etree.SubElement(spPr, f'{{{ns_a}}}noFill')
+    # Set line XML
+    for el in spPr.findall(f'{{{ns_a}}}ln'):
+        spPr.remove(el)
+    ln_el = etree.fromstring(ln_xml_str)
+    spPr.append(ln_el)
+    return s
+
+# ── Slide 32: Stroke styles on lines ─────────────────────────────────────
+
+slide32 = prs.slides.add_slide(blank)
+
+title32 = slide32.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.5))
+title32.text_frame.paragraphs[0].text = "Slide 32: Line Stroke Styles"
+title32.text_frame.paragraphs[0].font.size = Pt(20)
+title32.text_frame.paragraphs[0].font.bold = True
+
+# Dash styles on lines
+dash_info = [
+    ('dash', '0000FF'),
+    ('dot', '0066CC'),
+    ('dashDot', '009900'),
+    ('lgDash', 'CC6600'),
+    ('sysDot', '990099'),
+    ('sysDash', 'CC0000'),
+]
+for i, (dash, color) in enumerate(dash_info):
+    y = 1.0 + i * 0.9
+    add_line_shape(slide32, Inches(1), Inches(y), Inches(8), Emu(0),
+        f'''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:solidFill><a:srgbClr val="{color}"/></a:solidFill>
+          <a:prstDash val="{dash}"/>
+        </a:ln>''')
+    # Label
+    lbl = slide32.shapes.add_textbox(Inches(0.2), Inches(y - 0.25), Inches(0.8), Inches(0.3))
+    lbl.text_frame.paragraphs[0].text = dash
+    lbl.text_frame.paragraphs[0].font.size = Pt(9)
+    lbl.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# ── Slide 33: Arrows + Line cap/join ──────────────────────────────────────
+
+slide33 = prs.slides.add_slide(blank)
+
+title33 = slide33.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.5))
+title33.text_frame.paragraphs[0].text = "Slide 33: Arrow Lines"
+title33.text_frame.paragraphs[0].font.size = Pt(20)
+title33.text_frame.paragraphs[0].font.bold = True
+
+# Line with triangle head + stealth tail
+add_line_shape(slide33, Inches(0.5), Inches(1.2), Inches(4), Emu(0),
+    '''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>
+      <a:headEnd type="triangle" w="med" len="med"/>
+      <a:tailEnd type="stealth" w="lg" len="lg"/>
+    </a:ln>''')
+lbl33a = slide33.shapes.add_textbox(Inches(0.5), Inches(1.3), Inches(4), Inches(0.3))
+lbl33a.text_frame.paragraphs[0].text = "triangle head + stealth tail"
+lbl33a.text_frame.paragraphs[0].font.size = Pt(9)
+lbl33a.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Line with diamond head + oval tail
+add_line_shape(slide33, Inches(0.5), Inches(2.0), Inches(4), Emu(0),
+    '''<a:ln w="19050" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="008000"/></a:solidFill>
+      <a:headEnd type="diamond" w="med" len="med"/>
+      <a:tailEnd type="oval" w="med" len="med"/>
+    </a:ln>''')
+lbl33b = slide33.shapes.add_textbox(Inches(0.5), Inches(2.1), Inches(4), Inches(0.3))
+lbl33b.text_frame.paragraphs[0].text = "diamond head + oval tail"
+lbl33b.text_frame.paragraphs[0].font.size = Pt(9)
+lbl33b.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Line with arrow (open) head + triangle tail
+add_line_shape(slide33, Inches(0.5), Inches(2.8), Inches(4), Emu(0),
+    '''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="0000FF"/></a:solidFill>
+      <a:headEnd type="arrow" w="med" len="med"/>
+      <a:tailEnd type="triangle" w="sm" len="sm"/>
+    </a:ln>''')
+lbl33c = slide33.shapes.add_textbox(Inches(0.5), Inches(2.9), Inches(4), Inches(0.3))
+lbl33c.text_frame.paragraphs[0].text = "arrow head + triangle tail (sm)"
+lbl33c.text_frame.paragraphs[0].font.size = Pt(9)
+lbl33c.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Dashed line with round cap + round join
+add_line_shape(slide33, Inches(5), Inches(1.2), Inches(4.5), Emu(0),
+    '''<a:ln w="38100" cap="rnd" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="800080"/></a:solidFill>
+      <a:prstDash val="dash"/>
+      <a:round/>
+    </a:ln>''')
+lbl33d = slide33.shapes.add_textbox(Inches(5), Inches(1.3), Inches(4.5), Inches(0.3))
+lbl33d.text_frame.paragraphs[0].text = "dash + round cap + round join"
+lbl33d.text_frame.paragraphs[0].font.size = Pt(9)
+lbl33d.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Line with square cap + bevel join + lgDash
+add_line_shape(slide33, Inches(5), Inches(2.0), Inches(4.5), Emu(0),
+    '''<a:ln w="25400" cap="sq" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="006699"/></a:solidFill>
+      <a:prstDash val="lgDash"/>
+      <a:bevel/>
+    </a:ln>''')
+lbl33e = slide33.shapes.add_textbox(Inches(5), Inches(2.1), Inches(4.5), Inches(0.3))
+lbl33e.text_frame.paragraphs[0].text = "lgDash + sq cap + bevel join"
+lbl33e.text_frame.paragraphs[0].font.size = Pt(9)
+lbl33e.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Miter join with limit
+add_line_shape(slide33, Inches(5), Inches(2.8), Inches(4.5), Emu(0),
+    '''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="FF6600"/></a:solidFill>
+      <a:miter lim="800000"/>
+    </a:ln>''')
+lbl33f = slide33.shapes.add_textbox(Inches(5), Inches(2.9), Inches(4.5), Inches(0.3))
+lbl33f.text_frame.paragraphs[0].text = "miter join (lim=800000)"
+lbl33f.text_frame.paragraphs[0].font.size = Pt(9)
+lbl33f.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Dashed rect (stroke on rect shape) — keeps one rect for dash+cap test
+s33rect = slide33.shapes.add_shape(1, Inches(0.5), Inches(4.0), Inches(4), Inches(2))
+s33rect.text = "Rect: dashDot + rnd cap"
+s33rect.text_frame.paragraphs[0].font.size = Pt(12)
+set_line_xml(s33rect, '''<a:ln w="25400" cap="rnd" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <a:solidFill><a:srgbClr val="FF00FF"/></a:solidFill>
+  <a:prstDash val="dashDot"/>
+  <a:round/>
+</a:ln>''')
+
+# Compound line: double
+s33cmpd = slide33.shapes.add_shape(1, Inches(5), Inches(4.0), Inches(4.5), Inches(0.8))
+s33cmpd.text = "Compound: dbl"
+s33cmpd.text_frame.paragraphs[0].font.size = Pt(12)
+set_line_xml(s33cmpd, '''<a:ln w="38100" cmpd="dbl" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <a:solidFill><a:srgbClr val="333333"/></a:solidFill>
+</a:ln>''')
+
+# noFill line (stroke_no_fill)
+s33nf = slide33.shapes.add_shape(1, Inches(5), Inches(5.2), Inches(4.5), Inches(0.8))
+s33nf.text = "Line noFill"
+s33nf.text_frame.paragraphs[0].font.size = Pt(12)
+set_line_xml(s33nf, '''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <a:noFill/>
+</a:ln>''')
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

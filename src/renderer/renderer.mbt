@@ -75,6 +75,130 @@ fn bool_str(b : Bool) -> String {
   if b { "1" } else { "0" }
 }
 
+// ── Stroke rendering helpers ────────────────────────────────────────────────
+
+///| Convert OOXML preset dash name to SVG stroke-dasharray attribute.
+fn stroke_dasharray(dash : String, sw : Int) -> String {
+  if dash.is_empty() { return "" }
+  // Dash/gap values scaled relative to stroke width
+  let s = int_to_str(sw)
+  let s2 = int_to_str(sw * 2)
+  let s4 = int_to_str(sw * 4)
+  let s8 = int_to_str(sw * 8)
+  let pattern = if dash == "dash" {
+    s4 + "," + s2
+  } else if dash == "dot" {
+    s + "," + s2
+  } else if dash == "dashDot" {
+    s4 + "," + s2 + "," + s + "," + s2
+  } else if dash == "lgDash" {
+    s8 + "," + s2
+  } else if dash == "sysDot" {
+    s + "," + s
+  } else if dash == "sysDash" {
+    s2 + "," + s
+  } else if dash == "sysDashDot" {
+    s2 + "," + s + "," + s + "," + s
+  } else if dash == "sysDashDotDot" {
+    s2 + "," + s + "," + s + "," + s + "," + s + "," + s
+  } else if dash == "dashDotDot" {
+    s4 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
+  } else if dash == "lgDashDot" {
+    s8 + "," + s2 + "," + s + "," + s2
+  } else if dash == "lgDashDotDot" {
+    s8 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
+  } else {
+    return ""
+  }
+  a("stroke-dasharray", pattern)
+}
+
+///| Convert OOXML line cap to SVG stroke-linecap attribute.
+fn stroke_linecap(cap : String) -> String {
+  if cap == "flat" {
+    a("stroke-linecap", "butt")
+  } else if cap == "rnd" {
+    a("stroke-linecap", "round")
+  } else if cap == "sq" {
+    a("stroke-linecap", "square")
+  } else {
+    ""
+  }
+}
+
+///| Convert OOXML line join to SVG stroke-linejoin + miterlimit attributes.
+fn stroke_linejoin(join : String, miter_limit : Int) -> String {
+  if join == "round" {
+    a("stroke-linejoin", "round")
+  } else if join == "bevel" {
+    a("stroke-linejoin", "bevel")
+  } else if join == "miter" {
+    let ml = if miter_limit > 0 {
+      // OOXML miter limit is percentage * 1000 (e.g. 800000 = 800%)
+      // SVG miterlimit is a plain ratio
+      let ratio = miter_limit / 100000
+      if ratio > 1 { a("stroke-miterlimit", int_to_str(ratio)) } else { "" }
+    } else {
+      ""
+    }
+    a("stroke-linejoin", "miter") + ml
+  } else {
+    ""
+  }
+}
+
+///| Check if an arrow type string represents an active arrow.
+fn has_arrow(arrow_type : String) -> Bool {
+  not(arrow_type.is_empty()) && arrow_type != "none"
+}
+
+///| Generate arrow marker ID: "ah-s{slide}-{shape}-h" or "ah-s{slide}-{shape}-t".
+fn arrow_marker_id(slide_num : Int, shape_idx : Int, is_head : Bool) -> String {
+  "ah-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx) +
+    (if is_head { "-h" } else { "-t" })
+}
+
+///| Arrow marker size from sm/med/lg.
+fn arrow_size(sz : String) -> Int {
+  if sz == "sm" { 3 } else if sz == "lg" { 7 } else { 5 }
+}
+
+///| Render arrow marker SVG definition.
+fn render_arrow_marker(id : String, arrow_type : String, w_str : String, len_str : String, color : @ooxml.Color) -> String {
+  let w = arrow_size(w_str)
+  let h = arrow_size(len_str)
+  let ws = int_to_str(w)
+  let hs = int_to_str(h)
+  let fill_color = color.to_css()
+  let path = if arrow_type == "triangle" {
+    "<path d=\"M 0 0 L 10 5 L 0 10 z\"" + a("fill", fill_color) + "/>"
+  } else if arrow_type == "stealth" {
+    "<path d=\"M 0 0 L 10 5 L 0 10 L 3 5 z\"" + a("fill", fill_color) + "/>"
+  } else if arrow_type == "diamond" {
+    "<path d=\"M 0 5 L 5 0 L 10 5 L 5 10 z\"" + a("fill", fill_color) + "/>"
+  } else if arrow_type == "oval" {
+    "<ellipse cx=\"5\" cy=\"5\" rx=\"5\" ry=\"5\"" + a("fill", fill_color) + "/>"
+  } else if arrow_type == "arrow" {
+    "<path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\"" + a("stroke", fill_color) + " stroke-width=\"2\"/>"
+  } else {
+    return ""
+  }
+  "<marker id=\"" + id + "\" viewBox=\"0 0 10 10\" refX=\"10\" refY=\"5\" orient=\"auto-start-reverse\"" +
+    a("markerWidth", ws) + a("markerHeight", hs) + ">" + path + "</marker>"
+}
+
+///| Generate marker-start/marker-end attributes for arrows.
+fn stroke_markers(shape : @ooxml.Shape, shape_idx : Int, slide_num : Int) -> String {
+  let mut result = ""
+  if has_arrow(shape.stroke_head_type) {
+    result = result + " marker-start=\"url(#" + arrow_marker_id(slide_num, shape_idx, true) + ")\""
+  }
+  if has_arrow(shape.stroke_tail_type) {
+    result = result + " marker-end=\"url(#" + arrow_marker_id(slide_num, shape_idx, false) + ")\""
+  }
+  result
+}
+
 // Escape text for SVG content.
 fn svg_escape(s : String) -> String {
   let len = s.length()
@@ -299,7 +423,12 @@ fn render_shape(
       cy_p = text_h
     }
   }
-  if cx_p <= 0 || cy_p <= 0 { return "" }
+  let is_line = match shape.kind {
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Line) => true
+    _ => false
+  }
+  if cx_p <= 0 { return "" }
+  if cy_p <= 0 && not(is_line) { return "" }
   let rot = rotation_attr(t, scale)
 
   // Build data-ooxml-* attributes for the <g> wrapper
@@ -314,6 +443,18 @@ fn render_shape(
     da("fill", shape.fill.to_hex()) +
     da("stroke", shape.stroke.to_hex()) +
     dai("stroke-w", shape.stroke_w) +
+    da("stroke-dash", shape.stroke_dash) +
+    da("stroke-cap", shape.stroke_cap) +
+    da("stroke-join", shape.stroke_join) +
+    dai("stroke-miter-lim", shape.stroke_miter_limit) +
+    da("stroke-head-type", shape.stroke_head_type) +
+    da("stroke-head-w", shape.stroke_head_w) +
+    da("stroke-head-len", shape.stroke_head_len) +
+    da("stroke-tail-type", shape.stroke_tail_type) +
+    da("stroke-tail-w", shape.stroke_tail_w) +
+    da("stroke-tail-len", shape.stroke_tail_len) +
+    da("stroke-cmpd", shape.stroke_cmpd) +
+    da("stroke-no-fill", if shape.stroke_no_fill { "1" } else { "" }) +
     dai("shape-idx", shape_idx) +
     da("ph-type", shape.ph_type) +
     dai("ph-idx", shape.ph_idx) +
@@ -386,12 +527,18 @@ fn render_shape(
           fill_base
         }
       }
-      let stroke = if shape.stroke.is_none() {
+      let stroke = if shape.stroke.is_none() && not(shape.stroke_no_fill) {
+        " stroke=\"none\""
+      } else if shape.stroke_no_fill {
         " stroke=\"none\""
       } else {
-        a("stroke", shape.stroke.to_css()) +
-        ai("stroke-width",
-          px(if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }, scale))
+        let sw = px(if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }, scale)
+        let base = a("stroke", shape.stroke.to_css()) + ai("stroke-width", sw)
+        let dash_attr = stroke_dasharray(shape.stroke_dash, sw)
+        let cap_attr = stroke_linecap(shape.stroke_cap)
+        let join_attr = stroke_linejoin(shape.stroke_join, shape.stroke_miter_limit)
+        let marker_attr = stroke_markers(shape, shape_idx, slide_num)
+        base + dash_attr + cap_attr + join_attr + marker_attr
       }
       let rect_svg = match geom {
         @ooxml.ShapeGeom::Ellipse => {
@@ -399,6 +546,12 @@ fn render_shape(
           ai("cx", x_p + cx_p / 2) + ai("cy", y_p + cy_p / 2) +
           ai("rx", cx_p / 2) + ai("ry", cy_p / 2) +
           fill + stroke + rot + "/>"
+        }
+        @ooxml.ShapeGeom::Line => {
+          "<line" +
+          ai("x1", x_p) + ai("y1", y_p + cy_p / 2) +
+          ai("x2", x_p + cx_p) + ai("y2", y_p + cy_p / 2) +
+          stroke + rot + "/>"
         }
         _ => {
           let rx = match geom {
@@ -659,6 +812,18 @@ pub fn render_slide_svg(
       defs = defs + render_pattern_def(slide.shapes[pi].patt_fill, patt_id(slide_num, pi))
     }
     pi = pi + 1
+  }
+  // Arrow marker defs
+  let mut ai2 = 0
+  while ai2 < n {
+    let sh = slide.shapes[ai2]
+    if has_arrow(sh.stroke_head_type) {
+      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, ai2, true), sh.stroke_head_type, sh.stroke_head_w, sh.stroke_head_len, sh.stroke)
+    }
+    if has_arrow(sh.stroke_tail_type) {
+      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, ai2, false), sh.stroke_tail_type, sh.stroke_tail_w, sh.stroke_tail_len, sh.stroke)
+    }
+    ai2 = ai2 + 1
   }
   let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
 

@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 31', slideCount === 31, `got ${slideCount}`);
+  assert('slide count = 33', slideCount === 33, `got ${slideCount}`);
 
   // Verify all 28 slides exist
-  for (let i = 1; i <= 31; i++) {
+  for (let i = 1; i <= 33; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 31; i++) {
+  for (let i = 1; i <= 33; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -708,6 +708,36 @@ async function testFeaturesPptx() {
     assert('slide31 has sy="50000"', slide31.includes('sy="50000"'));
     assert('slide31 has flip="xy"', slide31.includes('flip="xy"'));
     assert('slide31 has algn="tl"', slide31.includes('algn="tl"'));
+  }
+
+  // ── Slide 32: Stroke dash styles ────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 32: stroke dash styles');
+    const slide32 = textFiles.get('ppt/slides/slide32.xml');
+    assert('slide32 exists', !!slide32);
+    assert('slide32 has a:ln', hasTag(slide32, 'a:ln'));
+    assert('slide32 has a:prstDash', hasTag(slide32, 'a:prstDash'));
+    assert('slide32 has val="dash"', slide32.includes('val="dash"'));
+    assert('slide32 has val="dot"', slide32.includes('val="dot"'));
+    assert('slide32 has val="dashDot"', slide32.includes('val="dashDot"'));
+  }
+
+  // ── Slide 33: Arrows, line join, line cap ───────────────────────────────
+  {
+    section('test_features.pptx — Slide 33: arrows/join/cap');
+    const slide33 = textFiles.get('ppt/slides/slide33.xml');
+    assert('slide33 exists', !!slide33);
+    assert('slide33 has a:headEnd', hasTag(slide33, 'a:headEnd'));
+    assert('slide33 has a:tailEnd', hasTag(slide33, 'a:tailEnd'));
+    assert('slide33 has type="triangle"', slide33.includes('type="triangle"'));
+    assert('slide33 has type="stealth"', slide33.includes('type="stealth"'));
+    assert('slide33 has a:round', hasTag(slide33, 'a:round'));
+    assert('slide33 has a:miter', hasTag(slide33, 'a:miter'));
+    assert('slide33 has a:bevel', hasTag(slide33, 'a:bevel'));
+    assert('slide33 has cap="rnd"', slide33.includes('cap="rnd"'));
+    assert('slide33 has cap="sq"', slide33.includes('cap="sq"'));
+    assert('slide33 has cmpd="dbl"', slide33.includes('cmpd="dbl"'));
+    assert('slide33 has a:noFill', hasTag(slide33, 'a:noFill'));
   }
 }
 

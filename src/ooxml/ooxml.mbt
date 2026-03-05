@@ -671,6 +671,30 @@ pub(all) enum ShapeKind {
   Other
 }
 
+///| Parsed stroke properties from a:ln.
+pub(all) struct StrokeProps {
+  color       : Color
+  width       : Int
+  dash        : String
+  cap         : String
+  join        : String
+  miter_limit : Int
+  head_type   : String
+  head_w      : String
+  head_len    : String
+  tail_type   : String
+  tail_w      : String
+  tail_len    : String
+  cmpd        : String
+  no_fill     : Bool
+}
+
+pub fn StrokeProps::default() -> StrokeProps {
+  { color: Color::none(), width: 0, dash: "", cap: "", join: "", miter_limit: 0,
+    head_type: "", head_w: "", head_len: "", tail_type: "", tail_w: "", tail_len: "",
+    cmpd: "", no_fill: false }
+}
+
 pub(all) struct Shape {
   kind        : ShapeKind
   transform   : ShapeTransform
@@ -680,10 +704,38 @@ pub(all) struct Shape {
   patt_fill   : PatternFill    // PatternFill::none() = no pattern fill
   stroke      : Color          // Color::none() = no stroke
   stroke_w    : Int            // stroke width in EMU (0 = default ~12700)
+  stroke_dash : String         // preset dash: dash/dot/dashDot/lgDash/sysDot/sysDash/etc. "" = solid
+  stroke_cap  : String         // line cap: flat/rnd/sq. "" = default (flat)
+  stroke_join : String         // line join: round/bevel/miter. "" = default
+  stroke_miter_limit : Int     // miter limit (EMU percentage, e.g. 800000). 0 = default
+  stroke_head_type : String    // arrow head type: triangle/stealth/diamond/oval/arrow. "" = none
+  stroke_head_w    : String    // arrow head width: sm/med/lg. "" = default (med)
+  stroke_head_len  : String    // arrow head length: sm/med/lg. "" = default (med)
+  stroke_tail_type : String    // arrow tail type
+  stroke_tail_w    : String    // arrow tail width
+  stroke_tail_len  : String    // arrow tail length
+  stroke_cmpd : String         // compound line: sng/dbl/thickThin/thinThick/tri. "" = default (sng)
+  stroke_no_fill : Bool        // explicit a:noFill on a:ln (line exists but invisible)
   paragraphs  : Array[TextParagraph]
   body_props  : BodyProps      // text body properties (anchor, insets)
   ph_type     : String         // "title","body","ctrTitle","subTitle","dt","ftr","sldNum","" (non-PH)
   ph_idx      : Int            // -1 = none
+}
+
+///| Create a Shape with default values (no fill, no stroke, no text).
+pub fn Shape::default_with(kind : ShapeKind, transform : ShapeTransform) -> Shape {
+  {
+    kind, transform,
+    fill: Color::none(), grad_fill: GradientFill::none(),
+    blip_fill: BlipFill::none(), patt_fill: PatternFill::none(),
+    stroke: Color::none(), stroke_w: 0,
+    stroke_dash: "", stroke_cap: "", stroke_join: "", stroke_miter_limit: 0,
+    stroke_head_type: "", stroke_head_w: "", stroke_head_len: "",
+    stroke_tail_type: "", stroke_tail_w: "", stroke_tail_len: "",
+    stroke_cmpd: "", stroke_no_fill: false,
+    paragraphs: [], body_props: BodyProps::default(),
+    ph_type: "", ph_idx: -1,
+  }
 }
 
 // ── Slide data ────────────────────────────────────────────────────────────────
