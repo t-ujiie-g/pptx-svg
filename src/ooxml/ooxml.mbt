@@ -663,11 +663,19 @@ pub fn ShapeTransform::default() -> ShapeTransform {
   { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flip_h: false, flip_v: false }
 }
 
+pub(all) struct GroupShapeData {
+  ch_off_x  : Int           // child offset x (EMU)
+  ch_off_y  : Int           // child offset y (EMU)
+  ch_ext_cx : Int           // child extent cx (EMU)
+  ch_ext_cy : Int           // child extent cy (EMU)
+  children  : Array[Shape]
+}
+
 pub(all) enum ShapeKind {
   AutoShape(ShapeGeom)
   Picture(String)  // relationship ID (r:embed)
   TableShape(TableData)
-  GroupShape
+  GroupShape(GroupShapeData)
   Other
 }
 

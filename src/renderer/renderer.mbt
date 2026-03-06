@@ -306,6 +306,35 @@ fn mime_from_ext(path : String) -> String {
   else { "image/png" }
 }
 
+// ── Scale ratio formatting (for group transforms) ──────────────────────────
+
+///| Format an integer ratio num/den as a decimal string (e.g. "1.5", "0.75").
+///| Used for SVG scale() transform values.
+fn format_ratio(num : Int, den : Int) -> String {
+  if den == 0 || num == den { return "1" }
+  // Use 4 fractional digits: compute ratio * 10000
+  let scaled = num * 10000 / den
+  let whole = scaled / 10000
+  let frac = scaled - whole * 10000
+  let abs_frac = if frac < 0 { -frac } else { frac }
+  if abs_frac == 0 { return int_to_str(whole) }
+  // Build fractional part, trimming trailing zeros
+  let d1 = abs_frac / 1000
+  let d2 = (abs_frac / 100) % 10
+  let d3 = (abs_frac / 10) % 10
+  let d4 = abs_frac % 10
+  let f = if d4 != 0 {
+    int_to_str(d1) + int_to_str(d2) + int_to_str(d3) + int_to_str(d4)
+  } else if d3 != 0 {
+    int_to_str(d1) + int_to_str(d2) + int_to_str(d3)
+  } else if d2 != 0 {
+    int_to_str(d1) + int_to_str(d2)
+  } else {
+    int_to_str(d1)
+  }
+  int_to_str(whole) + "." + f
+}
+
 // ── data-ooxml-* attribute helpers ───────────────────────────────────────────
 
 fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
@@ -313,7 +342,7 @@ fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
     @ooxml.ShapeKind::AutoShape(_) => "autoshape"
     @ooxml.ShapeKind::Picture(_) => "picture"
     @ooxml.ShapeKind::TableShape(_) => "table"
-    @ooxml.ShapeKind::GroupShape => "group"
+    @ooxml.ShapeKind::GroupShape(_) => "group"
     @ooxml.ShapeKind::Other => "other"
   }
 }
@@ -440,6 +469,8 @@ fn render_shape(
     dai("cx", t.cx) +
     dai("cy", t.cy) +
     dai("rot", t.rot) +
+    da("flip-h", if t.flip_h { "1" } else { "" }) +
+    da("flip-v", if t.flip_v { "1" } else { "" }) +
     da("fill", shape.fill.to_hex()) +
     da("stroke", shape.stroke.to_hex()) +
     dai("stroke-w", shape.stroke_w) +
@@ -503,7 +534,16 @@ fn render_shape(
       da("patt-prst", shape.patt_fill.prst) +
       da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
       da("patt-bg", shape.patt_fill.bg_color.to_hex())
-    } else { "" })
+    } else { "" }) +
+    // Group shape child offset/extent attributes
+    (match shape.kind {
+      @ooxml.ShapeKind::GroupShape(grp) =>
+        dai("grp-ch-off-x", grp.ch_off_x) +
+        dai("grp-ch-off-y", grp.ch_off_y) +
+        dai("grp-ch-ext-cx", grp.ch_ext_cx) +
+        dai("grp-ch-ext-cy", grp.ch_ext_cy)
+      _ => ""
+    })
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
@@ -548,9 +588,19 @@ fn render_shape(
           fill + stroke + rot + "/>"
         }
         @ooxml.ShapeGeom::Line => {
+          // Line goes from one corner to the opposite; flipH/flipV reverse direction
+          let (lx1, ly1, lx2, ly2) = if t.flip_h && t.flip_v {
+            (x_p + cx_p, y_p + cy_p, x_p, y_p)
+          } else if t.flip_h {
+            (x_p + cx_p, y_p, x_p, y_p + cy_p)
+          } else if t.flip_v {
+            (x_p, y_p + cy_p, x_p + cx_p, y_p)
+          } else {
+            (x_p, y_p, x_p + cx_p, y_p + cy_p)
+          }
           "<line" +
-          ai("x1", x_p) + ai("y1", y_p + cy_p / 2) +
-          ai("x2", x_p + cx_p) + ai("y2", y_p + cy_p / 2) +
+          ai("x1", lx1) + ai("y1", ly1) +
+          ai("x2", lx2) + ai("y2", ly2) +
           stroke + rot + "/>"
         }
         _ => {
@@ -640,6 +690,9 @@ fn render_shape(
     @ooxml.ShapeKind::TableShape(table) => {
       render_table(table, t, scale, theme, rels)
     }
+    @ooxml.ShapeKind::GroupShape(grp) => {
+      render_group(grp, t, rels, slide_num, scale, shape_idx, theme)
+    }
     _ => ""
   }
 
@@ -648,6 +701,67 @@ fn render_shape(
   } else {
     "<g" + g_attrs + ">" + inner + "</g>"
   }
+}
+
+// ── Group rendering ─────────────────────────────────────────────────────────
+
+fn render_group(
+  grp : @ooxml.GroupShapeData,
+  t : @ooxml.ShapeTransform,
+  rels : Array[@ooxml.Relationship],
+  slide_num : Int,
+  scale : Int,
+  shape_idx : Int,
+  theme : @ooxml.ThemeData
+) -> String {
+  let nc = grp.children.length()
+  if nc == 0 { return "" }
+  // Build SVG transform: translate(off) scale(ext/chExt) translate(-chOff)
+  let off_x = px(t.x, scale)
+  let off_y = px(t.y, scale)
+  let ch_off_x = px(grp.ch_off_x, scale)
+  let ch_off_y = px(grp.ch_off_y, scale)
+  let sx = format_ratio(t.cx, grp.ch_ext_cx)
+  let sy = format_ratio(t.cy, grp.ch_ext_cy)
+  let mut transform_str = "translate(" + int_to_str(off_x) + "," + int_to_str(off_y) + ")"
+  if sx != "1" || sy != "1" {
+    transform_str = transform_str + " scale(" + sx + "," + sy + ")"
+  }
+  if ch_off_x != 0 || ch_off_y != 0 {
+    transform_str = transform_str + " translate(" + int_to_str(-ch_off_x) + "," + int_to_str(-ch_off_y) + ")"
+  }
+  // Group rotation
+  if t.rot != 0 {
+    let cx_p = px(t.cx / 2, scale)
+    let cy_p = px(t.cy / 2, scale)
+    // Rotation is applied around the group center (before the translate)
+    // We prepend the rotation to the transform
+    transform_str = "translate(" + int_to_str(off_x + cx_p) + "," + int_to_str(off_y + cy_p) + ") rotate(" + format_rotation_deg(t.rot) + ") translate(" + int_to_str(-(off_x + cx_p)) + "," + int_to_str(-(off_y + cy_p)) + ") " + transform_str
+  }
+  // Render child defs (gradient, pattern, arrow markers) and shapes in one pass
+  let mut defs = ""
+  let mut children_svg = ""
+  let mut ci = 0
+  while ci < nc {
+    let child = grp.children[ci]
+    let child_idx = shape_idx * 1000 + ci
+    if not(child.grad_fill.is_none()) {
+      defs = defs + render_gradient_def(child.grad_fill, grad_id(slide_num, child_idx))
+    }
+    if not(child.patt_fill.is_none()) {
+      defs = defs + render_pattern_def(child.patt_fill, patt_id(slide_num, child_idx))
+    }
+    if has_arrow(child.stroke_head_type) {
+      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, child_idx, true), child.stroke_head_type, child.stroke_head_w, child.stroke_head_len, child.stroke)
+    }
+    if has_arrow(child.stroke_tail_type) {
+      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, child_idx, false), child.stroke_tail_type, child.stroke_tail_w, child.stroke_tail_len, child.stroke)
+    }
+    children_svg = children_svg + render_shape(child, rels, slide_num, scale, child_idx, theme)
+    ci = ci + 1
+  }
+  let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
+  "<g transform=\"" + transform_str + "\">" + defs_section + children_svg + "</g>"
 }
 
 // ── Table rendering ─────────────────────────────────────────────────────────

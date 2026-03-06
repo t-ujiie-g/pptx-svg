@@ -36,6 +36,8 @@ Slides:
  31. Image fill tile (a:tile with sx/sy/flip/algn)
  32. Stroke dash styles (dash/dot/dashDot/lgDash/sysDot/sysDash)
  33. Arrows (headEnd/tailEnd), line join (round/bevel/miter), line cap (rnd/sq), compound line (dbl), noFill
+ 34. Group shapes (p:grpSp) — simple group + nested group
+ 35. Connectors (p:cxnSp) — straight + diagonal with arrows
 """
 
 from pptx import Presentation
@@ -2178,6 +2180,237 @@ s33nf.text_frame.paragraphs[0].font.size = Pt(12)
 set_line_xml(s33nf, '''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
   <a:noFill/>
 </a:ln>''')
+
+# ── Slide 34: Group shapes ────────────────────────────────────────────────
+slide34 = prs.slides.add_slide(blank)
+
+title34 = slide34.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title34.text_frame.paragraphs[0].text = "Slide 34: Group Shapes"
+title34.text_frame.paragraphs[0].font.size = Pt(24)
+title34.text_frame.paragraphs[0].font.bold = True
+
+# Create a group shape with two rectangles using raw XML
+ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+ns_p = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+ns_r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+
+spTree34 = slide34.shapes._spTree
+grp_xml = f'''<p:grpSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
+  <p:nvGrpSpPr>
+    <p:cNvPr id="100" name="Group 1"/>
+    <p:cNvGrpSpPr/>
+    <p:nvPr/>
+  </p:nvGrpSpPr>
+  <p:grpSpPr>
+    <a:xfrm>
+      <a:off x="457200" y="1371600"/>
+      <a:ext cx="3657600" cy="2743200"/>
+      <a:chOff x="0" y="0"/>
+      <a:chExt cx="3657600" cy="2743200"/>
+    </a:xfrm>
+  </p:grpSpPr>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="101" name="Rect1"/>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+    <p:spPr>
+      <a:xfrm>
+        <a:off x="0" y="0"/>
+        <a:ext cx="1828800" cy="1371600"/>
+      </a:xfrm>
+      <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+      <a:solidFill><a:srgbClr val="FF6B6B"/></a:solidFill>
+      <a:ln w="12700"><a:solidFill><a:srgbClr val="333333"/></a:solidFill></a:ln>
+    </p:spPr>
+    <p:txBody>
+      <a:bodyPr/>
+      <a:lstStyle/>
+      <a:p><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Child 1 (red)</a:t></a:r></a:p>
+    </p:txBody>
+  </p:sp>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="102" name="Rect2"/>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+    <p:spPr>
+      <a:xfrm>
+        <a:off x="1828800" y="1371600"/>
+        <a:ext cx="1828800" cy="1371600"/>
+      </a:xfrm>
+      <a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>
+      <a:solidFill><a:srgbClr val="4ECDC4"/></a:solidFill>
+      <a:ln w="12700"><a:solidFill><a:srgbClr val="333333"/></a:solidFill></a:ln>
+    </p:spPr>
+    <p:txBody>
+      <a:bodyPr/>
+      <a:lstStyle/>
+      <a:p><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Child 2 (teal)</a:t></a:r></a:p>
+    </p:txBody>
+  </p:sp>
+</p:grpSp>'''
+spTree34.append(etree.fromstring(grp_xml))
+
+# Second group: nested group (group inside group)
+grp_nested_xml = f'''<p:grpSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
+  <p:nvGrpSpPr>
+    <p:cNvPr id="200" name="Outer Group"/>
+    <p:cNvGrpSpPr/>
+    <p:nvPr/>
+  </p:nvGrpSpPr>
+  <p:grpSpPr>
+    <a:xfrm>
+      <a:off x="4572000" y="1371600"/>
+      <a:ext cx="4572000" cy="2743200"/>
+      <a:chOff x="0" y="0"/>
+      <a:chExt cx="4572000" cy="2743200"/>
+    </a:xfrm>
+  </p:grpSpPr>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="201" name="Outer Rect"/>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+    <p:spPr>
+      <a:xfrm>
+        <a:off x="0" y="0"/>
+        <a:ext cx="4572000" cy="2743200"/>
+      </a:xfrm>
+      <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+      <a:solidFill><a:srgbClr val="E8E8E8"/></a:solidFill>
+      <a:ln w="12700"><a:solidFill><a:srgbClr val="999999"/></a:solidFill></a:ln>
+    </p:spPr>
+    <p:txBody>
+      <a:bodyPr/>
+      <a:lstStyle/>
+      <a:p><a:r><a:rPr lang="en-US" sz="1200"/><a:t>Outer bg</a:t></a:r></a:p>
+    </p:txBody>
+  </p:sp>
+  <p:grpSp>
+    <p:nvGrpSpPr>
+      <p:cNvPr id="210" name="Inner Group"/>
+      <p:cNvGrpSpPr/>
+      <p:nvPr/>
+    </p:nvGrpSpPr>
+    <p:grpSpPr>
+      <a:xfrm>
+        <a:off x="457200" y="457200"/>
+        <a:ext cx="3657600" cy="1828800"/>
+        <a:chOff x="0" y="0"/>
+        <a:chExt cx="3657600" cy="1828800"/>
+      </a:xfrm>
+    </p:grpSpPr>
+    <p:sp>
+      <p:nvSpPr>
+        <p:cNvPr id="211" name="Inner Circle"/>
+        <p:cNvSpPr/>
+        <p:nvPr/>
+      </p:nvSpPr>
+      <p:spPr>
+        <a:xfrm>
+          <a:off x="0" y="0"/>
+          <a:ext cx="1828800" cy="1828800"/>
+        </a:xfrm>
+        <a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>
+        <a:solidFill><a:srgbClr val="FFD93D"/></a:solidFill>
+      </p:spPr>
+      <p:txBody>
+        <a:bodyPr anchor="ctr"/>
+        <a:lstStyle/>
+        <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>Nested A</a:t></a:r></a:p>
+      </p:txBody>
+    </p:sp>
+    <p:sp>
+      <p:nvSpPr>
+        <p:cNvPr id="212" name="Inner Rect"/>
+        <p:cNvSpPr/>
+        <p:nvPr/>
+      </p:nvSpPr>
+      <p:spPr>
+        <a:xfrm>
+          <a:off x="1828800" y="0"/>
+          <a:ext cx="1828800" cy="1828800"/>
+        </a:xfrm>
+        <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+        <a:solidFill><a:srgbClr val="6C5CE7"/></a:solidFill>
+      </p:spPr>
+      <p:txBody>
+        <a:bodyPr anchor="ctr"/>
+        <a:lstStyle/>
+        <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>Nested B</a:t></a:r></a:p>
+      </p:txBody>
+    </p:sp>
+  </p:grpSp>
+</p:grpSp>'''
+spTree34.append(etree.fromstring(grp_nested_xml))
+
+# Label
+lbl34 = slide34.shapes.add_textbox(Inches(0.5), Inches(5.5), Inches(9), Inches(1))
+lbl34.text_frame.paragraphs[0].text = "Left: simple group (red rect + teal ellipse). Right: nested group (outer bg + inner circle + rounded rect)."
+lbl34.text_frame.paragraphs[0].font.size = Pt(12)
+lbl34.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 35: Connectors ────────────────────────────────────────────────────
+slide35 = prs.slides.add_slide(blank)
+
+title35 = slide35.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.6))
+title35.text_frame.paragraphs[0].text = "Slide 35: Connectors (p:cxnSp)"
+title35.text_frame.paragraphs[0].font.size = Pt(24)
+title35.text_frame.paragraphs[0].font.bold = True
+
+# Straight connector
+spTree35 = slide35.shapes._spTree
+cxn1_xml = f'''<p:cxnSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
+  <p:nvCxnSpPr>
+    <p:cNvPr id="300" name="Straight Connector"/>
+    <p:cNvCxnSpPr/>
+    <p:nvPr/>
+  </p:nvCxnSpPr>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="457200" y="1371600"/>
+      <a:ext cx="3657600" cy="0"/>
+    </a:xfrm>
+    <a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>
+    <a:ln w="25400">
+      <a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>
+      <a:tailEnd type="triangle"/>
+    </a:ln>
+  </p:spPr>
+</p:cxnSp>'''
+spTree35.append(etree.fromstring(cxn1_xml))
+
+# Diagonal connector with arrows on both ends
+cxn2_xml = f'''<p:cxnSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
+  <p:nvCxnSpPr>
+    <p:cNvPr id="301" name="Diagonal Connector"/>
+    <p:cNvCxnSpPr/>
+    <p:nvPr/>
+  </p:nvCxnSpPr>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="457200" y="2286000"/>
+      <a:ext cx="3657600" cy="1828800"/>
+    </a:xfrm>
+    <a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>
+    <a:ln w="19050">
+      <a:solidFill><a:srgbClr val="0066CC"/></a:solidFill>
+      <a:prstDash val="dash"/>
+      <a:headEnd type="diamond"/>
+      <a:tailEnd type="stealth"/>
+    </a:ln>
+  </p:spPr>
+</p:cxnSp>'''
+spTree35.append(etree.fromstring(cxn2_xml))
+
+lbl35 = slide35.shapes.add_textbox(Inches(0.5), Inches(5.5), Inches(9), Inches(1))
+lbl35.text_frame.paragraphs[0].text = "Top: straight connector (red, triangle arrow). Bottom: diagonal connector (blue dashed, diamond+stealth)."
+lbl35.text_frame.paragraphs[0].font.size = Pt(12)
+lbl35.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

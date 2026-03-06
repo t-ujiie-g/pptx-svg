@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 33', slideCount === 33, `got ${slideCount}`);
+  assert('slide count = 35', slideCount === 35, `got ${slideCount}`);
 
   // Verify all 28 slides exist
-  for (let i = 1; i <= 33; i++) {
+  for (let i = 1; i <= 35; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 33; i++) {
+  for (let i = 1; i <= 35; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -738,6 +738,37 @@ async function testFeaturesPptx() {
     assert('slide33 has cap="sq"', slide33.includes('cap="sq"'));
     assert('slide33 has cmpd="dbl"', slide33.includes('cmpd="dbl"'));
     assert('slide33 has a:noFill', hasTag(slide33, 'a:noFill'));
+  }
+
+  // ── Slide 34: Group shapes ──────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 34: group shapes');
+    const slide34 = textFiles.get('ppt/slides/slide34.xml');
+    assert('slide34 exists', !!slide34);
+    assert('slide34 has p:grpSp', hasTag(slide34, 'p:grpSp'));
+    assert('slide34 has a:chOff', hasTag(slide34, 'a:chOff'));
+    assert('slide34 has a:chExt', hasTag(slide34, 'a:chExt'));
+    // Simple group has two child shapes
+    assert('slide34 has FF6B6B (red)', slide34.includes('FF6B6B'));
+    assert('slide34 has 4ECDC4 (teal)', slide34.includes('4ECDC4'));
+    // Nested group
+    assert('slide34 has FFD93D (yellow)', slide34.includes('FFD93D'));
+    assert('slide34 has 6C5CE7 (purple)', slide34.includes('6C5CE7'));
+    assert('slide34 has prst="ellipse"', slide34.includes('prst="ellipse"'));
+    assert('slide34 has prst="roundRect"', slide34.includes('prst="roundRect"'));
+  }
+
+  // ── Slide 35: Connectors ────────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 35: connectors');
+    const slide35 = textFiles.get('ppt/slides/slide35.xml');
+    assert('slide35 exists', !!slide35);
+    assert('slide35 has p:cxnSp', hasTag(slide35, 'p:cxnSp'));
+    assert('slide35 has straightConnector1', slide35.includes('straightConnector1'));
+    assert('slide35 has a:tailEnd', hasTag(slide35, 'a:tailEnd'));
+    assert('slide35 has type="triangle"', slide35.includes('type="triangle"'));
+    assert('slide35 has type="diamond"', slide35.includes('type="diamond"'));
+    assert('slide35 has type="stealth"', slide35.includes('type="stealth"'));
   }
 }
 

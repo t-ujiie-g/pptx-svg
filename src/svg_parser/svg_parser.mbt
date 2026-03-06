@@ -245,8 +245,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
 
   let fill = parse_hex_color(fill_hex)
   let stroke = parse_hex_color(stroke_hex)
+  let flip_h = get_da(g_node, "flip-h") == "1"
+  let flip_v = get_da(g_node, "flip-v") == "1"
   let transform : @ooxml.ShapeTransform = {
-    x, y, cx, cy, rot, flip_h: false, flip_v: false,
+    x, y, cx, cy, rot, flip_h, flip_v,
   }
 
   // Determine shape kind
@@ -258,6 +260,17 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     // Table shapes carry no inline data in SVG for now — use empty table
     let table_data : @ooxml.TableData = { col_widths: [], rows: [] }
     @ooxml.ShapeKind::TableShape(table_data)
+  } else if shape_type == "group" {
+    // Parse group children from inner <g> containing child shape <g> elements
+    let grp_children = parse_group_children_from_g(g_node)
+    let grp_data : @ooxml.GroupShapeData = {
+      ch_off_x: get_dai(g_node, "grp-ch-off-x"),
+      ch_off_y: get_dai(g_node, "grp-ch-off-y"),
+      ch_ext_cx: get_dai(g_node, "grp-ch-ext-cx"),
+      ch_ext_cy: get_dai(g_node, "grp-ch-ext-cy"),
+      children: grp_children,
+    }
+    @ooxml.ShapeKind::GroupShape(grp_data)
   } else {
     let geom = parse_geom(geom_str)
     @ooxml.ShapeKind::AutoShape(geom)
@@ -351,6 +364,49 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     stroke_tail_type, stroke_tail_w, stroke_tail_len,
     stroke_cmpd, stroke_no_fill,
     paragraphs, body_props, ph_type, ph_idx }
+}
+
+///| Parse group children from the inner transform <g> of a group shape.
+fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
+  let children : Array[@ooxml.Shape] = []
+  let g_children = @xml.get_children(group_g)
+  let n = g_children.length()
+  let mut i = 0
+  while i < n {
+    match g_children[i] {
+      @xml.XmlNode::Element(tag, _, _) => {
+        if tag == "g" {
+          // Look inside: could be the transform <g> or a child shape <g>
+          let st = get_da(g_children[i], "shape-type")
+          if not(st.is_empty()) {
+            children.push(parse_shape_from_g(g_children[i]))
+          } else {
+            // This might be the inner transform <g> wrapping children
+            let inner_ch = @xml.get_children(g_children[i])
+            let ni = inner_ch.length()
+            let mut j = 0
+            while j < ni {
+              match inner_ch[j] {
+                @xml.XmlNode::Element(tag2, _, _) => {
+                  if tag2 == "g" {
+                    let st2 = get_da(inner_ch[j], "shape-type")
+                    if not(st2.is_empty()) {
+                      children.push(parse_shape_from_g(inner_ch[j]))
+                    }
+                  }
+                }
+                _ => ()
+              }
+              j = j + 1
+            }
+          }
+        }
+      }
+      _ => ()
+    }
+    i = i + 1
+  }
+  children
 }
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {

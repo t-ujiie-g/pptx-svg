@@ -529,6 +529,63 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
 }
 
+///| Create a Shape with given kind, transform, and stroke properties.
+fn shape_with_stroke(kind : ShapeKind, transform : ShapeTransform, sp : StrokeProps) -> Shape {
+  {
+    kind, transform,
+    fill: Color::none(), grad_fill: GradientFill::none(),
+    blip_fill: BlipFill::none(), patt_fill: PatternFill::none(),
+    stroke: sp.color, stroke_w: sp.width,
+    stroke_dash: sp.dash, stroke_cap: sp.cap,
+    stroke_join: sp.join, stroke_miter_limit: sp.miter_limit,
+    stroke_head_type: sp.head_type, stroke_head_w: sp.head_w, stroke_head_len: sp.head_len,
+    stroke_tail_type: sp.tail_type, stroke_tail_w: sp.tail_w, stroke_tail_len: sp.tail_len,
+    stroke_cmpd: sp.cmpd, stroke_no_fill: sp.no_fill,
+    paragraphs: [], body_props: BodyProps::default(),
+    ph_type: "", ph_idx: -1,
+  }
+}
+
+///| Parse connector shape — rendered as a line with stroke properties.
+fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
+  let ch = @xml.get_children(cxn)
+  let sppr = match @xml.find_child(ch, "p:spPr") {
+    None => return empty_shape()
+    Some(n) => n
+  }
+  let sppr_ch = @xml.get_children(sppr)
+  let transform = parse_xfrm(sppr_ch)
+  let sp = parse_stroke(sppr_ch, theme)
+  shape_with_stroke(ShapeKind::AutoShape(ShapeGeom::Line), transform, sp)
+}
+
+fn parse_grp_sp(grp : @xml.XmlNode, theme : ThemeData) -> Shape {
+  let ch = @xml.get_children(grp)
+  // Group shape properties
+  let grp_sp_pr = match @xml.find_child(ch, "p:grpSpPr") {
+    None => return empty_shape()
+    Some(n) => n
+  }
+  let pr_ch = @xml.get_children(grp_sp_pr)
+  // Parse group xfrm: has a:off, a:ext, a:chOff, a:chExt
+  let xfrm = match @xml.find_child(pr_ch, "a:xfrm") {
+    None => return empty_shape()
+    Some(n) => n
+  }
+  let transform = parse_xfrm_node(xfrm)
+  let xfrm_ch = @xml.get_children(xfrm)
+  let ch_off_x = @xml.parse_int(child_attr(xfrm_ch, "a:chOff", "x"))
+  let ch_off_y = @xml.parse_int(child_attr(xfrm_ch, "a:chOff", "y"))
+  let ch_ext_cx = @xml.parse_int(child_attr(xfrm_ch, "a:chExt", "cx"))
+  let ch_ext_cy = @xml.parse_int(child_attr(xfrm_ch, "a:chExt", "cy"))
+  // Parse child shapes recursively
+  let children = parse_shapes_from_children(ch, theme)
+  let grp_data : GroupShapeData = {
+    ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy, children,
+  }
+  Shape::default_with(ShapeKind::GroupShape(grp_data), transform)
+}
+
 fn empty_shape() -> Shape {
   Shape::default_with(ShapeKind::Other, ShapeTransform::default())
 }
@@ -642,25 +699,8 @@ pub fn parse_slide(
       match @xml.find_child(csld_ch, "p:spTree") {
         None => { slide_size, background: bg, bg_grad, shapes }
         Some(tree) => {
-          let tree_ch = @xml.get_children(tree)
-          let n = tree_ch.length()
-          let mut i = 0
-          while i < n {
-            match tree_ch[i] {
-              @xml.XmlNode::Element(tag, _, _) => {
-                if tag == "p:sp" {
-                  shapes.push(parse_sp(tree_ch[i], theme))
-                } else if tag == "p:pic" {
-                  shapes.push(parse_pic(tree_ch[i]))
-                } else if tag == "p:graphicFrame" {
-                  shapes.push(parse_graphic_frame(tree_ch[i], theme))
-                }
-              }
-              _ => ()
-            }
-            i = i + 1
-          }
-          { slide_size, background: bg, bg_grad, shapes }
+          let parsed = parse_shapes_from_children(@xml.get_children(tree), theme)
+          { slide_size, background: bg, bg_grad, shapes: parsed }
         }
       }
     }
@@ -683,21 +723,24 @@ fn parse_bg_from_csld(csld_ch : Array[@xml.XmlNode], theme : ThemeData) -> Color
   }
 }
 
-///| Parse shapes from p:spTree children.
-fn parse_shapes_from_tree(tree : @xml.XmlNode, theme : ThemeData) -> Array[Shape] {
+///| Parse shapes from a list of child nodes (shared by spTree and grpSp).
+fn parse_shapes_from_children(children : Array[@xml.XmlNode], theme : ThemeData) -> Array[Shape] {
   let shapes : Array[Shape] = []
-  let tree_ch = @xml.get_children(tree)
-  let n = tree_ch.length()
+  let n = children.length()
   let mut i = 0
   while i < n {
-    match tree_ch[i] {
+    match children[i] {
       @xml.XmlNode::Element(tag, _, _) => {
         if tag == "p:sp" {
-          shapes.push(parse_sp(tree_ch[i], theme))
+          shapes.push(parse_sp(children[i], theme))
         } else if tag == "p:pic" {
-          shapes.push(parse_pic(tree_ch[i]))
+          shapes.push(parse_pic(children[i]))
         } else if tag == "p:graphicFrame" {
-          shapes.push(parse_graphic_frame(tree_ch[i], theme))
+          shapes.push(parse_graphic_frame(children[i], theme))
+        } else if tag == "p:grpSp" {
+          shapes.push(parse_grp_sp(children[i], theme))
+        } else if tag == "p:cxnSp" {
+          shapes.push(parse_cxn_sp(children[i], theme))
         }
       }
       _ => ()
@@ -705,6 +748,11 @@ fn parse_shapes_from_tree(tree : @xml.XmlNode, theme : ThemeData) -> Array[Shape
     i = i + 1
   }
   shapes
+}
+
+///| Parse shapes from p:spTree children.
+fn parse_shapes_from_tree(tree : @xml.XmlNode, theme : ThemeData) -> Array[Shape] {
+  parse_shapes_from_children(@xml.get_children(tree), theme)
 }
 
 // ── Integer→string ───────────────────────────────────────────────────────────

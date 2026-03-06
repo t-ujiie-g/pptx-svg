@@ -603,11 +603,42 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   out + "</p:graphicFrame>"
 }
 
+fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String {
+  let t = shape.transform
+  let mut out = "<p:grpSp>"
+  out = out + "<p:nvGrpSpPr>"
+  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + "<p:cNvGrpSpPr/>"
+  out = out + "<p:nvPr/>"
+  out = out + "</p:nvGrpSpPr>"
+  out = out + "<p:grpSpPr>"
+  let mut xfrm = "<a:xfrm"
+  if t.rot != 0 { xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\"" }
+  if t.flip_h { xfrm = xfrm + " flipH=\"1\"" }
+  if t.flip_v { xfrm = xfrm + " flipV=\"1\"" }
+  xfrm = xfrm + ">"
+  xfrm = xfrm + "<a:off x=\"" + int_to_str(t.x) + "\" y=\"" + int_to_str(t.y) + "\"/>"
+  xfrm = xfrm + "<a:ext cx=\"" + int_to_str(t.cx) + "\" cy=\"" + int_to_str(t.cy) + "\"/>"
+  xfrm = xfrm + "<a:chOff x=\"" + int_to_str(grp.ch_off_x) + "\" y=\"" + int_to_str(grp.ch_off_y) + "\"/>"
+  xfrm = xfrm + "<a:chExt cx=\"" + int_to_str(grp.ch_ext_cx) + "\" cy=\"" + int_to_str(grp.ch_ext_cy) + "\"/>"
+  out = out + xfrm + "</a:xfrm>"
+  out = out + "</p:grpSpPr>"
+  // Serialize child shapes
+  let nc = grp.children.length()
+  let mut i = 0
+  while i < nc {
+    out = out + serialize_shape(grp.children[i])
+    i = i + 1
+  }
+  out + "</p:grpSp>"
+}
+
 fn serialize_shape(shape : @ooxml.Shape) -> String {
   match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => serialize_autoshape(shape, geom)
     @ooxml.ShapeKind::Picture(rid) => serialize_picture(shape, rid)
     @ooxml.ShapeKind::TableShape(table) => serialize_table(shape, table)
+    @ooxml.ShapeKind::GroupShape(grp) => serialize_group(shape, grp)
     _ => ""
   }
 }
