@@ -2,6 +2,8 @@
 //
 // Same package as renderer.mbt — all constants and helpers are shared.
 
+let pattern_tile_sz : Int = 8  // default SVG <pattern> tile size in px
+
 // ── Gradient helpers ─────────────────────────────────────────────────────────
 
 ///| Render a single gradient <defs> definition.
@@ -29,7 +31,7 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
   } else { "" }
   if gf.angle >= 0 && gf.path_type.is_empty() {
     // Linear gradient
-    // OOXML angle is in 60000ths of a degree. SVG gradientTransform rotate()
+    // OOXML angle is in 60000th of a degree. SVG gradientTransform rotate()
     // uses degrees centered at (0.5, 0.5). Direct division gives the SVG angle.
     let deg = gf.angle / ooxml_angle_unit
     "<linearGradient id=\"" + grad_id + "\" gradientUnits=\"objectBoundingBox\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\" gradientTransform=\"rotate(" + int_to_str(deg) + ", 0.5, 0.5)\"" + spread_attr + ">" + stops_svg + "</linearGradient>"
@@ -87,7 +89,6 @@ fn patt_svg_content(prst : String, fg : String, bg : String, sz : Int) -> String
   let h = int_to_str(sz / 2)
   let q = int_to_str(sz / 4)
   let q3 = int_to_str(sz * 3 / 4)
-  let hs = int_to_str(sz / 2)
   // Background rect
   let br = "<rect width=\"" + s + "\" height=\"" + s + "\" fill=\"" + bg + "\"/>"
   // Foreground-filled rect (for inverted patterns)
@@ -99,8 +100,8 @@ fn patt_svg_content(prst : String, fg : String, bg : String, sz : Int) -> String
   else if prst == "pct20" || prst == "pct25" { br + patt_dot(h, h, "2", fg) }
   else if prst == "pct30" { br + patt_dot(q, q, "1", fg) + patt_dot(q3, q3, "1", fg) }
   else if prst == "pct40" { br + patt_dot(q, q, "1", fg) + patt_dot(q3, q, "1", fg) + patt_dot(h, q3, "1", fg) }
-  else if prst == "pct50" { br + patt_rect("0", "0", hs, hs, fg) }
-  else if prst == "pct60" { br + patt_rect("0", "0", hs, hs, fg) + patt_dot(q3, q3, "1", fg) }
+  else if prst == "pct50" { br + patt_rect("0", "0", h, h, fg) }
+  else if prst == "pct60" { br + patt_rect("0", "0", h, h, fg) + patt_dot(q3, q3, "1", fg) }
   else if prst == "pct70" || prst == "pct75" { fr + patt_dot(h, h, "2", bg) }
   else if prst == "pct80" { fr + patt_dot(h, h, "1", bg) }
   else if prst == "pct90" { fr + patt_dot(h, q, "1", bg) }
@@ -134,7 +135,7 @@ fn patt_svg_content(prst : String, fg : String, bg : String, sz : Int) -> String
   else if prst == "dnCross" { br + patt_line("0", "0", s, s, fg, "1") + patt_line(s, "0", "0", s, fg, "1") }
 
   // ── Checkerboard / Diamond ──
-  else if prst == "smCheck" || prst == "lgCheck" { br + patt_rect("0", "0", hs, hs, fg) + patt_rect(hs, hs, hs, hs, fg) }
+  else if prst == "smCheck" || prst == "lgCheck" { br + patt_rect("0", "0", h, h, fg) + patt_rect(h, h, h, h, fg) }
   else if prst == "openDmnd" { br + "<polygon points=\"" + h + ",0 " + s + "," + h + " " + h + "," + s + " 0," + h + "\" fill=\"none\" stroke=\"" + fg + "\" stroke-width=\"1\"/>" }
   else if prst == "solidDmnd" { br + "<polygon points=\"" + h + ",0 " + s + "," + h + " " + h + "," + s + " 0," + h + "\" fill=\"" + fg + "\"/>" }
 
@@ -166,7 +167,7 @@ fn patt_svg_content(prst : String, fg : String, bg : String, sz : Int) -> String
 
 ///| Render a SVG <pattern> definition for a PatternFill.
 fn render_pattern_def(pf : @ooxml.PatternFill, id : String) -> String {
-  let sz = 8
+  let sz = pattern_tile_sz
   let fg = pf.fg_color.to_css()
   let bg = pf.bg_color.to_css()
   let content = patt_svg_content(pf.prst, fg, bg, sz)

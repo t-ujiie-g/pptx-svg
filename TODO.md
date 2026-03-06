@@ -29,7 +29,7 @@
 - [x] 透過 / アルファ (`a:alpha` / `a:alphaModFix` → `fill-opacity` / `stop-opacity` + round-trip)
 - [x] 画像フィル (`a:blipFill` in shapes — ストレッチ / クロッピング + round-trip)
 - [x] パターンフィル (`a:pattFill` — 主要12種 SVG `<pattern>` + round-trip)
-- [x] 線 / ストローク完全対応 (破線11種 / 矢印5種 / 線結合 / 線端 / 複合線 / noFill + round-trip)
+- [x] 線 / ストローク完全対応 (破線11種 + カスタム破線 / 矢印5種 / 線結合 / 線端 / 複合線 / noFill + round-trip)
 - [x] Line ジオメトリ SVG `<line>` レンダリング (対角線 / flipH / flipV 対応)
 - [x] グループシェイプ (`p:grpSp` — 再帰パース / 座標変換 / ネスト / SVG `<g>` + round-trip)
 - [x] コネクタ (`p:cxnSp` — 直線 / 折れ線 / 曲線 / 矢印 / 調整値 round-trip)
@@ -131,10 +131,10 @@
 
 ---
 
-## 4. 線 / ストローク [P1] (基本対応済み)
+## 4. 線 / ストローク — 完全対応 [P1] ✅
 
 - [x] 破線スタイル (`a:prstDash val="dash/dot/dashDot/lgDash/sysDot/..."` — 全11種)
-- [ ] カスタム破線 (`a:custDash`)
+- [x] カスタム破線 (`a:custDash` — `a:ds d/sp` パース + SVG stroke-dasharray + round-trip)
 - [x] 矢印ヘッド (`a:headEnd type="triangle/stealth/diamond/oval/arrow" w/len`)
 - [x] 矢印テイル (`a:tailEnd` — 同上)
 - [x] 線結合 (`a:round` / `a:bevel` / `a:miter lim`)

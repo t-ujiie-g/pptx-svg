@@ -56,7 +56,7 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     Some(cs) => {
       let cs_ch = @xml.get_children(cs)
       let mut si = 0
-      while si < 12 {
+      while si < slot_tags.length() {
         match parse_theme_color_node(cs_ch, slot_tags[si]) {
           Some(c) => slot_colors[si] = c
           None => ()

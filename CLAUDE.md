@@ -73,8 +73,14 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 ```
 SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, shapes: Array[Shape] }
-Shape { kind: ShapeKind, transform: ShapeTransform, fill, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill, stroke, stroke_w, stroke_dash/cap/join/miter_limit, stroke_head_type/w/len, stroke_tail_type/w/len, stroke_cmpd, stroke_no_fill, paragraphs, body_props, ph_type, ph_idx }
-StrokeProps { color, width, dash, cap, join, miter_limit, head_type/w/len, tail_type/w/len, cmpd, no_fill }
+Shape { kind: ShapeKind, transform: ShapeTransform,
+  fill: Color, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill,
+  stroke: Color, stroke_w: Int,
+  stroke_dash: String, stroke_cap: String, stroke_join: String, stroke_miter_limit: Int,
+  stroke_head_type: String, stroke_head_w: String, stroke_head_len: String,
+  stroke_tail_type: String, stroke_tail_w: String, stroke_tail_len: String,
+  stroke_cmpd: String, stroke_no_fill: Bool,
+  paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | Other
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String)

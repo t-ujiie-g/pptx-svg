@@ -499,8 +499,28 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     } else if not(shape.stroke.is_none()) {
       out = out + serialize_color(shape.stroke)
     }
-    // Preset dash
-    if not(shape.stroke_dash.is_empty()) {
+    // Preset dash or custom dash
+    if @xml.str_starts_with(shape.stroke_dash, @ooxml.cust_dash_prefix) {
+      let data = @xml.str_suffix(shape.stroke_dash, @ooxml.cust_dash_prefix_len)
+      out = out + "<a:custDash>"
+      // Parse "d1,sp1;d2,sp2;..."
+      let data_len = data.length()
+      let mut pos = 0
+      while pos < data_len {
+        // Parse d value
+        let mut d_end = pos
+        while d_end < data_len && data.get_char(d_end).unwrap() != ',' { d_end = d_end + 1 }
+        let d_val = @xml.parse_int(@xml.str_substring(data, pos, d_end))
+        // Parse sp value
+        let sp_start = d_end + 1
+        let mut sp_end = sp_start
+        while sp_end < data_len && data.get_char(sp_end).unwrap() != ';' { sp_end = sp_end + 1 }
+        let sp_val = @xml.parse_int(@xml.str_substring(data, sp_start, sp_end))
+        out = out + "<a:ds d=\"" + int_to_str(d_val) + "\" sp=\"" + int_to_str(sp_val) + "\"/>"
+        pos = sp_end + 1
+      }
+      out = out + "</a:custDash>"
+    } else if not(shape.stroke_dash.is_empty()) {
       out = out + "<a:prstDash val=\"" + shape.stroke_dash + "\"/>"
     }
     // Line join

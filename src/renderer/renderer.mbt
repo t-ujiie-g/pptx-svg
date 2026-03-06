@@ -28,11 +28,14 @@ let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999"
 let round_rect_radius_divisor : Int = 20  // corner radius = width / 20
 let group_child_idx_multiplier : Int = 1000  // child_idx = shape_idx * 1000 + ci
+let baseline_shift_extra_numer : Int = 2  // extra spacing for super/subscript = font_px * numer / denom
+let baseline_shift_extra_denom : Int = 5
 
-// ── OOXML gradient unit constants ────────────────────────────────────────────
-let ooxml_angle_unit : Int = 60000   // 1 degree = 60000 units in OOXML
-let ooxml_stop_pct : Int = 1000     // stop pos 0-100000 → percentage: divide by 1000
-let ooxml_fill_to_pct : Int = 2000  // fillToRect 0-100000 → center%: divide by 2000
+// ── OOXML unit constants ─────────────────────────────────────────────────────
+let ooxml_pct_denom : Int = 100000  // OOXML percentage denominator (100000 = 100%)
+let ooxml_angle_unit : Int = 60000  // 1 degree = 60000 units in OOXML
+let ooxml_stop_pct : Int = 1000    // stop pos 0-100000 → percentage: divide by 1000
+let ooxml_fill_to_pct : Int = 2000 // fillToRect 0-100000 → center%: divide by 2000
 
 // ── Gradient ID helper ──────────────────────────────────────────────────────
 
@@ -109,6 +112,32 @@ fn stroke_dasharray(dash : String, sw : Int) -> String {
     s8 + "," + s2 + "," + s + "," + s2
   } else if dash == "lgDashDotDot" {
     s8 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
+  } else if @xml.str_starts_with(dash, @ooxml.cust_dash_prefix) {
+    // Custom dash format: "custDash:d1,sp1;d2,sp2;..." (percentages * 100 of line width)
+    // Convert to SVG stroke-dasharray by scaling with stroke width
+    let data = @xml.str_suffix(dash, @ooxml.cust_dash_prefix_len)
+    let mut result = ""
+    let data_len = data.length()
+    let mut pos = 0
+    while pos < data_len {
+      // Parse next number (before , or ;)
+      let mut num_end = pos
+      while num_end < data_len {
+        let c = data.get_char(num_end).unwrap()
+        if c == ',' || c == ';' { break }
+        num_end = num_end + 1
+      }
+      if num_end > pos {
+        let val = @xml.parse_int(@xml.str_substring(data, pos, num_end))
+        // val is in percentage * 100 (e.g. 300000 = 300%). Scale: val * sw / ooxml_pct_denom
+        let px_val = val * sw / ooxml_pct_denom
+        let clamped = if px_val < 1 { 1 } else { px_val }
+        if not(result.is_empty()) { result = result + "," }
+        result = result + int_to_str(clamped)
+      }
+      pos = num_end + 1
+    }
+    result
   } else {
     return ""
   }
@@ -138,7 +167,7 @@ fn stroke_linejoin(join : String, miter_limit : Int) -> String {
     let ml = if miter_limit > 0 {
       // OOXML miter limit is percentage * 1000 (e.g. 800000 = 800%)
       // SVG miterlimit is a plain ratio
-      let ratio = miter_limit / 100000
+      let ratio = miter_limit / ooxml_pct_denom
       if ratio > 1 { a("stroke-miterlimit", int_to_str(ratio)) } else { "" }
     } else {
       ""
@@ -419,7 +448,7 @@ fn render_bent_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : In
   } else if prst == "bentConnector3" {
     // Z-shape: adj1 controls the horizontal split point
     let adj1 = adj_val(avs, 0)
-    let mx = x1 + (x2 - x1) * adj1 / 100000
+    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
     "M" + int_to_str(x1) + s + int_to_str(y1) +
     "L" + int_to_str(mx) + s + int_to_str(y1) +
     "L" + int_to_str(mx) + s + int_to_str(y2) +
@@ -428,8 +457,8 @@ fn render_bent_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : In
     // 4-segment: adj1 (horizontal split), adj2 (vertical split)
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
-    let mx = x1 + (x2 - x1) * adj1 / 100000
-    let my = y1 + (y2 - y1) * adj2 / 100000
+    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
+    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
     "M" + int_to_str(x1) + s + int_to_str(y1) +
     "L" + int_to_str(mx) + s + int_to_str(y1) +
     "L" + int_to_str(mx) + s + int_to_str(my) +
@@ -440,9 +469,9 @@ fn render_bent_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : In
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
     let adj3 = adj_val(avs, 2)
-    let mx1 = x1 + (x2 - x1) * adj1 / 100000
-    let my = y1 + (y2 - y1) * adj2 / 100000
-    let mx2 = x1 + (x2 - x1) * adj3 / 100000
+    let mx1 = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
+    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
+    let mx2 = x1 + (x2 - x1) * adj3 / ooxml_pct_denom
     "M" + int_to_str(x1) + s + int_to_str(y1) +
     "L" + int_to_str(mx1) + s + int_to_str(y1) +
     "L" + int_to_str(mx1) + s + int_to_str(my) +
@@ -465,7 +494,7 @@ fn render_curved_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : 
   } else if prst == "curvedConnector3" {
     // S-curve with adjustable midpoint
     let adj1 = adj_val(avs, 0)
-    let mx = x1 + (x2 - x1) * adj1 / 100000
+    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
     "M" + int_to_str(x1) + s + int_to_str(y1) +
     "C" + int_to_str(mx) + s + int_to_str(y1) + s +
     int_to_str(mx) + s + int_to_str(y2) + s +
@@ -473,8 +502,8 @@ fn render_curved_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : 
   } else if prst == "curvedConnector4" {
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
-    let mx = x1 + (x2 - x1) * adj1 / 100000
-    let my = y1 + (y2 - y1) * adj2 / 100000
+    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
+    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
     // Two cubic bezier segments
     "M" + int_to_str(x1) + s + int_to_str(y1) +
     "C" + int_to_str(mx) + s + int_to_str(y1) + s +
@@ -488,9 +517,9 @@ fn render_curved_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : 
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
     let adj3 = adj_val(avs, 2)
-    let mx1 = x1 + (x2 - x1) * adj1 / 100000
-    let my = y1 + (y2 - y1) * adj2 / 100000
-    let mx2 = x1 + (x2 - x1) * adj3 / 100000
+    let mx1 = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
+    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
+    let mx2 = x1 + (x2 - x1) * adj3 / ooxml_pct_denom
     "M" + int_to_str(x1) + s + int_to_str(y1) +
     "C" + int_to_str(mx1) + s + int_to_str(y1) + s +
     int_to_str(mx1) + s + int_to_str(my) + s +
@@ -795,8 +824,8 @@ fn render_shape(
             let mime = mime_from_ext(img_path)
             if not(bf.stretch) && bf.tile_sx > 0 {
               // Tile mode: create <pattern> definition (will be added to defs)
-              let tile_w = cx_p * bf.tile_sx / 100000
-              let tile_h = cy_p * bf.tile_sy / 100000
+              let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
+              let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
               let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
               let th = int_to_str(if tile_h > 0 { tile_h } else { cy_p })
               "<defs><pattern id=\"" + blip_tile_id + "\" patternUnits=\"userSpaceOnUse\"" +

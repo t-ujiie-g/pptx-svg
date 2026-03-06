@@ -237,6 +237,29 @@ fn apply_autofit_scale(val : Int, font_scale : Int, ln_spc_reduction : Int) -> I
   apply_ln_spc_reduction(apply_font_scale(val, font_scale), ln_spc_reduction)
 }
 
+///| Compute extra spacing needed above/below a paragraph due to super/subscript.
+///| Returns (extra_above, extra_below) in pixels.
+fn para_baseline_shift_extra(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> (Int, Int) {
+  let nr = para.runs.length()
+  let mut has_super = false
+  let mut has_sub = false
+  let mut i = 0
+  while i < nr {
+    if para.runs[i].baseline > 0 { has_super = true }
+    if para.runs[i].baseline < 0 { has_sub = true }
+    i = i + 1
+  }
+  if not(has_super) && not(has_sub) { return (0, 0) }
+  let font_emu = para_max_font_emu(para)
+  let font_px = if font_emu > 0 { px(font_emu, scale) } else { def_sz }
+  // SVG baseline-shift:super moves up ~40% of font size, sub moves down ~20%
+  // The shifted text is at 70% size, so it extends beyond the normal line bounds
+  let extra = font_px * baseline_shift_extra_numer / baseline_shift_extra_denom
+  let above = if has_super { extra } else { 0 }
+  let below = if has_sub { extra } else { 0 }
+  (above, below)
+}
+
 fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) -> Int {
   if para.line_spacing > 0 {
     // Positive = EMU absolute value
@@ -504,6 +527,9 @@ fn render_text(
 
       out = out + make_text_header(text_x)
     }
+    // Extra space for super/subscript to avoid overlap with adjacent lines
+    let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(para, scale, def_sz)
+    cur_y = cur_y + bl_extra_above
     // Advance to baseline (ascent ≈ font_size)
     cur_y = cur_y + p_font_sz
     if nr == 0 {
@@ -674,7 +700,7 @@ fn render_text(
         }
       }
       out = out + "</tspan>"
-      cur_y = cur_y + (p_line_h - p_font_sz)
+      cur_y = cur_y + (p_line_h - p_font_sz) + bl_extra_below
       // Apply spacing after paragraph
       if para.spc_after > 0 {
         cur_y = cur_y + px(para.spc_after, scale)
@@ -702,10 +728,11 @@ fn estimate_text_height(
   while i < np {
     let para = paragraphs[i]
     let plh = para_line_height(para, scale, def_line_h)
+    let (bl_above, bl_below) = para_baseline_shift_extra(para, scale, def_sz)
     if para.spc_before > 0 && i > 0 {
       total = total + px(para.spc_before, scale)
     }
-    total = total + plh
+    total = total + plh + bl_above + bl_below
     if para.spc_after > 0 {
       total = total + px(para.spc_after, scale)
     }

@@ -720,6 +720,8 @@ async function testFeaturesPptx() {
     assert('slide32 has val="dash"', slide32.includes('val="dash"'));
     assert('slide32 has val="dot"', slide32.includes('val="dot"'));
     assert('slide32 has val="dashDot"', slide32.includes('val="dashDot"'));
+    assert('slide32 has a:custDash', hasTag(slide32, 'a:custDash'));
+    assert('slide32 has a:ds (custom dash segment)', hasTag(slide32, 'a:ds'));
   }
 
   // ── Slide 33: Arrows, line join, line cap ───────────────────────────────

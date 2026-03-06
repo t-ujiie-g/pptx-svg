@@ -34,7 +34,7 @@ Slides:
  29. Gradient tileFlip (tileFlip="x" / "y" / "xy")
  30. Additional pattern fills (pct50 / dnDiag / cross / lgCheck / solidDmnd / trellis)
  31. Image fill tile (a:tile with sx/sy/flip/algn)
- 32. Stroke dash styles (dash/dot/dashDot/lgDash/sysDot/sysDash)
+ 32. Stroke dash styles (dash/dot/dashDot/lgDash/sysDot/sysDash + custDash)
  33. Arrows (headEnd/tailEnd), line join (round/bevel/miter), line cap (rnd/sq), compound line (dbl), noFill
  34. Group shapes (p:grpSp) — simple group + nested group
  35. Connectors (p:cxnSp) — straight, diagonal, bent, curved
@@ -2074,6 +2074,20 @@ for i, (dash, color) in enumerate(dash_info):
     lbl.text_frame.paragraphs[0].text = dash
     lbl.text_frame.paragraphs[0].font.size = Pt(9)
     lbl.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+# Custom dash (a:custDash with a:ds elements)
+add_line_shape(slide32, Inches(1), Inches(1.0 + 6 * 0.9), Inches(8), Emu(0),
+    '''<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:solidFill><a:srgbClr val="FF6600"/></a:solidFill>
+      <a:custDash>
+        <a:ds d="400000" sp="100000"/>
+        <a:ds d="100000" sp="100000"/>
+      </a:custDash>
+    </a:ln>''')
+lbl_cd = slide32.shapes.add_textbox(Inches(0.2), Inches(1.0 + 6 * 0.9 - 0.25), Inches(0.8), Inches(0.3))
+lbl_cd.text_frame.paragraphs[0].text = "custDash"
+lbl_cd.text_frame.paragraphs[0].font.size = Pt(9)
+lbl_cd.text_frame.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
 
 # ── Slide 33: Arrows + Line cap/join ──────────────────────────────────────
 

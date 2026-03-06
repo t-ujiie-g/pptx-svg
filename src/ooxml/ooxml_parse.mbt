@@ -186,10 +186,31 @@ fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> Strok
         let clr = parse_solid_fill(ln_ch, theme)
         if clr.is_none() { Color::black() } else { clr }
       }
-      // Preset dash
-      let dash = match @xml.find_child(ln_ch, "a:prstDash") {
+      // Preset dash or custom dash
+      let mut dash = match @xml.find_child(ln_ch, "a:prstDash") {
         None => ""
         Some(d) => match @xml.get_attr(d, "val") { Some(v) => v; None => "" }
+      }
+      if dash.is_empty() {
+        match @xml.find_child(ln_ch, "a:custDash") {
+          None => ()
+          Some(cd) => {
+            // a:custDash contains a:ds children with d (dash) and sp (space) percentages
+            // Format: "custDash:d1,sp1;d2,sp2;..." (percentages of line width * 100)
+            let ds_nodes = @xml.find_children(@xml.get_children(cd), "a:ds")
+            let nds = ds_nodes.length()
+            let mut cd_str = cust_dash_prefix
+            let mut di = 0
+            while di < nds {
+              if di > 0 { cd_str = cd_str + ";" }
+              let d_val = attr_int(ds_nodes[di], "d")
+              let sp_val = attr_int(ds_nodes[di], "sp")
+              cd_str = cd_str + int_to_str(d_val) + "," + int_to_str(sp_val)
+              di = di + 1
+            }
+            if nds > 0 { dash = cd_str }
+          }
+        }
       }
       // Line join
       let mut join = ""

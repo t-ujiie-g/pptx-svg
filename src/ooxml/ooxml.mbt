@@ -571,6 +571,10 @@ pub(all) struct TextParagraph {
 ///| 100000 = 100% in OOXML percentage units (fontScale, lnSpcReduction, etc.)
 pub let pct_100 : Int = 100000
 
+///| Prefix for custom dash stroke_dash strings. Format: "custDash:d1,sp1;d2,sp2;..."
+pub let cust_dash_prefix : String = "custDash:"
+pub let cust_dash_prefix_len : Int = 9
+
 ///| Maximum outline levels in OOXML (lvl1pPr through lvl9pPr).
 pub let max_outline_levels : Int = 9
 
