@@ -26,6 +26,8 @@ let table_cell_pad : Int = 4              // padding inside table cells (px)
 let default_text_fill : String = "black"
 let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999"
+let round_rect_radius_divisor : Int = 20  // corner radius = width / 20
+let group_child_idx_multiplier : Int = 1000  // child_idx = shape_idx * 1000 + ci
 
 // ── OOXML gradient unit constants ────────────────────────────────────────────
 let ooxml_angle_unit : Int = 60000   // 1 degree = 60000 units in OOXML
@@ -335,6 +337,173 @@ fn format_ratio(num : Int, den : Int) -> String {
   int_to_str(whole) + "." + f
 }
 
+///| Encode adjustment values as comma-separated string for data attribute.
+fn encode_adj_values(avs : Array[Int]) -> String {
+  let n = avs.length()
+  let mut out = ""
+  let mut i = 0
+  while i < n {
+    if i > 0 { out = out + "," }
+    out = out + int_to_str(avs[i])
+    i = i + 1
+  }
+  out
+}
+
+// ── Line / Connector rendering helpers ──────────────────────────────────────
+
+///| Compute line endpoints considering flipH/flipV.
+fn line_endpoints(x : Int, y : Int, w : Int, h : Int, flip_h : Bool, flip_v : Bool) -> (Int, Int, Int, Int) {
+  if flip_h && flip_v {
+    (x + w, y + h, x, y)
+  } else if flip_h {
+    (x + w, y, x, y + h)
+  } else if flip_v {
+    (x, y + h, x + w, y)
+  } else {
+    (x, y, x + w, y + h)
+  }
+}
+
+fn render_line_geom(x : Int, y : Int, w : Int, h : Int, flip_h : Bool, flip_v : Bool, stroke : String, rot : String) -> String {
+  let (x1, y1, x2, y2) = line_endpoints(x, y, w, h, flip_h, flip_v)
+  "<line" +
+  ai("x1", x1) + ai("y1", y1) +
+  ai("x2", x2) + ai("y2", y2) +
+  stroke + rot + "/>"
+}
+
+///| Get adjustment value with default fallback (50000 = 50%).
+fn adj_val(avs : Array[Int], idx : Int) -> Int {
+  if idx < avs.length() { avs[idx] } else { 50000 }
+}
+
+///| Render bent/curved connector as SVG <path>.
+fn render_connector_path(
+  prst : String,
+  avs : Array[Int],
+  x : Int, y : Int, w : Int, h : Int,
+  flip_h : Bool, flip_v : Bool,
+  stroke : String, rot : String
+) -> String {
+  let (x1, y1, x2, y2) = line_endpoints(x, y, w, h, flip_h, flip_v)
+  let d = if is_bent_connector(prst) {
+    render_bent_path(prst, avs, x1, y1, x2, y2)
+  } else if is_curved_connector(prst) {
+    render_curved_path(prst, avs, x1, y1, x2, y2)
+  } else {
+    // Fallback: straight line
+    "M" + int_to_str(x1) + " " + int_to_str(y1) + "L" + int_to_str(x2) + " " + int_to_str(y2)
+  }
+  "<path d=\"" + d + "\" fill=\"none\"" + stroke + rot + "/>"
+}
+
+fn is_bent_connector(prst : String) -> Bool {
+  prst == "bentConnector2" || prst == "bentConnector3" ||
+  prst == "bentConnector4" || prst == "bentConnector5"
+}
+
+fn is_curved_connector(prst : String) -> Bool {
+  prst == "curvedConnector2" || prst == "curvedConnector3" ||
+  prst == "curvedConnector4" || prst == "curvedConnector5"
+}
+
+///| Render bent connector SVG path (right-angle polyline).
+fn render_bent_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : Int, y2 : Int) -> String {
+  let s = " "
+  if prst == "bentConnector2" {
+    // L-shape: horizontal then vertical
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "L" + int_to_str(x2) + s + int_to_str(y1) +
+    "L" + int_to_str(x2) + s + int_to_str(y2)
+  } else if prst == "bentConnector3" {
+    // Z-shape: adj1 controls the horizontal split point
+    let adj1 = adj_val(avs, 0)
+    let mx = x1 + (x2 - x1) * adj1 / 100000
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "L" + int_to_str(mx) + s + int_to_str(y1) +
+    "L" + int_to_str(mx) + s + int_to_str(y2) +
+    "L" + int_to_str(x2) + s + int_to_str(y2)
+  } else if prst == "bentConnector4" {
+    // 4-segment: adj1 (horizontal split), adj2 (vertical split)
+    let adj1 = adj_val(avs, 0)
+    let adj2 = adj_val(avs, 1)
+    let mx = x1 + (x2 - x1) * adj1 / 100000
+    let my = y1 + (y2 - y1) * adj2 / 100000
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "L" + int_to_str(mx) + s + int_to_str(y1) +
+    "L" + int_to_str(mx) + s + int_to_str(my) +
+    "L" + int_to_str(x2) + s + int_to_str(my) +
+    "L" + int_to_str(x2) + s + int_to_str(y2)
+  } else {
+    // bentConnector5: 5-segment
+    let adj1 = adj_val(avs, 0)
+    let adj2 = adj_val(avs, 1)
+    let adj3 = adj_val(avs, 2)
+    let mx1 = x1 + (x2 - x1) * adj1 / 100000
+    let my = y1 + (y2 - y1) * adj2 / 100000
+    let mx2 = x1 + (x2 - x1) * adj3 / 100000
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "L" + int_to_str(mx1) + s + int_to_str(y1) +
+    "L" + int_to_str(mx1) + s + int_to_str(my) +
+    "L" + int_to_str(mx2) + s + int_to_str(my) +
+    "L" + int_to_str(mx2) + s + int_to_str(y2) +
+    "L" + int_to_str(x2) + s + int_to_str(y2)
+  }
+}
+
+///| Render curved connector SVG path (bezier curves).
+fn render_curved_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : Int, y2 : Int) -> String {
+  let s = " "
+  if prst == "curvedConnector2" {
+    // Simple S-curve
+    let mx = (x1 + x2) / 2
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "C" + int_to_str(mx) + s + int_to_str(y1) + s +
+    int_to_str(mx) + s + int_to_str(y2) + s +
+    int_to_str(x2) + s + int_to_str(y2)
+  } else if prst == "curvedConnector3" {
+    // S-curve with adjustable midpoint
+    let adj1 = adj_val(avs, 0)
+    let mx = x1 + (x2 - x1) * adj1 / 100000
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "C" + int_to_str(mx) + s + int_to_str(y1) + s +
+    int_to_str(mx) + s + int_to_str(y2) + s +
+    int_to_str(x2) + s + int_to_str(y2)
+  } else if prst == "curvedConnector4" {
+    let adj1 = adj_val(avs, 0)
+    let adj2 = adj_val(avs, 1)
+    let mx = x1 + (x2 - x1) * adj1 / 100000
+    let my = y1 + (y2 - y1) * adj2 / 100000
+    // Two cubic bezier segments
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "C" + int_to_str(mx) + s + int_to_str(y1) + s +
+    int_to_str(mx) + s + int_to_str(my) + s +
+    int_to_str(mx) + s + int_to_str(my) +
+    "C" + int_to_str(mx) + s + int_to_str(my) + s +
+    int_to_str(x2) + s + int_to_str(my) + s +
+    int_to_str(x2) + s + int_to_str(y2)
+  } else {
+    // curvedConnector5
+    let adj1 = adj_val(avs, 0)
+    let adj2 = adj_val(avs, 1)
+    let adj3 = adj_val(avs, 2)
+    let mx1 = x1 + (x2 - x1) * adj1 / 100000
+    let my = y1 + (y2 - y1) * adj2 / 100000
+    let mx2 = x1 + (x2 - x1) * adj3 / 100000
+    "M" + int_to_str(x1) + s + int_to_str(y1) +
+    "C" + int_to_str(mx1) + s + int_to_str(y1) + s +
+    int_to_str(mx1) + s + int_to_str(my) + s +
+    int_to_str(mx1) + s + int_to_str(my) +
+    "C" + int_to_str(mx1) + s + int_to_str(my) + s +
+    int_to_str(mx2) + s + int_to_str(my) + s +
+    int_to_str(mx2) + s + int_to_str(my) +
+    "C" + int_to_str(mx2) + s + int_to_str(my) + s +
+    int_to_str(x2) + s + int_to_str(y2) + s +
+    int_to_str(x2) + s + int_to_str(y2)
+  }
+}
+
 // ── data-ooxml-* attribute helpers ───────────────────────────────────────────
 
 fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
@@ -454,6 +623,7 @@ fn render_shape(
   }
   let is_line = match shape.kind {
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Line) => true
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, _)) => true
     _ => false
   }
   if cx_p <= 0 { return "" }
@@ -535,13 +705,15 @@ fn render_shape(
       da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
       da("patt-bg", shape.patt_fill.bg_color.to_hex())
     } else { "" }) +
-    // Group shape child offset/extent attributes
+    // Group shape / connector-specific attributes
     (match shape.kind {
       @ooxml.ShapeKind::GroupShape(grp) =>
         dai("grp-ch-off-x", grp.ch_off_x) +
         dai("grp-ch-off-y", grp.ch_off_y) +
         dai("grp-ch-ext-cx", grp.ch_ext_cx) +
         dai("grp-ch-ext-cy", grp.ch_ext_cy)
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, avs)) =>
+        if avs.length() > 0 { da("cxn-adj", encode_adj_values(avs)) } else { "" }
       _ => ""
     })
 
@@ -559,8 +731,7 @@ fn render_shape(
       } else if not(shape.grad_fill.is_none()) {
         " fill=\"url(#" + grad_id(slide_num, shape_idx) + ")\""
       } else {
-        let fill_css = "rgb(" + int_to_str(shape.fill.r) + "," + int_to_str(shape.fill.g) + "," + int_to_str(shape.fill.b) + ")"
-        let fill_base = if shape.fill.is_none() { a("fill", "none") } else { a("fill", fill_css) }
+        let fill_base = if shape.fill.is_none() { a("fill", "none") } else { a("fill", shape.fill.to_css()) }
         if shape.fill.alpha < 255 && not(shape.fill.is_none()) {
           fill_base + " fill-opacity=\"" + @ooxml.alpha_to_css_str(shape.fill.alpha) + "\""
         } else {
@@ -588,24 +759,14 @@ fn render_shape(
           fill + stroke + rot + "/>"
         }
         @ooxml.ShapeGeom::Line => {
-          // Line goes from one corner to the opposite; flipH/flipV reverse direction
-          let (lx1, ly1, lx2, ly2) = if t.flip_h && t.flip_v {
-            (x_p + cx_p, y_p + cy_p, x_p, y_p)
-          } else if t.flip_h {
-            (x_p + cx_p, y_p, x_p, y_p + cy_p)
-          } else if t.flip_v {
-            (x_p, y_p + cy_p, x_p + cx_p, y_p)
-          } else {
-            (x_p, y_p, x_p + cx_p, y_p + cy_p)
-          }
-          "<line" +
-          ai("x1", lx1) + ai("y1", ly1) +
-          ai("x2", lx2) + ai("y2", ly2) +
-          stroke + rot + "/>"
+          render_line_geom(x_p, y_p, cx_p, cy_p, t.flip_h, t.flip_v, stroke, rot)
+        }
+        @ooxml.ShapeGeom::Connector(prst, avs) => {
+          render_connector_path(prst, avs, x_p, y_p, cx_p, cy_p, t.flip_h, t.flip_v, stroke, rot)
         }
         _ => {
           let rx = match geom {
-            @ooxml.ShapeGeom::RoundRect => int_to_str(cx_p / 20)
+            @ooxml.ShapeGeom::RoundRect => int_to_str(cx_p / round_rect_radius_divisor)
             _ => "0"
           }
           let base = "<rect" +
@@ -744,7 +905,7 @@ fn render_group(
   let mut ci = 0
   while ci < nc {
     let child = grp.children[ci]
-    let child_idx = shape_idx * 1000 + ci
+    let child_idx = shape_idx * group_child_idx_multiplier + ci
     if not(child.grad_fill.is_none()) {
       defs = defs + render_gradient_def(child.grad_fill, grad_id(slide_num, child_idx))
     }
@@ -895,49 +1056,41 @@ pub fn render_slide_svg(
     da("bg", slide.background.to_hex()) +
     dai("scale", scale) +
     ">"
-  // Collect gradient <defs>
+  // Collect all <defs> in a single pass per shape set
   let mut defs = ""
   // Background gradient
   if not(slide.bg_grad.is_none()) {
     defs = defs + render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
   }
-  // Shape gradients
-  let n = slide.shapes.length()
-  let mut di = 0
-  while di < n {
-    if not(slide.shapes[di].grad_fill.is_none()) {
-      defs = defs + render_gradient_def(slide.shapes[di].grad_fill, grad_id(slide_num, di))
-    }
-    di = di + 1
-  }
-  // Background shape gradients
+  // Background shapes defs (master/layout non-placeholder shapes)
   let nbg = bg_shapes.length()
   let mut bdi = 0
   while bdi < nbg {
-    if not(bg_shapes[bdi].grad_fill.is_none()) {
-      defs = defs + render_gradient_def(bg_shapes[bdi].grad_fill, grad_id(slide_num, -(bdi + 1)))
+    let bs = bg_shapes[bdi]
+    let bs_idx = -(bdi + 1)
+    if not(bs.grad_fill.is_none()) {
+      defs = defs + render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
     }
     bdi = bdi + 1
   }
-  // Pattern fill defs
-  let mut pi = 0
-  while pi < n {
-    if not(slide.shapes[pi].patt_fill.is_none()) {
-      defs = defs + render_pattern_def(slide.shapes[pi].patt_fill, patt_id(slide_num, pi))
+  // Slide shapes defs (gradient, pattern, arrows)
+  let n = slide.shapes.length()
+  let mut di = 0
+  while di < n {
+    let sh = slide.shapes[di]
+    if not(sh.grad_fill.is_none()) {
+      defs = defs + render_gradient_def(sh.grad_fill, grad_id(slide_num, di))
     }
-    pi = pi + 1
-  }
-  // Arrow marker defs
-  let mut ai2 = 0
-  while ai2 < n {
-    let sh = slide.shapes[ai2]
+    if not(sh.patt_fill.is_none()) {
+      defs = defs + render_pattern_def(sh.patt_fill, patt_id(slide_num, di))
+    }
     if has_arrow(sh.stroke_head_type) {
-      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, ai2, true), sh.stroke_head_type, sh.stroke_head_w, sh.stroke_head_len, sh.stroke)
+      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, di, true), sh.stroke_head_type, sh.stroke_head_w, sh.stroke_head_len, sh.stroke)
     }
     if has_arrow(sh.stroke_tail_type) {
-      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, ai2, false), sh.stroke_tail_type, sh.stroke_tail_w, sh.stroke_tail_len, sh.stroke)
+      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, di, false), sh.stroke_tail_type, sh.stroke_tail_w, sh.stroke_tail_len, sh.stroke)
     }
-    ai2 = ai2 + 1
+    di = di + 1
   }
   let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
 

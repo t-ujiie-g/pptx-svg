@@ -769,6 +769,8 @@ async function testFeaturesPptx() {
     assert('slide35 has type="triangle"', slide35.includes('type="triangle"'));
     assert('slide35 has type="diamond"', slide35.includes('type="diamond"'));
     assert('slide35 has type="stealth"', slide35.includes('type="stealth"'));
+    assert('slide35 has bentConnector3', slide35.includes('bentConnector3'));
+    assert('slide35 has curvedConnector3', slide35.includes('curvedConnector3'));
   }
 }
 

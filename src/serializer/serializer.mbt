@@ -9,6 +9,15 @@
 
 fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
 
+///| Serialize an arrow end element (a:headEnd or a:tailEnd).
+fn serialize_arrow_end(tag : String, type_ : String, w : String, len : String) -> String {
+  if type_.is_empty() { return "" }
+  let mut attrs = " type=\"" + type_ + "\""
+  if not(w.is_empty()) { attrs = attrs + " w=\"" + w + "\"" }
+  if not(len.is_empty()) { attrs = attrs + " len=\"" + len + "\"" }
+  "<" + tag + attrs + "/>"
+}
+
 // ── XML helpers ──────────────────────────────────────────────────────────────
 
 fn xml_escape(s : String) -> String {
@@ -401,21 +410,41 @@ fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph], body_props : @o
 
 // ── Shape serialization ──────────────────────────────────────────────────────
 
-fn serialize_transform(t : @ooxml.ShapeTransform) -> String {
+///| Serialize a:xfrm with optional extra content (e.g. chOff/chExt for groups).
+fn serialize_transform_with_extra(t : @ooxml.ShapeTransform, extra : String) -> String {
   let mut xfrm = "<a:xfrm"
-  if t.rot != 0 {
-    xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\""
-  }
-  if t.flip_h {
-    xfrm = xfrm + " flipH=\"1\""
-  }
-  if t.flip_v {
-    xfrm = xfrm + " flipV=\"1\""
-  }
+  if t.rot != 0 { xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\"" }
+  if t.flip_h { xfrm = xfrm + " flipH=\"1\"" }
+  if t.flip_v { xfrm = xfrm + " flipV=\"1\"" }
   xfrm = xfrm + ">"
   xfrm = xfrm + "<a:off x=\"" + int_to_str(t.x) + "\" y=\"" + int_to_str(t.y) + "\"/>"
   xfrm = xfrm + "<a:ext cx=\"" + int_to_str(t.cx) + "\" cy=\"" + int_to_str(t.cy) + "\"/>"
-  xfrm + "</a:xfrm>"
+  xfrm + extra + "</a:xfrm>"
+}
+
+fn serialize_transform(t : @ooxml.ShapeTransform) -> String {
+  serialize_transform_with_extra(t, "")
+}
+
+fn serialize_prst_geom(geom : @ooxml.ShapeGeom) -> String {
+  let prst = geom.to_prst()
+  match geom {
+    @ooxml.ShapeGeom::Connector(_, avs) => {
+      if avs.length() == 0 {
+        "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
+      } else {
+        let mut out = "<a:prstGeom prst=\"" + prst + "\"><a:avLst>"
+        let n = avs.length()
+        let mut i = 0
+        while i < n {
+          out = out + "<a:gd name=\"adj" + int_to_str(i + 1) + "\" fmla=\"val " + int_to_str(avs[i]) + "\"/>"
+          i = i + 1
+        }
+        out + "</a:avLst></a:prstGeom>"
+      }
+    }
+    _ => "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
+  }
 }
 
 fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
@@ -437,7 +466,7 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   // Shape properties
   out = out + "<p:spPr>"
   out = out + serialize_transform(shape.transform)
-  out = out + "<a:prstGeom prst=\"" + geom.to_prst() + "\"><a:avLst/></a:prstGeom>"
+  out = out + serialize_prst_geom(geom)
   // Fill (priority: blipFill > pattFill > gradFill > solidFill)
   if not(shape.blip_fill.is_none()) {
     out = out + serialize_blip_fill(shape.blip_fill)
@@ -486,28 +515,9 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
         out = out + "<a:miter/>"
       }
     }
-    // Arrow head
-    if not(shape.stroke_head_type.is_empty()) {
-      let mut he_attrs = " type=\"" + shape.stroke_head_type + "\""
-      if not(shape.stroke_head_w.is_empty()) {
-        he_attrs = he_attrs + " w=\"" + shape.stroke_head_w + "\""
-      }
-      if not(shape.stroke_head_len.is_empty()) {
-        he_attrs = he_attrs + " len=\"" + shape.stroke_head_len + "\""
-      }
-      out = out + "<a:headEnd" + he_attrs + "/>"
-    }
-    // Arrow tail
-    if not(shape.stroke_tail_type.is_empty()) {
-      let mut te_attrs = " type=\"" + shape.stroke_tail_type + "\""
-      if not(shape.stroke_tail_w.is_empty()) {
-        te_attrs = te_attrs + " w=\"" + shape.stroke_tail_w + "\""
-      }
-      if not(shape.stroke_tail_len.is_empty()) {
-        te_attrs = te_attrs + " len=\"" + shape.stroke_tail_len + "\""
-      }
-      out = out + "<a:tailEnd" + te_attrs + "/>"
-    }
+    // Arrow head/tail
+    out = out + serialize_arrow_end("a:headEnd", shape.stroke_head_type, shape.stroke_head_w, shape.stroke_head_len)
+    out = out + serialize_arrow_end("a:tailEnd", shape.stroke_tail_type, shape.stroke_tail_w, shape.stroke_tail_len)
     out = out + "</a:ln>"
   }
   out = out + "</p:spPr>"
@@ -604,7 +614,6 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
 }
 
 fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String {
-  let t = shape.transform
   let mut out = "<p:grpSp>"
   out = out + "<p:nvGrpSpPr>"
   out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
@@ -612,16 +621,10 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
   out = out + "<p:nvPr/>"
   out = out + "</p:nvGrpSpPr>"
   out = out + "<p:grpSpPr>"
-  let mut xfrm = "<a:xfrm"
-  if t.rot != 0 { xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\"" }
-  if t.flip_h { xfrm = xfrm + " flipH=\"1\"" }
-  if t.flip_v { xfrm = xfrm + " flipV=\"1\"" }
-  xfrm = xfrm + ">"
-  xfrm = xfrm + "<a:off x=\"" + int_to_str(t.x) + "\" y=\"" + int_to_str(t.y) + "\"/>"
-  xfrm = xfrm + "<a:ext cx=\"" + int_to_str(t.cx) + "\" cy=\"" + int_to_str(t.cy) + "\"/>"
-  xfrm = xfrm + "<a:chOff x=\"" + int_to_str(grp.ch_off_x) + "\" y=\"" + int_to_str(grp.ch_off_y) + "\"/>"
-  xfrm = xfrm + "<a:chExt cx=\"" + int_to_str(grp.ch_ext_cx) + "\" cy=\"" + int_to_str(grp.ch_ext_cy) + "\"/>"
-  out = out + xfrm + "</a:xfrm>"
+  // Group xfrm includes chOff/chExt in addition to normal off/ext
+  let ch_extra = "<a:chOff x=\"" + int_to_str(grp.ch_off_x) + "\" y=\"" + int_to_str(grp.ch_off_y) + "\"/>" +
+    "<a:chExt cx=\"" + int_to_str(grp.ch_ext_cx) + "\" cy=\"" + int_to_str(grp.ch_ext_cy) + "\"/>"
+  out = out + serialize_transform_with_extra(shape.transform, ch_extra)
   out = out + "</p:grpSpPr>"
   // Serialize child shapes
   let nc = grp.children.length()

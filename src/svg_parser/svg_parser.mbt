@@ -272,7 +272,12 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     }
     @ooxml.ShapeKind::GroupShape(grp_data)
   } else {
-    let geom = parse_geom(geom_str)
+    let adj_str = get_da(g_node, "cxn-adj")
+    let geom = if is_connector_prst(geom_str) {
+      parse_connector_geom_from_svg(geom_str, adj_str)
+    } else {
+      parse_geom(geom_str)
+    }
     @ooxml.ShapeKind::AutoShape(geom)
   }
 
@@ -411,6 +416,43 @@ fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
 
 fn parse_geom(prst : String) -> @ooxml.ShapeGeom {
   @ooxml.parse_geom(prst)
+}
+
+fn is_connector_prst(prst : String) -> Bool {
+  let len = prst.length()
+  (len >= 14 && @xml.str_substring(prst, 0, 4) == "bent") ||
+  (len >= 16 && @xml.str_substring(prst, 0, 6) == "curved")
+}
+
+///| Parse connector geometry from geom string + adjustment data attribute.
+fn parse_connector_geom_from_svg(geom_str : String, adj_str : String) -> @ooxml.ShapeGeom {
+  if adj_str.is_empty() {
+    @ooxml.parse_connector_geom(geom_str, [])
+  } else {
+    let avs = parse_adj_string(adj_str)
+    @ooxml.parse_connector_geom(geom_str, avs)
+  }
+}
+
+///| Parse comma-separated adjustment values.
+fn parse_adj_string(s : String) -> Array[Int] {
+  let result : Array[Int] = []
+  let mut start = 0
+  let len = s.length()
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == ',' {
+      if i > start {
+        result.push(@xml.parse_int(@xml.str_substring(s, start, i)))
+      }
+      start = i + 1
+    }
+    i = i + 1
+  }
+  if start < len {
+    result.push(@xml.parse_int(@xml.str_substring(s, start, len)))
+  }
+  result
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

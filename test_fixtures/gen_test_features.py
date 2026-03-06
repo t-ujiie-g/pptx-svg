@@ -37,7 +37,7 @@ Slides:
  32. Stroke dash styles (dash/dot/dashDot/lgDash/sysDot/sysDash)
  33. Arrows (headEnd/tailEnd), line join (round/bevel/miter), line cap (rnd/sq), compound line (dbl), noFill
  34. Group shapes (p:grpSp) — simple group + nested group
- 35. Connectors (p:cxnSp) — straight + diagonal with arrows
+ 35. Connectors (p:cxnSp) — straight, diagonal, bent, curved
 """
 
 from pptx import Presentation
@@ -2407,8 +2407,59 @@ cxn2_xml = f'''<p:cxnSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
 </p:cxnSp>'''
 spTree35.append(etree.fromstring(cxn2_xml))
 
+# Bent connector (L-shape)
+cxn3_xml = f'''<p:cxnSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
+  <p:nvCxnSpPr>
+    <p:cNvPr id="302" name="Bent Connector"/>
+    <p:cNvCxnSpPr/>
+    <p:nvPr/>
+  </p:nvCxnSpPr>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="5029200" y="1371600"/>
+      <a:ext cx="3657600" cy="1371600"/>
+    </a:xfrm>
+    <a:prstGeom prst="bentConnector3">
+      <a:avLst>
+        <a:gd name="adj1" fmla="val 50000"/>
+      </a:avLst>
+    </a:prstGeom>
+    <a:ln w="25400">
+      <a:solidFill><a:srgbClr val="009900"/></a:solidFill>
+      <a:tailEnd type="triangle"/>
+    </a:ln>
+  </p:spPr>
+</p:cxnSp>'''
+spTree35.append(etree.fromstring(cxn3_xml))
+
+# Curved connector
+cxn4_xml = f'''<p:cxnSp xmlns:a="{ns_a}" xmlns:p="{ns_p}" xmlns:r="{ns_r}">
+  <p:nvCxnSpPr>
+    <p:cNvPr id="303" name="Curved Connector"/>
+    <p:cNvCxnSpPr/>
+    <p:nvPr/>
+  </p:nvCxnSpPr>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="5029200" y="3200400"/>
+      <a:ext cx="3657600" cy="1371600"/>
+    </a:xfrm>
+    <a:prstGeom prst="curvedConnector3">
+      <a:avLst>
+        <a:gd name="adj1" fmla="val 50000"/>
+      </a:avLst>
+    </a:prstGeom>
+    <a:ln w="25400">
+      <a:solidFill><a:srgbClr val="FF6600"/></a:solidFill>
+      <a:headEnd type="oval"/>
+      <a:tailEnd type="arrow"/>
+    </a:ln>
+  </p:spPr>
+</p:cxnSp>'''
+spTree35.append(etree.fromstring(cxn4_xml))
+
 lbl35 = slide35.shapes.add_textbox(Inches(0.5), Inches(5.5), Inches(9), Inches(1))
-lbl35.text_frame.paragraphs[0].text = "Top: straight connector (red, triangle arrow). Bottom: diagonal connector (blue dashed, diamond+stealth)."
+lbl35.text_frame.paragraphs[0].text = "Left: straight + diagonal. Right: bent (green) + curved (orange)."
 lbl35.text_frame.paragraphs[0].font.size = Pt(12)
 lbl35.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 

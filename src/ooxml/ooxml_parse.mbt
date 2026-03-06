@@ -546,7 +546,31 @@ fn shape_with_stroke(kind : ShapeKind, transform : ShapeTransform, sp : StrokePr
   }
 }
 
-///| Parse connector shape — rendered as a line with stroke properties.
+///| Parse adjustment values from a:avLst inside a:prstGeom.
+fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
+  let avs : Array[Int] = []
+  match @xml.find_child(@xml.get_children(geom_node), "a:avLst") {
+    None => ()
+    Some(avlst) => {
+      let gds = @xml.find_children(@xml.get_children(avlst), "a:gd")
+      let n = gds.length()
+      let mut i = 0
+      while i < n {
+        // <a:gd name="adj1" fmla="val 50000"/>
+        let fmla = match @xml.get_attr(gds[i], "fmla") { Some(v) => v; None => "" }
+        // Extract value from "val NNNNN"
+        if fmla.length() > 4 {
+          let val_str = @xml.str_suffix(fmla, 4)
+          avs.push(@xml.parse_int(val_str))
+        }
+        i = i + 1
+      }
+    }
+  }
+  avs
+}
+
+///| Parse connector shape — rendered as a line or path with stroke properties.
 fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(cxn)
   let sppr = match @xml.find_child(ch, "p:spPr") {
@@ -556,7 +580,15 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
   let sppr_ch = @xml.get_children(sppr)
   let transform = parse_xfrm(sppr_ch)
   let sp = parse_stroke(sppr_ch, theme)
-  shape_with_stroke(ShapeKind::AutoShape(ShapeGeom::Line), transform, sp)
+  let geom = match @xml.find_child(sppr_ch, "a:prstGeom") {
+    None => ShapeGeom::Line
+    Some(g) => {
+      let prst = match @xml.get_attr(g, "prst") { Some(v) => v; None => "line" }
+      let avs = parse_avlst(g)
+      parse_connector_geom(prst, avs)
+    }
+  }
+  shape_with_stroke(ShapeKind::AutoShape(geom), transform, sp)
 }
 
 fn parse_grp_sp(grp : @xml.XmlNode, theme : ThemeData) -> Shape {

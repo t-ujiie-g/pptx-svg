@@ -28,6 +28,19 @@ fn find_placeholder(shapes : Array[@ooxml.Shape], ph_type : String, ph_idx : Int
   None
 }
 
+///| Create a new shape with inherited transform and optionally body_props from a placeholder source.
+fn shape_with_inherited_transform(shape : @ooxml.Shape, source_ph : @ooxml.Shape) -> @ooxml.Shape {
+  {
+    ..shape,
+    transform: source_ph.transform,
+    body_props: if shape.body_props.anchor.is_empty() && not(source_ph.body_props.anchor.is_empty()) {
+      source_ph.body_props
+    } else {
+      shape.body_props
+    },
+  }
+}
+
 ///| Resolve placeholder transforms and fills from layout/master for a slide's shapes.
 ///  Modifies shapes in-place by replacing zero-size transforms with inherited ones.
 fn resolve_placeholder_inheritance(
@@ -39,87 +52,29 @@ fn resolve_placeholder_inheritance(
   let mut i = 0
   while i < ns {
     let shape = shapes[i]
-    if shape.ph_type.is_empty() {
-      i = i + 1
-      continue
-    }
-    let t = shape.transform
-    let needs_transform = t.cx == 0 && t.cy == 0
-    if not(needs_transform) {
+    if shape.ph_type.is_empty() || shape.transform.cx != 0 || shape.transform.cy != 0 {
       i = i + 1
       continue
     }
     // Try layout first, then master
     let mut resolved = false
     match layout_opt {
-      Some(layout) => {
-        match find_placeholder(layout.shapes, shape.ph_type, shape.ph_idx) {
-          Some(layout_ph) => {
-            if layout_ph.transform.cx > 0 && layout_ph.transform.cy > 0 {
-              shapes[i] = {
-                kind: shape.kind,
-                transform: layout_ph.transform,
-                fill: shape.fill,
-                grad_fill: shape.grad_fill,
-                blip_fill: shape.blip_fill,
-                patt_fill: shape.patt_fill,
-                stroke: shape.stroke,
-                stroke_w: shape.stroke_w,
-                stroke_dash: shape.stroke_dash, stroke_cap: shape.stroke_cap,
-                stroke_join: shape.stroke_join, stroke_miter_limit: shape.stroke_miter_limit,
-                stroke_head_type: shape.stroke_head_type, stroke_head_w: shape.stroke_head_w, stroke_head_len: shape.stroke_head_len,
-                stroke_tail_type: shape.stroke_tail_type, stroke_tail_w: shape.stroke_tail_w, stroke_tail_len: shape.stroke_tail_len,
-                stroke_cmpd: shape.stroke_cmpd, stroke_no_fill: shape.stroke_no_fill,
-                paragraphs: shape.paragraphs,
-                body_props: if shape.body_props.anchor.is_empty() && not(layout_ph.body_props.anchor.is_empty()) {
-                  layout_ph.body_props
-                } else {
-                  shape.body_props
-                },
-                ph_type: shape.ph_type,
-                ph_idx: shape.ph_idx,
-              }
-              resolved = true
-            }
-          }
-          None => ()
+      Some(layout) => match find_placeholder(layout.shapes, shape.ph_type, shape.ph_idx) {
+        Some(ph) => if ph.transform.cx > 0 && ph.transform.cy > 0 {
+          shapes[i] = shape_with_inherited_transform(shape, ph)
+          resolved = true
         }
+        None => ()
       }
       None => ()
     }
     if not(resolved) {
       match master_opt {
-        Some(master) => {
-          match find_placeholder(master.shapes, shape.ph_type, shape.ph_idx) {
-            Some(master_ph) => {
-              if master_ph.transform.cx > 0 && master_ph.transform.cy > 0 {
-                shapes[i] = {
-                  kind: shape.kind,
-                  transform: master_ph.transform,
-                  fill: shape.fill,
-                  grad_fill: shape.grad_fill,
-                  blip_fill: shape.blip_fill,
-                  patt_fill: shape.patt_fill,
-                  stroke: shape.stroke,
-                  stroke_w: shape.stroke_w,
-                  stroke_dash: shape.stroke_dash, stroke_cap: shape.stroke_cap,
-                  stroke_join: shape.stroke_join, stroke_miter_limit: shape.stroke_miter_limit,
-                  stroke_head_type: shape.stroke_head_type, stroke_head_w: shape.stroke_head_w, stroke_head_len: shape.stroke_head_len,
-                  stroke_tail_type: shape.stroke_tail_type, stroke_tail_w: shape.stroke_tail_w, stroke_tail_len: shape.stroke_tail_len,
-                  stroke_cmpd: shape.stroke_cmpd, stroke_no_fill: shape.stroke_no_fill,
-                  paragraphs: shape.paragraphs,
-                  body_props: if shape.body_props.anchor.is_empty() && not(master_ph.body_props.anchor.is_empty()) {
-                    master_ph.body_props
-                  } else {
-                    shape.body_props
-                  },
-                  ph_type: shape.ph_type,
-                  ph_idx: shape.ph_idx,
-                }
-              }
-            }
-            None => ()
+        Some(master) => match find_placeholder(master.shapes, shape.ph_type, shape.ph_idx) {
+          Some(ph) => if ph.transform.cx > 0 && ph.transform.cy > 0 {
+            shapes[i] = shape_with_inherited_transform(shape, ph)
           }
+          None => ()
         }
         None => ()
       }

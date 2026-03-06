@@ -73,10 +73,12 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 ```
 SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, shapes: Array[Shape] }
-Shape { kind: ShapeKind, transform: ShapeTransform, fill, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill, stroke, stroke_w, paragraphs, body_props, ph_type, ph_idx }
+Shape { kind: ShapeKind, transform: ShapeTransform, fill, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill, stroke, stroke_w, stroke_dash/cap/join/miter_limit, stroke_head_type/w/len, stroke_tail_type/w/len, stroke_cmpd, stroke_no_fill, paragraphs, body_props, ph_type, ph_idx }
+StrokeProps { color, width, dash, cap, join, miter_limit, head_type/w/len, tail_type/w/len, cmpd, no_fill }
 
-ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape | Other
-ShapeGeom = Rect | Ellipse | RoundRect | Line | Other(String)
+ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | Other
+ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String)
+GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
 
 GradientStop { pos: Int, color: Color }  // pos: 0-100000

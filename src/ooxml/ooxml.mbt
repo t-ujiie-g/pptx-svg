@@ -619,6 +619,7 @@ pub(all) enum ShapeGeom {
   Ellipse
   RoundRect
   Line
+  Connector(String, Array[Int])  // preset name, adjustment values (0-100000)
   Other(String)
 }
 
@@ -636,6 +637,15 @@ pub fn parse_geom(prst : String) -> ShapeGeom {
   }
 }
 
+///| Parse connector geometry with adjustment values.
+pub fn parse_connector_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
+  if prst == "straightConnector1" || prst == "line" {
+    ShapeGeom::Line
+  } else {
+    ShapeGeom::Connector(prst, avlst)
+  }
+}
+
 ///| Convert ShapeGeom back to OOXML preset geometry name.
 pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
   match self {
@@ -643,6 +653,7 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
     ShapeGeom::Ellipse => "ellipse"
     ShapeGeom::RoundRect => "roundRect"
     ShapeGeom::Line => "line"
+    ShapeGeom::Connector(prst, _) => prst
     ShapeGeom::Other(s) => s
   }
 }

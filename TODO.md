@@ -32,7 +32,7 @@
 - [x] 線 / ストローク完全対応 (破線11種 / 矢印5種 / 線結合 / 線端 / 複合線 / noFill + round-trip)
 - [x] Line ジオメトリ SVG `<line>` レンダリング (対角線 / flipH / flipV 対応)
 - [x] グループシェイプ (`p:grpSp` — 再帰パース / 座標変換 / ネスト / SVG `<g>` + round-trip)
-- [x] コネクタ (`p:cxnSp` — 直線コネクタ / 対角線 / 矢印)
+- [x] コネクタ (`p:cxnSp` — 直線 / 折れ線 / 曲線 / 矢印 / 調整値 round-trip)
 
 ---
 
@@ -131,7 +131,7 @@
 
 ---
 
-## 4. 線 / ストローク — 完全対応 [P1] ✅
+## 4. 線 / ストローク [P1] (基本対応済み)
 
 - [x] 破線スタイル (`a:prstDash val="dash/dot/dashDot/lgDash/sysDot/..."` — 全11種)
 - [ ] カスタム破線 (`a:custDash`)
@@ -157,8 +157,9 @@
 - [x] 直線コネクタ (`straightConnector1`) — Line ジオメトリとして描画
 - [x] 対角線 / flip 対応 (`flipH`/`flipV` → 線方向反転)
 - [x] 矢印ヘッド/テイルとの組み合わせ (既存ストローク機能で対応)
-- [ ] 曲線コネクタ (`curvedConnector2-5`)
-- [ ] 折れ線コネクタ (`bentConnector2-5`)
+- [x] 曲線コネクタ (`curvedConnector2-5`) — cubic bezier パス
+- [x] 折れ線コネクタ (`bentConnector2-5`) — 直角折れ線ポリライン
+- [x] 調整値 (`a:avLst`) パース・シリアライズ・round-trip
 
 ### 5.3 プリセットジオメトリ — 全 220+ 種 (`a:prstGeom`)
 
