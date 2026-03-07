@@ -1,5 +1,0 @@
-{
-  "import": [
-    { "path": "pptx-svg/xml", "alias": "xml" }
-  ]
-}

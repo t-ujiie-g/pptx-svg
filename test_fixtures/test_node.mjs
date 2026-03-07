@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 35', slideCount === 35, `got ${slideCount}`);
+  assert('slide count = 36', slideCount === 36, `got ${slideCount}`);
 
   // Verify all 28 slides exist
-  for (let i = 1; i <= 35; i++) {
+  for (let i = 1; i <= 36; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 35; i++) {
+  for (let i = 1; i <= 36; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -773,6 +773,24 @@ async function testFeaturesPptx() {
     assert('slide35 has type="stealth"', slide35.includes('type="stealth"'));
     assert('slide35 has bentConnector3', slide35.includes('bentConnector3'));
     assert('slide35 has curvedConnector3', slide35.includes('curvedConnector3'));
+  }
+
+  // ── Slide 36: preset geometry shapes ──
+  {
+    console.log('\n── test_features.pptx — Slide 36: preset geometry shapes ──');
+    const slide36 = textFiles.get('ppt/slides/slide36.xml');
+    assert('slide36 exists', !!slide36);
+    assert('slide36 has a:prstGeom', hasTag(slide36, 'a:prstGeom'));
+    assert('slide36 has prst="triangle"', slide36.includes('prst="triangle"'));
+    assert('slide36 has prst="diamond"', slide36.includes('prst="diamond"'));
+    assert('slide36 has prst="pentagon"', slide36.includes('prst="pentagon"'));
+    assert('slide36 has prst="hexagon"', slide36.includes('prst="hexagon"'));
+    assert('slide36 has prst="rightArrow"', slide36.includes('prst="rightArrow"'));
+    assert('slide36 has prst="star5"', slide36.includes('prst="star5"'));
+    assert('slide36 has prst="heart"', slide36.includes('prst="heart"'));
+    assert('slide36 has prst="plus"', slide36.includes('prst="plus"'));
+    assert('slide36 has prst="chevron"', slide36.includes('prst="chevron"'));
+    assert('slide36 has a:avLst with adj', slide36.includes('name="adj1"') || slide36.includes('name="adj"'));
   }
 }
 

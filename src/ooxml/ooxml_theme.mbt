@@ -4,7 +4,8 @@
 
 // ── Theme color node parser ──────────────────────────────────────────────────
 
-///| Parse the first color child of a clrScheme element (sysClr or srgbClr).
+///|
+/// Parse the first color child of a clrScheme element (sysClr or srgbClr).
 fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
   match @xml.find_child(nodes, tag) {
     None => None
@@ -34,7 +35,8 @@ fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
 
 // ── Theme parser ────────────────────────────────────────────────────────────
 
-///| Parse theme1.xml into ThemeData.
+///|
+/// Parse theme1.xml into ThemeData.
 pub fn parse_theme(xml_str : String) -> ThemeData {
   let def = ThemeData::default()
   let nodes = @xml.parse_xml(xml_str)
@@ -49,8 +51,24 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   }
   let te_ch = @xml.get_children(theme_el)
   // ── Color scheme ──
-  let slot_tags = ["a:dk1", "a:lt1", "a:dk2", "a:lt2", "a:accent1", "a:accent2", "a:accent3", "a:accent4", "a:accent5", "a:accent6", "a:hlink", "a:folHlink"]
-  let slot_colors = [def.dk1, def.lt1, def.dk2, def.lt2, def.accent1, def.accent2, def.accent3, def.accent4, def.accent5, def.accent6, def.hlink, def.fol_hlink]
+  let slot_tags = [
+    "a:dk1", "a:lt1", "a:dk2", "a:lt2", "a:accent1", "a:accent2", "a:accent3", "a:accent4",
+    "a:accent5", "a:accent6", "a:hlink", "a:folHlink",
+  ]
+  let slot_colors = [
+    def.dk1,
+    def.lt1,
+    def.dk2,
+    def.lt2,
+    def.accent1,
+    def.accent2,
+    def.accent3,
+    def.accent4,
+    def.accent5,
+    def.accent6,
+    def.hlink,
+    def.fol_hlink,
+  ]
   match @xml.find_child(te_ch, "a:clrScheme") {
     None => ()
     Some(cs) => {
@@ -133,40 +151,58 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     }
   }
   {
-    dk1, lt1, dk2, lt2,
-    accent1, accent2, accent3, accent4, accent5, accent6,
-    hlink, fol_hlink,
-    major_font, minor_font, major_ea_font, minor_ea_font,
+    dk1,
+    lt1,
+    dk2,
+    lt2,
+    accent1,
+    accent2,
+    accent3,
+    accent4,
+    accent5,
+    accent6,
+    hlink,
+    fol_hlink,
+    major_font,
+    minor_font,
+    major_ea_font,
+    minor_ea_font,
   }
 }
 
 // ── Color map helpers ────────────────────────────────────────────────────────
 
-///| Get an XML attribute with a fallback default value.
+///|
+/// Get an XML attribute with a fallback default value.
 fn get_attr_or(node : @xml.XmlNode, name : String, default : String) -> String {
-  match @xml.get_attr(node, name) { Some(v) => v; None => default }
+  match @xml.get_attr(node, name) {
+    Some(v) => v
+    None => default
+  }
 }
 
-///| Parse a ColorMap from XML node attributes (e.g. `<p:clrMap bg1="dk1" .../>`).
+///|
+/// Parse a ColorMap from XML node attributes (e.g. `<p:clrMap bg1="dk1" .../>`).
 pub fn parse_clr_map_from_node(node : @xml.XmlNode) -> ColorMap {
   let d = ColorMap::default()
   {
-    bg1:      get_attr_or(node, "bg1", d.bg1),
-    tx1:      get_attr_or(node, "tx1", d.tx1),
-    bg2:      get_attr_or(node, "bg2", d.bg2),
-    tx2:      get_attr_or(node, "tx2", d.tx2),
-    accent1:  get_attr_or(node, "accent1", d.accent1),
-    accent2:  get_attr_or(node, "accent2", d.accent2),
-    accent3:  get_attr_or(node, "accent3", d.accent3),
-    accent4:  get_attr_or(node, "accent4", d.accent4),
-    accent5:  get_attr_or(node, "accent5", d.accent5),
-    accent6:  get_attr_or(node, "accent6", d.accent6),
-    hlink:    get_attr_or(node, "hlink", d.hlink),
+    bg1: get_attr_or(node, "bg1", d.bg1),
+    tx1: get_attr_or(node, "tx1", d.tx1),
+    bg2: get_attr_or(node, "bg2", d.bg2),
+    tx2: get_attr_or(node, "tx2", d.tx2),
+    accent1: get_attr_or(node, "accent1", d.accent1),
+    accent2: get_attr_or(node, "accent2", d.accent2),
+    accent3: get_attr_or(node, "accent3", d.accent3),
+    accent4: get_attr_or(node, "accent4", d.accent4),
+    accent5: get_attr_or(node, "accent5", d.accent5),
+    accent6: get_attr_or(node, "accent6", d.accent6),
+    hlink: get_attr_or(node, "hlink", d.hlink),
     fol_hlink: get_attr_or(node, "folHlink", d.fol_hlink),
   }
 }
 
-///| Resolve a direct theme slot name (dk1, lt1, accent1, etc.) to a Color.
+///|
+/// Resolve a direct theme slot name (dk1, lt1, accent1, etc.) to a Color.
 ///  Unlike `resolve_scheme_color`, this does NOT apply bg1→lt1 / tx1→dk1 aliasing.
 fn resolve_slot(name : String, theme : ThemeData) -> Color {
   if name == "dk1" {
@@ -198,7 +234,8 @@ fn resolve_slot(name : String, theme : ThemeData) -> Color {
   }
 }
 
-///| Apply a ColorMap to a ThemeData, producing a remapped ThemeData.
+///|
+/// Apply a ColorMap to a ThemeData, producing a remapped ThemeData.
 ///
 ///  `resolve_scheme_color` hard-codes: bg1/lt1→theme.lt1, tx1/dk1→theme.dk1, etc.
 ///  This function sets `new.lt1 = resolve_slot(cmap.bg1, original)` so that
@@ -224,9 +261,12 @@ pub fn apply_color_map(theme : ThemeData, cmap : ColorMap) -> ThemeData {
   }
 }
 
-///| Extract `p:clrMapOvr` from already-parsed XML nodes.
+///|
+/// Extract `p:clrMapOvr` from already-parsed XML nodes.
 ///  Returns `None` if not present or if `<a:masterClrMapping/>` is used (= inherit master).
-pub fn extract_clr_map_ovr_from_nodes(root_ch : Array[@xml.XmlNode]) -> ColorMap? {
+pub fn extract_clr_map_ovr_from_nodes(
+  root_ch : Array[@xml.XmlNode],
+) -> ColorMap? {
   match @xml.find_child(root_ch, "p:clrMapOvr") {
     None => None
     Some(ovr_node) => {
@@ -241,24 +281,48 @@ pub fn extract_clr_map_ovr_from_nodes(root_ch : Array[@xml.XmlNode]) -> ColorMap
 
 // ── Level text defaults parsing ──────────────────────────────────────────────
 
-///| Parse a level paragraph properties node (e.g. a:lvl1pPr) into LevelTextDefaults.
-fn parse_level_defaults(ppr : @xml.XmlNode, theme : ThemeData) -> LevelTextDefaults {
-  let align = match @xml.get_attr(ppr, "algn") { Some(v) => v; None => "" }
-  let mar_l = match @xml.get_attr(ppr, "marL") { Some(v) => @xml.parse_int(v); None => -1 }
+///|
+/// Parse a level paragraph properties node (e.g. a:lvl1pPr) into LevelTextDefaults.
+fn parse_level_defaults(
+  ppr : @xml.XmlNode,
+  theme : ThemeData,
+) -> LevelTextDefaults {
+  let align = match @xml.get_attr(ppr, "algn") {
+    Some(v) => v
+    None => ""
+  }
+  let mar_l = match @xml.get_attr(ppr, "marL") {
+    Some(v) => @xml.parse_int(v)
+    None => -1
+  }
   let indent = attr_int(ppr, "indent")
   let ppr_ch = @xml.get_children(ppr)
   // Bullet
   let bu_char = match @xml.find_child(ppr_ch, "a:buChar") {
     None => ""
-    Some(bc) => match @xml.get_attr(bc, "char") { Some(v) => v; None => "" }
+    Some(bc) =>
+      match @xml.get_attr(bc, "char") {
+        Some(v) => v
+        None => ""
+      }
   }
-  let bu_none = match @xml.find_child(ppr_ch, "a:buNone") { Some(_) => true; None => false }
+  let bu_none = match @xml.find_child(ppr_ch, "a:buNone") {
+    Some(_) => true
+    None => false
+  }
   // Default run properties from a:defRPr
-  let (bold, italic, font_size, color, font_face, ea_font) = match @xml.find_child(ppr_ch, "a:defRPr") {
+  let (bold, italic, font_size, color, font_face, ea_font) = match
+    @xml.find_child(ppr_ch, "a:defRPr") {
     None => (false, false, 0, Color::none(), "", "")
     Some(drpr) => {
-      let db = match @xml.get_attr(drpr, "b") { Some(v) => v == "1" || v == "true"; None => false }
-      let di = match @xml.get_attr(drpr, "i") { Some(v) => v == "1" || v == "true"; None => false }
+      let db = match @xml.get_attr(drpr, "b") {
+        Some(v) => v == "1" || v == "true"
+        None => false
+      }
+      let di = match @xml.get_attr(drpr, "i") {
+        Some(v) => v == "1" || v == "true"
+        None => false
+      }
       let dsz = attr_int(drpr, "sz")
       let drpr_ch = @xml.get_children(drpr)
       let dclr = parse_solid_fill(drpr_ch, theme)
@@ -269,16 +333,32 @@ fn parse_level_defaults(ppr : @xml.XmlNode, theme : ThemeData) -> LevelTextDefau
       (db, di, dsz, dclr, dff, dea)
     }
   }
-  { font_size, bold, italic, color, font_face, ea_font, align, mar_l, indent, bullet: bu_char, bullet_none: bu_none }
+  {
+    font_size,
+    bold,
+    italic,
+    color,
+    font_face,
+    ea_font,
+    align,
+    mar_l,
+    indent,
+    bullet: bu_char,
+    bullet_none: bu_none,
+  }
 }
 
-///| Parse a text style group (e.g. p:titleStyle) into TextStyleGroup.
-pub fn parse_text_style_group(node : @xml.XmlNode, theme : ThemeData) -> TextStyleGroup {
+///|
+/// Parse a text style group (e.g. p:titleStyle) into TextStyleGroup.
+pub fn parse_text_style_group(
+  node : @xml.XmlNode,
+  theme : ThemeData,
+) -> TextStyleGroup {
   let ch = @xml.get_children(node)
   let levels : Array[LevelTextDefaults] = []
   let mut i = 0
   while i < max_outline_levels {
-    let tag = "a:lvl" + int_to_str(i + 1) + "pPr"
+    let tag = "a:lvl" + @xml.int_to_str(i + 1) + "pPr"
     let lvl = match @xml.find_child(ch, tag) {
       None => LevelTextDefaults::empty()
       Some(ppr) => parse_level_defaults(ppr, theme)
@@ -289,7 +369,8 @@ pub fn parse_text_style_group(node : @xml.XmlNode, theme : ThemeData) -> TextSty
   { levels, }
 }
 
-///| Parse p:txStyles from slide master.
+///|
+/// Parse p:txStyles from slide master.
 fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
   let ch = @xml.get_children(node)
   let title_style = match @xml.find_child(ch, "p:titleStyle") {
@@ -309,8 +390,12 @@ fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
 
 // ── Slide master parser ──────────────────────────────────────────────────────
 
-///| Parse a slide master XML string into SlideMasterData.
-pub fn parse_slide_master(xml_str : String, theme : ThemeData) -> SlideMasterData {
+///|
+/// Parse a slide master XML string into SlideMasterData.
+pub fn parse_slide_master(
+  xml_str : String,
+  theme : ThemeData,
+) -> SlideMasterData {
   let nodes = @xml.parse_xml(xml_str)
   // Parse p:clrMap and apply to theme
   let clr_map = match @xml.find_child(nodes, "p:sldMaster") {
@@ -327,7 +412,8 @@ pub fn parse_slide_master(xml_str : String, theme : ThemeData) -> SlideMasterDat
   let csld = @xml.find_path(nodes, ["p:sldMaster", "p:cSld"])
   let background = match csld {
     None => Color::none()
-    Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), effective_theme)
+    Some(csld_node) =>
+      parse_bg_from_csld(@xml.get_children(csld_node), effective_theme)
   }
   let shapes : Array[Shape] = match csld {
     None => []
@@ -355,8 +441,12 @@ pub fn parse_slide_master(xml_str : String, theme : ThemeData) -> SlideMasterDat
 
 // ── Slide layout parser ──────────────────────────────────────────────────────
 
-///| Parse a slide layout XML string into SlideLayoutData.
-pub fn parse_slide_layout(xml_str : String, theme : ThemeData) -> SlideLayoutData {
+///|
+/// Parse a slide layout XML string into SlideLayoutData.
+pub fn parse_slide_layout(
+  xml_str : String,
+  theme : ThemeData,
+) -> SlideLayoutData {
   let nodes = @xml.parse_xml(xml_str)
   let root_ch = match @xml.find_child(nodes, "p:sldLayout") {
     Some(n) => @xml.get_children(n)

@@ -4,7 +4,8 @@
 
 // ── Text helpers ─────────────────────────────────────────────────────────────
 
-///| Convert ASCII lowercase letters to uppercase.
+///|
+/// Convert ASCII lowercase letters to uppercase.
 fn to_upper_ascii(s : String) -> String {
   let len = s.length()
   let mut result = ""
@@ -23,7 +24,8 @@ fn to_upper_ascii(s : String) -> String {
   result
 }
 
-///| Check if a character is CJK (Chinese/Japanese/Korean).
+///|
+/// Check if a character is CJK (Chinese/Japanese/Korean).
 fn is_cjk(c : Char) -> Bool {
   let code = Char::to_int(c)
   // CJK Unified Ideographs, CJK Compat Ideographs, Fullwidth forms, CJK Ext-B+
@@ -39,14 +41,16 @@ fn is_cjk(c : Char) -> Bool {
 ///  Used to split paragraph runs into wrapped lines.
 
 ///| Split paragraph runs into visual lines that fit within max_width pixels.
-///| Returns Array of lines, each line being Array of (run_idx, text).
+
+///|
+/// Returns Array of lines, each line being Array of (run_idx, text).
 fn wrap_paragraph(
   para : @ooxml.TextParagraph,
   max_width : Int,
   scale : Int,
   def_sz : Int,
   font_scale : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
 ) -> Array[Array[(Int, String)]] {
   let lines : Array[Array[(Int, String)]] = []
   let mut cur_line : Array[(Int, String)] = []
@@ -56,7 +60,13 @@ fn wrap_paragraph(
   let mut ri = 0
   while ri < nr {
     let run = para.runs[ri]
-    let fs_raw = if run.font_size > 0 { run.font_size } else { if def_sz > 0 { def_sz * scale / @ooxml.emu_per_hundredth_pt } else { 1800 } }
+    let fs_raw = if run.font_size > 0 {
+      run.font_size
+    } else if def_sz > 0 {
+      def_sz * scale / @ooxml.emu_per_hundredth_pt
+    } else {
+      1800
+    }
     let fs_pt = apply_font_scale(fs_raw, font_scale).to_double() / 100.0
     let ff = if not(run.ea_font.is_empty()) {
       run.ea_font
@@ -65,7 +75,11 @@ fn wrap_paragraph(
     } else {
       theme.minor_font
     }
-    let text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
+    let text = if run.cap == "all" {
+      to_upper_ascii(run.text)
+    } else {
+      run.text
+    }
     let text_len = text.length()
     // Split text into segments (words for Latin, chars for CJK)
     let mut seg_start = 0
@@ -80,14 +94,18 @@ fn wrap_paragraph(
         seg_end = seg_start
         while seg_end < text_len {
           let sc = text.get_char(seg_end).unwrap()
-          if is_cjk(sc) { break }
+          if is_cjk(sc) {
+            break
+          }
           seg_end = seg_end + 1
           // Break after whitespace
-          if sc == ' ' || sc == '\t' { break }
+          if sc == ' ' || sc == '\t' {
+            break
+          }
         }
       }
       // Extract segment text
-      let seg_text = str_sub(text, seg_start, seg_end)
+      let seg_text = @xml.str_substring(text, seg_start, seg_end)
       let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_pt)
       // Check if adding this segment would overflow
       if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
@@ -114,32 +132,24 @@ fn wrap_paragraph(
   lines
 }
 
-///| Extract substring from start (inclusive) to end (exclusive).
-fn str_sub(s : String, start : Int, end_ : Int) -> String {
-  let mut result = ""
-  let mut i = start
-  while i < end_ {
-    let c = s.get_char(i).unwrap()
-    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
-    i = i + 1
-  }
-  result
-}
-
 // ── Tab helpers ──────────────────────────────────────────────────────────
 
-///| Check if a string contains a tab character.
+///|
+/// Check if a string contains a tab character.
 fn contains_tab(s : String) -> Bool {
   let len = s.length()
   let mut i = 0
   while i < len {
-    if s.get_char(i).unwrap() == '\t' { return true }
+    if s.get_char(i).unwrap() == '\t' {
+      return true
+    }
     i = i + 1
   }
   false
 }
 
-///| Split a string by tab characters. Returns array of parts.
+///|
+/// Split a string by tab characters. Returns array of parts.
 fn split_by_tab(s : String) -> Array[String] {
   let parts : Array[String] = []
   let len = s.length()
@@ -147,16 +157,17 @@ fn split_by_tab(s : String) -> Array[String] {
   let mut i = 0
   while i < len {
     if s.get_char(i).unwrap() == '\t' {
-      parts.push(str_sub(s, start, i))
+      parts.push(@xml.str_substring(s, start, i))
       start = i + 1
     }
     i = i + 1
   }
-  parts.push(str_sub(s, start, len))
+  parts.push(@xml.str_substring(s, start, len))
   parts
 }
 
-///| Render a run's text, splitting by tab characters and positioning at tab stops.
+///|
+/// Render a run's text, splitting by tab characters and positioning at tab stops.
 ///  Returns (svg_output, updated_tab_idx).
 fn render_run_with_tabs(
   run : @ooxml.TextRun,
@@ -169,7 +180,7 @@ fn render_run_with_tabs(
   scale : Int,
   fs : Int,
   rels : Array[@ooxml.Relationship],
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
 ) -> (String, Int) {
   if tab_stops.length() > 0 && contains_tab(display_text) {
     let parts = split_by_tab(display_text)
@@ -189,31 +200,52 @@ fn render_run_with_tabs(
     }
     (out, ti)
   } else {
-    (render_run_tspan(run, run_idx, display_text, scale, fs, rels, theme), tab_idx)
+    (
+      render_run_tspan(run, run_idx, display_text, scale, fs, rels, theme),
+      tab_idx,
+    )
   }
 }
 
 // ── Text rendering ────────────────────────────────────────────────────────────
 
+///|
 fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
   let nr = para.runs.length()
   let mut max_fs = 0
   let mut i = 0
   while i < nr {
     let fs = para.runs[i].font_size
-    if fs > max_fs { max_fs = fs }
+    if fs > max_fs {
+      max_fs = fs
+    }
     i = i + 1
   }
-  if max_fs > 0 { hundredth_pt_to_emu(max_fs) } else { 0 }
+  if max_fs > 0 {
+    hundredth_pt_to_emu(max_fs)
+  } else {
+    0
+  }
 }
 
-fn para_font_size(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> Int {
+///|
+fn para_font_size(
+  para : @ooxml.TextParagraph,
+  scale : Int,
+  def_sz : Int,
+) -> Int {
   let emu = para_max_font_emu(para)
-  if emu > 0 { px(emu, scale) } else { def_sz }
+  if emu > 0 {
+    px(emu, scale)
+  } else {
+    def_sz
+  }
 }
 
 ///| Apply normAutofit font_scale to a pixel value.
-///| font_scale: -1=inactive, 0-100000=percentage (100000=100%).
+
+///|
+/// font_scale: -1=inactive, 0-100000=percentage (100000=100%).
 fn apply_font_scale(val : Int, font_scale : Int) -> Int {
   if font_scale >= 0 && font_scale < @ooxml.pct_100 {
     val * font_scale / @ooxml.pct_100
@@ -223,7 +255,9 @@ fn apply_font_scale(val : Int, font_scale : Int) -> Int {
 }
 
 ///| Apply normAutofit lnSpcReduction to a line height.
-///| ln_spc_reduction: -1=inactive, 0-100000=reduction percentage.
+
+///|
+/// ln_spc_reduction: -1=inactive, 0-100000=reduction percentage.
 fn apply_ln_spc_reduction(val : Int, ln_spc_reduction : Int) -> Int {
   if ln_spc_reduction > 0 {
     val * (@ooxml.pct_100 - ln_spc_reduction) / @ooxml.pct_100
@@ -232,24 +266,41 @@ fn apply_ln_spc_reduction(val : Int, ln_spc_reduction : Int) -> Int {
   }
 }
 
-///| Apply both normAutofit adjustments: font_scale then lnSpcReduction.
-fn apply_autofit_scale(val : Int, font_scale : Int, ln_spc_reduction : Int) -> Int {
+///|
+/// Apply both normAutofit adjustments: font_scale then lnSpcReduction.
+fn apply_autofit_scale(
+  val : Int,
+  font_scale : Int,
+  ln_spc_reduction : Int,
+) -> Int {
   apply_ln_spc_reduction(apply_font_scale(val, font_scale), ln_spc_reduction)
 }
 
 ///| Compute extra spacing needed above/below a paragraph due to super/subscript.
-///| Returns (extra_above, extra_below) in pixels.
-fn para_baseline_shift_extra(para : @ooxml.TextParagraph, scale : Int, def_sz : Int) -> (Int, Int) {
+
+///|
+/// Returns (extra_above, extra_below) in pixels.
+fn para_baseline_shift_extra(
+  para : @ooxml.TextParagraph,
+  scale : Int,
+  def_sz : Int,
+) -> (Int, Int) {
   let nr = para.runs.length()
   let mut has_super = false
   let mut has_sub = false
   let mut i = 0
   while i < nr {
-    if para.runs[i].baseline > 0 { has_super = true }
-    if para.runs[i].baseline < 0 { has_sub = true }
+    if para.runs[i].baseline > 0 {
+      has_super = true
+    }
+    if para.runs[i].baseline < 0 {
+      has_sub = true
+    }
     i = i + 1
   }
-  if not(has_super) && not(has_sub) { return (0, 0) }
+  if not(has_super) && not(has_sub) {
+    return (0, 0)
+  }
   let font_emu = para_max_font_emu(para)
   let font_px = if font_emu > 0 { px(font_emu, scale) } else { def_sz }
   // SVG baseline-shift:super moves up ~40% of font size, sub moves down ~20%
@@ -260,25 +311,39 @@ fn para_baseline_shift_extra(para : @ooxml.TextParagraph, scale : Int, def_sz : 
   (above, below)
 }
 
-fn para_line_height(para : @ooxml.TextParagraph, scale : Int, def_line_h : Int) -> Int {
+///|
+fn para_line_height(
+  para : @ooxml.TextParagraph,
+  scale : Int,
+  def_line_h : Int,
+) -> Int {
   if para.line_spacing > 0 {
     // Positive = EMU absolute value
     px(para.line_spacing, scale)
   } else if para.line_spacing < 0 {
     // Negative = percentage (-100000 = 100% = single spacing)
     // In OOXML, 100% means the default single-line spacing (font_size * 1.2)
-    let pct = -(para.line_spacing) // e.g. 150000 for 150%
+    let pct = -para.line_spacing // e.g. 150000 for 150%
     let emu = para_max_font_emu(para)
-    let base_line_h = if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+    let base_line_h = if emu > 0 {
+      px(emu, scale) * line_height_numer / line_height_denom
+    } else {
+      def_line_h
+    }
     base_line_h * pct / @ooxml.pct_100
   } else {
     // Default: use font size * line_height ratio
     let emu = para_max_font_emu(para)
-    if emu > 0 { px(emu, scale) * line_height_numer / line_height_denom } else { def_line_h }
+    if emu > 0 {
+      px(emu, scale) * line_height_numer / line_height_denom
+    } else {
+      def_line_h
+    }
   }
 }
 
-///| Render a single text run as a <tspan> element.
+///|
+/// Render a single text run as a <tspan> element.
 fn render_run_tspan(
   run : @ooxml.TextRun,
   ri : Int,
@@ -286,30 +351,52 @@ fn render_run_tspan(
   scale : Int,
   font_scale : Int,
   rels : Array[@ooxml.Relationship],
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
 ) -> String {
   let mut span = "<tspan"
   // Visual attributes
-  if run.bold   { span = span + " font-weight=\"bold\""  }
-  if run.italic { span = span + " font-style=\"italic\"" }
+  if run.bold {
+    span = span + " font-weight=\"bold\""
+  }
+  if run.italic {
+    span = span + " font-style=\"italic\""
+  }
   if run.font_size > 0 {
-    span = span + ai("font-size", apply_font_scale(px(hundredth_pt_to_emu(run.font_size), scale), font_scale))
+    span = span +
+      ai(
+        "font-size",
+        apply_font_scale(
+          px(hundredth_pt_to_emu(run.font_size), scale),
+          font_scale,
+        ),
+      )
   }
   // font-family: sym_font, cs_font, ea_font, latin_font, sans-serif
-  let has_ff = not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty())
+  let has_ff = not(run.font_face.is_empty()) ||
+    not(run.ea_font.is_empty()) ||
+    not(run.cs_font.is_empty()) ||
+    not(run.sym_font.is_empty())
   if has_ff {
     let mut ff = ""
-    if not(run.sym_font.is_empty()) { ff = run.sym_font }
+    if not(run.sym_font.is_empty()) {
+      ff = run.sym_font
+    }
     if not(run.cs_font.is_empty()) {
-      if not(ff.is_empty()) { ff = ff + ", " }
+      if not(ff.is_empty()) {
+        ff = ff + ", "
+      }
       ff = ff + run.cs_font
     }
     if not(run.ea_font.is_empty()) {
-      if not(ff.is_empty()) { ff = ff + ", " }
+      if not(ff.is_empty()) {
+        ff = ff + ", "
+      }
       ff = ff + run.ea_font
     }
     if not(run.font_face.is_empty()) {
-      if not(ff.is_empty()) { ff = ff + ", " }
+      if not(ff.is_empty()) {
+        ff = ff + ", "
+      }
       ff = ff + run.font_face
     }
     span = span + a("font-family", ff + ", sans-serif")
@@ -322,7 +409,9 @@ fn render_run_tspan(
   }
   // Character spacing
   if run.char_spacing != 0 {
-    let ls_px = run.char_spacing * @ooxml.char_spc_dpi / @ooxml.hundredth_pt_per_inch
+    let ls_px = run.char_spacing *
+      @ooxml.char_spc_dpi /
+      @ooxml.hundredth_pt_per_inch
     if ls_px != 0 {
       span = span + ai("letter-spacing", ls_px)
     }
@@ -333,7 +422,11 @@ fn render_run_tspan(
     deco = "underline"
   }
   if run.strike == "sngStrike" || run.strike == "dblStrike" {
-    if deco.is_empty() { deco = "line-through" } else { deco = deco + " line-through" }
+    if deco.is_empty() {
+      deco = "line-through"
+    } else {
+      deco = deco + " line-through"
+    }
   }
   if not(deco.is_empty()) {
     span = span + a("text-decoration", deco)
@@ -382,29 +475,44 @@ fn render_run_tspan(
   }
 }
 
+///|
 fn render_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
   scale : Int,
   theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
-  rels : Array[@ooxml.Relationship]
+  rels : Array[@ooxml.Relationship],
 ) -> String {
-  if paragraphs.length() == 0 { return "" }
+  if paragraphs.length() == 0 {
+    return ""
+  }
   // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
-  let l_ins = if body_props.l_ins >= 0 { body_props.l_ins } else { default_l_inset }
-  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
-  let r_ins = if body_props.r_ins >= 0 { body_props.r_ins } else { default_l_inset }
+  let l_ins = if body_props.l_ins >= 0 {
+    body_props.l_ins
+  } else {
+    default_l_inset
+  }
+  let t_ins = if body_props.t_ins >= 0 {
+    body_props.t_ins
+  } else {
+    default_t_inset
+  }
+  let r_ins = if body_props.r_ins >= 0 {
+    body_props.r_ins
+  } else {
+    default_l_inset
+  }
 
-  let pad_l   = px(l_ins, scale)
-  let pad_t   = px(t_ins, scale)
-  let pad_r   = px(r_ins, scale)
-  let base_text_x  = px(t.x, scale) + pad_l
-  let full_text_w  = px(t.cx, scale) - pad_l - pad_r
+  let pad_l = px(l_ins, scale)
+  let pad_t = px(t_ins, scale)
+  let pad_r = px(r_ins, scale)
+  let base_text_x = px(t.x, scale) + pad_l
+  let full_text_w = px(t.cx, scale) - pad_l - pad_r
   let mut text_x = base_text_x
   let mut text_w = full_text_w
-  let def_sz  = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
-  let def_line_h  = def_sz * line_height_numer / line_height_denom // unscaled default line height
+  let def_sz = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
+  let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
   let fs = body_props.font_scale
   let lr = body_props.ln_spc_reduction
 
@@ -412,8 +520,16 @@ fn render_text(
 
   // Multi-column support
   let num_cols = if body_props.num_cols > 1 { body_props.num_cols } else { 1 }
-  let col_spacing_px = if num_cols > 1 { px(body_props.col_spacing, scale) } else { 0 }
-  let col_w = if num_cols > 1 { (full_text_w - col_spacing_px * (num_cols - 1)) / num_cols } else { full_text_w }
+  let col_spacing_px = if num_cols > 1 {
+    px(body_props.col_spacing, scale)
+  } else {
+    0
+  }
+  let col_w = if num_cols > 1 {
+    (full_text_w - col_spacing_px * (num_cols - 1)) / num_cols
+  } else {
+    full_text_w
+  }
   if num_cols > 1 {
     text_w = col_w
   }
@@ -425,7 +541,11 @@ fn render_text(
   while ti < np {
     let para = paragraphs[ti]
     let nr = para.runs.length()
-    let para_line_h = apply_autofit_scale(para_line_height(para, scale, def_line_h), fs, lr)
+    let para_line_h = apply_autofit_scale(
+      para_line_height(para, scale, def_line_h),
+      fs,
+      lr,
+    )
     if nr == 0 {
       total_text_h = total_text_h + para_line_h
     } else {
@@ -435,7 +555,11 @@ fn render_text(
       }
       // Count visual lines for wrapped text (uses col_w for multi-col)
       let num_visual_lines = if do_wrap {
-        let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
+        let indent_emu = if para.mar_l > 0 {
+          para.mar_l
+        } else {
+          para.level * level_indent_emu
+        }
         let indent_px = px(indent_emu, scale)
         let wrap_w = col_w - indent_px
         let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
@@ -454,7 +578,11 @@ fn render_text(
 
   // Vertical anchor offset
   let shape_h = px(t.cy, scale)
-  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let b_ins = if body_props.b_ins >= 0 {
+    body_props.b_ins
+  } else {
+    default_t_inset
+  }
   let pad_b = px(b_ins, scale)
   let avail_h = shape_h - pad_t - pad_b
   let anchor_offset = if body_props.anchor == "ctr" {
@@ -467,7 +595,10 @@ fn render_text(
   let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
 
   // Vertical text mode
-  let is_vert = body_props.vert == "vert" || body_props.vert == "eaVert" || body_props.vert == "vert270" || body_props.vert == "wordArtVert"
+  let is_vert = body_props.vert == "vert" ||
+    body_props.vert == "eaVert" ||
+    body_props.vert == "vert270" ||
+    body_props.vert == "wordArtVert"
 
   // Text rotation from bodyPr rot (60000ths of a degree)
   let bp_rot = body_props.rot
@@ -512,14 +643,18 @@ fn render_text(
   while pi < np {
     let para = paragraphs[pi]
     let nr = para.runs.length()
-    let p_line_h = apply_autofit_scale(para_line_height(para, scale, def_line_h), fs, lr)
+    let p_line_h = apply_autofit_scale(
+      para_line_height(para, scale, def_line_h),
+      fs,
+      lr,
+    )
     let p_font_sz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
     // Apply spacing before paragraph
     if para.spc_before > 0 && pi > 0 {
       cur_y = cur_y + px(para.spc_before, scale)
     }
     // Multi-column: check if we need to move to the next column (paragraph boundary)
-    if num_cols > 1 && cur_col < num_cols - 1 && (cur_y - base_y) >= max_col_h {
+    if num_cols > 1 && cur_col < num_cols - 1 && cur_y - base_y >= max_col_h {
       out = out + "</text>"
       cur_col = cur_col + 1
       text_x = base_text_x + (col_w + col_spacing_px) * cur_col
@@ -528,7 +663,9 @@ fn render_text(
       out = out + make_text_header(text_x)
     }
     // Extra space for super/subscript to avoid overlap with adjacent lines
-    let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(para, scale, def_sz)
+    let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
+      para, scale, def_sz,
+    )
     cur_y = cur_y + bl_extra_above
     // Advance to baseline (ascent ≈ font_size)
     cur_y = cur_y + p_font_sz
@@ -537,14 +674,23 @@ fn render_text(
       pi = pi + 1
     } else {
       // Indent: use marL from paragraph if set, otherwise use level-based
-      let indent_emu = if para.mar_l > 0 { para.mar_l } else { para.level * level_indent_emu }
+      let indent_emu = if para.mar_l > 0 {
+        para.mar_l
+      } else {
+        para.level * level_indent_emu
+      }
       let indent = px(indent_emu, scale)
       // RTL: default alignment is right
       // In SVG with direction="rtl", text-anchor semantics are swapped:
       //   "start" = right edge (text flows leftward from x)
       //   "end"   = left edge (text flows rightward from x)
-      let effective_align = if para.rtl && para.align.is_empty() { "r" } else { para.align }
-      let (anchor_x, anchor_attr) = if effective_align == "ctr" || effective_align == "c" {
+      let effective_align = if para.rtl && para.align.is_empty() {
+        "r"
+      } else {
+        para.align
+      }
+      let (anchor_x, anchor_attr) = if effective_align == "ctr" ||
+        effective_align == "c" {
         (text_x + indent + (text_w - indent) / 2, " text-anchor=\"middle\"")
       } else if effective_align == "r" || (para.rtl && effective_align != "l") {
         if para.rtl {
@@ -553,13 +699,11 @@ fn render_text(
         } else {
           (text_x + text_w, " text-anchor=\"end\"")
         }
+      } else if para.rtl {
+        // RTL left-aligned: use text-anchor="end" so text ends at left edge
+        (text_x + indent, " text-anchor=\"end\"")
       } else {
-        if para.rtl {
-          // RTL left-aligned: use text-anchor="end" so text ends at left edge
-          (text_x + indent, " text-anchor=\"end\"")
-        } else {
-          (text_x + indent, " text-anchor=\"start\"")
-        }
+        (text_x + indent, " text-anchor=\"start\"")
       }
       // RTL direction attribute
       let rtl_attr = if para.rtl { " direction=\"rtl\"" } else { "" }
@@ -582,11 +726,18 @@ fn render_text(
           if not(bu_b64.is_empty()) {
             let bu_mime = mime_from_ext(bu_img_path)
             let bu_img_sz = p_font_sz // size bullet image to font size
-            let bu_img_x = if para.rtl { anchor_x + 4 } else { anchor_x - bu_img_sz - 4 }
+            let bu_img_x = if para.rtl {
+              anchor_x + 4
+            } else {
+              anchor_x - bu_img_sz - 4
+            }
             let bu_img_y = cur_y - bu_img_sz + 2
-            img_bullets_svg = img_bullets_svg + "<image" +
-              ai("x", bu_img_x) + ai("y", bu_img_y) +
-              ai("width", bu_img_sz) + ai("height", bu_img_sz) +
+            img_bullets_svg = img_bullets_svg +
+              "<image" +
+              ai("x", bu_img_x) +
+              ai("y", bu_img_y) +
+              ai("width", bu_img_sz) +
+              ai("height", bu_img_sz) +
               a("href", "data:" + bu_mime + ";base64," + bu_b64) +
               "/>"
           }
@@ -594,7 +745,8 @@ fn render_text(
       }
       // Paragraph-level tspan with data-ooxml-* attributes
       let para_align = if para.align.is_empty() { "l" } else { para.align }
-      out = out + "<tspan" +
+      out = out +
+        "<tspan" +
         ai("x", anchor_x) +
         ai("y", cur_y) +
         anchor_attr +
@@ -611,7 +763,8 @@ fn render_text(
       if not(bullet_text.is_empty()) {
         let mut bu_span = "<tspan"
         if not(para.bullet_font.is_empty()) {
-          bu_span = bu_span + a("font-family", para.bullet_font + ", sans-serif")
+          bu_span = bu_span +
+            a("font-family", para.bullet_font + ", sans-serif")
         }
         if para.bullet_size > 0 {
           // Percentage of run font size
@@ -620,8 +773,9 @@ fn render_text(
           bu_span = bu_span + ai("font-size", bu_fs)
         } else if para.bullet_size < 0 {
           // Absolute size in hundredths-of-a-point (negated)
-          let bu_fs_emu = hundredth_pt_to_emu(-(para.bullet_size))
-          bu_span = bu_span + ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
+          let bu_fs_emu = hundredth_pt_to_emu(-para.bullet_size)
+          bu_span = bu_span +
+            ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
         }
         if not(para.bullet_color.is_none()) {
           bu_span = bu_span + a("fill", para.bullet_color.to_css())
@@ -642,7 +796,9 @@ fn render_text(
           if vli > 0 {
             cur_y = cur_y + p_line_h
             // Multi-column: check if this line overflows to next column
-            if num_cols > 1 && cur_col < num_cols - 1 && (cur_y - base_y) >= max_col_h {
+            if num_cols > 1 &&
+              cur_col < num_cols - 1 &&
+              cur_y - base_y >= max_col_h {
               // Close current paragraph tspan and <text>
               out = out + "</tspan></text>"
               cur_col = cur_col + 1
@@ -658,14 +814,16 @@ fn render_text(
               }
               // Open new <text> and paragraph tspan
               out = out + make_text_header(text_x)
-              out = out + "<tspan" +
+              out = out +
+                "<tspan" +
                 ai("x", anchor_x) +
                 ai("y", cur_y) +
                 anchor_attr +
                 rtl_attr +
                 ">"
             } else {
-              out = out + "</tspan><tspan" +
+              out = out +
+                "</tspan><tspan" +
                 ai("x", anchor_x) +
                 ai("y", cur_y) +
                 anchor_attr +
@@ -679,7 +837,19 @@ fn render_text(
           while fi < nf {
             let (run_idx, frag_text) = vline[fi]
             let run = para.runs[run_idx]
-            let (tab_svg, new_ti) = render_run_with_tabs(run, run_idx, frag_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels, theme)
+            let (tab_svg, new_ti) = render_run_with_tabs(
+              run,
+              run_idx,
+              frag_text,
+              para.tab_stops,
+              tab_idx,
+              text_x,
+              cur_y,
+              scale,
+              fs,
+              rels,
+              theme,
+            )
             out = out + tab_svg
             tab_idx = new_ti
             fi = fi + 1
@@ -692,8 +862,24 @@ fn render_text(
         let mut ri = 0
         while ri < nr {
           let run = para.runs[ri]
-          let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
-          let (tab_svg, new_ti) = render_run_with_tabs(run, ri, display_text, para.tab_stops, tab_idx, text_x, cur_y, scale, fs, rels, theme)
+          let display_text = if run.cap == "all" {
+            to_upper_ascii(run.text)
+          } else {
+            run.text
+          }
+          let (tab_svg, new_ti) = render_run_with_tabs(
+            run,
+            ri,
+            display_text,
+            para.tab_stops,
+            tab_idx,
+            text_x,
+            cur_y,
+            scale,
+            fs,
+            rels,
+            theme,
+          )
           out = out + tab_svg
           tab_idx = new_ti
           ri = ri + 1
@@ -713,15 +899,24 @@ fn render_text(
 
 // ── Text height estimation ──────────────────────────────────────────────────
 
+///|
 fn estimate_text_height(
   paragraphs : Array[@ooxml.TextParagraph],
   scale : Int,
-  body_props : @ooxml.BodyProps
+  body_props : @ooxml.BodyProps,
 ) -> Int {
   let def_sz = px(default_font_size_emu(), scale)
   let def_line_h = def_sz * line_height_numer / line_height_denom
-  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
-  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let t_ins = if body_props.t_ins >= 0 {
+    body_props.t_ins
+  } else {
+    default_t_inset
+  }
+  let b_ins = if body_props.b_ins >= 0 {
+    body_props.b_ins
+  } else {
+    default_t_inset
+  }
   let np = paragraphs.length()
   let mut total = 0
   let mut i = 0

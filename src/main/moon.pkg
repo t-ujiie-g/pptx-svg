@@ -1,0 +1,26 @@
+import {
+  "pptx-svg/xml" @xml,
+  "pptx-svg/ffi" @ffi,
+  "pptx-svg/ooxml" @ooxml,
+  "pptx-svg/renderer" @renderer,
+  "pptx-svg/serializer" @serializer,
+  "pptx-svg/svg_parser" @svg_parser,
+}
+
+options(
+  link: {
+    "wasm-gc": {
+      "exports": [
+        "initialize_pptx",
+        "get_slide_count",
+        "get_slide_xml_raw",
+        "get_entry_list",
+        "render_slide_svg",
+        "update_slide_from_svg",
+        "get_slide_ooxml",
+        "get_modified_entries",
+      ],
+      "use-js-builtin-string": true,
+    },
+  },
+)

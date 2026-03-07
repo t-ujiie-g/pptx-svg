@@ -299,6 +299,10 @@ export class PptxRenderer {
         warn:  (msg) => console.warn('[pptx]', msg),
         error: (msg) => console.error('[pptx]', msg),
         measure_text: (text, fontFace, fontSizePt) => this.#measureText(text, fontFace, fontSizePt),
+        math_sin:   (x) => Math.sin(x),
+        math_cos:   (x) => Math.cos(x),
+        math_atan2: (y, x) => Math.atan2(y, x),
+        math_sqrt:  (x) => Math.sqrt(x),
       },
       'moonbit:ffi': {
         make_closure: (f, ctx) => f.bind(null, ctx),

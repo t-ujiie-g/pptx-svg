@@ -4,6 +4,7 @@
 
 // ── Attribute helpers ─────────────────────────────────────────────────────────
 
+///|
 fn attr_int(node : @xml.XmlNode, name : String) -> Int {
   match @xml.get_attr(node, name) {
     Some(v) => @xml.parse_int(v)
@@ -11,10 +12,11 @@ fn attr_int(node : @xml.XmlNode, name : String) -> Int {
   }
 }
 
+///|
 fn child_attr(
   nodes : Array[@xml.XmlNode],
   tag : String,
-  attr : String
+  attr : String,
 ) -> String {
   match @xml.find_child(nodes, tag) {
     None => ""
@@ -28,9 +30,13 @@ fn child_attr(
 
 // ── Color parsing ─────────────────────────────────────────────────────────────
 
-///| Parse a color from direct children (a:srgbClr or a:schemeClr), without a:solidFill wrapper.
+///|
+/// Parse a color from direct children (a:srgbClr or a:schemeClr), without a:solidFill wrapper.
 ///  Used for e.g. a:buClr which contains color child directly.
-fn parse_color_from_children(children : Array[@xml.XmlNode], theme : ThemeData) -> Color {
+fn parse_color_from_children(
+  children : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Color {
   match @xml.find_child(children, "a:srgbClr") {
     Some(clr) =>
       match @xml.get_attr(clr, "val") {
@@ -55,17 +61,23 @@ fn parse_color_from_children(children : Array[@xml.XmlNode], theme : ThemeData) 
   }
 }
 
+///|
 fn parse_solid_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Color {
   match @xml.find_child(nodes, "a:solidFill") {
     None => Color::none()
-    Some(fill_node) => parse_color_from_children(@xml.get_children(fill_node), theme)
+    Some(fill_node) =>
+      parse_color_from_children(@xml.get_children(fill_node), theme)
   }
 }
 
 // ── Gradient fill parsing ────────────────────────────────────────────────────
 
-///| Parse <a:gradFill> from child nodes. Returns GradientFill::none() if absent.
-fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> GradientFill {
+///|
+/// Parse <a:gradFill> from child nodes. Returns GradientFill::none() if absent.
+fn parse_gradient_fill(
+  nodes : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> GradientFill {
   match @xml.find_child(nodes, "a:gradFill") {
     None => GradientFill::none()
     Some(gf_node) => {
@@ -84,7 +96,10 @@ fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Gradie
           let mut gi = 0
           while gi < ngs {
             let pos = attr_int(gs_nodes[gi], "pos")
-            let color = parse_color_from_children(@xml.get_children(gs_nodes[gi]), theme)
+            let color = parse_color_from_children(
+              @xml.get_children(gs_nodes[gi]),
+              theme,
+            )
             stops.push({ pos, color })
             gi = gi + 1
           }
@@ -101,10 +116,8 @@ fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Gradie
       let mut fill_to_r = -1
       let mut fill_to_b = -1
       match @xml.find_child(gf_ch, "a:lin") {
-        Some(lin) => {
-          angle = attr_int(lin, "ang")
-        }
-        None => {
+        Some(lin) => angle = attr_int(lin, "ang")
+        None =>
           // Parse path gradient: <a:path path="circle|rect|shape">
           match @xml.find_child(gf_ch, "a:path") {
             Some(path_node) => {
@@ -114,7 +127,8 @@ fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Gradie
                 None => "circle"
               }
               // Parse <a:fillToRect l="N" t="N" r="N" b="N"/>
-              match @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
+              match
+                @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
                 Some(ftr) => {
                   fill_to_l = attr_int(ftr, "l")
                   fill_to_t = attr_int(ftr, "t")
@@ -126,20 +140,30 @@ fn parse_gradient_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Gradie
             }
             None => ()
           }
-        }
       }
       let tile_flip = match @xml.get_attr(gf_node, "tileFlip") {
         Some(v) => v
         None => ""
       }
-      { stops, angle, path_type, rot_with_shape, fill_to_l, fill_to_t, fill_to_r, fill_to_b, tile_flip }
+      {
+        stops,
+        angle,
+        path_type,
+        rot_with_shape,
+        fill_to_l,
+        fill_to_t,
+        fill_to_r,
+        fill_to_b,
+        tile_flip,
+      }
     }
   }
 }
 
 // ── Transform parsing ─────────────────────────────────────────────────────────
 
-///| Parse transform from an xfrm element node (either a:xfrm or p:xfrm).
+///|
+/// Parse transform from an xfrm element node (either a:xfrm or p:xfrm).
 fn parse_xfrm_node(xfrm : @xml.XmlNode) -> ShapeTransform {
   let rot = attr_int(xfrm, "rot")
   let flip_h_s = match @xml.get_attr(xfrm, "flipH") {
@@ -158,7 +182,8 @@ fn parse_xfrm_node(xfrm : @xml.XmlNode) -> ShapeTransform {
   { x, y, cx, cy, rot, flip_h: flip_h_s, flip_v: flip_v_s }
 }
 
-///| Parse transform from a:xfrm child within spPr children.
+///|
+/// Parse transform from a:xfrm child within spPr children.
 fn parse_xfrm(sppr_children : Array[@xml.XmlNode]) -> ShapeTransform {
   match @xml.find_child(sppr_children, "a:xfrm") {
     None => ShapeTransform::default()
@@ -168,13 +193,23 @@ fn parse_xfrm(sppr_children : Array[@xml.XmlNode]) -> ShapeTransform {
 
 // ── Stroke parsing ────────────────────────────────────────────────────────────
 
-fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> StrokeProps {
+///|
+fn parse_stroke(
+  sppr_children : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> StrokeProps {
   match @xml.find_child(sppr_children, "a:ln") {
     None => StrokeProps::default()
     Some(ln) => {
       let w = attr_int(ln, "w")
-      let cap = match @xml.get_attr(ln, "cap") { Some(v) => v; None => "" }
-      let cmpd = match @xml.get_attr(ln, "cmpd") { Some(v) => v; None => "" }
+      let cap = match @xml.get_attr(ln, "cap") {
+        Some(v) => v
+        None => ""
+      }
+      let cmpd = match @xml.get_attr(ln, "cmpd") {
+        Some(v) => v
+        None => ""
+      }
       let ln_ch = @xml.get_children(ln)
       let no_fill = match @xml.find_child(ln_ch, "a:noFill") {
         Some(_) => true
@@ -184,12 +219,20 @@ fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> Strok
         Color::none()
       } else {
         let clr = parse_solid_fill(ln_ch, theme)
-        if clr.is_none() { Color::black() } else { clr }
+        if clr.is_none() {
+          Color::black()
+        } else {
+          clr
+        }
       }
       // Preset dash or custom dash
       let mut dash = match @xml.find_child(ln_ch, "a:prstDash") {
         None => ""
-        Some(d) => match @xml.get_attr(d, "val") { Some(v) => v; None => "" }
+        Some(d) =>
+          match @xml.get_attr(d, "val") {
+            Some(v) => v
+            None => ""
+          }
       }
       if dash.is_empty() {
         match @xml.find_child(ln_ch, "a:custDash") {
@@ -202,13 +245,20 @@ fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> Strok
             let mut cd_str = cust_dash_prefix
             let mut di = 0
             while di < nds {
-              if di > 0 { cd_str = cd_str + ";" }
+              if di > 0 {
+                cd_str = cd_str + ";"
+              }
               let d_val = attr_int(ds_nodes[di], "d")
               let sp_val = attr_int(ds_nodes[di], "sp")
-              cd_str = cd_str + int_to_str(d_val) + "," + int_to_str(sp_val)
+              cd_str = cd_str +
+                @xml.int_to_str(d_val) +
+                "," +
+                @xml.int_to_str(sp_val)
               di = di + 1
             }
-            if nds > 0 { dash = cd_str }
+            if nds > 0 {
+              dash = cd_str
+            }
           }
         }
       }
@@ -240,9 +290,18 @@ fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> Strok
       let mut head_len = ""
       match @xml.find_child(ln_ch, "a:headEnd") {
         Some(he) => {
-          head_type = match @xml.get_attr(he, "type") { Some(v) => v; None => "" }
-          head_w = match @xml.get_attr(he, "w") { Some(v) => v; None => "" }
-          head_len = match @xml.get_attr(he, "len") { Some(v) => v; None => "" }
+          head_type = match @xml.get_attr(he, "type") {
+            Some(v) => v
+            None => ""
+          }
+          head_w = match @xml.get_attr(he, "w") {
+            Some(v) => v
+            None => ""
+          }
+          head_len = match @xml.get_attr(he, "len") {
+            Some(v) => v
+            None => ""
+          }
         }
         None => ()
       }
@@ -252,21 +311,45 @@ fn parse_stroke(sppr_children : Array[@xml.XmlNode], theme : ThemeData) -> Strok
       let mut tail_len = ""
       match @xml.find_child(ln_ch, "a:tailEnd") {
         Some(te) => {
-          tail_type = match @xml.get_attr(te, "type") { Some(v) => v; None => "" }
-          tail_w = match @xml.get_attr(te, "w") { Some(v) => v; None => "" }
-          tail_len = match @xml.get_attr(te, "len") { Some(v) => v; None => "" }
+          tail_type = match @xml.get_attr(te, "type") {
+            Some(v) => v
+            None => ""
+          }
+          tail_w = match @xml.get_attr(te, "w") {
+            Some(v) => v
+            None => ""
+          }
+          tail_len = match @xml.get_attr(te, "len") {
+            Some(v) => v
+            None => ""
+          }
         }
         None => ()
       }
-      { color, width: w, dash, cap, join, miter_limit, head_type, head_w, head_len,
-        tail_type, tail_w, tail_len, cmpd, no_fill }
+      {
+        color,
+        width: w,
+        dash,
+        cap,
+        join,
+        miter_limit,
+        head_type,
+        head_w,
+        head_len,
+        tail_type,
+        tail_w,
+        tail_len,
+        cmpd,
+        no_fill,
+      }
     }
   }
 }
 
 // ── Blip fill parser ──────────────────────────────────────────────────────────
 
-///| Parse a:blipFill from spPr children → BlipFill.
+///|
+/// Parse a:blipFill from spPr children → BlipFill.
 fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
   match @xml.find_child(nodes, "a:blipFill") {
     None => BlipFill::none()
@@ -280,7 +363,9 @@ fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
             None => ""
           }
       }
-      if rid.is_empty() { return BlipFill::none() }
+      if rid.is_empty() {
+        return BlipFill::none()
+      }
       let stretch = match @xml.find_child(bf_ch, "a:stretch") {
         Some(_) => true
         None => false
@@ -322,15 +407,32 @@ fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
         }
         None => ()
       }
-      { rid, stretch, src_l, src_t, src_r, src_b, tile_tx, tile_ty, tile_sx, tile_sy, tile_flip, tile_algn }
+      {
+        rid,
+        stretch,
+        src_l,
+        src_t,
+        src_r,
+        src_b,
+        tile_tx,
+        tile_ty,
+        tile_sx,
+        tile_sy,
+        tile_flip,
+        tile_algn,
+      }
     }
   }
 }
 
 // ── Pattern fill parser ──────────────────────────────────────────────────────
 
-///| Parse a:pattFill from spPr children → PatternFill.
-fn parse_pattern_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> PatternFill {
+///|
+/// Parse a:pattFill from spPr children → PatternFill.
+fn parse_pattern_fill(
+  nodes : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> PatternFill {
   match @xml.find_child(nodes, "a:pattFill") {
     None => PatternFill::none()
     Some(pf_node) => {
@@ -338,7 +440,9 @@ fn parse_pattern_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Pattern
         Some(v) => v
         None => ""
       }
-      if prst.is_empty() { return PatternFill::none() }
+      if prst.is_empty() {
+        return PatternFill::none()
+      }
       let pf_ch = @xml.get_children(pf_node)
       let fg_color = match @xml.find_child(pf_ch, "a:fgClr") {
         None => Color::black()
@@ -355,6 +459,7 @@ fn parse_pattern_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Pattern
 
 // ── Shape parsers ─────────────────────────────────────────────────────────────
 
+///|
 fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(sp)
   // Extract placeholder info from p:nvSpPr/p:nvPr/p:ph
@@ -371,8 +476,14 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
           match @xml.find_child(nvpr_ch, "p:ph") {
             None => ()
             Some(ph) => {
-              ph_type = match @xml.get_attr(ph, "type") { Some(v) => v; None => "body" }
-              ph_idx = match @xml.get_attr(ph, "idx") { Some(v) => @xml.parse_int(v); None => -1 }
+              ph_type = match @xml.get_attr(ph, "type") {
+                Some(v) => v
+                None => "body"
+              }
+              ph_idx = match @xml.get_attr(ph, "idx") {
+                Some(v) => @xml.parse_int(v)
+                None => -1
+              }
             }
           }
         }
@@ -390,7 +501,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     None => ShapeGeom::Rect
     Some(g) =>
       match @xml.get_attr(g, "prst") {
-        Some(v) => parse_geom(v)
+        Some(v) => parse_geom(v, parse_avlst(g))
         None => ShapeGeom::Rect
       }
   }
@@ -399,7 +510,11 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     Some(_) => Color::none()
     None => {
       let c = parse_solid_fill(sppr_ch, theme)
-      if c.is_none() { Color::none() } else { c }
+      if c.is_none() {
+        Color::none()
+      } else {
+        c
+      }
     }
   }
   let grad_fill = parse_gradient_fill(sppr_ch, theme)
@@ -441,6 +556,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
 }
 
+///|
 fn parse_pic(pic : @xml.XmlNode) -> Shape {
   let ch = @xml.get_children(pic)
   let sppr = match @xml.find_child(ch, "p:spPr") {
@@ -464,6 +580,7 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
   Shape::default_with(ShapeKind::Picture(rid), transform)
 }
 
+///|
 fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let ch = @xml.get_children(tc)
   // Parse cell text from <a:txBody>
@@ -482,7 +599,8 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   { paragraphs, fill, grad_fill: GradientFill::none() }
 }
 
-///| Parse transform from either a:xfrm or p:xfrm (graphicFrame uses p:xfrm).
+///|
+/// Parse transform from either a:xfrm or p:xfrm (graphicFrame uses p:xfrm).
 fn parse_xfrm_any(nodes : Array[@xml.XmlNode]) -> ShapeTransform {
   match @xml.find_child(nodes, "a:xfrm") {
     Some(xfrm) => parse_xfrm_node(xfrm)
@@ -494,6 +612,7 @@ fn parse_xfrm_any(nodes : Array[@xml.XmlNode]) -> ShapeTransform {
   }
 }
 
+///|
 fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(gf)
   // Transform from <p:xfrm> (direct child of graphicFrame, not inside spPr)
@@ -550,24 +669,43 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
 }
 
-///| Create a Shape with given kind, transform, and stroke properties.
-fn shape_with_stroke(kind : ShapeKind, transform : ShapeTransform, sp : StrokeProps) -> Shape {
+///|
+/// Create a Shape with given kind, transform, and stroke properties.
+fn shape_with_stroke(
+  kind : ShapeKind,
+  transform : ShapeTransform,
+  sp : StrokeProps,
+) -> Shape {
   {
-    kind, transform,
-    fill: Color::none(), grad_fill: GradientFill::none(),
-    blip_fill: BlipFill::none(), patt_fill: PatternFill::none(),
-    stroke: sp.color, stroke_w: sp.width,
-    stroke_dash: sp.dash, stroke_cap: sp.cap,
-    stroke_join: sp.join, stroke_miter_limit: sp.miter_limit,
-    stroke_head_type: sp.head_type, stroke_head_w: sp.head_w, stroke_head_len: sp.head_len,
-    stroke_tail_type: sp.tail_type, stroke_tail_w: sp.tail_w, stroke_tail_len: sp.tail_len,
-    stroke_cmpd: sp.cmpd, stroke_no_fill: sp.no_fill,
-    paragraphs: [], body_props: BodyProps::default(),
-    ph_type: "", ph_idx: -1,
+    kind,
+    transform,
+    fill: Color::none(),
+    grad_fill: GradientFill::none(),
+    blip_fill: BlipFill::none(),
+    patt_fill: PatternFill::none(),
+    stroke: sp.color,
+    stroke_w: sp.width,
+    stroke_dash: sp.dash,
+    stroke_cap: sp.cap,
+    stroke_join: sp.join,
+    stroke_miter_limit: sp.miter_limit,
+    stroke_head_type: sp.head_type,
+    stroke_head_w: sp.head_w,
+    stroke_head_len: sp.head_len,
+    stroke_tail_type: sp.tail_type,
+    stroke_tail_w: sp.tail_w,
+    stroke_tail_len: sp.tail_len,
+    stroke_cmpd: sp.cmpd,
+    stroke_no_fill: sp.no_fill,
+    paragraphs: [],
+    body_props: BodyProps::default(),
+    ph_type: "",
+    ph_idx: -1,
   }
 }
 
-///| Parse adjustment values from a:avLst inside a:prstGeom.
+///|
+/// Parse adjustment values from a:avLst inside a:prstGeom.
 fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
   let avs : Array[Int] = []
   match @xml.find_child(@xml.get_children(geom_node), "a:avLst") {
@@ -578,7 +716,10 @@ fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
       let mut i = 0
       while i < n {
         // <a:gd name="adj1" fmla="val 50000"/>
-        let fmla = match @xml.get_attr(gds[i], "fmla") { Some(v) => v; None => "" }
+        let fmla = match @xml.get_attr(gds[i], "fmla") {
+          Some(v) => v
+          None => ""
+        }
         // Extract value from "val NNNNN"
         if fmla.length() > 4 {
           let val_str = @xml.str_suffix(fmla, 4)
@@ -591,7 +732,8 @@ fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
   avs
 }
 
-///| Parse connector shape — rendered as a line or path with stroke properties.
+///|
+/// Parse connector shape — rendered as a line or path with stroke properties.
 fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(cxn)
   let sppr = match @xml.find_child(ch, "p:spPr") {
@@ -604,7 +746,10 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
   let geom = match @xml.find_child(sppr_ch, "a:prstGeom") {
     None => ShapeGeom::Line
     Some(g) => {
-      let prst = match @xml.get_attr(g, "prst") { Some(v) => v; None => "line" }
+      let prst = match @xml.get_attr(g, "prst") {
+        Some(v) => v
+        None => "line"
+      }
       let avs = parse_avlst(g)
       parse_connector_geom(prst, avs)
     }
@@ -612,6 +757,7 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
   shape_with_stroke(ShapeKind::AutoShape(geom), transform, sp)
 }
 
+///|
 fn parse_grp_sp(grp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(grp)
   // Group shape properties
@@ -634,18 +780,24 @@ fn parse_grp_sp(grp : @xml.XmlNode, theme : ThemeData) -> Shape {
   // Parse child shapes recursively
   let children = parse_shapes_from_children(ch, theme)
   let grp_data : GroupShapeData = {
-    ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy, children,
+    ch_off_x,
+    ch_off_y,
+    ch_ext_cx,
+    ch_ext_cy,
+    children,
   }
   Shape::default_with(ShapeKind::GroupShape(grp_data), transform)
 }
 
+///|
 fn empty_shape() -> Shape {
   Shape::default_with(ShapeKind::Other, ShapeTransform::default())
 }
 
 // ── Relationship parsing ──────────────────────────────────────────────────────
 
-///| Parse a .rels XML file into a map of relationship ID → target path.
+///|
+/// Parse a .rels XML file into a map of relationship ID → target path.
 pub fn parse_rels(xml_str : String) -> Array[Relationship] {
   let nodes = @xml.parse_xml(xml_str)
   let rels : Array[Relationship] = []
@@ -681,7 +833,8 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
   rels
 }
 
-///| Look up a relationship target by ID.
+///|
+/// Look up a relationship target by ID.
 pub fn find_rel_target(rels : Array[Relationship], id : String) -> String {
   let n = rels.length()
   let mut i = 0
@@ -696,7 +849,8 @@ pub fn find_rel_target(rels : Array[Relationship], id : String) -> String {
 
 // ── Slide size ────────────────────────────────────────────────────────────────
 
-///| Extract slide size from ppt/presentation.xml.
+///|
+/// Extract slide size from ppt/presentation.xml.
 pub fn parse_slide_size(prs_xml : String) -> SlideSize {
   let nodes = @xml.parse_xml(prs_xml)
   match @xml.find_child(nodes, "p:presentation") {
@@ -708,7 +862,11 @@ pub fn parse_slide_size(prs_xml : String) -> SlideSize {
         Some(sz) => {
           let cx = attr_int(sz, "cx")
           let cy = attr_int(sz, "cy")
-          if cx > 0 && cy > 0 { { cx, cy } } else { SlideSize::default() }
+          if cx > 0 && cy > 0 {
+            { cx, cy }
+          } else {
+            SlideSize::default()
+          }
         }
       }
     }
@@ -717,18 +875,25 @@ pub fn parse_slide_size(prs_xml : String) -> SlideSize {
 
 // ── Main slide parser ─────────────────────────────────────────────────────────
 
-///| Parse a slide XML string into a SlideData.
+///|
+/// Parse a slide XML string into a SlideData.
 pub fn parse_slide(
   slide_xml : String,
   slide_size : SlideSize,
-  theme : ThemeData
+  theme : ThemeData,
 ) -> SlideData {
   let nodes = @xml.parse_xml(slide_xml)
   let shapes : Array[Shape] = []
   // Navigate p:sld → p:cSld
   let csld = @xml.find_path(nodes, ["p:sld", "p:cSld"])
   match csld {
-    None => { slide_size, background: Color::none(), bg_grad: GradientFill::none(), shapes }
+    None =>
+      {
+        slide_size,
+        background: Color::none(),
+        bg_grad: GradientFill::none(),
+        shapes,
+      }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
       // Parse background: p:bg → p:bgPr → solidFill / gradFill
@@ -752,7 +917,10 @@ pub fn parse_slide(
       match @xml.find_child(csld_ch, "p:spTree") {
         None => { slide_size, background: bg, bg_grad, shapes }
         Some(tree) => {
-          let parsed = parse_shapes_from_children(@xml.get_children(tree), theme)
+          let parsed = parse_shapes_from_children(
+            @xml.get_children(tree),
+            theme,
+          )
           { slide_size, background: bg, bg_grad, shapes: parsed }
         }
       }
@@ -762,8 +930,12 @@ pub fn parse_slide(
 
 // ── Background parsing (shared) ──────────────────────────────────────────────
 
-///| Parse background color from p:cSld children. Returns Color::none() if no bg.
-fn parse_bg_from_csld(csld_ch : Array[@xml.XmlNode], theme : ThemeData) -> Color {
+///|
+/// Parse background color from p:cSld children. Returns Color::none() if no bg.
+fn parse_bg_from_csld(
+  csld_ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Color {
   match @xml.find_child(csld_ch, "p:bg") {
     None => Color::none()
     Some(bg_node) => {
@@ -776,14 +948,18 @@ fn parse_bg_from_csld(csld_ch : Array[@xml.XmlNode], theme : ThemeData) -> Color
   }
 }
 
-///| Parse shapes from a list of child nodes (shared by spTree and grpSp).
-fn parse_shapes_from_children(children : Array[@xml.XmlNode], theme : ThemeData) -> Array[Shape] {
+///|
+/// Parse shapes from a list of child nodes (shared by spTree and grpSp).
+fn parse_shapes_from_children(
+  children : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Array[Shape] {
   let shapes : Array[Shape] = []
   let n = children.length()
   let mut i = 0
   while i < n {
     match children[i] {
-      @xml.XmlNode::Element(tag, _, _) => {
+      @xml.XmlNode::Element(tag, _, _) =>
         if tag == "p:sp" {
           shapes.push(parse_sp(children[i], theme))
         } else if tag == "p:pic" {
@@ -795,7 +971,6 @@ fn parse_shapes_from_children(children : Array[@xml.XmlNode], theme : ThemeData)
         } else if tag == "p:cxnSp" {
           shapes.push(parse_cxn_sp(children[i], theme))
         }
-      }
       _ => ()
     }
     i = i + 1
@@ -803,11 +978,11 @@ fn parse_shapes_from_children(children : Array[@xml.XmlNode], theme : ThemeData)
   shapes
 }
 
-///| Parse shapes from p:spTree children.
-fn parse_shapes_from_tree(tree : @xml.XmlNode, theme : ThemeData) -> Array[Shape] {
+///|
+/// Parse shapes from p:spTree children.
+fn parse_shapes_from_tree(
+  tree : @xml.XmlNode,
+  theme : ThemeData,
+) -> Array[Shape] {
   parse_shapes_from_children(@xml.get_children(tree), theme)
 }
-
-// ── Integer→string ───────────────────────────────────────────────────────────
-
-fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }

@@ -32,22 +32,43 @@
 //   g_masters            — parsed SlideMasterData + path pairs
 //   g_layout_to_master   — (layout_path, master_path) mapping
 
+///|
 let g_slide_count : Ref[Int] = { val: 0 }
+
+///|
 let g_slide_size : Ref[@ooxml.SlideSize] = { val: @ooxml.SlideSize::default() }
+
+///|
 let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [] }
+
+///|
 let g_modified : Ref[Array[Bool]] = { val: [] }
+
+///|
 let g_theme : Ref[@ooxml.ThemeData] = { val: @ooxml.ThemeData::default() }
 
+///|
 let g_slide_layout_paths : Ref[Array[String]] = { val: [] }
+
+///|
 let g_layout_paths : Ref[Array[String]] = { val: [] }
+
+///|
 let g_layouts : Ref[Array[(@ooxml.SlideLayoutData, String)]] = { val: [] }
+
+///|
 let g_master_paths : Ref[Array[String]] = { val: [] }
+
+///|
 let g_masters : Ref[Array[(@ooxml.SlideMasterData, String)]] = { val: [] }
+
+///|
 let g_layout_to_master : Ref[Array[(String, String)]] = { val: [] }
 
 // ── Path resolution helpers ──────────────────────────────────────────────────
 
-///| Resolve a relative target path against a base directory.
+///|
+/// Resolve a relative target path against a base directory.
 ///  e.g. resolve_rel_path("ppt/slides", "../slideLayouts/slideLayout1.xml")
 ///    → "ppt/slideLayouts/slideLayout1.xml"
 fn resolve_rel_path(base_dir : String, target : String) -> String {
@@ -81,26 +102,41 @@ fn resolve_rel_path(base_dir : String, target : String) -> String {
   }
 }
 
+///|
 fn last_index_of(s : String, c : Char) -> Int {
   let len = s.length()
   let mut i = len - 1
   while i >= 0 {
-    if s.get_char(i).unwrap() == c { return i }
+    if s.get_char(i).unwrap() == c {
+      return i
+    }
     i = i - 1
   }
   -1
 }
 
-fn substring(s : String, from : Int, to : Int) -> String { @xml.str_substring(s, from, to) }
-
-///| Get the directory portion of a path.
-fn dir_of(path : String) -> String {
-  let slash = last_index_of(path, '/')
-  if slash >= 0 { substring(path, 0, slash) } else { "" }
+///|
+fn substring(s : String, from : Int, to : Int) -> String {
+  @xml.str_substring(s, from, to)
 }
 
-///| Find relationship by type suffix in a rels array.
-fn find_rel_by_type_suffix(rels : Array[@ooxml.Relationship], type_suffix : String) -> String {
+///|
+/// Get the directory portion of a path.
+fn dir_of(path : String) -> String {
+  let slash = last_index_of(path, '/')
+  if slash >= 0 {
+    substring(path, 0, slash)
+  } else {
+    ""
+  }
+}
+
+///|
+/// Find relationship by type suffix in a rels array.
+fn find_rel_by_type_suffix(
+  rels : Array[@ooxml.Relationship],
+  type_suffix : String,
+) -> String {
   let n = rels.length()
   let mut i = 0
   while i < n {
@@ -112,43 +148,53 @@ fn find_rel_by_type_suffix(rels : Array[@ooxml.Relationship], type_suffix : Stri
   ""
 }
 
-///| Check if an array contains a string.
+///|
+/// Check if an array contains a string.
 fn array_contains(arr : Array[String], val : String) -> Bool {
   let n = arr.length()
   let mut i = 0
   while i < n {
-    if arr[i] == val { return true }
+    if arr[i] == val {
+      return true
+    }
     i = i + 1
   }
   false
 }
 
-///| Find index of a string in an array, or -1.
+///|
+/// Find index of a string in an array, or -1.
 fn array_index_of(arr : Array[String], val : String) -> Int {
   let n = arr.length()
   let mut i = 0
   while i < n {
-    if arr[i] == val { return i }
+    if arr[i] == val {
+      return i
+    }
     i = i + 1
   }
   -1
 }
 
-///| Get the .rels path for a given content path.
+///|
+/// Get the .rels path for a given content path.
 fn rels_path_for(path : String) -> String {
   let dir = dir_of(path)
   let filename = suffix(path, dir.length() + 1)
   dir + "/_rels/" + filename + ".rels"
 }
 
-///| Look up the master for a given layout path.
+///|
+/// Look up the master for a given layout path.
 fn find_master_for_layout(layout_path : String) -> String {
   let pairs = g_layout_to_master.val
   let n = pairs.length()
   let mut i = 0
   while i < n {
     let (lp, mp) = pairs[i]
-    if lp == layout_path { return mp }
+    if lp == layout_path {
+      return mp
+    }
     i = i + 1
   }
   // Fallback: first master
@@ -159,7 +205,8 @@ fn find_master_for_layout(layout_path : String) -> String {
   }
 }
 
-///| Look up parsed layout data by path.
+///|
+/// Look up parsed layout data by path.
 fn get_layout(layout_path : String) -> @ooxml.SlideLayoutData? {
   let idx = array_index_of(g_layout_paths.val, layout_path)
   if idx >= 0 {
@@ -170,7 +217,8 @@ fn get_layout(layout_path : String) -> @ooxml.SlideLayoutData? {
   }
 }
 
-///| Look up parsed master data by path.
+///|
+/// Look up parsed master data by path.
 fn get_master(master_path : String) -> @ooxml.SlideMasterData? {
   let idx = array_index_of(g_master_paths.val, master_path)
   if idx >= 0 {
@@ -181,11 +229,12 @@ fn get_master(master_path : String) -> @ooxml.SlideMasterData? {
   }
 }
 
-///| Find the owning master's ColorMap for a given layout path.
+///|
+/// Find the owning master's ColorMap for a given layout path.
 fn find_master_clr_map(
   layout_to_master : Array[(String, String)],
   masters : Array[(@ooxml.SlideMasterData, String)],
-  layout_path : String
+  layout_path : String,
 ) -> @ooxml.ColorMap {
   // Find master path for this layout
   let mut master_path = ""
@@ -209,7 +258,8 @@ fn find_master_clr_map(
   @ooxml.ColorMap::default()
 }
 
-///| Initialize the PPTX processor.
+///|
+/// Initialize the PPTX processor.
 ///
 /// Reads presentation.xml via FFI and counts the number of slides.
 /// Returns "OK:<count>" on success, "ERROR:<message>" on failure.
@@ -245,7 +295,9 @@ pub fn initialize_pptx() -> String {
   let mut si = 0
   while si < count {
     let slide_num = si + 1
-    let slide_rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+    let slide_rels_path = "ppt/slides/_rels/slide" +
+      int_to_str(slide_num) +
+      ".xml.rels"
     let slide_rels_xml = @ffi.ffi_get_file(slide_rels_path)
     let layout_path = if slide_rels_xml.is_empty() {
       ""
@@ -259,7 +311,8 @@ pub fn initialize_pptx() -> String {
       }
     }
     slide_layout_paths.push(layout_path)
-    if not(layout_path.is_empty()) && not(array_contains(layout_paths, layout_path)) {
+    if not(layout_path.is_empty()) &&
+      not(array_contains(layout_paths, layout_path)) {
       layout_paths.push(layout_path)
     }
     si = si + 1
@@ -359,29 +412,36 @@ pub fn initialize_pptx() -> String {
   let modified : Array[Bool] = []
   let mut i = 0
   while i < count {
-    slides.push(
-      {
-        slide_size: g_slide_size.val,
-        background: @ooxml.Color::none(),
-        bg_grad: @ooxml.GradientFill::none(),
-        shapes: [],
-      },
-    )
+    slides.push({
+      slide_size: g_slide_size.val,
+      background: @ooxml.Color::none(),
+      bg_grad: @ooxml.GradientFill::none(),
+      shapes: [],
+    })
     modified.push(false)
     i = i + 1
   }
   g_slides.val = slides
   g_modified.val = modified
-  @ffi.ffi_log("Slide count: " + int_to_str(count) + ", layouts: " + int_to_str(nlay) + ", masters: " + int_to_str(nmas))
+  @ffi.ffi_log(
+    "Slide count: " +
+    int_to_str(count) +
+    ", layouts: " +
+    int_to_str(nlay) +
+    ", masters: " +
+    int_to_str(nmas),
+  )
   "OK:" + int_to_str(count)
 }
 
-///| Get the number of slides in the loaded presentation.
+///|
+/// Get the number of slides in the loaded presentation.
 pub fn get_slide_count() -> Int {
   g_slide_count.val
 }
 
-///| Get the raw XML of a slide (0-indexed).
+///|
+/// Get the raw XML of a slide (0-indexed).
 pub fn get_slide_xml_raw(slide_idx : Int) -> String {
   let path = "ppt/slides/slide" + int_to_str(slide_idx + 1) + ".xml"
   @ffi.ffi_log("get_slide_xml_raw: " + path)
@@ -393,12 +453,14 @@ pub fn get_slide_xml_raw(slide_idx : Int) -> String {
   }
 }
 
-///| Get a newline-separated list of all PPTX entry paths.
+///|
+/// Get a newline-separated list of all PPTX entry paths.
 pub fn get_entry_list() -> String {
   @ffi.ffi_get_entry_list()
 }
 
-///| Render slide `slide_idx` (0-indexed) as an SVG string.
+///|
+/// Render slide `slide_idx` (0-indexed) as an SVG string.
 ///
 /// Returns the SVG markup on success, or "ERROR:<message>" on failure.
 pub fn render_slide_svg(slide_idx : Int) -> String {
@@ -417,27 +479,30 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     return "ERROR:slide XML not found: " + slide_path
   }
   // Load slide relationships (.rels)
-  let rels_path =
-    "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+  let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
   let rels_xml = @ffi.ffi_get_file(rels_path)
-  let rels = if rels_xml.is_empty() {
-    []
-  } else {
-    @ooxml.parse_rels(rels_xml)
-  }
+  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
   // ── Resolve layout/master for this slide ──
   let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
     g_slide_layout_paths.val[slide_idx]
   } else {
     ""
   }
-  let layout_opt = if not(layout_path.is_empty()) { get_layout(layout_path) } else { None }
+  let layout_opt = if not(layout_path.is_empty()) {
+    get_layout(layout_path)
+  } else {
+    None
+  }
   let master_path = if not(layout_path.is_empty()) {
     find_master_for_layout(layout_path)
   } else {
     ""
   }
-  let master_opt = if not(master_path.is_empty()) { get_master(master_path) } else { None }
+  let master_opt = if not(master_path.is_empty()) {
+    get_master(master_path)
+  } else {
+    None
+  }
   // ── Compute effective theme with color map overrides ──
   let effective_theme = {
     // Start with master's clr_map
@@ -447,10 +512,11 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     }
     // Apply layout clrMapOvr if present
     match layout_opt {
-      Some(layout) => match layout.clr_map_ovr {
-        Some(ovr) => eff = @ooxml.apply_color_map(g_theme.val, ovr)
-        None => ()
-      }
+      Some(layout) =>
+        match layout.clr_map_ovr {
+          Some(ovr) => eff = @ooxml.apply_color_map(g_theme.val, ovr)
+          None => ()
+        }
       None => ()
     }
     // Apply slide's own clrMapOvr if present
@@ -466,27 +532,29 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     eff
   }
   // Parse slide and cache it
-  let slide_data = @ooxml.parse_slide(slide_xml, g_slide_size.val, effective_theme)
+  let slide_data = @ooxml.parse_slide(
+    slide_xml,
+    g_slide_size.val,
+    effective_theme,
+  )
   // ── Placeholder inheritance: resolve transforms from layout/master ──
   resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
   // ── Background inheritance: slide → layout → master → white ──
   let mut bg = slide_data.background
   if bg.is_none() {
     match layout_opt {
-      Some(layout) => {
+      Some(layout) =>
         if not(layout.background.is_none()) {
           bg = layout.background
         }
-      }
       None => ()
     }
     if bg.is_none() {
       match master_opt {
-        Some(master) => {
+        Some(master) =>
           if not(master.background.is_none()) {
             bg = master.background
           }
-        }
         None => ()
       }
     }
@@ -543,10 +611,13 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     None => ()
   }
   // Render to SVG
-  @renderer.render_slide_svg(resolved_slide, rels, slide_num, effective_theme, bg_shapes)
+  @renderer.render_slide_svg(
+    resolved_slide, rels, slide_num, effective_theme, bg_shapes,
+  )
 }
 
-///| Update a slide's internal data from an edited SVG string.
+///|
+/// Update a slide's internal data from an edited SVG string.
 ///
 /// Parses the SVG's data-ooxml-* attributes back into SlideData.
 /// Returns "OK" on success, "ERROR:<message>" on failure.
@@ -564,7 +635,8 @@ pub fn update_slide_from_svg(slide_idx : Int, svg_string : String) -> String {
   "OK"
 }
 
-///| Get the OOXML slide XML for a slide (0-indexed).
+///|
+/// Get the OOXML slide XML for a slide (0-indexed).
 ///
 /// If the slide has been modified via update_slide_from_svg(),
 /// returns the serialized modified data. Otherwise returns the
@@ -592,7 +664,8 @@ pub fn get_slide_ooxml(slide_idx : Int) -> String {
   }
 }
 
-///| Get tab-separated list of modified entries for ZIP rebuild.
+///|
+/// Get tab-separated list of modified entries for ZIP rebuild.
 ///
 /// Format: "path\tcontent\n" for each modified slide.
 /// JS uses this to replace entries in the ZIP archive.
@@ -610,4 +683,3 @@ pub fn get_modified_entries() -> String {
   }
   result
 }
-

@@ -38,6 +38,7 @@ Slides:
  33. Arrows (headEnd/tailEnd), line join (round/bevel/miter), line cap (rnd/sq), compound line (dbl), noFill
  34. Group shapes (p:grpSp) — simple group + nested group
  35. Connectors (p:cxnSp) — straight, diagonal, bent, curved
+ 36. Preset geometry shapes (triangle, diamond, pentagon, hexagon, arrow, star, heart, etc.)
 """
 
 from pptx import Presentation
@@ -2476,6 +2477,79 @@ lbl35 = slide35.shapes.add_textbox(Inches(0.5), Inches(5.5), Inches(9), Inches(1
 lbl35.text_frame.paragraphs[0].text = "Left: straight + diagonal. Right: bent (green) + curved (orange)."
 lbl35.text_frame.paragraphs[0].font.size = Pt(12)
 lbl35.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Slide 36: Preset geometry shapes (triangle, diamond, arrow, star, heart, etc.)
+# ────────────────────────────────────────────────────────────────────────────
+slide36 = prs.slides.add_slide(prs.slide_layouts[6])  # Blank layout
+spTree36 = slide36.shapes._spTree
+
+# Helper: inject a preset geometry shape via raw XML
+def make_prst_shape(name, prst, x_emu, y_emu, cx_emu, cy_emu, fill_hex, avlst_xml=''):
+    av_xml = f'<a:avLst>{avlst_xml}</a:avLst>' if avlst_xml else '<a:avLst/>'
+    return f'''<p:sp xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="0" name="{name}"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="{x_emu}" y="{y_emu}"/>
+      <a:ext cx="{cx_emu}" cy="{cy_emu}"/>
+    </a:xfrm>
+    <a:prstGeom prst="{prst}">{av_xml}</a:prstGeom>
+    <a:solidFill><a:srgbClr val="{fill_hex}"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="333333"/></a:solidFill></a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr/>
+    <a:lstStyle/>
+    <a:p><a:r><a:rPr lang="en-US" sz="900"/><a:t>{prst}</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+shapes_36 = [
+    ("triangle", "FF6B6B"),
+    ("diamond", "4ECDC4"),
+    ("pentagon", "FFD93D"),
+    ("hexagon", "6C5CE7"),
+    ("rightArrow", "74B9FF"),
+    ("star5", "FDCB6E"),
+    ("heart", "E17055"),
+    ("plus", "00CEC9"),
+    ("flowChartDecision", "A29BFE"),
+    ("chevron", "55EFC4"),
+    ("parallelogram", "FF7675"),
+    ("octagon", "FFEAA7"),
+]
+
+row_y = [Emu(457200), Emu(2286000)]  # 2 rows
+col_x = [Emu(457200 + i * 1524000) for i in range(6)]  # 6 columns
+sz = Emu(1143000)  # ~1.2 inch
+for idx, (prst, fill) in enumerate(shapes_36):
+    row = idx // 6
+    col = idx % 6
+    xml = make_prst_shape(f"prst_{prst}", prst, col_x[col], row_y[row], sz, sz, fill)
+    spTree36.append(etree.fromstring(xml))
+
+# Also add shapes with custom adj values
+adj_shapes = [
+    ("rightArrow_adj", "rightArrow", Emu(457200), Emu(4114800), Emu(2286000), Emu(914400), "74B9FF",
+     '<a:gd name="adj1" fmla="val 70000"/><a:gd name="adj2" fmla="val 30000"/>'),
+    ("star5_adj", "star5", Emu(3200400), Emu(4114800), Emu(1143000), Emu(1143000), "FDCB6E",
+     '<a:gd name="adj" fmla="val 40000"/>'),
+]
+for name, prst, x, y, cx, cy, fill, avlst in adj_shapes:
+    xml = make_prst_shape(name, prst, x, y, cx, cy, fill, avlst)
+    spTree36.append(etree.fromstring(xml))
+
+lbl36 = slide36.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0.5))
+lbl36.text_frame.paragraphs[0].text = "Preset geometry: triangle, diamond, pentagon, hexagon, rightArrow, star5, heart, plus, flowChartDecision, chevron, parallelogram, octagon"
+lbl36.text_frame.paragraphs[0].font.size = Pt(10)
+lbl36.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

@@ -1,0 +1,3 @@
+import {
+  "pptx-svg/ffi" @ffi,
+}

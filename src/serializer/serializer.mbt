@@ -7,19 +7,35 @@
 
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
-fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
+///|
+fn int_to_str(n : Int) -> String {
+  @xml.int_to_str(n)
+}
 
-///| Serialize an arrow end element (a:headEnd or a:tailEnd).
-fn serialize_arrow_end(tag : String, type_ : String, w : String, len : String) -> String {
-  if type_.is_empty() { return "" }
+///|
+/// Serialize an arrow end element (a:headEnd or a:tailEnd).
+fn serialize_arrow_end(
+  tag : String,
+  type_ : String,
+  w : String,
+  len : String,
+) -> String {
+  if type_.is_empty() {
+    return ""
+  }
   let mut attrs = " type=\"" + type_ + "\""
-  if not(w.is_empty()) { attrs = attrs + " w=\"" + w + "\"" }
-  if not(len.is_empty()) { attrs = attrs + " len=\"" + len + "\"" }
+  if not(w.is_empty()) {
+    attrs = attrs + " w=\"" + w + "\""
+  }
+  if not(len.is_empty()) {
+    attrs = attrs + " len=\"" + len + "\""
+  }
   "<" + tag + attrs + "/>"
 }
 
 // ── XML helpers ──────────────────────────────────────────────────────────────
 
+///|
 fn xml_escape(s : String) -> String {
   let len = s.length()
   let mut needs = false
@@ -32,7 +48,9 @@ fn xml_escape(s : String) -> String {
     }
     k = k + 1
   }
-  if not(needs) { return s }
+  if not(needs) {
+    return s
+  }
   let mut result = ""
   let mut i = 0
   while i < len {
@@ -57,18 +75,24 @@ fn xml_escape(s : String) -> String {
 
 // ── Color serialization ─────────────────────────────────────────────────────
 
-///| Serialize inner color element (a:srgbClr with optional a:alpha child).
+///|
+/// Serialize inner color element (a:srgbClr with optional a:alpha child).
 ///  No solidFill wrapper — used for gradient stops, pattFill fg/bg, etc.
 fn serialize_color_inner(color : @ooxml.Color) -> String {
   if color.alpha < 255 {
     // alpha → OOXML 1/1000th percent: alpha * 100000 / 255
     let alpha_val = color.alpha * 100000 / 255
-    "<a:srgbClr val=\"" + color.to_hex_rgb() + "\"><a:alpha val=\"" + int_to_str(alpha_val) + "\"/></a:srgbClr>"
+    "<a:srgbClr val=\"" +
+    color.to_hex_rgb() +
+    "\"><a:alpha val=\"" +
+    int_to_str(alpha_val) +
+    "\"/></a:srgbClr>"
   } else {
     "<a:srgbClr val=\"" + color.to_hex_rgb() + "\"/>"
   }
 }
 
+///|
 fn serialize_color(color : @ooxml.Color) -> String {
   if color.is_none() {
     "<a:noFill/>"
@@ -79,9 +103,18 @@ fn serialize_color(color : @ooxml.Color) -> String {
 
 // ── Gradient fill serialization ──────────────────────────────────────────────
 
+///|
 fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
-  let rot_attr = if gf.rot_with_shape { " rotWithShape=\"1\"" } else { " rotWithShape=\"0\"" }
-  let flip_attr = if gf.tile_flip.is_empty() || gf.tile_flip == "none" { "" } else { " tileFlip=\"" + gf.tile_flip + "\"" }
+  let rot_attr = if gf.rot_with_shape {
+    " rotWithShape=\"1\""
+  } else {
+    " rotWithShape=\"0\""
+  }
+  let flip_attr = if gf.tile_flip.is_empty() || gf.tile_flip == "none" {
+    ""
+  } else {
+    " tileFlip=\"" + gf.tile_flip + "\""
+  }
   let mut out = "<a:gradFill" + rot_attr + flip_attr + ">"
   // Gradient stops
   out = out + "<a:gsLst>"
@@ -89,7 +122,12 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   let mut si = 0
   while si < ns {
     let stop = gf.stops[si]
-    out = out + "<a:gs pos=\"" + int_to_str(stop.pos) + "\">" + serialize_color_inner(stop.color) + "</a:gs>"
+    out = out +
+      "<a:gs pos=\"" +
+      int_to_str(stop.pos) +
+      "\">" +
+      serialize_color_inner(stop.color) +
+      "</a:gs>"
     si = si + 1
   }
   out = out + "</a:gsLst>"
@@ -100,12 +138,23 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   } else if not(gf.path_type.is_empty()) {
     // Path gradient
     out = out + "<a:path path=\"" + gf.path_type + "\">"
-    if gf.fill_to_l >= 0 || gf.fill_to_t >= 0 || gf.fill_to_r >= 0 || gf.fill_to_b >= 0 {
+    if gf.fill_to_l >= 0 ||
+      gf.fill_to_t >= 0 ||
+      gf.fill_to_r >= 0 ||
+      gf.fill_to_b >= 0 {
       out = out + "<a:fillToRect"
-      if gf.fill_to_l >= 0 { out = out + " l=\"" + int_to_str(gf.fill_to_l) + "\"" }
-      if gf.fill_to_t >= 0 { out = out + " t=\"" + int_to_str(gf.fill_to_t) + "\"" }
-      if gf.fill_to_r >= 0 { out = out + " r=\"" + int_to_str(gf.fill_to_r) + "\"" }
-      if gf.fill_to_b >= 0 { out = out + " b=\"" + int_to_str(gf.fill_to_b) + "\"" }
+      if gf.fill_to_l >= 0 {
+        out = out + " l=\"" + int_to_str(gf.fill_to_l) + "\""
+      }
+      if gf.fill_to_t >= 0 {
+        out = out + " t=\"" + int_to_str(gf.fill_to_t) + "\""
+      }
+      if gf.fill_to_r >= 0 {
+        out = out + " r=\"" + int_to_str(gf.fill_to_r) + "\""
+      }
+      if gf.fill_to_b >= 0 {
+        out = out + " b=\"" + int_to_str(gf.fill_to_b) + "\""
+      }
       out = out + "/>"
     }
     out = out + "</a:path>"
@@ -115,27 +164,48 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
 
 // ── Blip fill serialization ──────────────────────────────────────────────────
 
+///|
 fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
   let mut out = "<a:blipFill>"
   out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
   if bf.src_l > 0 || bf.src_t > 0 || bf.src_r > 0 || bf.src_b > 0 {
     out = out + "<a:srcRect"
-    if bf.src_l > 0 { out = out + " l=\"" + int_to_str(bf.src_l) + "\"" }
-    if bf.src_t > 0 { out = out + " t=\"" + int_to_str(bf.src_t) + "\"" }
-    if bf.src_r > 0 { out = out + " r=\"" + int_to_str(bf.src_r) + "\"" }
-    if bf.src_b > 0 { out = out + " b=\"" + int_to_str(bf.src_b) + "\"" }
+    if bf.src_l > 0 {
+      out = out + " l=\"" + int_to_str(bf.src_l) + "\""
+    }
+    if bf.src_t > 0 {
+      out = out + " t=\"" + int_to_str(bf.src_t) + "\""
+    }
+    if bf.src_r > 0 {
+      out = out + " r=\"" + int_to_str(bf.src_r) + "\""
+    }
+    if bf.src_b > 0 {
+      out = out + " b=\"" + int_to_str(bf.src_b) + "\""
+    }
     out = out + "/>"
   }
   if bf.stretch {
     out = out + "<a:stretch><a:fillRect/></a:stretch>"
   } else if bf.tile_sx > 0 || bf.tile_sy > 0 {
     out = out + "<a:tile"
-    if bf.tile_tx != 0 { out = out + " tx=\"" + int_to_str(bf.tile_tx) + "\"" }
-    if bf.tile_ty != 0 { out = out + " ty=\"" + int_to_str(bf.tile_ty) + "\"" }
-    if bf.tile_sx != 0 { out = out + " sx=\"" + int_to_str(bf.tile_sx) + "\"" }
-    if bf.tile_sy != 0 { out = out + " sy=\"" + int_to_str(bf.tile_sy) + "\"" }
-    if not(bf.tile_flip.is_empty()) && bf.tile_flip != "none" { out = out + " flip=\"" + bf.tile_flip + "\"" }
-    if not(bf.tile_algn.is_empty()) { out = out + " algn=\"" + bf.tile_algn + "\"" }
+    if bf.tile_tx != 0 {
+      out = out + " tx=\"" + int_to_str(bf.tile_tx) + "\""
+    }
+    if bf.tile_ty != 0 {
+      out = out + " ty=\"" + int_to_str(bf.tile_ty) + "\""
+    }
+    if bf.tile_sx != 0 {
+      out = out + " sx=\"" + int_to_str(bf.tile_sx) + "\""
+    }
+    if bf.tile_sy != 0 {
+      out = out + " sy=\"" + int_to_str(bf.tile_sy) + "\""
+    }
+    if not(bf.tile_flip.is_empty()) && bf.tile_flip != "none" {
+      out = out + " flip=\"" + bf.tile_flip + "\""
+    }
+    if not(bf.tile_algn.is_empty()) {
+      out = out + " algn=\"" + bf.tile_algn + "\""
+    }
     out = out + "/>"
   }
   out + "</a:blipFill>"
@@ -143,6 +213,7 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
 
 // ── Pattern fill serialization ──────────────────────────────────────────────
 
+///|
 fn serialize_pattern_fill(pf : @ooxml.PatternFill) -> String {
   let mut out = "<a:pattFill prst=\"" + pf.prst + "\">"
   out = out + "<a:fgClr>" + serialize_color_inner(pf.fg_color) + "</a:fgClr>"
@@ -152,11 +223,19 @@ fn serialize_pattern_fill(pf : @ooxml.PatternFill) -> String {
 
 // ── Text body serialization ──────────────────────────────────────────────────
 
-///| Serialize a:bodyPr element.
+///|
+/// Serialize a:bodyPr element.
 fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
-  let has_attrs = not(bp.anchor.is_empty()) || bp.l_ins >= 0 || bp.t_ins >= 0 ||
-    bp.r_ins >= 0 || bp.b_ins >= 0 || bp.wrap == "none" || bp.rot != 0 ||
-    not(bp.vert.is_empty()) || bp.num_cols > 1 || bp.col_spacing > 0
+  let has_attrs = not(bp.anchor.is_empty()) ||
+    bp.l_ins >= 0 ||
+    bp.t_ins >= 0 ||
+    bp.r_ins >= 0 ||
+    bp.b_ins >= 0 ||
+    bp.wrap == "none" ||
+    bp.rot != 0 ||
+    not(bp.vert.is_empty()) ||
+    bp.num_cols > 1 ||
+    bp.col_spacing > 0
   let has_children = bp.auto_fit || bp.font_scale >= 0
   if not(has_attrs) && not(has_children) {
     return "<a:bodyPr/>"
@@ -209,7 +288,8 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   }
 }
 
-///| Serialize spacing as a:spcBef or a:spcAft child element.
+///|
+/// Serialize spacing as a:spcBef or a:spcAft child element.
 fn serialize_spacing(tag : String, val : Int) -> String {
   if val == 0 {
     return ""
@@ -226,12 +306,13 @@ fn serialize_spacing(tag : String, val : Int) -> String {
   out + "</" + tag + ">"
 }
 
-///| Serialize paragraphs as OOXML text body content (shared by shapes and table cells).
+///|
+/// Serialize paragraphs as OOXML text body content (shared by shapes and table cells).
 ///  `wrapper` is the outer tag: "p:txBody" for shapes, "a:txBody" for table cells.
 fn serialize_text_body_inner(
   paragraphs : Array[@ooxml.TextParagraph],
   wrapper : String,
-  body_props : @ooxml.BodyProps
+  body_props : @ooxml.BodyProps,
 ) -> String {
   let mut out = "<" + wrapper + ">"
   out = out + serialize_body_pr(body_props) + "<a:lstStyle/>"
@@ -247,12 +328,24 @@ fn serialize_text_body_inner(
     let has_indent = para.indent != 0
     let has_spc = para.spc_before != 0 || para.spc_after != 0
     let has_lnspc = para.line_spacing != 0
-    let has_bullet = not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) || para.bullet_none ||
-      not(para.bullet_font.is_empty()) || para.bullet_size != 0 || not(para.bullet_color.is_none()) ||
+    let has_bullet = not(para.bullet.is_empty()) ||
+      not(para.bullet_auto.is_empty()) ||
+      para.bullet_none ||
+      not(para.bullet_font.is_empty()) ||
+      para.bullet_size != 0 ||
+      not(para.bullet_color.is_none()) ||
       not(para.bullet_img_rid.is_empty())
     let has_tabs = para.tab_stops.length() > 0
     let has_rtl = para.rtl
-    let has_ppr = has_align || has_level || has_mar_l || has_indent || has_spc || has_lnspc || has_bullet || has_tabs || has_rtl
+    let has_ppr = has_align ||
+      has_level ||
+      has_mar_l ||
+      has_indent ||
+      has_spc ||
+      has_lnspc ||
+      has_bullet ||
+      has_tabs ||
+      has_rtl
     if has_ppr {
       let mut ppr = "<a:pPr"
       if has_align {
@@ -280,15 +373,27 @@ fn serialize_text_body_inner(
         ppr = ppr + serialize_spacing("a:spcAft", para.spc_after)
         // Bullet formatting
         if not(para.bullet_font.is_empty()) {
-          ppr = ppr + "<a:buFont typeface=\"" + xml_escape(para.bullet_font) + "\"/>"
+          ppr = ppr +
+            "<a:buFont typeface=\"" +
+            xml_escape(para.bullet_font) +
+            "\"/>"
         }
         if para.bullet_size > 0 {
-          ppr = ppr + "<a:buSzPct val=\"" + int_to_str(para.bullet_size) + "\"/>"
+          ppr = ppr +
+            "<a:buSzPct val=\"" +
+            int_to_str(para.bullet_size) +
+            "\"/>"
         } else if para.bullet_size < 0 {
-          ppr = ppr + "<a:buSzPts val=\"" + int_to_str(-(para.bullet_size)) + "\"/>"
+          ppr = ppr +
+            "<a:buSzPts val=\"" +
+            int_to_str(-para.bullet_size) +
+            "\"/>"
         }
         if not(para.bullet_color.is_none()) {
-          ppr = ppr + "<a:buClr>" + serialize_color_inner(para.bullet_color) + "</a:buClr>"
+          ppr = ppr +
+            "<a:buClr>" +
+            serialize_color_inner(para.bullet_color) +
+            "</a:buClr>"
         }
         if para.bullet_none {
           ppr = ppr + "<a:buNone/>"
@@ -297,7 +402,10 @@ fn serialize_text_body_inner(
         } else if not(para.bullet_auto.is_empty()) {
           ppr = ppr + "<a:buAutoNum type=\"" + para.bullet_auto + "\"/>"
         } else if not(para.bullet_img_rid.is_empty()) {
-          ppr = ppr + "<a:buBlip><a:blip r:embed=\"" + para.bullet_img_rid + "\"/></a:buBlip>"
+          ppr = ppr +
+            "<a:buBlip><a:blip r:embed=\"" +
+            para.bullet_img_rid +
+            "\"/></a:buBlip>"
         }
         // Tab stops
         if has_tabs {
@@ -341,7 +449,8 @@ fn serialize_text_body_inner(
   out + "</" + wrapper + ">"
 }
 
-///| Serialize a:rPr element for a text run.
+///|
+/// Serialize a:rPr element for a text run.
 fn serialize_run_props(run : @ooxml.TextRun) -> String {
   let mut rpr = "<a:rPr lang=\"en-US\" dirty=\"0\""
   if run.bold {
@@ -371,7 +480,13 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if run.kern > 0 {
     rpr = rpr + " kern=\"" + int_to_str(run.kern) + "\""
   }
-  let has_children = not(run.color.is_none()) || not(run.font_face.is_empty()) || not(run.ea_font.is_empty()) || not(run.cs_font.is_empty()) || not(run.sym_font.is_empty()) || not(run.hlink_rid.is_empty()) || not(run.hlink_mouse_over_rid.is_empty())
+  let has_children = not(run.color.is_none()) ||
+    not(run.font_face.is_empty()) ||
+    not(run.ea_font.is_empty()) ||
+    not(run.cs_font.is_empty()) ||
+    not(run.sym_font.is_empty()) ||
+    not(run.hlink_rid.is_empty()) ||
+    not(run.hlink_mouse_over_rid.is_empty())
   if has_children {
     rpr = rpr + ">"
     if not(run.color.is_none()) {
@@ -401,7 +516,11 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   }
 }
 
-fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph], body_props : @ooxml.BodyProps) -> String {
+///|
+fn serialize_text_body(
+  paragraphs : Array[@ooxml.TextParagraph],
+  body_props : @ooxml.BodyProps,
+) -> String {
   if paragraphs.length() == 0 {
     return ""
   }
@@ -410,43 +529,72 @@ fn serialize_text_body(paragraphs : Array[@ooxml.TextParagraph], body_props : @o
 
 // ── Shape serialization ──────────────────────────────────────────────────────
 
-///| Serialize a:xfrm with optional extra content (e.g. chOff/chExt for groups).
-fn serialize_transform_with_extra(t : @ooxml.ShapeTransform, extra : String) -> String {
+///|
+/// Serialize a:xfrm with optional extra content (e.g. chOff/chExt for groups).
+fn serialize_transform_with_extra(
+  t : @ooxml.ShapeTransform,
+  extra : String,
+) -> String {
   let mut xfrm = "<a:xfrm"
-  if t.rot != 0 { xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\"" }
-  if t.flip_h { xfrm = xfrm + " flipH=\"1\"" }
-  if t.flip_v { xfrm = xfrm + " flipV=\"1\"" }
+  if t.rot != 0 {
+    xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\""
+  }
+  if t.flip_h {
+    xfrm = xfrm + " flipH=\"1\""
+  }
+  if t.flip_v {
+    xfrm = xfrm + " flipV=\"1\""
+  }
   xfrm = xfrm + ">"
-  xfrm = xfrm + "<a:off x=\"" + int_to_str(t.x) + "\" y=\"" + int_to_str(t.y) + "\"/>"
-  xfrm = xfrm + "<a:ext cx=\"" + int_to_str(t.cx) + "\" cy=\"" + int_to_str(t.cy) + "\"/>"
+  xfrm = xfrm +
+    "<a:off x=\"" +
+    int_to_str(t.x) +
+    "\" y=\"" +
+    int_to_str(t.y) +
+    "\"/>"
+  xfrm = xfrm +
+    "<a:ext cx=\"" +
+    int_to_str(t.cx) +
+    "\" cy=\"" +
+    int_to_str(t.cy) +
+    "\"/>"
   xfrm + extra + "</a:xfrm>"
 }
 
+///|
 fn serialize_transform(t : @ooxml.ShapeTransform) -> String {
   serialize_transform_with_extra(t, "")
 }
 
+///|
 fn serialize_prst_geom(geom : @ooxml.ShapeGeom) -> String {
   let prst = geom.to_prst()
-  match geom {
-    @ooxml.ShapeGeom::Connector(_, avs) => {
-      if avs.length() == 0 {
-        "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
-      } else {
-        let mut out = "<a:prstGeom prst=\"" + prst + "\"><a:avLst>"
-        let n = avs.length()
-        let mut i = 0
-        while i < n {
-          out = out + "<a:gd name=\"adj" + int_to_str(i + 1) + "\" fmla=\"val " + int_to_str(avs[i]) + "\"/>"
-          i = i + 1
-        }
-        out + "</a:avLst></a:prstGeom>"
-      }
+  let avs = match geom {
+    @ooxml.ShapeGeom::Connector(_, a) => a
+    @ooxml.ShapeGeom::Other(_, a) => a
+    _ => []
+  }
+  if avs.length() == 0 {
+    "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
+  } else {
+    let mut out = "<a:prstGeom prst=\"" + prst + "\"><a:avLst>"
+    let n = avs.length()
+    let mut i = 0
+    while i < n {
+      let name = if i == 0 { "adj" } else { "adj" + int_to_str(i + 1) }
+      out = out +
+        "<a:gd name=\"" +
+        name +
+        "\" fmla=\"val " +
+        int_to_str(avs[i]) +
+        "\"/>"
+      i = i + 1
     }
-    _ => "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
+    out + "</a:avLst></a:prstGeom>"
   }
 }
 
+///|
 fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
   let mut out = "<p:sp>"
   // Non-visual properties
@@ -480,11 +628,17 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     out = out + serialize_color(shape.fill)
   }
   // Stroke
-  let has_stroke = not(shape.stroke.is_none()) || shape.stroke_no_fill ||
-    not(shape.stroke_dash.is_empty()) || not(shape.stroke_head_type.is_empty()) ||
+  let has_stroke = not(shape.stroke.is_none()) ||
+    shape.stroke_no_fill ||
+    not(shape.stroke_dash.is_empty()) ||
+    not(shape.stroke_head_type.is_empty()) ||
     not(shape.stroke_tail_type.is_empty())
   if has_stroke {
-    let w = if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }
+    let w = if shape.stroke_w > 0 {
+      shape.stroke_w
+    } else {
+      @ooxml.default_stroke_w
+    }
     let mut ln_attrs = " w=\"" + int_to_str(w) + "\""
     if not(shape.stroke_cap.is_empty()) {
       ln_attrs = ln_attrs + " cap=\"" + shape.stroke_cap + "\""
@@ -509,14 +663,23 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
       while pos < data_len {
         // Parse d value
         let mut d_end = pos
-        while d_end < data_len && data.get_char(d_end).unwrap() != ',' { d_end = d_end + 1 }
+        while d_end < data_len && data.get_char(d_end).unwrap() != ',' {
+          d_end = d_end + 1
+        }
         let d_val = @xml.parse_int(@xml.str_substring(data, pos, d_end))
         // Parse sp value
         let sp_start = d_end + 1
         let mut sp_end = sp_start
-        while sp_end < data_len && data.get_char(sp_end).unwrap() != ';' { sp_end = sp_end + 1 }
+        while sp_end < data_len && data.get_char(sp_end).unwrap() != ';' {
+          sp_end = sp_end + 1
+        }
         let sp_val = @xml.parse_int(@xml.str_substring(data, sp_start, sp_end))
-        out = out + "<a:ds d=\"" + int_to_str(d_val) + "\" sp=\"" + int_to_str(sp_val) + "\"/>"
+        out = out +
+          "<a:ds d=\"" +
+          int_to_str(d_val) +
+          "\" sp=\"" +
+          int_to_str(sp_val) +
+          "\"/>"
         pos = sp_end + 1
       }
       out = out + "</a:custDash>"
@@ -530,14 +693,29 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
       out = out + "<a:bevel/>"
     } else if shape.stroke_join == "miter" {
       if shape.stroke_miter_limit > 0 {
-        out = out + "<a:miter lim=\"" + int_to_str(shape.stroke_miter_limit) + "\"/>"
+        out = out +
+          "<a:miter lim=\"" +
+          int_to_str(shape.stroke_miter_limit) +
+          "\"/>"
       } else {
         out = out + "<a:miter/>"
       }
     }
     // Arrow head/tail
-    out = out + serialize_arrow_end("a:headEnd", shape.stroke_head_type, shape.stroke_head_w, shape.stroke_head_len)
-    out = out + serialize_arrow_end("a:tailEnd", shape.stroke_tail_type, shape.stroke_tail_w, shape.stroke_tail_len)
+    out = out +
+      serialize_arrow_end(
+        "a:headEnd",
+        shape.stroke_head_type,
+        shape.stroke_head_w,
+        shape.stroke_head_len,
+      )
+    out = out +
+      serialize_arrow_end(
+        "a:tailEnd",
+        shape.stroke_tail_type,
+        shape.stroke_tail_w,
+        shape.stroke_tail_len,
+      )
     out = out + "</a:ln>"
   }
   out = out + "</p:spPr>"
@@ -546,6 +724,7 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out + "</p:sp>"
 }
 
+///|
 fn serialize_picture(shape : @ooxml.Shape, rid : String) -> String {
   let mut out = "<p:pic>"
   // Non-visual properties
@@ -567,13 +746,15 @@ fn serialize_picture(shape : @ooxml.Shape, rid : String) -> String {
   out + "</p:pic>"
 }
 
+///|
 fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   let mut out = "<a:tc>"
   // Text body
   if cell.paragraphs.length() > 0 {
     out = out + serialize_table_text_body(cell.paragraphs)
   } else {
-    out = out + "<a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang=\"en-US\"/></a:p></a:txBody>"
+    out = out +
+      "<a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang=\"en-US\"/></a:p></a:txBody>"
   }
   // Cell properties
   out = out + "<a:tcPr>"
@@ -586,22 +767,28 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   out + "</a:tc>"
 }
 
-fn serialize_table_text_body(paragraphs : Array[@ooxml.TextParagraph]) -> String {
+///|
+fn serialize_table_text_body(
+  paragraphs : Array[@ooxml.TextParagraph],
+) -> String {
   serialize_text_body_inner(paragraphs, "a:txBody", @ooxml.BodyProps::default())
 }
 
+///|
 fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   let mut out = "<p:graphicFrame>"
   // Non-visual properties
   out = out + "<p:nvGraphicFramePr>"
   out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
-  out = out + "<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp=\"1\"/></p:cNvGraphicFramePr>"
+  out = out +
+    "<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp=\"1\"/></p:cNvGraphicFramePr>"
   out = out + "<p:nvPr/>"
   out = out + "</p:nvGraphicFramePr>"
   // Transform (directly under graphicFrame)
   out = out + serialize_transform(shape.transform)
   // Table content
-  out = out + "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/table\">"
+  out = out +
+    "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/table\">"
   out = out + "<a:tbl>"
   out = out + "<a:tblPr firstRow=\"1\" bandRow=\"1\"/>"
   // Grid columns
@@ -633,6 +820,7 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   out + "</p:graphicFrame>"
 }
 
+///|
 fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String {
   let mut out = "<p:grpSp>"
   out = out + "<p:nvGrpSpPr>"
@@ -642,8 +830,16 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
   out = out + "</p:nvGrpSpPr>"
   out = out + "<p:grpSpPr>"
   // Group xfrm includes chOff/chExt in addition to normal off/ext
-  let ch_extra = "<a:chOff x=\"" + int_to_str(grp.ch_off_x) + "\" y=\"" + int_to_str(grp.ch_off_y) + "\"/>" +
-    "<a:chExt cx=\"" + int_to_str(grp.ch_ext_cx) + "\" cy=\"" + int_to_str(grp.ch_ext_cy) + "\"/>"
+  let ch_extra = "<a:chOff x=\"" +
+    int_to_str(grp.ch_off_x) +
+    "\" y=\"" +
+    int_to_str(grp.ch_off_y) +
+    "\"/>" +
+    "<a:chExt cx=\"" +
+    int_to_str(grp.ch_ext_cx) +
+    "\" cy=\"" +
+    int_to_str(grp.ch_ext_cy) +
+    "\"/>"
   out = out + serialize_transform_with_extra(shape.transform, ch_extra)
   out = out + "</p:grpSpPr>"
   // Serialize child shapes
@@ -656,6 +852,7 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
   out + "</p:grpSp>"
 }
 
+///|
 fn serialize_shape(shape : @ooxml.Shape) -> String {
   match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => serialize_autoshape(shape, geom)
@@ -668,21 +865,28 @@ fn serialize_shape(shape : @ooxml.Shape) -> String {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-///| Serialize a SlideData into a complete OOXML slide XML string.
+///|
+/// Serialize a SlideData into a complete OOXML slide XML string.
 pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   let mut out = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
-  out = out + "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\""
-  out = out + " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\""
-  out = out + " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
+  out = out +
+    "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\""
+  out = out +
+    " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\""
+  out = out +
+    " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
   out = out + "<p:cSld>"
   // Background
   if not(slide.bg_grad.is_none()) {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_gradient_fill(slide.bg_grad)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"
-  } else if not(slide.background.is_none()) && not(
-    slide.background.r == 255 && slide.background.g == 255 && slide.background.b == 255
-  ) {
+  } else if not(slide.background.is_none()) &&
+    not(
+      slide.background.r == 255 &&
+      slide.background.g == 255 &&
+      slide.background.b == 255,
+    ) {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_color(slide.background)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"

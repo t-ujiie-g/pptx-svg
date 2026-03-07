@@ -1,5 +1,0 @@
-{
-  "import": [
-    { "path": "pptx-svg/ffi", "alias": "ffi" }
-  ]
-}

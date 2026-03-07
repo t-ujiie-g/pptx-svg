@@ -1,203 +1,47 @@
 # pptx-svg — PPTX 完全互換レンダリングライブラリ
 
-**目標**: OOXML PresentationML (ECMA-376 / ISO 29500) 準拠の PPTX → SVG レンダリング + PPTX エクスポート  
+**目標**: OOXML PresentationML (ECMA-376 / ISO 29500) 準拠の PPTX → SVG レンダリング + PPTX エクスポート
 **スコープ外**: アニメーション (`p:timing`)、トランジション (`p:transition`)、マクロ/VBA
 
 ---
 
-## 完了済み ✅
+## 完了済み
 
-- [x] ZIP 解凍 (JS DecompressionStream) + Wasm FFI + 3-tier js-string 互換
-- [x] 汎用 XML パーサー (DOM ツリー)
-- [x] AutoShape (rect / ellipse / roundRect / line) + 回転 / フリップ
-- [x] Picture (PNG / JPEG / GIF / SVG → data URI base64)
-- [x] テキスト (段落 / ラン / bold / italic / fontSize / color / fontFace / level)
-- [x] `a:defRPr` デフォルトランプロパティ (bold / italic / fontSize / color / fontFace のフォールバック)
-- [x] XML エンティティデコード (`&amp;` → `&` テキストノード)
-- [x] テーブル (`p:graphicFrame` + `a:tbl` — セル背景 / テキスト)
-- [x] スライド背景色 (`p:bg` → `p:bgPr` → solidFill)
-- [x] テーマ解決 (theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod)
-- [x] Round-trip パイプライン (data-ooxml-* SVG ↔ SlideData ↔ OOXML ↔ ZIP)
-- [x] スライドマスター / レイアウト継承 (背景 / テキストスタイル / placeholder transform / master shapes)
-- [x] フォントテーマ参照 (`+mj-lt`/`+mn-lt`/`+mj-ea`/`+mn-ea`)
-- [x] 東アジアフォント (`a:ea typeface`) + round-trip
-- [x] 行間 (`a:lnSpc`) EMU / 百分率
-- [x] 文字間隔 (`a:rPr spc`) + letter-spacing
-- [x] `a:lstStyle` シェイプ固有リストスタイル継承
-- [x] テキスト完全対応 (タブ / RTL / 画像バレット / kern / cs・sym フォント / 縦書き / 回転 / ハイパーリンク / ホバーリンク / リンク色 / テキストカラム)
-- [x] グラデーション塗りつぶし (`a:gradFill` — リニア / パス型 / ストップ色解決 + round-trip)
-- [x] 透過 / アルファ (`a:alpha` / `a:alphaModFix` → `fill-opacity` / `stop-opacity` + round-trip)
-- [x] 画像フィル (`a:blipFill` in shapes — ストレッチ / クロッピング + round-trip)
-- [x] パターンフィル (`a:pattFill` — 主要12種 SVG `<pattern>` + round-trip)
-- [x] 線 / ストローク完全対応 (破線11種 + カスタム破線 / 矢印5種 / 線結合 / 線端 / 複合線 / noFill + round-trip)
-- [x] Line ジオメトリ SVG `<line>` レンダリング (対角線 / flipH / flipV 対応)
-- [x] グループシェイプ (`p:grpSp` — 再帰パース / 座標変換 / ネスト / SVG `<g>` + round-trip)
-- [x] コネクタ (`p:cxnSp` — 直線 / 折れ線 / 曲線 / 矢印 / 調整値 round-trip)
+- [x] **基盤**: ZIP 解凍 (JS DecompressionStream) + Wasm FFI + 3-tier js-string 互換 + 汎用 XML パーサー
+- [x] **シェイプ基本**: AutoShape (rect/ellipse/roundRect/line) + 回転/フリップ + Picture (data URI base64)
+- [x] **テーブル**: `p:graphicFrame` + `a:tbl` — セル背景/テキスト/グラデーション
+- [x] **テーマ解決**: theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod
+- [x] **Round-trip**: data-ooxml-* SVG ↔ SlideData ↔ OOXML ↔ ZIP
+- [x] **マスター/レイアウト継承**: slideMaster/slideLayout パース + placeholder transform/bodyProps/背景/テキストスタイル継承 + `p:clrMapOvr` + マスターシェイプ描画
+- [x] **テキスト完全対応**: 段落書式 (spacing/indent/tab/RTL) + バレット全種 (文字/自動番号/画像/フォント/サイズ/色) + ラン装飾 (下線/取消線/上下付き/間隔/kern/cap) + フォント (EA/CS/Sym/テーマ参照) + bodyPr (anchor/insets/autofit/wrap/vert/rot/columns) + ハイパーリンク (click/hover/色)
+- [x] **塗りつぶし完全対応**: グラデーション (linear/path/tileFlip) + パターン (全 48 種) + 画像フィル (stretch/tile/crop) + アルファ/透過
+- [x] **線/ストローク完全対応**: 破線 11 種 + カスタム破線 + 矢印 5 種 + 線結合/線端/複合線/noFill + Line ジオメトリ `<line>` SVG
+- [x] **グループシェイプ**: `p:grpSp` 再帰パース + 座標変換 + ネスト + SVG `<g>`
+- [x] **コネクタ**: `p:cxnSp` 直線/折れ線/曲線 + 矢印 + 調整値 round-trip
+- [x] **プリセットジオメトリ**: `a:prstGeom` ガイド式エバリュエータ + ~70 種 SVG path 生成
+- [x] **ライブラリ化**: TypeScript 分割 (lib/ → dist/) + PptxRenderer クラス + Wasm 3-tier フォールバック
 
 ---
 
-## 1. スライドマスター / レイアウト継承 [P0 — 最優先]
+## 5. シェイプ — 残タスク [P1]
 
-ほぼ全ての PPTX で必要。マスター/レイアウトがないと背景・デフォルト書式・プレースホルダが再現できない。
-
-- [x] slideMaster*.xml パース — デフォルトスタイル / 背景 / シェイプ
-- [x] slideLayout*.xml パース — レイアウトテンプレート
-- [x] スタイル継承チェーン: slide → layout → master → theme
-- [x] プレースホルダタイプ解決 (`<p:ph type="title/body/..." idx="N">`)
-- [x] マスター/レイアウトからの背景継承 (slide に `p:bg` がなければ親を参照)
-- [x] `p:clrMapOvr` カラーマップオーバーライド
-- [x] デフォルトテキストスタイル (`p:txStyles` titleStyle/bodyStyle/otherStyle レベル 0-8)
-- [x] `a:lstStyle` (シェイプ/プレースホルダ固有のリストスタイル) レベル継承
-- [x] プレースホルダの transform 継承 (slide → layout → master)
-- [x] プレースホルダの bodyProps 継承 (anchor 等)
-- [x] マスター/レイアウト上のシェイプ描画 (ロゴ・フッター等 — 非PHのみ)
-
----
-
-## 2. テキスト — 完全対応 [P0]
-
-### 2.1 段落プロパティ
-- [x] スペーシング: `a:spcBef` (前) / `a:spcAft` (後) — パース + レンダリング
-- [x] 行間 (`a:lnSpc`) — パース + レンダリング (EMU / 百分率)
-- [x] インデント: `a:pPr marL/indent` — 左マージン、ぶら下げインデント
-- [x] タブストップ (`a:tabLst`) — パース + タブ位置レンダリング
-- [x] RTL / BiDi (`a:pPr rtl`) — 右→左テキスト方向 + SVG direction/text-anchor
-
-### 2.2 箇条書き / 番号付きリスト
-- [x] 文字バレット (`a:buChar char="●"`)
-- [x] 自動番号 (`a:buAutoNum type="arabicPeriod/alphaLcParenR/..."`)
-- [x] バレットフォント (`a:buFont typeface`)
-- [x] バレットサイズ (`a:buSzPct` / `a:buSzPts`)
-- [x] バレット色 (`a:buClr`)
-- [x] バレット非表示 (`a:buNone`)
-- [x] 画像バレット (`a:buBlip`) — Relationship 経由で画像解決 + `<image>` 要素レンダリング
-
-### 2.3 ラン装飾
-- [x] 下線 (`a:rPr u="sng/dbl/heavy/dotted/dash/wavy/..."` — 18 種)
-- [x] 取り消し線 (`a:rPr strike="sngStrike/dblStrike"`)
-- [x] 上付き / 下付き (`a:rPr baseline="30000/-25000"`)
-- [x] 文字間隔 (`a:rPr spc`) — パース + letter-spacing レンダリング
-- [x] カーニング (`a:rPr kern`) — パース + data 属性保持
-- [x] キャピタライズ (`a:rPr cap="all/small"`)
-
-### 2.4 フォント
-- [x] 東アジアフォント (`a:ea typeface`) — パース + font-family レンダリング + round-trip
-- [x] 複合スクリプト (`a:cs typeface`) — パース + font-family + round-trip
-- [x] シンボルフォント (`a:sym typeface`) — パース + font-family + round-trip
-- [x] フォントテーマ参照 (`+mj-lt`/`+mn-lt`/`+mj-ea`/`+mn-ea` → theme font 解決)
-
-### 2.5 テキストボディ
-- [x] `a:bodyPr` — アンカー (`anchor="ctr/b/t"`) 垂直位置合わせ
-- [x] 内部マージン (`lIns/tIns/rIns/bIns`)
-- [x] シェイプ自動フィット (`a:spAutoFit`) — テキスト溢れ時にシェイプ拡大
-- [x] テキスト自動フィット (`a:normAutofit fontScale/lnSpcReduction`)
-- [x] テキスト折り返し (`wrap="square/none"`)
-- [x] 縦書き (`vert="eaVert/vert/vert270/wordArtVert/..."`) — `writing-mode="tb"` レンダリング
-- [x] テキスト回転 (`rot`) — SVG `transform="rotate()"` レンダリング
-- [x] カラム数 (`numCol`) / カラム間隔 (`spcCol`) — 行レベルカラム分割レンダリング
-
-### 2.6 ハイパーリンク
-- [x] `a:hlinkClick r:id` → Relationship 経由で URL 解決 + `<a>` ラップ
-- [x] `a:hlinkHover r:id` — ホバーリンク (data 属性 + round-trip)
-- [x] リンク色 (hlink テーマカラー — 明示色なし時に自動適用)
-
----
-
-## 3. 塗りつぶし — 完全対応 [P1]
-
-### 3.1 グラデーション (`a:gradFill`)
-- [x] リニア (`a:lin ang="..." scaled="1"`) → SVG `<linearGradient>`
-- [x] パス型 (`a:path path="circle/rect/shape"`) → SVG `<radialGradient>`
-- [x] グラデーションストップ (`a:gs pos`) の色解決 (schemeClr / srgbClr + モディファイア)
-- [x] タイルフリップ (`tileFlip`)
-
-### 3.2 パターンフィル (`a:pattFill`)
-- [x] 主要12種のプリセットパターン (`prst="pct5/pct10/ltDnDiag/..."`) — SVG `<pattern>` レンダリング
-- [x] 前景色 / 背景色
-- [x] SVG `<pattern>` へマッピング + round-trip
-- [x] 残り36種のプリセットパターン (→ 全48種実装済み)
-
-### 3.3 画像フィル (`a:blipFill` in shapes)
-- [x] ストレッチ (`a:stretch` + `a:fillRect`)
-- [x] タイル (`a:tile tx/ty/sx/sy/flip/algn`)
-- [x] ソースRect (`a:srcRect l/t/r/b`) — クロッピング
-- [x] round-trip (data-ooxml-blip-* 属性)
-
-### 3.4 透過 / アルファ
-- [x] Color に alpha フィールド追加 (0-255)
-- [x] `a:alpha val` → SVG `fill-opacity` / `stop-opacity`
-- [x] `a:alphaModFix amt` — 固定アルファ変更
-- [x] グラデーションストップ個別アルファ
-
----
-
-## 4. 線 / ストローク — 完全対応 [P1] ✅
-
-- [x] 破線スタイル (`a:prstDash val="dash/dot/dashDot/lgDash/sysDot/..."` — 全11種)
-- [x] カスタム破線 (`a:custDash` — `a:ds d/sp` パース + SVG stroke-dasharray + round-trip)
-- [x] 矢印ヘッド (`a:headEnd type="triangle/stealth/diamond/oval/arrow" w/len`)
-- [x] 矢印テイル (`a:tailEnd` — 同上)
-- [x] 線結合 (`a:round` / `a:bevel` / `a:miter lim`)
-- [x] 線端 (`a:ln cap="flat/rnd/sq"`)
-- [x] 複合線 (`a:ln cmpd="sng/dbl/thickThin/thinThick/tri"`) — データ保持 + round-trip
-- [x] 線なし (`a:noFill` inside `a:ln`)
-- [x] Line ジオメトリの `<line>` SVG レンダリング (矢印マーカー対応)
-
----
-
-## 5. シェイプ — 完全対応 [P1]
-
-### 5.1 グループシェイプ (`p:grpSp`)
-- [x] 再帰的子シェイプパース
-- [x] グループ変換 (`a:xfrm` + `a:chOff` / `a:chExt`) の座標変換
-- [x] ネストグループ
-- [x] SVG `<g transform="...">` レンダリング
-
-### 5.2 コネクタ (`p:cxnSp`)
-- [x] 直線コネクタ (`straightConnector1`) — Line ジオメトリとして描画
-- [x] 対角線 / flip 対応 (`flipH`/`flipV` → 線方向反転)
-- [x] 矢印ヘッド/テイルとの組み合わせ (既存ストローク機能で対応)
-- [x] 曲線コネクタ (`curvedConnector2-5`) — cubic bezier パス
-- [x] 折れ線コネクタ (`bentConnector2-5`) — 直角折れ線ポリライン
-- [x] 調整値 (`a:avLst`) パース・シリアライズ・round-trip
-
-### 5.3 プリセットジオメトリ — 全 220+ 種 (`a:prstGeom`)
-
-ECMA-376 Part 1 §20.1.10.56 `ST_ShapeType` で定義される全図形を実装する。
-描画定義は `presetShapeDefinitions.xml` (ECMA-376 Appendix D) にガイド式で記載。
-
-**実装方針**: DrawingML ガイド式エバリュエータを作り、`presetShapeDefinitions.xml` の定義から SVG path を生成する。個別ハードコードはしない。
-
-#### カテゴリ別 (全て対応必須)
-
-| カテゴリ | 種数 | 例 |
-|---------|------|-----|
-| 基本図形 | ~40 | rect, ellipse, triangle, diamond, pentagon, hexagon, octagon, trapezoid, parallelogram, plus, cross, donut, blockArc, ... |
-| ブロック矢印 | ~25 | rightArrow, leftArrow, upArrow, downArrow, leftRightArrow, quadArrow, curvedRightArrow, circularArrow, uturnArrow, ... |
-| フローチャート | ~27 | flowChartProcess, flowChartDecision, flowChartTerminator, flowChartDocument, flowChartMultidocument, flowChartPredefinedProcess, ... |
-| 吹き出し | ~20 | wedgeRoundRectCallout, wedgeEllipseCallout, cloudCallout, borderCallout1-3, accentCallout1-3, accentBorderCallout1-3, ... |
-| 星・リボン | ~15 | star4, star5, star6, star8, star10, star12, star16, star24, star32, ribbon, ribbon2, wave, doubleWave, ... |
-| 数式記号 | ~5 | mathPlus, mathMinus, mathMultiply, mathDivide, mathEqual |
-| アクションボタン | ~14 | actionButtonBlank, actionButtonHome, actionButtonHelp, actionButtonForwardNext, actionButtonBackPrevious, ... |
-| 装飾 | ~20 | heart, lightningBolt, sun, moon, smileyFace, foldedCorner, irregularSeal1-2, gear6, gear9, funnel, ... |
-| その他 | ~50+ | frame, bevel, plaque, can, cube, corner, diagStripe, pie, chord, teardrop, ... |
-
-#### ガイド式エバリュエータ
-- [ ] `a:gd` (ガイド定義) パース — `fmla` 式: `+- */ ?: val pin cos sin tan at2 cat2 sat2 sqrt mod abs`
-- [ ] `a:avLst` (調整値) パース — パラメトリック図形
-- [ ] `a:gdLst` (ガイドリスト) 評価
-- [ ] `a:pathLst` → SVG `<path d="...">` 変換
-  - [ ] moveTo / lineTo / arcTo / cubicBezTo / quadBezTo / close
+### 5.1 プリセットジオメトリ 残り (~150+ 種)
+- [ ] 残りの基本図形 (cloud, gear6/9 の正確なパス, etc.)
+- [ ] 残りのブロック矢印 (curvedRightArrow, circularArrow, uturnArrow, etc.)
+- [ ] 残りのフローチャート (~12種: flowChartMultidocument, flowChartAlternateProcess, etc.)
+- [ ] 残りの吹き出し (~17種: cloudCallout, borderCallout1-3, accentCallout1-3, etc.)
+- [ ] 残りの星 (star10, star12, star16, star24, star32)
+- [ ] 残りのアクションボタン (~13種)
 - [ ] `a:rect` (テキスト矩形) 計算
 - [ ] `a:cxnLst` (接続ポイント) — コネクタ接続用
 
-### 5.4 カスタムジオメトリ (`a:custGeom`)
+### 5.2 カスタムジオメトリ (`a:custGeom`)
 - [ ] `a:pathLst` → SVG path (プリセットと同じエンジン)
 - [ ] フリーフォーム図形対応
 
 ---
 
-## 6. テーブル — 完全対応 [P1]
+## 6. テーブル — 残タスク [P1]
 
 - [ ] セル結合 — 水平 (`gridSpan`) / 垂直 (`vMerge` / `rowSpan`)
 - [ ] セルボーダー (`a:tcBorders` — `lnL/lnR/lnT/lnB/lnTlToBr/lnBlToTr`)
@@ -205,146 +49,73 @@ ECMA-376 Part 1 §20.1.10.56 `ST_ShapeType` で定義される全図形を実装
 - [ ] セルアンカー (`a:tcPr anchor="ctr/b/t"`)
 - [ ] テーブルスタイル (`a:tblStyleId` → theme のテーブルスタイル定義)
 - [ ] バンド行/列条件書式 (`firstRow/lastRow/firstCol/lastCol/bandRow/bandCol`)
-- [ ] セルグラデーション塗りつぶし
 
 ---
 
-## 7. 画像 — 完全対応 [P2]
+## 7. 画像 — 高度機能 [P2]
 
-- [ ] クロッピング (`a:srcRect l/t/r/b` — %)
 - [ ] SVG 画像 (`a:blip` + SVG extension `a:extLst`)
 - [ ] 画像エフェクト (`a:clrChange`, brightness/contrast)
 - [ ] Duotone (`a:duotone`)
 - [ ] 画像のアルファ (`a:alphaModFix`)
-- [ ] EMF (Enhanced Metafile) — ラスタライズ
-- [ ] WMF (Windows Metafile) — ラスタライズ
-- [ ] TIFF 画像
+- [ ] EMF / WMF / TIFF — ラスタライズ
 
 ---
 
 ## 8. エフェクト [P2]
 
-- [ ] 外側シャドウ (`a:outerShdw blurRad/dist/dir/algn/...`) → SVG `<filter>` feDropShadow
+- [ ] 外側シャドウ (`a:outerShdw`) → SVG `<filter>` feDropShadow
 - [ ] 内側シャドウ (`a:innerShdw`)
 - [ ] グロー (`a:glow rad`)
 - [ ] ソフトエッジ (`a:softEdge rad`) → SVG feGaussianBlur
-- [ ] リフレクション (`a:reflection blurRad/stA/endA/endPos/dir/...`)
-- [ ] 3D — ベベル / 押し出し / 照明 (ベストエフォート、完全再現は困難)
+- [ ] リフレクション (`a:reflection`)
+- [ ] 3D — ベベル / 押し出し / 照明 (ベストエフォート)
 
 ---
 
-## 9. チャート — 全タイプ対応 [P2]
+## 9. チャート [P2]
 
 ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要。
 
-### 9.1 基盤
-- [ ] `c:chartSpace` / `c:chart` パース
-- [ ] 軸 (`c:valAx`, `c:catAx`, `c:dateAx`, `c:serAx`) — ラベル / スケール / グリッド線
-- [ ] 凡例 (`c:legend`)
-- [ ] データラベル (`c:dLbls`)
-- [ ] タイトル (`c:title`)
-- [ ] プロットエリア (`c:plotArea`)
-
-### 9.2 チャートタイプ (全て対応)
-
-| タイプ | 要素 | 備考 |
-|--------|------|------|
-| 棒グラフ | `c:barChart` | 縦/横 (`barDir`), 積み上げ (`grouping`) |
-| 折れ線グラフ | `c:lineChart` | マーカー, 平滑化 |
-| 円グラフ | `c:pieChart` | 分離 (`explosion`) |
-| ドーナツグラフ | `c:doughnutChart` | 穴サイズ (`holeSize`) |
-| 散布図 | `c:scatterChart` | マーカー, 線スタイル |
-| 面グラフ | `c:areaChart` | 積み上げ対応 |
-| レーダーチャート | `c:radarChart` | 塗りつぶし / 線 |
-| バブルチャート | `c:bubbleChart` | サイズ軸 |
-| 株価チャート | `c:stockChart` | HLC / OHLC |
-| 等高線 | `c:surfaceChart` | 3D / ワイヤーフレーム |
-| 円グラフ付き | `c:ofPieChart` | 円 of 円 / 棒 of 円 |
-| 3D チャート | `c:bar3DChart`, `c:line3DChart`, `c:pie3DChart`, `c:area3DChart`, `c:surface3DChart` | 2D 投影で近似 |
-| 複合チャート | 複数系列 | 異なるタイプの系列を重ね合わせ |
-
-### 9.3 チャート装飾
-- [ ] 系列の塗りつぶし / 線スタイル
-- [ ] データポイント個別書式
-- [ ] トレンドライン (`c:trendline`)
-- [ ] エラーバー (`c:errBars`)
-- [ ] 近似曲線
+- [ ] 基盤: `c:chartSpace` / 軸 / 凡例 / データラベル / タイトル / プロットエリア
+- [ ] 棒/折れ線/円/ドーナツ/散布/面/レーダー/バブル/株価/等高線
+- [ ] 複合チャート、3D チャート (2D 投影で近似)
+- [ ] 系列書式 / データポイント個別書式 / トレンドライン / エラーバー
 
 ---
 
 ## 10. SmartArt [P3]
 
-- [ ] `dgm:*` (DiagramML) パース
-- [ ] レイアウトアルゴリズム (list / cycle / hierarchy / process / relationship / matrix / pyramid)
-- [ ] フォールバック: SmartArt の画像キャッシュ (`drs/` 内の EMF/PNG) 利用
+- [ ] `dgm:*` (DiagramML) パース + レイアウトアルゴリズム
+- [ ] フォールバック: SmartArt の画像キャッシュ利用
 
 ---
 
 ## 11. その他のオブジェクト [P3]
 
-### 11.1 OLE / 埋め込み
-- [ ] `p:oleObj` — フォールバック画像表示
-- [ ] 埋め込み Excel / Word のプレビュー
-
-### 11.2 メディア
-- [ ] ビデオ (`p:vid`) — ポスターフレーム表示
-- [ ] オーディオ (`p:audio`) — アイコン表示
-
-### 11.3 数式
-- [ ] OMML (`m:oMath`) — Office Math Markup Language
-- [ ] フォールバック画像
-
-### 11.4 コメント / ノート
-- [ ] スピーカーノート (`notesSlide*.xml`) — API 経由で取得可能に
-- [ ] コメント (`comments*.xml`) — 同上
+- [ ] OLE / 埋め込み (`p:oleObj` — フォールバック画像表示)
+- [ ] メディア (ビデオポスターフレーム / オーディオアイコン)
+- [ ] 数式 (OMML `m:oMath`)
+- [ ] スピーカーノート / コメント (API 経由取得)
 
 ---
 
-## 12. ライブラリ公開 [P1 — インフラ]
+## 12. ライブラリ公開 — 残タスク [P1]
 
-### 12.1 TypeScript ライブラリ化
-- [x] `host.js` → TypeScript 分離 (`lib/`)
-- [x] `lib/pptx-renderer.ts` — PptxRenderer クラス (コア API)
-- [x] `lib/wasm-compat.ts` — 3-tier Wasm インスタンス化
-- [x] `lib/zip.ts` — ZIP 解凍 / 構築
-- [x] `lib/utils.ts` — CRC-32, base64
-- [x] `lib/index.ts` — 公開 API re-export
-- [x] `web/` — デモ UI (ライブラリをインポートして使う)
-
-### 12.2 ビルド / パッケージング
-- [x] `tsconfig.json` — ESM 出力 (`dist/`)
-- [x] `package.json` — name, version, exports, types, files
-- [x] `dist/` — JS + `.d.ts` + source maps 出力
-- [ ] `dist/pptx-svg.wasm` — ビルド成果物コピー (ビルドスクリプト)
+- [ ] `dist/pptx-svg.wasm` ビルド成果物コピー (ビルドスクリプト)
 - [ ] npm publish ワークフロー
-
-### 12.3 API 設計
-- [x] `PptxRenderer.init(wasmUrl | wasmBytes)` — Wasm 初期化
-- [x] `PptxRenderer.loadPptx(ArrayBuffer)` — PPTX ロード
-- [x] `PptxRenderer.renderSlideSvg(idx) → string (SVG)`
-- [x] `PptxRenderer.getSlideCount() → number`
-- [x] `PptxRenderer.exportPptx() → Promise<ArrayBuffer>`
-- [x] `PptxRenderer.getSlideXmlRaw(idx) → string` — デバッグ用
-- [ ] エラーハンドリング (例外 vs Result 型)
-
-### 12.4 テスト
-- [ ] ユニットテスト (Vitest or similar)
-- [ ] ビジュアルリグレッションテスト (参照 SVG との diff)
-- [ ] 複数 PPTX ファイルでの互換性テスト
-- [ ] ブラウザ互換テスト (Chrome 111+, Firefox 120+, Safari 17+)
-
-### 12.5 ドキュメント
-- [ ] README.md — 使い方、API リファレンス、ブラウザ互換性
-- [ ] CHANGELOG.md
-- [ ] JSDoc / TSDoc
+- [ ] エラーハンドリング設計
+- [ ] テスト (Vitest / ビジュアルリグレッション / ブラウザ互換)
+- [ ] ドキュメント (README / CHANGELOG / JSDoc)
 
 ---
 
 ## 優先度サマリー
 
-| 優先度 | 内容 | 理由 |
+| 優先度 | 内容 | 状態 |
 |--------|------|------|
-| **P0** | ~~1. マスター/レイアウト継承, 2. テキスト完全対応~~ ✅ 完了 | ほぼ全 PPTX で必要 |
-| **P1** | ~~3. 塗り, 4. 線~~ ✅ 完了 / 5. シェイプ (grpSp/cxnSp ✅, prstGeom 残) / 6. テーブル, 12. ライブラリ公開 | ビジネス文書の 90% をカバー |
-| **P2** | 7-9. 画像高度/エフェクト/チャート | 完全互換に必要 |
-| **P3** | 10-11. SmartArt/OLE/メディア/数式 | 特殊ケース |
+| **P0** | マスター/レイアウト継承, テキスト完全対応 | **完了** |
+| **P1** | 塗り/線/グループ/コネクタ/プリセットGeom (~70種) | **完了** |
+| **P1** | テーブル高度機能, プリセットGeom 残り, カスタムGeom, ライブラリ公開 | 未着手 |
+| **P2** | 画像高度/エフェクト/チャート | 未着手 |
+| **P3** | SmartArt/OLE/メディア/数式 | 未着手 |

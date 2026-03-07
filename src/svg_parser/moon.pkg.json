@@ -1,7 +1,0 @@
-{
-  "import": [
-    { "path": "pptx-svg/xml",   "alias": "xml"   },
-    { "path": "pptx-svg/ooxml", "alias": "ooxml" },
-    { "path": "pptx-svg/ffi",   "alias": "ffi"   }
-  ]
-}

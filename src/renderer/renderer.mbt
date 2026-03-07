@@ -14,77 +14,133 @@
 // ── EMU constants ────────────────────────────────────────────────────────────
 // 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
-let default_font_size_emu_ : Int = 228600  // 18 pt
-let default_l_inset : Int = 91440          // 0.1 in (left / right)
-let default_t_inset : Int = 45720          // 0.05 in (top / bottom)
-let level_indent_emu : Int = 342900        // indent per bullet level
-let svg_target_width : Int = 960           // output SVG width in px
-let default_emu_per_px : Int = 9525        // EMU per pixel at 96 DPI
-let line_height_numer : Int = 12           // line-height = font-size * line_height_numer / line_height_denom
+///|
+let default_font_size_emu_ : Int = 228600 // 18 pt
+
+///|
+let default_l_inset : Int = 91440 // 0.1 in (left / right)
+
+///|
+let default_t_inset : Int = 45720 // 0.05 in (top / bottom)
+
+///|
+let level_indent_emu : Int = 342900 // indent per bullet level
+
+///|
+let svg_target_width : Int = 960 // output SVG width in px
+
+///|
+let default_emu_per_px : Int = 9525 // EMU per pixel at 96 DPI
+
+///|
+let line_height_numer : Int = 12 // line-height = font-size * line_height_numer / line_height_denom
+
+///|
 let line_height_denom : Int = 10
-let table_cell_pad : Int = 4              // padding inside table cells (px)
+
+///|
+let table_cell_pad : Int = 4 // padding inside table cells (px)
+
+///|
 let default_text_fill : String = "black"
+
+///|
 let image_placeholder_fill : String = "#dddddd"
+
+///|
 let table_border_color : String = "#999999"
-let round_rect_radius_divisor : Int = 20  // corner radius = width / 20
-let group_child_idx_multiplier : Int = 1000  // child_idx = shape_idx * 1000 + ci
-let baseline_shift_extra_numer : Int = 2  // extra spacing for super/subscript = font_px * numer / denom
+
+///|
+let round_rect_radius_divisor : Int = 20 // corner radius = width / 20
+
+///|
+let group_child_idx_multiplier : Int = 1000 // child_idx = shape_idx * 1000 + ci
+
+///|
+let baseline_shift_extra_numer : Int = 2 // extra spacing for super/subscript = font_px * numer / denom
+
+///|
 let baseline_shift_extra_denom : Int = 5
 
 // ── OOXML unit constants ─────────────────────────────────────────────────────
-let ooxml_pct_denom : Int = 100000  // OOXML percentage denominator (100000 = 100%)
-let ooxml_angle_unit : Int = 60000  // 1 degree = 60000 units in OOXML
-let ooxml_stop_pct : Int = 1000    // stop pos 0-100000 → percentage: divide by 1000
+
+///|
+let ooxml_pct_denom : Int = 100000 // OOXML percentage denominator (100000 = 100%)
+
+///|
+let ooxml_angle_unit : Int = 60000 // 1 degree = 60000 units in OOXML
+
+///|
+let ooxml_stop_pct : Int = 1000 // stop pos 0-100000 → percentage: divide by 1000
+
+///|
 let ooxml_fill_to_pct : Int = 2000 // fillToRect 0-100000 → center%: divide by 2000
 
 // ── Gradient ID helper ──────────────────────────────────────────────────────
 
-///| Build a gradient definition ID. Negative shape_idx uses "-n" prefix.
+///|
+/// Build a gradient definition ID. Negative shape_idx uses "-n" prefix.
 fn grad_id(slide_num : Int, shape_idx : Int) -> String {
   if shape_idx >= 0 {
     "grad-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
   } else {
-    "grad-s" + int_to_str(slide_num) + "-n" + int_to_str(-(shape_idx))
+    "grad-s" + int_to_str(slide_num) + "-n" + int_to_str(-shape_idx)
   }
 }
 
-///| Build a pattern definition ID.
+///|
+/// Build a pattern definition ID.
 fn patt_id(slide_num : Int, shape_idx : Int) -> String {
   "patt-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
 }
 
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
-fn int_to_str(n : Int) -> String { @xml.int_to_str(n) }
+///|
+fn int_to_str(n : Int) -> String {
+  @xml.int_to_str(n)
+}
 
 // ── SVG attribute helpers ─────────────────────────────────────────────────────
 
+///|
 fn a(name : String, value : String) -> String {
   " " + name + "=\"" + value + "\""
 }
 
+///|
 fn ai(name : String, value : Int) -> String {
   a(name, int_to_str(value))
 }
 
-///| Shorthand for data-ooxml-* attributes.
+///|
+/// Shorthand for data-ooxml-* attributes.
 fn da(name : String, value : String) -> String {
   " data-ooxml-" + name + "=\"" + value + "\""
 }
 
+///|
 fn dai(name : String, value : Int) -> String {
   da(name, int_to_str(value))
 }
 
+///|
 fn bool_str(b : Bool) -> String {
-  if b { "1" } else { "0" }
+  if b {
+    "1"
+  } else {
+    "0"
+  }
 }
 
 // ── Stroke rendering helpers ────────────────────────────────────────────────
 
-///| Convert OOXML preset dash name to SVG stroke-dasharray attribute.
+///|
+/// Convert OOXML preset dash name to SVG stroke-dasharray attribute.
 fn stroke_dasharray(dash : String, sw : Int) -> String {
-  if dash.is_empty() { return "" }
+  if dash.is_empty() {
+    return ""
+  }
   // Dash/gap values scaled relative to stroke width
   let s = int_to_str(sw)
   let s2 = int_to_str(sw * 2)
@@ -124,7 +180,9 @@ fn stroke_dasharray(dash : String, sw : Int) -> String {
       let mut num_end = pos
       while num_end < data_len {
         let c = data.get_char(num_end).unwrap()
-        if c == ',' || c == ';' { break }
+        if c == ',' || c == ';' {
+          break
+        }
         num_end = num_end + 1
       }
       if num_end > pos {
@@ -132,7 +190,9 @@ fn stroke_dasharray(dash : String, sw : Int) -> String {
         // val is in percentage * 100 (e.g. 300000 = 300%). Scale: val * sw / ooxml_pct_denom
         let px_val = val * sw / ooxml_pct_denom
         let clamped = if px_val < 1 { 1 } else { px_val }
-        if not(result.is_empty()) { result = result + "," }
+        if not(result.is_empty()) {
+          result = result + ","
+        }
         result = result + int_to_str(clamped)
       }
       pos = num_end + 1
@@ -144,7 +204,8 @@ fn stroke_dasharray(dash : String, sw : Int) -> String {
   a("stroke-dasharray", pattern)
 }
 
-///| Convert OOXML line cap to SVG stroke-linecap attribute.
+///|
+/// Convert OOXML line cap to SVG stroke-linecap attribute.
 fn stroke_linecap(cap : String) -> String {
   if cap == "flat" {
     a("stroke-linecap", "butt")
@@ -157,7 +218,8 @@ fn stroke_linecap(cap : String) -> String {
   }
 }
 
-///| Convert OOXML line join to SVG stroke-linejoin + miterlimit attributes.
+///|
+/// Convert OOXML line join to SVG stroke-linejoin + miterlimit attributes.
 fn stroke_linejoin(join : String, miter_limit : Int) -> String {
   if join == "round" {
     a("stroke-linejoin", "round")
@@ -168,7 +230,11 @@ fn stroke_linejoin(join : String, miter_limit : Int) -> String {
       // OOXML miter limit is percentage * 1000 (e.g. 800000 = 800%)
       // SVG miterlimit is a plain ratio
       let ratio = miter_limit / ooxml_pct_denom
-      if ratio > 1 { a("stroke-miterlimit", int_to_str(ratio)) } else { "" }
+      if ratio > 1 {
+        a("stroke-miterlimit", int_to_str(ratio))
+      } else {
+        ""
+      }
     } else {
       ""
     }
@@ -178,24 +244,43 @@ fn stroke_linejoin(join : String, miter_limit : Int) -> String {
   }
 }
 
-///| Check if an arrow type string represents an active arrow.
+///|
+/// Check if an arrow type string represents an active arrow.
 fn has_arrow(arrow_type : String) -> Bool {
   not(arrow_type.is_empty()) && arrow_type != "none"
 }
 
-///| Generate arrow marker ID: "ah-s{slide}-{shape}-h" or "ah-s{slide}-{shape}-t".
+///|
+/// Generate arrow marker ID: "ah-s{slide}-{shape}-h" or "ah-s{slide}-{shape}-t".
 fn arrow_marker_id(slide_num : Int, shape_idx : Int, is_head : Bool) -> String {
-  "ah-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx) +
-    (if is_head { "-h" } else { "-t" })
+  "ah-s" +
+  int_to_str(slide_num) +
+  "-" +
+  int_to_str(shape_idx) +
+  (if is_head { "-h" } else { "-t" })
 }
 
-///| Arrow marker size from sm/med/lg.
+///|
+/// Arrow marker size from sm/med/lg.
 fn arrow_size(sz : String) -> Int {
-  if sz == "sm" { 3 } else if sz == "lg" { 7 } else { 5 }
+  if sz == "sm" {
+    3
+  } else if sz == "lg" {
+    7
+  } else {
+    5
+  }
 }
 
-///| Render arrow marker SVG definition.
-fn render_arrow_marker(id : String, arrow_type : String, w_str : String, len_str : String, color : @ooxml.Color) -> String {
+///|
+/// Render arrow marker SVG definition.
+fn render_arrow_marker(
+  id : String,
+  arrow_type : String,
+  w_str : String,
+  len_str : String,
+  color : @ooxml.Color,
+) -> String {
   let w = arrow_size(w_str)
   let h = arrow_size(len_str)
   let ws = int_to_str(w)
@@ -208,29 +293,52 @@ fn render_arrow_marker(id : String, arrow_type : String, w_str : String, len_str
   } else if arrow_type == "diamond" {
     "<path d=\"M 0 5 L 5 0 L 10 5 L 5 10 z\"" + a("fill", fill_color) + "/>"
   } else if arrow_type == "oval" {
-    "<ellipse cx=\"5\" cy=\"5\" rx=\"5\" ry=\"5\"" + a("fill", fill_color) + "/>"
+    "<ellipse cx=\"5\" cy=\"5\" rx=\"5\" ry=\"5\"" +
+    a("fill", fill_color) +
+    "/>"
   } else if arrow_type == "arrow" {
-    "<path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\"" + a("stroke", fill_color) + " stroke-width=\"2\"/>"
+    "<path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\"" +
+    a("stroke", fill_color) +
+    " stroke-width=\"2\"/>"
   } else {
     return ""
   }
-  "<marker id=\"" + id + "\" viewBox=\"0 0 10 10\" refX=\"10\" refY=\"5\" orient=\"auto-start-reverse\"" +
-    a("markerWidth", ws) + a("markerHeight", hs) + ">" + path + "</marker>"
+  "<marker id=\"" +
+  id +
+  "\" viewBox=\"0 0 10 10\" refX=\"10\" refY=\"5\" orient=\"auto-start-reverse\"" +
+  a("markerWidth", ws) +
+  a("markerHeight", hs) +
+  ">" +
+  path +
+  "</marker>"
 }
 
-///| Generate marker-start/marker-end attributes for arrows.
-fn stroke_markers(shape : @ooxml.Shape, shape_idx : Int, slide_num : Int) -> String {
+///|
+/// Generate marker-start/marker-end attributes for arrows.
+fn stroke_markers(
+  shape : @ooxml.Shape,
+  shape_idx : Int,
+  slide_num : Int,
+) -> String {
   let mut result = ""
   if has_arrow(shape.stroke_head_type) {
-    result = result + " marker-start=\"url(#" + arrow_marker_id(slide_num, shape_idx, true) + ")\""
+    result = result +
+      " marker-start=\"url(#" +
+      arrow_marker_id(slide_num, shape_idx, true) +
+      ")\""
   }
   if has_arrow(shape.stroke_tail_type) {
-    result = result + " marker-end=\"url(#" + arrow_marker_id(slide_num, shape_idx, false) + ")\""
+    result = result +
+      " marker-end=\"url(#" +
+      arrow_marker_id(slide_num, shape_idx, false) +
+      ")\""
   }
   result
 }
 
 // Escape text for SVG content.
+
+///|
 fn svg_escape(s : String) -> String {
   let len = s.length()
   let mut needs = false
@@ -243,7 +351,9 @@ fn svg_escape(s : String) -> String {
     }
     k = k + 1
   }
-  if not(needs) { return s }
+  if not(needs) {
+    return s
+  }
   let mut result = ""
   let mut i = 0
   while i < len {
@@ -266,22 +376,30 @@ fn svg_escape(s : String) -> String {
 
 // ── EMU → pixel conversion ────────────────────────────────────────────────────
 
+///|
 fn px(emu : Int, scale : Int) -> Int {
-  if scale <= 0 { 0 } else { emu / scale }
+  if scale <= 0 {
+    0
+  } else {
+    emu / scale
+  }
 }
 
 // ── Font size ─────────────────────────────────────────────────────────────────
 
+///|
 fn hundredth_pt_to_emu(sz : Int) -> Int {
   sz * @ooxml.emu_per_hundredth_pt
 }
 
+///|
 fn default_font_size_emu() -> Int {
   default_font_size_emu_
 }
 
 // ── Rotation transform ────────────────────────────────────────────────────────
 
+///|
 /// Format rotation in 60000ths of a degree as "D.DD" string (e.g. "45.00").
 /// Handles negative rotations correctly.
 fn format_rotation_deg(rot_60k : Int) -> String {
@@ -289,17 +407,30 @@ fn format_rotation_deg(rot_60k : Int) -> String {
   let deg_int = deg_x100 / @ooxml.centideg_per_deg
   let deg_frac_raw = deg_x100 % @ooxml.centideg_per_deg
   let deg_frac = if deg_frac_raw < 0 { -deg_frac_raw } else { deg_frac_raw }
-  let frac_str = if deg_frac < 10 { "0" + int_to_str(deg_frac) } else { int_to_str(deg_frac) }
+  let frac_str = if deg_frac < 10 {
+    "0" + int_to_str(deg_frac)
+  } else {
+    int_to_str(deg_frac)
+  }
   int_to_str(deg_int) + "." + frac_str
 }
 
+///|
 /// Build SVG rotate() transform attribute string centered on (cx, cy).
 fn rotation_transform(rot_60k : Int, cx : Int, cy : Int) -> String {
-  if rot_60k == 0 { return "" }
-  " transform=\"rotate(" + format_rotation_deg(rot_60k) + "," +
-  int_to_str(cx) + "," + int_to_str(cy) + ")\""
+  if rot_60k == 0 {
+    return ""
+  }
+  " transform=\"rotate(" +
+  format_rotation_deg(rot_60k) +
+  "," +
+  int_to_str(cx) +
+  "," +
+  int_to_str(cy) +
+  ")\""
 }
 
+///|
 fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
   let cx_p = px(t.x + t.cx / 2, scale)
   let cy_p = px(t.y + t.cy / 2, scale)
@@ -308,6 +439,7 @@ fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
 
+///|
 fn resolve_image_path(target : String) -> String {
   if target.length() > 3 &&
     target.get_char(0).unwrap() == '.' &&
@@ -319,40 +451,60 @@ fn resolve_image_path(target : String) -> String {
   }
 }
 
-fn suffix(s : String, from : Int) -> String { @xml.str_suffix(s, from) }
+///|
+fn suffix(s : String, from : Int) -> String {
+  @xml.str_suffix(s, from)
+}
 
+///|
 fn mime_from_ext(path : String) -> String {
   let len = path.length()
   let mut dot = len - 1
   while dot >= 0 {
-    if path.get_char(dot).unwrap() == '.' { break }
+    if path.get_char(dot).unwrap() == '.' {
+      break
+    }
     dot = dot - 1
   }
-  if dot < 0 { return "image/png" }
+  if dot < 0 {
+    return "image/png"
+  }
   let ext = suffix(path, dot + 1)
-  if ext == "png" { "image/png" }
-  else if ext == "jpg" || ext == "jpeg" { "image/jpeg" }
-  else if ext == "gif" { "image/gif" }
-  else if ext == "svg" || ext == "svgz" { "image/svg+xml" }
-  else { "image/png" }
+  if ext == "png" {
+    "image/png"
+  } else if ext == "jpg" || ext == "jpeg" {
+    "image/jpeg"
+  } else if ext == "gif" {
+    "image/gif"
+  } else if ext == "svg" || ext == "svgz" {
+    "image/svg+xml"
+  } else {
+    "image/png"
+  }
 }
 
 // ── Scale ratio formatting (for group transforms) ──────────────────────────
 
 ///| Format an integer ratio num/den as a decimal string (e.g. "1.5", "0.75").
-///| Used for SVG scale() transform values.
+
+///|
+/// Used for SVG scale() transform values.
 fn format_ratio(num : Int, den : Int) -> String {
-  if den == 0 || num == den { return "1" }
+  if den == 0 || num == den {
+    return "1"
+  }
   // Use 4 fractional digits: compute ratio * 10000
   let scaled = num * 10000 / den
   let whole = scaled / 10000
   let frac = scaled - whole * 10000
   let abs_frac = if frac < 0 { -frac } else { frac }
-  if abs_frac == 0 { return int_to_str(whole) }
+  if abs_frac == 0 {
+    return int_to_str(whole)
+  }
   // Build fractional part, trimming trailing zeros
   let d1 = abs_frac / 1000
-  let d2 = (abs_frac / 100) % 10
-  let d3 = (abs_frac / 10) % 10
+  let d2 = abs_frac / 100 % 10
+  let d3 = abs_frac / 10 % 10
   let d4 = abs_frac % 10
   let f = if d4 != 0 {
     int_to_str(d1) + int_to_str(d2) + int_to_str(d3) + int_to_str(d4)
@@ -366,13 +518,16 @@ fn format_ratio(num : Int, den : Int) -> String {
   int_to_str(whole) + "." + f
 }
 
-///| Encode adjustment values as comma-separated string for data attribute.
+///|
+/// Encode adjustment values as comma-separated string for data attribute.
 fn encode_adj_values(avs : Array[Int]) -> String {
   let n = avs.length()
   let mut out = ""
   let mut i = 0
   while i < n {
-    if i > 0 { out = out + "," }
+    if i > 0 {
+      out = out + ","
+    }
     out = out + int_to_str(avs[i])
     i = i + 1
   }
@@ -381,8 +536,16 @@ fn encode_adj_values(avs : Array[Int]) -> String {
 
 // ── Line / Connector rendering helpers ──────────────────────────────────────
 
-///| Compute line endpoints considering flipH/flipV.
-fn line_endpoints(x : Int, y : Int, w : Int, h : Int, flip_h : Bool, flip_v : Bool) -> (Int, Int, Int, Int) {
+///|
+/// Compute line endpoints considering flipH/flipV.
+fn line_endpoints(
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+  flip_h : Bool,
+  flip_v : Bool,
+) -> (Int, Int, Int, Int) {
   if flip_h && flip_v {
     (x + w, y + h, x, y)
   } else if flip_h {
@@ -394,26 +557,51 @@ fn line_endpoints(x : Int, y : Int, w : Int, h : Int, flip_h : Bool, flip_v : Bo
   }
 }
 
-fn render_line_geom(x : Int, y : Int, w : Int, h : Int, flip_h : Bool, flip_v : Bool, stroke : String, rot : String) -> String {
+///|
+fn render_line_geom(
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+  flip_h : Bool,
+  flip_v : Bool,
+  stroke : String,
+  rot : String,
+) -> String {
   let (x1, y1, x2, y2) = line_endpoints(x, y, w, h, flip_h, flip_v)
   "<line" +
-  ai("x1", x1) + ai("y1", y1) +
-  ai("x2", x2) + ai("y2", y2) +
-  stroke + rot + "/>"
+  ai("x1", x1) +
+  ai("y1", y1) +
+  ai("x2", x2) +
+  ai("y2", y2) +
+  stroke +
+  rot +
+  "/>"
 }
 
-///| Get adjustment value with default fallback (50000 = 50%).
+///|
+/// Get adjustment value with default fallback (50000 = 50%).
 fn adj_val(avs : Array[Int], idx : Int) -> Int {
-  if idx < avs.length() { avs[idx] } else { 50000 }
+  if idx < avs.length() {
+    avs[idx]
+  } else {
+    50000
+  }
 }
 
-///| Render bent/curved connector as SVG <path>.
+///|
+/// Render bent/curved connector as SVG <path>.
 fn render_connector_path(
   prst : String,
   avs : Array[Int],
-  x : Int, y : Int, w : Int, h : Int,
-  flip_h : Bool, flip_v : Bool,
-  stroke : String, rot : String
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+  flip_h : Bool,
+  flip_v : Bool,
+  stroke : String,
+  rot : String,
 ) -> String {
   let (x1, y1, x2, y2) = line_endpoints(x, y, w, h, flip_h, flip_v)
   let d = if is_bent_connector(prst) {
@@ -422,48 +610,105 @@ fn render_connector_path(
     render_curved_path(prst, avs, x1, y1, x2, y2)
   } else {
     // Fallback: straight line
-    "M" + int_to_str(x1) + " " + int_to_str(y1) + "L" + int_to_str(x2) + " " + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    " " +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(x2) +
+    " " +
+    int_to_str(y2)
   }
   "<path d=\"" + d + "\" fill=\"none\"" + stroke + rot + "/>"
 }
 
+///|
 fn is_bent_connector(prst : String) -> Bool {
-  prst == "bentConnector2" || prst == "bentConnector3" ||
-  prst == "bentConnector4" || prst == "bentConnector5"
+  prst == "bentConnector2" ||
+  prst == "bentConnector3" ||
+  prst == "bentConnector4" ||
+  prst == "bentConnector5"
 }
 
+///|
 fn is_curved_connector(prst : String) -> Bool {
-  prst == "curvedConnector2" || prst == "curvedConnector3" ||
-  prst == "curvedConnector4" || prst == "curvedConnector5"
+  prst == "curvedConnector2" ||
+  prst == "curvedConnector3" ||
+  prst == "curvedConnector4" ||
+  prst == "curvedConnector5"
 }
 
-///| Render bent connector SVG path (right-angle polyline).
-fn render_bent_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : Int, y2 : Int) -> String {
+///|
+/// Render bent connector SVG path (right-angle polyline).
+fn render_bent_path(
+  prst : String,
+  avs : Array[Int],
+  x1 : Int,
+  y1 : Int,
+  x2 : Int,
+  y2 : Int,
+) -> String {
   let s = " "
   if prst == "bentConnector2" {
     // L-shape: horizontal then vertical
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "L" + int_to_str(x2) + s + int_to_str(y1) +
-    "L" + int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(x2) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   } else if prst == "bentConnector3" {
     // Z-shape: adj1 controls the horizontal split point
     let adj1 = adj_val(avs, 0)
     let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "L" + int_to_str(mx) + s + int_to_str(y1) +
-    "L" + int_to_str(mx) + s + int_to_str(y2) +
-    "L" + int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(mx) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(mx) +
+    s +
+    int_to_str(y2) +
+    "L" +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   } else if prst == "bentConnector4" {
     // 4-segment: adj1 (horizontal split), adj2 (vertical split)
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
     let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
     let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "L" + int_to_str(mx) + s + int_to_str(y1) +
-    "L" + int_to_str(mx) + s + int_to_str(my) +
-    "L" + int_to_str(x2) + s + int_to_str(my) +
-    "L" + int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(mx) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(mx) +
+    s +
+    int_to_str(my) +
+    "L" +
+    int_to_str(x2) +
+    s +
+    int_to_str(my) +
+    "L" +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   } else {
     // bentConnector5: 5-segment
     let adj1 = adj_val(avs, 0)
@@ -472,46 +717,117 @@ fn render_bent_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : In
     let mx1 = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
     let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
     let mx2 = x1 + (x2 - x1) * adj3 / ooxml_pct_denom
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "L" + int_to_str(mx1) + s + int_to_str(y1) +
-    "L" + int_to_str(mx1) + s + int_to_str(my) +
-    "L" + int_to_str(mx2) + s + int_to_str(my) +
-    "L" + int_to_str(mx2) + s + int_to_str(y2) +
-    "L" + int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(mx1) +
+    s +
+    int_to_str(y1) +
+    "L" +
+    int_to_str(mx1) +
+    s +
+    int_to_str(my) +
+    "L" +
+    int_to_str(mx2) +
+    s +
+    int_to_str(my) +
+    "L" +
+    int_to_str(mx2) +
+    s +
+    int_to_str(y2) +
+    "L" +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   }
 }
 
-///| Render curved connector SVG path (bezier curves).
-fn render_curved_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : Int, y2 : Int) -> String {
+///|
+/// Render curved connector SVG path (bezier curves).
+fn render_curved_path(
+  prst : String,
+  avs : Array[Int],
+  x1 : Int,
+  y1 : Int,
+  x2 : Int,
+  y2 : Int,
+) -> String {
   let s = " "
   if prst == "curvedConnector2" {
     // Simple S-curve
     let mx = (x1 + x2) / 2
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "C" + int_to_str(mx) + s + int_to_str(y1) + s +
-    int_to_str(mx) + s + int_to_str(y2) + s +
-    int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "C" +
+    int_to_str(mx) +
+    s +
+    int_to_str(y1) +
+    s +
+    int_to_str(mx) +
+    s +
+    int_to_str(y2) +
+    s +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   } else if prst == "curvedConnector3" {
     // S-curve with adjustable midpoint
     let adj1 = adj_val(avs, 0)
     let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "C" + int_to_str(mx) + s + int_to_str(y1) + s +
-    int_to_str(mx) + s + int_to_str(y2) + s +
-    int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "C" +
+    int_to_str(mx) +
+    s +
+    int_to_str(y1) +
+    s +
+    int_to_str(mx) +
+    s +
+    int_to_str(y2) +
+    s +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   } else if prst == "curvedConnector4" {
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
     let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
     let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
     // Two cubic bezier segments
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "C" + int_to_str(mx) + s + int_to_str(y1) + s +
-    int_to_str(mx) + s + int_to_str(my) + s +
-    int_to_str(mx) + s + int_to_str(my) +
-    "C" + int_to_str(mx) + s + int_to_str(my) + s +
-    int_to_str(x2) + s + int_to_str(my) + s +
-    int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "C" +
+    int_to_str(mx) +
+    s +
+    int_to_str(y1) +
+    s +
+    int_to_str(mx) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(mx) +
+    s +
+    int_to_str(my) +
+    "C" +
+    int_to_str(mx) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(x2) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   } else {
     // curvedConnector5
     let adj1 = adj_val(avs, 0)
@@ -520,21 +836,52 @@ fn render_curved_path(prst : String, avs : Array[Int], x1 : Int, y1 : Int, x2 : 
     let mx1 = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
     let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
     let mx2 = x1 + (x2 - x1) * adj3 / ooxml_pct_denom
-    "M" + int_to_str(x1) + s + int_to_str(y1) +
-    "C" + int_to_str(mx1) + s + int_to_str(y1) + s +
-    int_to_str(mx1) + s + int_to_str(my) + s +
-    int_to_str(mx1) + s + int_to_str(my) +
-    "C" + int_to_str(mx1) + s + int_to_str(my) + s +
-    int_to_str(mx2) + s + int_to_str(my) + s +
-    int_to_str(mx2) + s + int_to_str(my) +
-    "C" + int_to_str(mx2) + s + int_to_str(my) + s +
-    int_to_str(x2) + s + int_to_str(y2) + s +
-    int_to_str(x2) + s + int_to_str(y2)
+    "M" +
+    int_to_str(x1) +
+    s +
+    int_to_str(y1) +
+    "C" +
+    int_to_str(mx1) +
+    s +
+    int_to_str(y1) +
+    s +
+    int_to_str(mx1) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(mx1) +
+    s +
+    int_to_str(my) +
+    "C" +
+    int_to_str(mx1) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(mx2) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(mx2) +
+    s +
+    int_to_str(my) +
+    "C" +
+    int_to_str(mx2) +
+    s +
+    int_to_str(my) +
+    s +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2) +
+    s +
+    int_to_str(x2) +
+    s +
+    int_to_str(y2)
   }
 }
 
 // ── data-ooxml-* attribute helpers ───────────────────────────────────────────
 
+///|
 fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
   match kind {
     @ooxml.ShapeKind::AutoShape(_) => "autoshape"
@@ -545,6 +892,7 @@ fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
   }
 }
 
+///|
 fn geom_str(kind : @ooxml.ShapeKind) -> String {
   match kind {
     @ooxml.ShapeKind::AutoShape(g) => g.to_prst()
@@ -554,6 +902,7 @@ fn geom_str(kind : @ooxml.ShapeKind) -> String {
 
 // ── Bullet auto-numbering ─────────────────────────────────────────────────────
 
+///|
 fn auto_number_text(type_ : String, idx : Int) -> String {
   let n = idx + 1
   if type_ == "arabicPeriod" {
@@ -577,13 +926,25 @@ fn auto_number_text(type_ : String, idx : Int) -> String {
   }
 }
 
-let alpha_count : Int = 26        // number of letters in alphabet
-let ascii_lower_a_minus1 : Int = 96  // 'a' - 1
-let ascii_upper_a_minus1 : Int = 64  // 'A' - 1
-let ascii_lower_a : Int = 97
-let ascii_lower_z : Int = 122
-let ascii_case_shift : Int = 32   // 'a' - 'A'
+///|
+let alpha_count : Int = 26 // number of letters in alphabet
 
+///|
+let ascii_lower_a_minus1 : Int = 96 // 'a' - 1
+
+///|
+let ascii_upper_a_minus1 : Int = 64 // 'A' - 1
+
+///|
+let ascii_lower_a : Int = 97
+
+///|
+let ascii_lower_z : Int = 122
+
+///|
+let ascii_case_shift : Int = 32 // 'a' - 'A'
+
+///|
 fn alpha_lower(n : Int) -> String {
   if n >= 1 && n <= alpha_count {
     @ffi.ffi_char_code_to_str(ascii_lower_a_minus1 + n)
@@ -592,6 +953,7 @@ fn alpha_lower(n : Int) -> String {
   }
 }
 
+///|
 fn alpha_upper(n : Int) -> String {
   if n >= 1 && n <= alpha_count {
     @ffi.ffi_char_code_to_str(ascii_upper_a_minus1 + n)
@@ -600,19 +962,28 @@ fn alpha_upper(n : Int) -> String {
   }
 }
 
+///|
 fn roman_lower(n : Int) -> String {
   roman_convert(n, true)
 }
 
+///|
 fn roman_upper(n : Int) -> String {
   roman_convert(n, false)
 }
 
+///|
 fn roman_convert(n : Int, lower : Bool) -> String {
-  if n <= 0 || n > 3999 { return int_to_str(n) }
-  let vals  = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
-  let syms  = ["M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"]
-  let syml  = ["m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i"]
+  if n <= 0 || n > 3999 {
+    return int_to_str(n)
+  }
+  let vals = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1]
+  let syms = [
+    "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I",
+  ]
+  let syml = [
+    "m", "cm", "d", "cd", "c", "xc", "l", "xl", "x", "ix", "v", "iv", "i",
+  ]
   let mut result = ""
   let mut rem = n
   let n_pairs = vals.length()
@@ -627,20 +998,20 @@ fn roman_convert(n : Int, lower : Bool) -> String {
   result
 }
 
-
 // ── Shape rendering ───────────────────────────────────────────────────────────
 
+///|
 fn render_shape(
   shape : @ooxml.Shape,
   rels : Array[@ooxml.Relationship],
   slide_num : Int,
   scale : Int,
   shape_idx : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
 ) -> String {
-  let t    = shape.transform
-  let x_p  = px(t.x,  scale)
-  let y_p  = px(t.y,  scale)
+  let t = shape.transform
+  let x_p = px(t.x, scale)
+  let y_p = px(t.y, scale)
   let cx_p = px(t.cx, scale)
   let mut cy_p = px(t.cy, scale)
   // Apply autoFit: expand shape height if text overflows (never shrink)
@@ -655,13 +1026,16 @@ fn render_shape(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, _)) => true
     _ => false
   }
-  if cx_p <= 0 { return "" }
-  if cy_p <= 0 && not(is_line) { return "" }
+  if cx_p <= 0 {
+    return ""
+  }
+  if cy_p <= 0 && not(is_line) {
+    return ""
+  }
   let rot = rotation_attr(t, scale)
 
   // Build data-ooxml-* attributes for the <g> wrapper
-  let g_attrs =
-    da("shape-type", shape_type_str(shape.kind)) +
+  let g_attrs = da("shape-type", shape_type_str(shape.kind)) +
     da("geom", geom_str(shape.kind)) +
     dai("x", t.x) +
     dai("y", t.y) +
@@ -712,7 +1086,9 @@ fn render_shape(
       dai("grad-ftr", shape.grad_fill.fill_to_r) +
       dai("grad-ftb", shape.grad_fill.fill_to_b) +
       da("grad-tile-flip", shape.grad_fill.tile_flip)
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // Blip fill attributes
     (if not(shape.blip_fill.is_none()) {
       da("blip-rid", shape.blip_fill.rid) +
@@ -727,13 +1103,17 @@ fn render_shape(
       dai("blip-tile-sy", shape.blip_fill.tile_sy) +
       da("blip-tile-flip", shape.blip_fill.tile_flip) +
       da("blip-tile-algn", shape.blip_fill.tile_algn)
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // Pattern fill attributes
     (if not(shape.patt_fill.is_none()) {
       da("patt-prst", shape.patt_fill.prst) +
       da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
       da("patt-bg", shape.patt_fill.bg_color.to_hex())
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // Group shape / connector-specific attributes
     (match shape.kind {
       @ooxml.ShapeKind::GroupShape(grp) =>
@@ -742,14 +1122,29 @@ fn render_shape(
         dai("grp-ch-ext-cx", grp.ch_ext_cx) +
         dai("grp-ch-ext-cy", grp.ch_ext_cy)
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, avs)) =>
-        if avs.length() > 0 { da("cxn-adj", encode_adj_values(avs)) } else { "" }
+        if avs.length() > 0 {
+          da("cxn-adj", encode_adj_values(avs))
+        } else {
+          ""
+        }
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Other(_, avs)) =>
+        if avs.length() > 0 {
+          da("cxn-adj", encode_adj_values(avs))
+        } else {
+          ""
+        }
       _ => ""
     })
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
-      let blip_tile_id = "bliptile_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
-      let fill = if not(shape.blip_fill.is_none()) && not(shape.blip_fill.stretch) && shape.blip_fill.tile_sx > 0 {
+      let blip_tile_id = "bliptile_s" +
+        int_to_str(slide_num) +
+        "_" +
+        int_to_str(shape_idx)
+      let fill = if not(shape.blip_fill.is_none()) &&
+        not(shape.blip_fill.stretch) &&
+        shape.blip_fill.tile_sx > 0 {
         // BlipFill tile: filled via <pattern> defined in defs
         " fill=\"url(#" + blip_tile_id + ")\""
       } else if not(shape.blip_fill.is_none()) {
@@ -760,9 +1155,16 @@ fn render_shape(
       } else if not(shape.grad_fill.is_none()) {
         " fill=\"url(#" + grad_id(slide_num, shape_idx) + ")\""
       } else {
-        let fill_base = if shape.fill.is_none() { a("fill", "none") } else { a("fill", shape.fill.to_css()) }
+        let fill_base = if shape.fill.is_none() {
+          a("fill", "none")
+        } else {
+          a("fill", shape.fill.to_css())
+        }
         if shape.fill.alpha < 255 && not(shape.fill.is_none()) {
-          fill_base + " fill-opacity=\"" + @ooxml.alpha_to_css_str(shape.fill.alpha) + "\""
+          fill_base +
+          " fill-opacity=\"" +
+          @ooxml.alpha_to_css_str(shape.fill.alpha) +
+          "\""
         } else {
           fill_base
         }
@@ -772,36 +1174,76 @@ fn render_shape(
       } else if shape.stroke_no_fill {
         " stroke=\"none\""
       } else {
-        let sw = px(if shape.stroke_w > 0 { shape.stroke_w } else { @ooxml.default_stroke_w }, scale)
+        let sw = px(
+          if shape.stroke_w > 0 {
+            shape.stroke_w
+          } else {
+            @ooxml.default_stroke_w
+          },
+          scale,
+        )
         let base = a("stroke", shape.stroke.to_css()) + ai("stroke-width", sw)
         let dash_attr = stroke_dasharray(shape.stroke_dash, sw)
         let cap_attr = stroke_linecap(shape.stroke_cap)
-        let join_attr = stroke_linejoin(shape.stroke_join, shape.stroke_miter_limit)
+        let join_attr = stroke_linejoin(
+          shape.stroke_join,
+          shape.stroke_miter_limit,
+        )
         let marker_attr = stroke_markers(shape, shape_idx, slide_num)
         base + dash_attr + cap_attr + join_attr + marker_attr
       }
       let rect_svg = match geom {
-        @ooxml.ShapeGeom::Ellipse => {
+        @ooxml.ShapeGeom::Ellipse =>
           "<ellipse" +
-          ai("cx", x_p + cx_p / 2) + ai("cy", y_p + cy_p / 2) +
-          ai("rx", cx_p / 2) + ai("ry", cy_p / 2) +
-          fill + stroke + rot + "/>"
-        }
-        @ooxml.ShapeGeom::Line => {
-          render_line_geom(x_p, y_p, cx_p, cy_p, t.flip_h, t.flip_v, stroke, rot)
-        }
-        @ooxml.ShapeGeom::Connector(prst, avs) => {
-          render_connector_path(prst, avs, x_p, y_p, cx_p, cy_p, t.flip_h, t.flip_v, stroke, rot)
-        }
+          ai("cx", x_p + cx_p / 2) +
+          ai("cy", y_p + cy_p / 2) +
+          ai("rx", cx_p / 2) +
+          ai("ry", cy_p / 2) +
+          fill +
+          stroke +
+          rot +
+          "/>"
+        @ooxml.ShapeGeom::Line =>
+          render_line_geom(
+            x_p,
+            y_p,
+            cx_p,
+            cy_p,
+            t.flip_h,
+            t.flip_v,
+            stroke,
+            rot,
+          )
+        @ooxml.ShapeGeom::Connector(prst, avs) =>
+          render_connector_path(
+            prst,
+            avs,
+            x_p,
+            y_p,
+            cx_p,
+            cy_p,
+            t.flip_h,
+            t.flip_v,
+            stroke,
+            rot,
+          )
+        @ooxml.ShapeGeom::Other(prst, avs) =>
+          render_preset_geom(prst, avs, cx_p, cy_p, x_p, y_p, fill, stroke, rot)
         _ => {
+          // Rect / RoundRect
           let rx = match geom {
-            @ooxml.ShapeGeom::RoundRect => int_to_str(cx_p / round_rect_radius_divisor)
+            @ooxml.ShapeGeom::RoundRect =>
+              int_to_str(cx_p / round_rect_radius_divisor)
             _ => "0"
           }
           let base = "<rect" +
-            ai("x", x_p) + ai("y", y_p) +
-            ai("width", cx_p) + ai("height", cy_p) +
-            fill + stroke + rot
+            ai("x", x_p) +
+            ai("y", y_p) +
+            ai("width", cx_p) +
+            ai("height", cy_p) +
+            fill +
+            stroke +
+            rot
           if rx == "0" {
             base + "/>"
           } else {
@@ -828,17 +1270,34 @@ fn render_shape(
               let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
               let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
               let th = int_to_str(if tile_h > 0 { tile_h } else { cy_p })
-              "<defs><pattern id=\"" + blip_tile_id + "\" patternUnits=\"userSpaceOnUse\"" +
-              ai("x", x_p) + ai("y", y_p) +
-              " width=\"" + tw + "\" height=\"" + th + "\">" +
-              "<image width=\"" + tw + "\" height=\"" + th + "\" preserveAspectRatio=\"none\"" +
-              a("href", "data:" + mime + ";base64," + b64) + "/>" +
+              "<defs><pattern id=\"" +
+              blip_tile_id +
+              "\" patternUnits=\"userSpaceOnUse\"" +
+              ai("x", x_p) +
+              ai("y", y_p) +
+              " width=\"" +
+              tw +
+              "\" height=\"" +
+              th +
+              "\">" +
+              "<image width=\"" +
+              tw +
+              "\" height=\"" +
+              th +
+              "\" preserveAspectRatio=\"none\"" +
+              a("href", "data:" + mime + ";base64," + b64) +
+              "/>" +
               "</pattern></defs>"
             } else {
-              "<image" + ai("x", x_p) + ai("y", y_p) + ai("width", cx_p) + ai("height", cy_p) +
+              "<image" +
+              ai("x", x_p) +
+              ai("y", y_p) +
+              ai("width", cx_p) +
+              ai("height", cy_p) +
               " preserveAspectRatio=\"none\"" +
               a("href", "data:" + mime + ";base64," + b64) +
-              rot + "/>"
+              rot +
+              "/>"
             }
           }
         }
@@ -846,19 +1305,43 @@ fn render_shape(
         ""
       }
       // For autoFit, use adjusted cy for text rendering if shape was expanded
-      let text_t : @ooxml.ShapeTransform = if shape.body_props.auto_fit && cy_p > px(t.cy, scale) {
-        { x: t.x, y: t.y, cx: t.cx, cy: cy_p * scale, rot: t.rot, flip_h: t.flip_h, flip_v: t.flip_v }
+      let text_t : @ooxml.ShapeTransform = if shape.body_props.auto_fit &&
+        cy_p > px(t.cy, scale) {
+        {
+          x: t.x,
+          y: t.y,
+          cx: t.cx,
+          cy: cy_p * scale,
+          rot: t.rot,
+          flip_h: t.flip_h,
+          flip_v: t.flip_v,
+        }
       } else {
         t
       }
-      rect_svg + blip_svg + render_text(shape.paragraphs, text_t, scale, theme, shape.body_props, rels)
+      rect_svg +
+      blip_svg +
+      render_text(
+        shape.paragraphs,
+        text_t,
+        scale,
+        theme,
+        shape.body_props,
+        rels,
+      )
     }
     @ooxml.ShapeKind::Picture(rid) => {
       let target = @ooxml.find_rel_target(rels, rid)
       let placeholder = "<rect" +
-        ai("x", x_p) + ai("y", y_p) +
-        ai("width", cx_p) + ai("height", cy_p) +
-        " fill=\"" + image_placeholder_fill + "\"" + rot + "/>"
+        ai("x", x_p) +
+        ai("y", y_p) +
+        ai("width", cx_p) +
+        ai("height", cy_p) +
+        " fill=\"" +
+        image_placeholder_fill +
+        "\"" +
+        rot +
+        "/>"
       if target.is_empty() {
         placeholder
       } else {
@@ -869,20 +1352,21 @@ fn render_shape(
         } else {
           let mime = mime_from_ext(img_path)
           "<image" +
-          ai("x", x_p) + ai("y", y_p) +
-          ai("width", cx_p) + ai("height", cy_p) +
+          ai("x", x_p) +
+          ai("y", y_p) +
+          ai("width", cx_p) +
+          ai("height", cy_p) +
           " preserveAspectRatio=\"xMidYMid meet\"" +
           a("href", "data:" + mime + ";base64," + b64) +
-          rot + "/>"
+          rot +
+          "/>"
         }
       }
     }
-    @ooxml.ShapeKind::TableShape(table) => {
+    @ooxml.ShapeKind::TableShape(table) =>
       render_table(table, t, scale, theme, rels)
-    }
-    @ooxml.ShapeKind::GroupShape(grp) => {
+    @ooxml.ShapeKind::GroupShape(grp) =>
       render_group(grp, t, rels, slide_num, scale, shape_idx, theme)
-    }
     _ => ""
   }
 
@@ -895,6 +1379,7 @@ fn render_shape(
 
 // ── Group rendering ─────────────────────────────────────────────────────────
 
+///|
 fn render_group(
   grp : @ooxml.GroupShapeData,
   t : @ooxml.ShapeTransform,
@@ -902,10 +1387,12 @@ fn render_group(
   slide_num : Int,
   scale : Int,
   shape_idx : Int,
-  theme : @ooxml.ThemeData
+  theme : @ooxml.ThemeData,
 ) -> String {
   let nc = grp.children.length()
-  if nc == 0 { return "" }
+  if nc == 0 {
+    return ""
+  }
   // Build SVG transform: translate(off) scale(ext/chExt) translate(-chOff)
   let off_x = px(t.x, scale)
   let off_y = px(t.y, scale)
@@ -913,12 +1400,21 @@ fn render_group(
   let ch_off_y = px(grp.ch_off_y, scale)
   let sx = format_ratio(t.cx, grp.ch_ext_cx)
   let sy = format_ratio(t.cy, grp.ch_ext_cy)
-  let mut transform_str = "translate(" + int_to_str(off_x) + "," + int_to_str(off_y) + ")"
+  let mut transform_str = "translate(" +
+    int_to_str(off_x) +
+    "," +
+    int_to_str(off_y) +
+    ")"
   if sx != "1" || sy != "1" {
     transform_str = transform_str + " scale(" + sx + "," + sy + ")"
   }
   if ch_off_x != 0 || ch_off_y != 0 {
-    transform_str = transform_str + " translate(" + int_to_str(-ch_off_x) + "," + int_to_str(-ch_off_y) + ")"
+    transform_str = transform_str +
+      " translate(" +
+      int_to_str(-ch_off_x) +
+      "," +
+      int_to_str(-ch_off_y) +
+      ")"
   }
   // Group rotation
   if t.rot != 0 {
@@ -926,7 +1422,18 @@ fn render_group(
     let cy_p = px(t.cy / 2, scale)
     // Rotation is applied around the group center (before the translate)
     // We prepend the rotation to the transform
-    transform_str = "translate(" + int_to_str(off_x + cx_p) + "," + int_to_str(off_y + cy_p) + ") rotate(" + format_rotation_deg(t.rot) + ") translate(" + int_to_str(-(off_x + cx_p)) + "," + int_to_str(-(off_y + cy_p)) + ") " + transform_str
+    transform_str = "translate(" +
+      int_to_str(off_x + cx_p) +
+      "," +
+      int_to_str(off_y + cy_p) +
+      ") rotate(" +
+      format_rotation_deg(t.rot) +
+      ") translate(" +
+      int_to_str(-(off_x + cx_p)) +
+      "," +
+      int_to_str(-(off_y + cy_p)) +
+      ") " +
+      transform_str
   }
   // Render child defs (gradient, pattern, arrow markers) and shapes in one pass
   let mut defs = ""
@@ -936,26 +1443,53 @@ fn render_group(
     let child = grp.children[ci]
     let child_idx = shape_idx * group_child_idx_multiplier + ci
     if not(child.grad_fill.is_none()) {
-      defs = defs + render_gradient_def(child.grad_fill, grad_id(slide_num, child_idx))
+      defs = defs +
+        render_gradient_def(child.grad_fill, grad_id(slide_num, child_idx))
     }
     if not(child.patt_fill.is_none()) {
-      defs = defs + render_pattern_def(child.patt_fill, patt_id(slide_num, child_idx))
+      defs = defs +
+        render_pattern_def(child.patt_fill, patt_id(slide_num, child_idx))
     }
     if has_arrow(child.stroke_head_type) {
-      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, child_idx, true), child.stroke_head_type, child.stroke_head_w, child.stroke_head_len, child.stroke)
+      defs = defs +
+        render_arrow_marker(
+          arrow_marker_id(slide_num, child_idx, true),
+          child.stroke_head_type,
+          child.stroke_head_w,
+          child.stroke_head_len,
+          child.stroke,
+        )
     }
     if has_arrow(child.stroke_tail_type) {
-      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, child_idx, false), child.stroke_tail_type, child.stroke_tail_w, child.stroke_tail_len, child.stroke)
+      defs = defs +
+        render_arrow_marker(
+          arrow_marker_id(slide_num, child_idx, false),
+          child.stroke_tail_type,
+          child.stroke_tail_w,
+          child.stroke_tail_len,
+          child.stroke,
+        )
     }
-    children_svg = children_svg + render_shape(child, rels, slide_num, scale, child_idx, theme)
+    children_svg = children_svg +
+      render_shape(child, rels, slide_num, scale, child_idx, theme)
     ci = ci + 1
   }
-  let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
-  "<g transform=\"" + transform_str + "\">" + defs_section + children_svg + "</g>"
+  let defs_section = if defs.is_empty() {
+    ""
+  } else {
+    "<defs>" + defs + "</defs>"
+  }
+  "<g transform=\"" +
+  transform_str +
+  "\">" +
+  defs_section +
+  children_svg +
+  "</g>"
 }
 
 // ── Table rendering ─────────────────────────────────────────────────────────
 
+///|
 fn render_table_cell_text(
   paragraphs : Array[@ooxml.TextParagraph],
   cell_x : Int,
@@ -964,12 +1498,18 @@ fn render_table_cell_text(
   cell_h : Int,
   scale : Int,
   theme : @ooxml.ThemeData,
-  rels : Array[@ooxml.Relationship]
+  rels : Array[@ooxml.Relationship],
 ) -> String {
-  if paragraphs.length() == 0 { return "" }
+  if paragraphs.length() == 0 {
+    return ""
+  }
   let tx = cell_x + table_cell_pad
   let def_sz = px(default_font_size_emu(), scale)
-  let font_sz = if def_sz > cell_h - table_cell_pad * 2 { cell_h - table_cell_pad * 2 } else { def_sz }
+  let font_sz = if def_sz > cell_h - table_cell_pad * 2 {
+    cell_h - table_cell_pad * 2
+  } else {
+    def_sz
+  }
   let line_h = font_sz * line_height_numer / line_height_denom
   let font_face = theme.minor_font + ", sans-serif"
   let mut out = "<text" +
@@ -993,8 +1533,13 @@ fn render_table_cell_text(
       let mut ri = 0
       while ri < nr {
         let run = para.runs[ri]
-        let display_text = if run.cap == "all" { to_upper_ascii(run.text) } else { run.text }
-        out = out + render_run_tspan(run, ri, display_text, scale, -1, rels, theme)
+        let display_text = if run.cap == "all" {
+          to_upper_ascii(run.text)
+        } else {
+          run.text
+        }
+        out = out +
+          render_run_tspan(run, ri, display_text, scale, -1, rels, theme)
         ri = ri + 1
       }
       out = out + "</tspan>"
@@ -1002,17 +1547,20 @@ fn render_table_cell_text(
     }
     pi = pi + 1
     // Stop if we overflow the cell
-    if cur_y > cell_y + cell_h - table_cell_pad { break }
+    if cur_y > cell_y + cell_h - table_cell_pad {
+      break
+    }
   }
   out + "</text>"
 }
 
+///|
 fn render_table(
   table : @ooxml.TableData,
   t : @ooxml.ShapeTransform,
   scale : Int,
   theme : @ooxml.ThemeData,
-  rels : Array[@ooxml.Relationship]
+  rels : Array[@ooxml.Relationship],
 ) -> String {
   let base_x = px(t.x, scale)
   let base_y = px(t.y, scale)
@@ -1042,14 +1590,33 @@ fn render_table(
       let cx_px = base_x + col_x[cj]
       let cw = px(table.col_widths[cj], scale)
       // Cell background
-      let cell_fill = if cell.fill.is_none() { "none" } else { cell.fill.to_css() }
-      out = out + "<rect" +
-        ai("x", cx_px) + ai("y", ry) +
-        ai("width", cw) + ai("height", rh) +
+      let cell_fill = if cell.fill.is_none() {
+        "none"
+      } else {
+        cell.fill.to_css()
+      }
+      out = out +
+        "<rect" +
+        ai("x", cx_px) +
+        ai("y", ry) +
+        ai("width", cw) +
+        ai("height", rh) +
         a("fill", cell_fill) +
-        " stroke=\"" + table_border_color + "\" stroke-width=\"1\"/>"
+        " stroke=\"" +
+        table_border_color +
+        "\" stroke-width=\"1\"/>"
       // Cell text
-      out = out + render_table_cell_text(cell.paragraphs, cx_px, ry, cw, rh, scale, theme, rels)
+      out = out +
+        render_table_cell_text(
+          cell.paragraphs,
+          cx_px,
+          ry,
+          cw,
+          rh,
+          scale,
+          theme,
+          rels,
+        )
       cj = cj + 1
     }
     row_y_emu = row_y_emu + row.height
@@ -1058,16 +1625,16 @@ fn render_table(
   out
 }
 
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
-///| Render a SlideData to an SVG string with data-ooxml-* attributes.
+///|
+/// Render a SlideData to an SVG string with data-ooxml-* attributes.
 pub fn render_slide_svg(
   slide : @ooxml.SlideData,
   rels : Array[@ooxml.Relationship],
   slide_num : Int,
   theme : @ooxml.ThemeData,
-  bg_shapes : Array[@ooxml.Shape]
+  bg_shapes : Array[@ooxml.Shape],
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
@@ -1077,8 +1644,11 @@ pub fn render_slide_svg(
   let header = "<svg" +
     " xmlns=\"http://www.w3.org/2000/svg\"" +
     " xmlns:xlink=\"http://www.w3.org/1999/xlink\"" +
-    ai("width", w) + ai("height", h) +
-    " style=\"background:" + slide.background.to_css() + ";display:block\"" +
+    ai("width", w) +
+    ai("height", h) +
+    " style=\"background:" +
+    slide.background.to_css() +
+    ";display:block\"" +
     // data-ooxml-* metadata on SVG root for round-trip
     dai("slide-cx", sw) +
     dai("slide-cy", sh) +
@@ -1089,7 +1659,8 @@ pub fn render_slide_svg(
   let mut defs = ""
   // Background gradient
   if not(slide.bg_grad.is_none()) {
-    defs = defs + render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
+    defs = defs +
+      render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
   }
   // Background shapes defs (master/layout non-placeholder shapes)
   let nbg = bg_shapes.length()
@@ -1098,7 +1669,8 @@ pub fn render_slide_svg(
     let bs = bg_shapes[bdi]
     let bs_idx = -(bdi + 1)
     if not(bs.grad_fill.is_none()) {
-      defs = defs + render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
+      defs = defs +
+        render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
     }
     bdi = bdi + 1
   }
@@ -1114,14 +1686,32 @@ pub fn render_slide_svg(
       defs = defs + render_pattern_def(sh.patt_fill, patt_id(slide_num, di))
     }
     if has_arrow(sh.stroke_head_type) {
-      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, di, true), sh.stroke_head_type, sh.stroke_head_w, sh.stroke_head_len, sh.stroke)
+      defs = defs +
+        render_arrow_marker(
+          arrow_marker_id(slide_num, di, true),
+          sh.stroke_head_type,
+          sh.stroke_head_w,
+          sh.stroke_head_len,
+          sh.stroke,
+        )
     }
     if has_arrow(sh.stroke_tail_type) {
-      defs = defs + render_arrow_marker(arrow_marker_id(slide_num, di, false), sh.stroke_tail_type, sh.stroke_tail_w, sh.stroke_tail_len, sh.stroke)
+      defs = defs +
+        render_arrow_marker(
+          arrow_marker_id(slide_num, di, false),
+          sh.stroke_tail_type,
+          sh.stroke_tail_w,
+          sh.stroke_tail_len,
+          sh.stroke,
+        )
     }
     di = di + 1
   }
-  let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
+  let defs_section = if defs.is_empty() {
+    ""
+  } else {
+    "<defs>" + defs + "</defs>"
+  }
 
   let bg_fill = if not(slide.bg_grad.is_none()) {
     "url(#grad-bg-s" + int_to_str(slide_num) + ")"
@@ -1129,21 +1719,24 @@ pub fn render_slide_svg(
     slide.background.to_css()
   }
   let bg_rect = "<rect" +
-    ai("width", w) + ai("height", h) +
+    ai("width", w) +
+    ai("height", h) +
     a("fill", bg_fill) +
     "/>"
   // Render master/layout background shapes (non-placeholder)
   let mut bg_shapes_svg = ""
   let mut bi = 0
   while bi < nbg {
-    bg_shapes_svg = bg_shapes_svg + render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme)
+    bg_shapes_svg = bg_shapes_svg +
+      render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme)
     bi = bi + 1
   }
   // Render slide shapes
   let mut shapes_svg = ""
   let mut i = 0
   while i < n {
-    shapes_svg = shapes_svg + render_shape(slide.shapes[i], rels, slide_num, scale, i, theme)
+    shapes_svg = shapes_svg +
+      render_shape(slide.shapes[i], rels, slide_num, scale, i, theme)
     i = i + 1
   }
   header + defs_section + bg_rect + bg_shapes_svg + shapes_svg + "</svg>"

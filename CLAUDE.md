@@ -83,7 +83,7 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | Other
-ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String)
+ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int])
 GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
 
@@ -117,6 +117,7 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape/Table rendering + public API |
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern fill SVG rendering |
+| `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), global state |
