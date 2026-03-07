@@ -1133,6 +1133,11 @@ fn render_shape(
         } else {
           ""
         }
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Custom(data)) =>
+        da("cust-gdlst", data.gdlst) +
+        da("cust-paths", data.paths) +
+        dai("cust-pw", data.path_w) +
+        dai("cust-ph", data.path_h)
       _ => ""
     })
 
@@ -1229,6 +1234,8 @@ fn render_shape(
           )
         @ooxml.ShapeGeom::Other(prst, avs) =>
           render_preset_geom(prst, avs, cx_p, cy_p, x_p, y_p, fill, stroke, rot)
+        @ooxml.ShapeGeom::Custom(data) =>
+          render_custom_geom(data, cx_p, cy_p, x_p, y_p, fill, stroke, rot)
         _ => {
           // Rect / RoundRect
           let rx = match geom {

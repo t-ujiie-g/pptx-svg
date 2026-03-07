@@ -600,3 +600,25 @@ pub fn str_substring(s : String, from : Int, to : Int) -> String {
   }
   result
 }
+
+///|
+/// Split a string by spaces into an array of tokens.
+pub fn split_by_space(s : String) -> Array[String] {
+  let tokens : Array[String] = []
+  let len = s.length()
+  let mut start = 0
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == ' ' {
+      if i > start {
+        tokens.push(str_substring(s, start, i))
+      }
+      start = i + 1
+    }
+    i = i + 1
+  }
+  if start < len {
+    tokens.push(str_substring(s, start, len))
+  }
+  tokens
+}

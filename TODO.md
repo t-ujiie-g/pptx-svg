@@ -18,26 +18,18 @@
 - [x] **線/ストローク完全対応**: 破線 11 種 + カスタム破線 + 矢印 5 種 + 線結合/線端/複合線/noFill + Line ジオメトリ `<line>` SVG
 - [x] **グループシェイプ**: `p:grpSp` 再帰パース + 座標変換 + ネスト + SVG `<g>`
 - [x] **コネクタ**: `p:cxnSp` 直線/折れ線/曲線 + 矢印 + 調整値 round-trip
-- [x] **プリセットジオメトリ**: `a:prstGeom` ガイド式エバリュエータ + ~70 種 SVG path 生成
+- [x] **プリセットジオメトリ**: `a:prstGeom` ガイド式エバリュエータ + ~154 種 SVG path 生成
+- [x] **カスタムジオメトリ**: `a:custGeom` パース + ガイド式 + pathLst → SVG path + round-trip
 - [x] **ライブラリ化**: TypeScript 分割 (lib/ → dist/) + PptxRenderer クラス + Wasm 3-tier フォールバック
 
 ---
 
 ## 5. シェイプ — 残タスク [P1]
 
-### 5.1 プリセットジオメトリ 残り (~150+ 種)
-- [ ] 残りの基本図形 (cloud, gear6/9 の正確なパス, etc.)
-- [ ] 残りのブロック矢印 (curvedRightArrow, circularArrow, uturnArrow, etc.)
-- [ ] 残りのフローチャート (~12種: flowChartMultidocument, flowChartAlternateProcess, etc.)
-- [ ] 残りの吹き出し (~17種: cloudCallout, borderCallout1-3, accentCallout1-3, etc.)
-- [ ] 残りの星 (star10, star12, star16, star24, star32)
-- [ ] 残りのアクションボタン (~13種)
+### 5.1 プリセットジオメトリ 残り
 - [ ] `a:rect` (テキスト矩形) 計算
 - [ ] `a:cxnLst` (接続ポイント) — コネクタ接続用
-
-### 5.2 カスタムジオメトリ (`a:custGeom`)
-- [ ] `a:pathLst` → SVG path (プリセットと同じエンジン)
-- [ ] フリーフォーム図形対応
+- [ ] gear6/9 の正確なギア歯パス (現在は円で近似)
 
 ---
 
@@ -115,7 +107,7 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 | 優先度 | 内容 | 状態 |
 |--------|------|------|
 | **P0** | マスター/レイアウト継承, テキスト完全対応 | **完了** |
-| **P1** | 塗り/線/グループ/コネクタ/プリセットGeom (~70種) | **完了** |
-| **P1** | テーブル高度機能, プリセットGeom 残り, カスタムGeom, ライブラリ公開 | 未着手 |
+| **P1** | 塗り/線/グループ/コネクタ/プリセットGeom (~154種)/カスタムGeom | **完了** |
+| **P1** | テーブル高度機能, ライブラリ公開 | 未着手 |
 | **P2** | 画像高度/エフェクト/チャート | 未着手 |
 | **P3** | SmartArt/OLE/メディア/数式 | 未着手 |

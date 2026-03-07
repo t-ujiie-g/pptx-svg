@@ -7,7 +7,6 @@
 
 // ── Integer parsing ──────────────────────────────────────────────────────────
 
-
 // ── Color parsing ────────────────────────────────────────────────────────────
 
 ///|
@@ -334,14 +333,28 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     }
     @ooxml.ShapeKind::GroupShape(grp_data)
   } else {
-    let adj_str = get_da(g_node, "cxn-adj")
-    let geom = if is_connector_prst(geom_str) {
-      parse_connector_geom_from_svg(geom_str, adj_str)
-    } else if not(adj_str.is_empty()) {
-      let avs = parse_adj_string(adj_str)
-      @ooxml.parse_geom(geom_str, avs)
+    let geom = if geom_str == "custGeom" {
+      // Custom geometry round-trip
+      let cust_gdlst = get_da(g_node, "cust-gdlst")
+      let cust_paths = get_da(g_node, "cust-paths")
+      let cust_pw = @xml.parse_int(get_da(g_node, "cust-pw"))
+      let cust_ph = @xml.parse_int(get_da(g_node, "cust-ph"))
+      @ooxml.ShapeGeom::Custom({
+        gdlst: cust_gdlst,
+        paths: cust_paths,
+        path_w: cust_pw,
+        path_h: cust_ph,
+      })
     } else {
-      @ooxml.parse_geom(geom_str, [])
+      let adj_str = get_da(g_node, "cxn-adj")
+      if is_connector_prst(geom_str) {
+        parse_connector_geom_from_svg(geom_str, adj_str)
+      } else if not(adj_str.is_empty()) {
+        let avs = parse_adj_string(adj_str)
+        @ooxml.parse_geom(geom_str, avs)
+      } else {
+        @ooxml.parse_geom(geom_str, [])
+      }
     }
     @ooxml.ShapeKind::AutoShape(geom)
   }

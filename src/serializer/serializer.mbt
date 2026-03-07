@@ -568,31 +568,194 @@ fn serialize_transform(t : @ooxml.ShapeTransform) -> String {
 
 ///|
 fn serialize_prst_geom(geom : @ooxml.ShapeGeom) -> String {
-  let prst = geom.to_prst()
-  let avs = match geom {
-    @ooxml.ShapeGeom::Connector(_, a) => a
-    @ooxml.ShapeGeom::Other(_, a) => a
-    _ => []
-  }
-  if avs.length() == 0 {
-    "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
-  } else {
-    let mut out = "<a:prstGeom prst=\"" + prst + "\"><a:avLst>"
-    let n = avs.length()
-    let mut i = 0
-    while i < n {
-      let name = if i == 0 { "adj" } else { "adj" + int_to_str(i + 1) }
-      out = out +
-        "<a:gd name=\"" +
-        name +
-        "\" fmla=\"val " +
-        int_to_str(avs[i]) +
-        "\"/>"
-      i = i + 1
+  match geom {
+    @ooxml.ShapeGeom::Custom(data) => serialize_custom_geom(data)
+    _ => {
+      let prst = geom.to_prst()
+      let avs = match geom {
+        @ooxml.ShapeGeom::Connector(_, a) => a
+        @ooxml.ShapeGeom::Other(_, a) => a
+        _ => []
+      }
+      if avs.length() == 0 {
+        "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
+      } else {
+        let mut out = "<a:prstGeom prst=\"" + prst + "\"><a:avLst>"
+        let n = avs.length()
+        let mut i = 0
+        while i < n {
+          let name = if i == 0 { "adj" } else { "adj" + int_to_str(i + 1) }
+          out = out +
+            "<a:gd name=\"" +
+            name +
+            "\" fmla=\"val " +
+            int_to_str(avs[i]) +
+            "\"/>"
+          i = i + 1
+        }
+        out + "</a:avLst></a:prstGeom>"
+      }
     }
-    out + "</a:avLst></a:prstGeom>"
   }
 }
+
+///|
+/// Serialize custom geometry (a:custGeom) back to OOXML XML.
+fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
+  let mut out = "<a:custGeom>"
+  // Serialize guide list → split into avLst and gdLst
+  let mut avlst = "<a:avLst/>"
+  let mut gdlst_out = ""
+  if data.gdlst.length() > 0 {
+    let mut av_entries = ""
+    let mut gd_entries = ""
+    // Split by ";" and separate avLst (val formulas) from gdLst (others)
+    let len = data.gdlst.length()
+    let mut start = 0
+    let mut i = 0
+    while i <= len {
+      if i == len || data.gdlst.get_char(i).unwrap() == ';' {
+        if i > start {
+          let entry = @xml.str_substring(data.gdlst, start, i)
+          // Find "=" separator
+          let elen = entry.length()
+          let mut eq = 0
+          while eq < elen {
+            if entry.get_char(eq).unwrap() == '=' {
+              break
+            }
+            eq = eq + 1
+          }
+          if eq < elen {
+            let name = @xml.str_substring(entry, 0, eq)
+            let fmla = @xml.str_substring(entry, eq + 1, elen)
+            if @xml.str_starts_with(fmla, "val ") {
+              av_entries = av_entries +
+                "<a:gd name=\"" +
+                name +
+                "\" fmla=\"" +
+                fmla +
+                "\"/>"
+            } else {
+              gd_entries = gd_entries +
+                "<a:gd name=\"" +
+                name +
+                "\" fmla=\"" +
+                fmla +
+                "\"/>"
+            }
+          }
+        }
+        start = i + 1
+      }
+      i = i + 1
+    }
+    if av_entries.length() > 0 {
+      avlst = "<a:avLst>" + av_entries + "</a:avLst>"
+    }
+    if gd_entries.length() > 0 {
+      gdlst_out = "<a:gdLst>" + gd_entries + "</a:gdLst>"
+    }
+  }
+  out = out + avlst + gdlst_out
+  // Serialize paths
+  out = out + "<a:pathLst>"
+  // Split paths by "|" for multiple sub-paths
+  let plen = data.paths.length()
+  let mut pstart = 0
+  let mut pi = 0
+  while pi <= plen {
+    if pi == plen || data.paths.get_char(pi).unwrap() == '|' {
+      if pi > pstart {
+        let seg = @xml.str_substring(data.paths, pstart, pi)
+        out = out + serialize_path_segment(seg, data.path_w, data.path_h)
+      }
+      pstart = pi + 1
+    }
+    pi = pi + 1
+  }
+  out + "</a:pathLst></a:custGeom>"
+}
+
+///|
+/// Serialize a single path segment from compact format to OOXML XML.
+fn serialize_path_segment(seg : String, path_w : Int, path_h : Int) -> String {
+  let mut out = "<a:path"
+  if path_w > 0 {
+    out = out + " w=\"" + int_to_str(path_w) + "\""
+  }
+  if path_h > 0 {
+    out = out + " h=\"" + int_to_str(path_h) + "\""
+  }
+  out = out + ">"
+  // Parse compact format tokens
+  let tokens = @xml.split_by_space(seg)
+  let nt = tokens.length()
+  let mut i = 0
+  while i < nt {
+    let cmd = tokens[i]
+    if cmd == "M" && i + 2 < nt {
+      out = out +
+        "<a:moveTo><a:pt x=\"" +
+        tokens[i + 1] +
+        "\" y=\"" +
+        tokens[i + 2] +
+        "\"/></a:moveTo>"
+      i = i + 3
+    } else if cmd == "L" && i + 2 < nt {
+      out = out +
+        "<a:lnTo><a:pt x=\"" +
+        tokens[i + 1] +
+        "\" y=\"" +
+        tokens[i + 2] +
+        "\"/></a:lnTo>"
+      i = i + 3
+    } else if cmd == "C" && i + 6 < nt {
+      out = out + "<a:cubicBezTo>"
+      for j in 0..<3 {
+        out = out +
+          "<a:pt x=\"" +
+          tokens[i + 1 + j * 2] +
+          "\" y=\"" +
+          tokens[i + 2 + j * 2] +
+          "\"/>"
+      }
+      out = out + "</a:cubicBezTo>"
+      i = i + 7
+    } else if cmd == "Q" && i + 4 < nt {
+      out = out + "<a:quadBezTo>"
+      for j in 0..<2 {
+        out = out +
+          "<a:pt x=\"" +
+          tokens[i + 1 + j * 2] +
+          "\" y=\"" +
+          tokens[i + 2 + j * 2] +
+          "\"/>"
+      }
+      out = out + "</a:quadBezTo>"
+      i = i + 5
+    } else if cmd == "A" && i + 4 < nt {
+      out = out +
+        "<a:arcTo wR=\"" +
+        tokens[i + 1] +
+        "\" hR=\"" +
+        tokens[i + 2] +
+        "\" stAng=\"" +
+        tokens[i + 3] +
+        "\" swAng=\"" +
+        tokens[i + 4] +
+        "\"/>"
+      i = i + 5
+    } else if cmd == "Z" {
+      out = out + "<a:close/>"
+      i = i + 1
+    } else {
+      i = i + 1
+    }
+  }
+  out + "</a:path>"
+}
+
 
 ///|
 fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {

@@ -855,6 +855,15 @@ pub(all) enum ShapeGeom {
   Line
   Connector(String, Array[Int]) // preset name, adjustment values (0-100000)
   Other(String, Array[Int]) // preset name, adjustment values
+  Custom(CustomGeomData) // a:custGeom freeform/custom geometry
+}
+
+///|
+pub(all) struct CustomGeomData {
+  gdlst : String // guide formulas: "name1=fmla1;name2=fmla2"
+  paths : String // compact path: "M x y L x y Z" ("|" separates sub-paths)
+  path_w : Int // path coordinate space width (0 = use shape width)
+  path_h : Int // path coordinate space height (0 = use shape height)
 }
 
 ///|
@@ -892,6 +901,7 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
     ShapeGeom::Line => "line"
     ShapeGeom::Connector(prst, _) => prst
     ShapeGeom::Other(s, _) => s
+    ShapeGeom::Custom(_) => "custGeom"
   }
 }
 

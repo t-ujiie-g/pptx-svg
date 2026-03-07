@@ -39,6 +39,7 @@ Slides:
  34. Group shapes (p:grpSp) — simple group + nested group
  35. Connectors (p:cxnSp) — straight, diagonal, bent, curved
  36. Preset geometry shapes (triangle, diamond, pentagon, hexagon, arrow, star, heart, etc.)
+ 37. Custom geometry (a:custGeom) — freeform shapes with guide formulas and paths
 """
 
 from pptx import Presentation
@@ -2550,6 +2551,106 @@ lbl36 = slide36.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0
 lbl36.text_frame.paragraphs[0].text = "Preset geometry: triangle, diamond, pentagon, hexagon, rightArrow, star5, heart, plus, flowChartDecision, chevron, parallelogram, octagon"
 lbl36.text_frame.paragraphs[0].font.size = Pt(10)
 lbl36.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 37: Custom geometry (a:custGeom) ──
+slide37 = prs.slides.add_slide(blank)
+spTree37 = slide37.shapes._spTree
+
+# Custom freeform shape 1: a star-like custom geometry with path coordinates
+cust1_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="100" name="CustomStar"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="1828800" cy="1828800"/></a:xfrm>
+    <a:custGeom>
+      <a:avLst/>
+      <a:gdLst/>
+      <a:pathLst>
+        <a:path w="200" h="200">
+          <a:moveTo><a:pt x="100" y="0"/></a:moveTo>
+          <a:lnTo><a:pt x="130" y="70"/></a:lnTo>
+          <a:lnTo><a:pt x="200" y="80"/></a:lnTo>
+          <a:lnTo><a:pt x="150" y="130"/></a:lnTo>
+          <a:lnTo><a:pt x="160" y="200"/></a:lnTo>
+          <a:lnTo><a:pt x="100" y="170"/></a:lnTo>
+          <a:lnTo><a:pt x="40" y="200"/></a:lnTo>
+          <a:lnTo><a:pt x="50" y="130"/></a:lnTo>
+          <a:lnTo><a:pt x="0" y="80"/></a:lnTo>
+          <a:lnTo><a:pt x="70" y="70"/></a:lnTo>
+          <a:close/>
+        </a:path>
+      </a:pathLst>
+    </a:custGeom>
+    <a:solidFill><a:srgbClr val="FFD700"/></a:solidFill>
+    <a:ln w="19050"><a:solidFill><a:srgbClr val="B8860B"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree37.append(etree.fromstring(cust1_xml))
+
+# Custom freeform shape 2: curved shape with cubicBezTo
+cust2_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="101" name="CustomCurve"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="2743200" y="457200"/><a:ext cx="1828800" cy="1828800"/></a:xfrm>
+    <a:custGeom>
+      <a:avLst/>
+      <a:gdLst/>
+      <a:pathLst>
+        <a:path w="100" h="100">
+          <a:moveTo><a:pt x="0" y="100"/></a:moveTo>
+          <a:cubicBezTo>
+            <a:pt x="0" y="0"/>
+            <a:pt x="100" y="0"/>
+            <a:pt x="100" y="100"/>
+          </a:cubicBezTo>
+          <a:close/>
+        </a:path>
+      </a:pathLst>
+    </a:custGeom>
+    <a:solidFill><a:srgbClr val="87CEEB"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="4169E1"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree37.append(etree.fromstring(cust2_xml))
+
+# Custom shape 3: with guide formulas
+cust3_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="102" name="CustomGuide"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="457200"/><a:ext cx="1828800" cy="1828800"/></a:xfrm>
+    <a:custGeom>
+      <a:avLst>
+        <a:gd name="adj" fmla="val 50000"/>
+      </a:avLst>
+      <a:gdLst>
+        <a:gd name="x1" fmla="*/ w adj 100000"/>
+        <a:gd name="y1" fmla="*/ h adj 100000"/>
+      </a:gdLst>
+      <a:pathLst>
+        <a:path>
+          <a:moveTo><a:pt x="0" y="0"/></a:moveTo>
+          <a:lnTo><a:pt x="x1" y="0"/></a:lnTo>
+          <a:lnTo><a:pt x="x1" y="y1"/></a:lnTo>
+          <a:lnTo><a:pt x="0" y="y1"/></a:lnTo>
+          <a:close/>
+        </a:path>
+      </a:pathLst>
+    </a:custGeom>
+    <a:solidFill><a:srgbClr val="98FB98"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="228B22"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree37.append(etree.fromstring(cust3_xml))
+
+lbl37 = slide37.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0.5))
+lbl37.text_frame.paragraphs[0].text = "Custom geometry (a:custGeom): freeform star, bezier curve, guide-based rect"
+lbl37.text_frame.paragraphs[0].font.size = Pt(10)
+lbl37.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

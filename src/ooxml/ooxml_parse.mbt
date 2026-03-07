@@ -498,10 +498,14 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let transform = parse_xfrm(sppr_ch)
   // Geometry
   let geom = match @xml.find_child(sppr_ch, "a:prstGeom") {
-    None => ShapeGeom::Rect
     Some(g) =>
       match @xml.get_attr(g, "prst") {
         Some(v) => parse_geom(v, parse_avlst(g))
+        None => ShapeGeom::Rect
+      }
+    None =>
+      match @xml.find_child(sppr_ch, "a:custGeom") {
+        Some(g) => parse_custom_geom(g)
         None => ShapeGeom::Rect
       }
   }
@@ -730,6 +734,198 @@ fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
     }
   }
   avs
+}
+
+///|
+/// Parse a:custGeom into CustomGeomData.
+fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
+  let ch = @xml.get_children(node)
+  let mut gdlst = ""
+  // Parse a:avLst → guide formulas with "val" operator
+  match @xml.find_child(ch, "a:avLst") {
+    None => ()
+    Some(avlst_node) => {
+      let gds = @xml.find_children(@xml.get_children(avlst_node), "a:gd")
+      for i in 0..<gds.length() {
+        let name = match @xml.get_attr(gds[i], "name") {
+          Some(v) => v
+          None => continue
+        }
+        let fmla = match @xml.get_attr(gds[i], "fmla") {
+          Some(v) => v
+          None => "val 0"
+        }
+        if gdlst.length() > 0 {
+          gdlst = gdlst + ";"
+        }
+        gdlst = gdlst + name + "=" + fmla
+      }
+    }
+  }
+  // Parse a:gdLst → guide formulas
+  match @xml.find_child(ch, "a:gdLst") {
+    None => ()
+    Some(gdlst_node) => {
+      let gds = @xml.find_children(@xml.get_children(gdlst_node), "a:gd")
+      for i in 0..<gds.length() {
+        let name = match @xml.get_attr(gds[i], "name") {
+          Some(v) => v
+          None => continue
+        }
+        let fmla = match @xml.get_attr(gds[i], "fmla") {
+          Some(v) => v
+          None => continue
+        }
+        if gdlst.length() > 0 {
+          gdlst = gdlst + ";"
+        }
+        gdlst = gdlst + name + "=" + fmla
+      }
+    }
+  }
+  // Parse a:pathLst → compact path format
+  let mut paths = ""
+  let mut path_w = 0
+  let mut path_h = 0
+  match @xml.find_child(ch, "a:pathLst") {
+    None => ()
+    Some(pathlst_node) => {
+      let path_nodes = @xml.find_children(
+        @xml.get_children(pathlst_node),
+        "a:path",
+      )
+      for pi in 0..<path_nodes.length() {
+        let pn = path_nodes[pi]
+        // Get path coordinate space (first path's values used)
+        if pi == 0 {
+          path_w = match @xml.get_attr(pn, "w") {
+            Some(v) => @xml.parse_int(v)
+            None => 0
+          }
+          path_h = match @xml.get_attr(pn, "h") {
+            Some(v) => @xml.parse_int(v)
+            None => 0
+          }
+        }
+        let seg = parse_custom_path_segment(pn)
+        if seg.length() > 0 {
+          if paths.length() > 0 {
+            paths = paths + "|"
+          }
+          paths = paths + seg
+        }
+      }
+    }
+  }
+  ShapeGeom::Custom({ gdlst, paths, path_w, path_h })
+}
+
+///|
+/// Parse a single a:path element into compact path format.
+fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
+  let ch = @xml.get_children(path_node)
+  let mut d = ""
+  for i in 0..<ch.length() {
+    let tag = @xml.get_tag(ch[i])
+    if tag == "a:moveTo" {
+      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+      if pts.length() >= 1 {
+        let x = match @xml.get_attr(pts[0], "x") {
+          Some(v) => v
+          None => "0"
+        }
+        let y = match @xml.get_attr(pts[0], "y") {
+          Some(v) => v
+          None => "0"
+        }
+        if d.length() > 0 {
+          d = d + " "
+        }
+        d = d + "M " + x + " " + y
+      }
+    } else if tag == "a:lnTo" {
+      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+      if pts.length() >= 1 {
+        let x = match @xml.get_attr(pts[0], "x") {
+          Some(v) => v
+          None => "0"
+        }
+        let y = match @xml.get_attr(pts[0], "y") {
+          Some(v) => v
+          None => "0"
+        }
+        if d.length() > 0 {
+          d = d + " "
+        }
+        d = d + "L " + x + " " + y
+      }
+    } else if tag == "a:cubicBezTo" {
+      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+      if pts.length() >= 3 {
+        if d.length() > 0 {
+          d = d + " "
+        }
+        d = d + "C"
+        for j in 0..<3 {
+          let x = match @xml.get_attr(pts[j], "x") {
+            Some(v) => v
+            None => "0"
+          }
+          let y = match @xml.get_attr(pts[j], "y") {
+            Some(v) => v
+            None => "0"
+          }
+          d = d + " " + x + " " + y
+        }
+      }
+    } else if tag == "a:quadBezTo" {
+      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+      if pts.length() >= 2 {
+        if d.length() > 0 {
+          d = d + " "
+        }
+        d = d + "Q"
+        for j in 0..<2 {
+          let x = match @xml.get_attr(pts[j], "x") {
+            Some(v) => v
+            None => "0"
+          }
+          let y = match @xml.get_attr(pts[j], "y") {
+            Some(v) => v
+            None => "0"
+          }
+          d = d + " " + x + " " + y
+        }
+      }
+    } else if tag == "a:arcTo" {
+      let wr = match @xml.get_attr(ch[i], "wR") {
+        Some(v) => v
+        None => "0"
+      }
+      let hr = match @xml.get_attr(ch[i], "hR") {
+        Some(v) => v
+        None => "0"
+      }
+      let st = match @xml.get_attr(ch[i], "stAng") {
+        Some(v) => v
+        None => "0"
+      }
+      let sw = match @xml.get_attr(ch[i], "swAng") {
+        Some(v) => v
+        None => "0"
+      }
+      if d.length() > 0 {
+        d = d + " "
+      }
+      d = d + "A " + wr + " " + hr + " " + st + " " + sw
+    } else if tag == "a:close" {
+      if d.length() > 0 {
+        d = d + " "
+      }
+      d = d + "Z"
+    }
+  }
+  d
 }
 
 ///|

@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 36', slideCount === 36, `got ${slideCount}`);
+  assert('slide count = 37', slideCount === 37, `got ${slideCount}`);
 
-  // Verify all 28 slides exist
-  for (let i = 1; i <= 36; i++) {
+  // Verify all slides exist
+  for (let i = 1; i <= 37; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 36; i++) {
+  for (let i = 1; i <= 37; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -791,6 +791,25 @@ async function testFeaturesPptx() {
     assert('slide36 has prst="plus"', slide36.includes('prst="plus"'));
     assert('slide36 has prst="chevron"', slide36.includes('prst="chevron"'));
     assert('slide36 has a:avLst with adj', slide36.includes('name="adj1"') || slide36.includes('name="adj"'));
+  }
+
+  // ── Slide 37: Custom geometry ──
+  {
+    console.log('\n── test_features.pptx — Slide 37: custom geometry ──');
+    const slide37 = textFiles.get('ppt/slides/slide37.xml');
+    assert('slide37 exists', !!slide37);
+    assert('slide37 has a:custGeom', hasTag(slide37, 'a:custGeom'));
+    assert('slide37 has a:pathLst', hasTag(slide37, 'a:pathLst'));
+    assert('slide37 has a:moveTo', hasTag(slide37, 'a:moveTo'));
+    assert('slide37 has a:lnTo', hasTag(slide37, 'a:lnTo'));
+    assert('slide37 has a:cubicBezTo', hasTag(slide37, 'a:cubicBezTo'));
+    assert('slide37 has a:close', hasTag(slide37, 'a:close'));
+    // Guide formula shape
+    assert('slide37 has a:avLst', hasTag(slide37, 'a:avLst'));
+    assert('slide37 has a:gdLst', hasTag(slide37, 'a:gdLst'));
+    assert('slide37 has FFD700 (gold)', slide37.includes('FFD700'));
+    assert('slide37 has 87CEEB (sky blue)', slide37.includes('87CEEB'));
+    assert('slide37 has 98FB98 (pale green)', slide37.includes('98FB98'));
   }
 }
 
