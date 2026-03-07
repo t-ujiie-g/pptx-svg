@@ -40,6 +40,9 @@ Slides:
  35. Connectors (p:cxnSp) — straight, diagonal, bent, curved
  36. Preset geometry shapes (triangle, diamond, pentagon, hexagon, arrow, star, heart, etc.)
  37. Custom geometry (a:custGeom) — freeform shapes with guide formulas and paths
+ 38. Gear shapes (gear6, gear9) — preset geometry with accurate tooth paths
+ 39. Text rectangles (a:rect) — text positioned within non-rectangular shapes
+ 40. Connection points (a:cxnLst) — custom geometry with connection points + connector refs
 """
 
 from pptx import Presentation
@@ -2651,6 +2654,220 @@ lbl37 = slide37.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0
 lbl37.text_frame.paragraphs[0].text = "Custom geometry (a:custGeom): freeform star, bezier curve, guide-based rect"
 lbl37.text_frame.paragraphs[0].font.size = Pt(10)
 lbl37.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 38: Gear shapes ────────────────────────────────────────────────────
+slide38 = prs.slides.add_slide(blank)
+spTree38 = slide38.shapes._spTree
+
+# Gear6
+gear6_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="201" name="Gear6"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="2286000" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="gear6"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="2F528F"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree38.append(etree.fromstring(gear6_xml))
+
+# Gear9
+gear9_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="202" name="Gear9"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="3429000" y="457200"/><a:ext cx="2286000" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="gear9"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="AE5A21"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree38.append(etree.fromstring(gear9_xml))
+
+# Gear6 with custom adj (deeper teeth)
+gear6_adj_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="203" name="Gear6Deep"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="6400800" y="457200"/><a:ext cx="2286000" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="gear6"><a:avLst><a:gd name="adj" fmla="val 50000"/></a:avLst></a:prstGeom>
+    <a:solidFill><a:srgbClr val="70AD47"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="507E32"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree38.append(etree.fromstring(gear6_adj_xml))
+
+lbl38 = slide38.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0.5))
+lbl38.text_frame.paragraphs[0].text = "Gear shapes: gear6 (default), gear9 (default), gear6 (adj=50000 deeper teeth)"
+lbl38.text_frame.paragraphs[0].font.size = Pt(10)
+lbl38.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 39: Text rectangles ────────────────────────────────────────────────
+slide39 = prs.slides.add_slide(blank)
+spTree39 = slide39.shapes._spTree
+
+# Triangle with text
+tri_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="301" name="Triangle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="457200"/><a:ext cx="2286000" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="triangle"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="FFD700"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="B8860B"/></a:solidFill></a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Text in Triangle</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+spTree39.append(etree.fromstring(tri_xml))
+
+# Diamond with text
+diamond_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="302" name="Diamond"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="3429000" y="457200"/><a:ext cx="2286000" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="diamond"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="87CEEB"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="4682B4"/></a:solidFill></a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Diamond</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+spTree39.append(etree.fromstring(diamond_xml))
+
+# Right arrow with text
+arrow_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="303" name="RightArrow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="6400800" y="914400"/><a:ext cx="2743200" cy="1371600"/></a:xfrm>
+    <a:prstGeom prst="rightArrow"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="FF6347"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="8B0000"/></a:solidFill></a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Arrow</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+spTree39.append(etree.fromstring(arrow_xml))
+
+lbl39 = slide39.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0.5))
+lbl39.text_frame.paragraphs[0].text = "Text rectangles: triangle (text in lower half), diamond (text inscribed), right arrow (text in shaft)"
+lbl39.text_frame.paragraphs[0].font.size = Pt(10)
+lbl39.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 40: Connection points ──────────────────────────────────────────────
+slide40 = prs.slides.add_slide(blank)
+spTree40 = slide40.shapes._spTree
+
+# Shape 1: Rectangle (target for connectors)
+rect1_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="401" name="Rect1"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="1371600"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+  </p:spPr>
+  <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>Start</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+spTree40.append(etree.fromstring(rect1_xml))
+
+# Shape 2: Rectangle (target for connectors)
+rect2_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="402" name="Rect2"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5486400" y="914400"/><a:ext cx="1828800" cy="1371600"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+  </p:spPr>
+  <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>End</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+spTree40.append(etree.fromstring(rect2_xml))
+
+# Connector with stCxn/endCxn references
+cxn_xml = '''<p:cxnSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvCxnSpPr>
+    <p:cNvPr id="403" name="Connector"/>
+    <p:cNvCxnSpPr>
+      <a:stCxn id="401" idx="3"/>
+      <a:endCxn id="402" idx="1"/>
+    </p:cNvCxnSpPr>
+    <p:nvPr/>
+  </p:nvCxnSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="2743200" y="1600200"/><a:ext cx="2743200" cy="0"/></a:xfrm>
+    <a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>
+    <a:ln w="25400">
+      <a:solidFill><a:srgbClr val="333333"/></a:solidFill>
+      <a:tailEnd type="triangle"/>
+    </a:ln>
+  </p:spPr>
+</p:cxnSp>'''
+spTree40.append(etree.fromstring(cxn_xml))
+
+# Custom geometry with a:cxnLst
+cust_cxn_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr><p:cNvPr id="404" name="CustomWithCxn"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="3200400" y="3429000"/><a:ext cx="2286000" cy="1828800"/></a:xfrm>
+    <a:custGeom>
+      <a:avLst/>
+      <a:gdLst/>
+      <a:cxnLst>
+        <a:cxn ang="0"><a:pos x="r" y="vc"/></a:cxn>
+        <a:cxn ang="5400000"><a:pos x="hc" y="b"/></a:cxn>
+        <a:cxn ang="10800000"><a:pos x="l" y="vc"/></a:cxn>
+        <a:cxn ang="16200000"><a:pos x="hc" y="t"/></a:cxn>
+      </a:cxnLst>
+      <a:rect l="l" t="t" r="r" b="b"/>
+      <a:pathLst>
+        <a:path w="100" h="100">
+          <a:moveTo><a:pt x="50" y="0"/></a:moveTo>
+          <a:lnTo><a:pt x="100" y="50"/></a:lnTo>
+          <a:lnTo><a:pt x="50" y="100"/></a:lnTo>
+          <a:lnTo><a:pt x="0" y="50"/></a:lnTo>
+          <a:close/>
+        </a:path>
+      </a:pathLst>
+    </a:custGeom>
+    <a:solidFill><a:srgbClr val="9370DB"/></a:solidFill>
+    <a:ln w="12700"><a:solidFill><a:srgbClr val="4B0082"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>'''
+spTree40.append(etree.fromstring(cust_cxn_xml))
+
+lbl40 = slide40.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0.5))
+lbl40.text_frame.paragraphs[0].text = "Connection points: connector with stCxn/endCxn refs, custom geom with a:cxnLst"
+lbl40.text_frame.paragraphs[0].font.size = Pt(10)
+lbl40.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

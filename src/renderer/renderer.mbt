@@ -1062,6 +1062,10 @@ fn render_shape(
     dai("shape-idx", shape_idx) +
     da("ph-type", shape.ph_type) +
     dai("ph-idx", shape.ph_idx) +
+    dai("st-cxn-id", shape.st_cxn_id) +
+    dai("st-cxn-idx", shape.st_cxn_idx) +
+    dai("end-cxn-id", shape.end_cxn_id) +
+    dai("end-cxn-idx", shape.end_cxn_idx) +
     da("anchor", shape.body_props.anchor) +
     dai("l-ins", shape.body_props.l_ins) +
     dai("t-ins", shape.body_props.t_ins) +
@@ -1137,7 +1141,12 @@ fn render_shape(
         da("cust-gdlst", data.gdlst) +
         da("cust-paths", data.paths) +
         dai("cust-pw", data.path_w) +
-        dai("cust-ph", data.path_h)
+        dai("cust-ph", data.path_h) +
+        da("cust-rl", data.rect_l) +
+        da("cust-rt", data.rect_t) +
+        da("cust-rr", data.rect_r) +
+        da("cust-rb", data.rect_b) +
+        da("cust-cxn", data.cxn_lst)
       _ => ""
     })
 
@@ -1311,20 +1320,28 @@ fn render_shape(
       } else {
         ""
       }
+      // Compute text rectangle for non-rectangular shapes
+      let (tr_l, tr_t, tr_w, tr_h) = match geom {
+        @ooxml.ShapeGeom::Other(prst, avs) =>
+          compute_preset_text_rect(prst, avs, cx_p, cy_p)
+        @ooxml.ShapeGeom::Custom(data) =>
+          compute_custom_text_rect(data, cx_p, cy_p)
+        _ => (0, 0, cx_p, cy_p)
+      }
       // For autoFit, use adjusted cy for text rendering if shape was expanded
-      let text_t : @ooxml.ShapeTransform = if shape.body_props.auto_fit &&
-        cy_p > px(t.cy, scale) {
-        {
-          x: t.x,
-          y: t.y,
-          cx: t.cx,
-          cy: cy_p * scale,
-          rot: t.rot,
-          flip_h: t.flip_h,
-          flip_v: t.flip_v,
-        }
+      let eff_cy = if shape.body_props.auto_fit && cy_p > px(t.cy, scale) {
+        cy_p
       } else {
-        t
+        tr_h
+      }
+      let text_t : @ooxml.ShapeTransform = {
+        x: t.x + tr_l * scale,
+        y: t.y + tr_t * scale,
+        cx: tr_w * scale,
+        cy: eff_cy * scale,
+        rot: t.rot,
+        flip_h: t.flip_h,
+        flip_v: t.flip_v,
       }
       rect_svg +
       blip_svg +

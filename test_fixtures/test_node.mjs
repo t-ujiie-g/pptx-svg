@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 37', slideCount === 37, `got ${slideCount}`);
+  assert('slide count = 40', slideCount === 40, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 37; i++) {
+  for (let i = 1; i <= 40; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 37; i++) {
+  for (let i = 1; i <= 40; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -810,6 +810,44 @@ async function testFeaturesPptx() {
     assert('slide37 has FFD700 (gold)', slide37.includes('FFD700'));
     assert('slide37 has 87CEEB (sky blue)', slide37.includes('87CEEB'));
     assert('slide37 has 98FB98 (pale green)', slide37.includes('98FB98'));
+  }
+
+  // ── Slide 38: Gear shapes ──
+  {
+    console.log('\n── test_features.pptx — Slide 38: gear shapes ──');
+    const slide38 = textFiles.get('ppt/slides/slide38.xml');
+    assert('slide38 exists', !!slide38);
+    assert('slide38 has gear6', slide38.includes('gear6'));
+    assert('slide38 has gear9', slide38.includes('gear9'));
+    assert('slide38 has 4472C4 (blue)', slide38.includes('4472C4'));
+    assert('slide38 has ED7D31 (orange)', slide38.includes('ED7D31'));
+    assert('slide38 has adj fmla', slide38.includes('val 50000'));
+  }
+
+  // ── Slide 39: Text rectangles ──
+  {
+    console.log('\n── test_features.pptx — Slide 39: text rectangles ──');
+    const slide39 = textFiles.get('ppt/slides/slide39.xml');
+    assert('slide39 exists', !!slide39);
+    assert('slide39 has triangle', slide39.includes('triangle'));
+    assert('slide39 has diamond', slide39.includes('diamond'));
+    assert('slide39 has rightArrow', slide39.includes('rightArrow'));
+    assert('slide39 has text body', hasTag(slide39, 'p:txBody'));
+    assert('slide39 has FFD700 (gold)', slide39.includes('FFD700'));
+  }
+
+  // ── Slide 40: Connection points ──
+  {
+    console.log('\n── test_features.pptx — Slide 40: connection points ──');
+    const slide40 = textFiles.get('ppt/slides/slide40.xml');
+    assert('slide40 exists', !!slide40);
+    assert('slide40 has p:cxnSp', hasTag(slide40, 'p:cxnSp'));
+    assert('slide40 has a:stCxn', hasTag(slide40, 'a:stCxn'));
+    assert('slide40 has a:endCxn', hasTag(slide40, 'a:endCxn'));
+    assert('slide40 has a:cxnLst', hasTag(slide40, 'a:cxnLst'));
+    assert('slide40 has a:pos', hasTag(slide40, 'a:pos'));
+    assert('slide40 has a:custGeom', hasTag(slide40, 'a:custGeom'));
+    assert('slide40 has a:rect', hasTag(slide40, 'a:rect'));
   }
 }
 

@@ -557,6 +557,10 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     body_props,
     ph_type,
     ph_idx,
+    st_cxn_id: -1,
+    st_cxn_idx: -1,
+    end_cxn_id: -1,
+    end_cxn_idx: -1,
   }
 }
 
@@ -705,6 +709,10 @@ fn shape_with_stroke(
     body_props: BodyProps::default(),
     ph_type: "",
     ph_idx: -1,
+    st_cxn_id: -1,
+    st_cxn_idx: -1,
+    end_cxn_id: -1,
+    end_cxn_idx: -1,
   }
 }
 
@@ -817,7 +825,69 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       }
     }
   }
-  ShapeGeom::Custom({ gdlst, paths, path_w, path_h })
+  // Parse a:rect → text rectangle guide variable references
+  let mut rect_l = ""
+  let mut rect_t = ""
+  let mut rect_r = ""
+  let mut rect_b = ""
+  match @xml.find_child(ch, "a:rect") {
+    None => ()
+    Some(rect_node) => {
+      rect_l = match @xml.get_attr(rect_node, "l") {
+        Some(v) => v
+        None => ""
+      }
+      rect_t = match @xml.get_attr(rect_node, "t") {
+        Some(v) => v
+        None => ""
+      }
+      rect_r = match @xml.get_attr(rect_node, "r") {
+        Some(v) => v
+        None => ""
+      }
+      rect_b = match @xml.get_attr(rect_node, "b") {
+        Some(v) => v
+        None => ""
+      }
+    }
+  }
+  // Parse a:cxnLst → connection points: "x,y,ang;x2,y2,ang2;..."
+  let mut cxn_lst = ""
+  match @xml.find_child(ch, "a:cxnLst") {
+    None => ()
+    Some(cxn_node) => {
+      let cxns = @xml.find_children(@xml.get_children(cxn_node), "a:cxn")
+      for ci in 0..<cxns.length() {
+        let ang = match @xml.get_attr(cxns[ci], "ang") {
+          Some(v) => v
+          None => "0"
+        }
+        let cxn_ch = @xml.get_children(cxns[ci])
+        let mut cx = "0"
+        let mut cy = "0"
+        match @xml.find_child(cxn_ch, "a:pos") {
+          None => ()
+          Some(pos) => {
+            cx = match @xml.get_attr(pos, "x") {
+              Some(v) => v
+              None => "0"
+            }
+            cy = match @xml.get_attr(pos, "y") {
+              Some(v) => v
+              None => "0"
+            }
+          }
+        }
+        if cxn_lst.length() > 0 {
+          cxn_lst = cxn_lst + ";"
+        }
+        cxn_lst = cxn_lst + cx + "," + cy + "," + ang
+      }
+    }
+  }
+  ShapeGeom::Custom(
+    { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b, cxn_lst },
+  )
 }
 
 ///|
@@ -950,7 +1020,65 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
       parse_connector_geom(prst, avs)
     }
   }
-  shape_with_stroke(ShapeKind::AutoShape(geom), transform, sp)
+  // Parse connection references from p:nvCxnSpPr/p:cNvCxnSpPr
+  let mut st_id = -1
+  let mut st_idx = -1
+  let mut end_id = -1
+  let mut end_idx = -1
+  match @xml.find_child(ch, "p:nvCxnSpPr") {
+    None => ()
+    Some(nv) => {
+      let nv_ch = @xml.get_children(nv)
+      match @xml.find_child(nv_ch, "p:cNvCxnSpPr") {
+        None => ()
+        Some(cnv) => {
+          let cnv_ch = @xml.get_children(cnv)
+          match @xml.find_child(cnv_ch, "a:stCxn") {
+            None => ()
+            Some(st) => {
+              st_id = @xml.parse_int(
+                match @xml.get_attr(st, "id") {
+                  Some(v) => v
+                  None => "-1"
+                },
+              )
+              st_idx = @xml.parse_int(
+                match @xml.get_attr(st, "idx") {
+                  Some(v) => v
+                  None => "-1"
+                },
+              )
+            }
+          }
+          match @xml.find_child(cnv_ch, "a:endCxn") {
+            None => ()
+            Some(en) => {
+              end_id = @xml.parse_int(
+                match @xml.get_attr(en, "id") {
+                  Some(v) => v
+                  None => "-1"
+                },
+              )
+              end_idx = @xml.parse_int(
+                match @xml.get_attr(en, "idx") {
+                  Some(v) => v
+                  None => "-1"
+                },
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+  let base = shape_with_stroke(ShapeKind::AutoShape(geom), transform, sp)
+  {
+    ..base,
+    st_cxn_id: st_id,
+    st_cxn_idx: st_idx,
+    end_cxn_id: end_id,
+    end_cxn_idx: end_idx,
+  }
 }
 
 ///|

@@ -942,12 +942,22 @@ fn get_preset_def(prst : String) -> PresetDef? {
       gdlst: "a=pin 0 adj 50000;dx=*/ ss a 100000;x1=+- r 0 dx;y1=+- b 0 dx",
       paths: "M l dx A dx dx 5400000 -5400000 L x1 t A dx dx 10800000 -5400000 L r y1 A dx dx 16200000 -5400000 L dx b A dx dx 0 -5400000 Z",
     })
-  } else if prst == "gear6" || prst == "gear9" {
-    // Simplified — render as circle for gear shapes
+  } else if prst == "gear6" {
+    // 6-tooth gear: alternating outer arcs (teeth) and inner arcs (valleys)
+    // Each tooth sector = 60°, tooth top = 30° arc, valley = 30° arc
+    // adj controls inner radius (tooth valley depth)
     Some({
-      avlst: "",
-      gdlst: "",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z",
+      avlst: "adj=75000",
+      gdlst: "a=pin 10000 adj 99000;ir=*/ wd2 a 100000;irh=*/ hd2 a 100000;c00=cos 20700000 wd2;s00=sin 20700000 hd2;mx=+- wd2 c00 0;my=+- hd2 s00 0;ci0=cos 900000 ir;si0=sin 900000 irh;px0=+- wd2 ci0 0;py0=+- hd2 si0 0;co1=cos 2700000 wd2;so1=sin 2700000 hd2;qx1=+- wd2 co1 0;qy1=+- hd2 so1 0;ci1=cos 4500000 ir;si1=sin 4500000 irh;px1=+- wd2 ci1 0;py1=+- hd2 si1 0;co2=cos 6300000 wd2;so2=sin 6300000 hd2;qx2=+- wd2 co2 0;qy2=+- hd2 so2 0;ci2=cos 8100000 ir;si2=sin 8100000 irh;px2=+- wd2 ci2 0;py2=+- hd2 si2 0;co3=cos 9900000 wd2;so3=sin 9900000 hd2;qx3=+- wd2 co3 0;qy3=+- hd2 so3 0;ci3=cos 11700000 ir;si3=sin 11700000 irh;px3=+- wd2 ci3 0;py3=+- hd2 si3 0;co4=cos 13500000 wd2;so4=sin 13500000 hd2;qx4=+- wd2 co4 0;qy4=+- hd2 so4 0;ci4=cos 15300000 ir;si4=sin 15300000 irh;px4=+- wd2 ci4 0;py4=+- hd2 si4 0;co5=cos 17100000 wd2;so5=sin 17100000 hd2;qx5=+- wd2 co5 0;qy5=+- hd2 so5 0;ci5=cos 18900000 ir;si5=sin 18900000 irh;px5=+- wd2 ci5 0;py5=+- hd2 si5 0;hr=*/ wd2 30000 100000;hrh=*/ hd2 30000 100000;hx=+- wd2 hr 0",
+      paths: "M mx my A wd2 hd2 20700000 1800000 L px0 py0 A ir irh 900000 1800000 L qx1 qy1 A wd2 hd2 2700000 1800000 L px1 py1 A ir irh 4500000 1800000 L qx2 qy2 A wd2 hd2 6300000 1800000 L px2 py2 A ir irh 8100000 1800000 L qx3 qy3 A wd2 hd2 9900000 1800000 L px3 py3 A ir irh 11700000 1800000 L qx4 qy4 A wd2 hd2 13500000 1800000 L px4 py4 A ir irh 15300000 1800000 L qx5 qy5 A wd2 hd2 17100000 1800000 L px5 py5 A ir irh 18900000 1800000 Z|M hx hd2 A hr hrh 0 21600000 Z",
+    })
+  } else if prst == "gear9" {
+    // 9-tooth gear: alternating outer arcs (teeth) and inner arcs (valleys)
+    // Each tooth sector = 40°, tooth top = 20° arc, valley = 20° arc
+    Some({
+      avlst: "adj=75000",
+      gdlst: "a=pin 10000 adj 99000;ir=*/ wd2 a 100000;irh=*/ hd2 a 100000;c00=cos 21000000 wd2;s00=sin 21000000 hd2;mx=+- wd2 c00 0;my=+- hd2 s00 0;ci0=cos 600000 ir;si0=sin 600000 irh;px0=+- wd2 ci0 0;py0=+- hd2 si0 0;co1=cos 1800000 wd2;so1=sin 1800000 hd2;qx1=+- wd2 co1 0;qy1=+- hd2 so1 0;ci1=cos 3000000 ir;si1=sin 3000000 irh;px1=+- wd2 ci1 0;py1=+- hd2 si1 0;co2=cos 4200000 wd2;so2=sin 4200000 hd2;qx2=+- wd2 co2 0;qy2=+- hd2 so2 0;ci2=cos 5400000 ir;si2=sin 5400000 irh;px2=+- wd2 ci2 0;py2=+- hd2 si2 0;co3=cos 6600000 wd2;so3=sin 6600000 hd2;qx3=+- wd2 co3 0;qy3=+- hd2 so3 0;ci3=cos 7800000 ir;si3=sin 7800000 irh;px3=+- wd2 ci3 0;py3=+- hd2 si3 0;co4=cos 9000000 wd2;so4=sin 9000000 hd2;qx4=+- wd2 co4 0;qy4=+- hd2 so4 0;ci4=cos 10200000 ir;si4=sin 10200000 irh;px4=+- wd2 ci4 0;py4=+- hd2 si4 0;co5=cos 11400000 wd2;so5=sin 11400000 hd2;qx5=+- wd2 co5 0;qy5=+- hd2 so5 0;ci5=cos 12600000 ir;si5=sin 12600000 irh;px5=+- wd2 ci5 0;py5=+- hd2 si5 0;co6=cos 13800000 wd2;so6=sin 13800000 hd2;qx6=+- wd2 co6 0;qy6=+- hd2 so6 0;ci6=cos 15000000 ir;si6=sin 15000000 irh;px6=+- wd2 ci6 0;py6=+- hd2 si6 0;co7=cos 16200000 wd2;so7=sin 16200000 hd2;qx7=+- wd2 co7 0;qy7=+- hd2 so7 0;ci7=cos 17400000 ir;si7=sin 17400000 irh;px7=+- wd2 ci7 0;py7=+- hd2 si7 0;co8=cos 18600000 wd2;so8=sin 18600000 hd2;qx8=+- wd2 co8 0;qy8=+- hd2 so8 0;ci8=cos 19800000 ir;si8=sin 19800000 irh;px8=+- wd2 ci8 0;py8=+- hd2 si8 0;hr=*/ wd2 25000 100000;hrh=*/ hd2 25000 100000;hx=+- wd2 hr 0",
+      paths: "M mx my A wd2 hd2 21000000 1200000 L px0 py0 A ir irh 600000 1200000 L qx1 qy1 A wd2 hd2 1800000 1200000 L px1 py1 A ir irh 3000000 1200000 L qx2 qy2 A wd2 hd2 4200000 1200000 L px2 py2 A ir irh 5400000 1200000 L qx3 qy3 A wd2 hd2 6600000 1200000 L px3 py3 A ir irh 7800000 1200000 L qx4 qy4 A wd2 hd2 9000000 1200000 L px4 py4 A ir irh 10200000 1200000 L qx5 qy5 A wd2 hd2 11400000 1200000 L px5 py5 A ir irh 12600000 1200000 L qx6 qy6 A wd2 hd2 13800000 1200000 L px6 py6 A ir irh 15000000 1200000 L qx7 qy7 A wd2 hd2 16200000 1200000 L px7 py7 A ir irh 17400000 1200000 L qx8 qy8 A wd2 hd2 18600000 1200000 L px8 py8 A ir irh 19800000 1200000 Z|M hx hd2 A hr hrh 0 21600000 Z",
     })
   } else if prst == "funnel" {
     Some({
@@ -1408,6 +1418,237 @@ fn render_custom_geom(
   } else {
     "<path d=\"" + d + "\"" + fill + stroke + rot + "/>"
   }
+}
+
+///|
+/// Text rectangle definition: "l t r b" using guide variable names.
+/// Returns (rect_l, rect_t, rect_r, rect_b) as guide var names, or empty for default.
+fn get_preset_text_rect(prst : String) -> String {
+  // Text rects for shapes where text area differs from bounding box.
+  // Values are guide variable names resolved after evaluating the preset's gdlst.
+  if prst == "triangle" || prst == "isosTriangle" {
+    "trl t trr b"
+  } else if prst == "rtTriangle" {
+    "l trt trr b"
+  } else if prst == "diamond" || prst == "flowChartDecision" {
+    "wd4 hd4 3wd4 3hd4"
+  } else if prst == "pentagon" || prst == "homePlate" {
+    "wd6 t 5wd6 b"
+  } else if prst == "hexagon" {
+    "hxl t hxr b"
+  } else if prst == "parallelogram" {
+    "prl t prr b"
+  } else if prst == "trapezoid" {
+    "tzl t tzr b"
+  } else if prst == "rightArrow" || prst == "notchedRightArrow" {
+    "l ady1 arx b"
+  } else if prst == "leftArrow" {
+    "alx ady1 r b"
+  } else if prst == "upArrow" {
+    "adx1 aly t adx2 b"
+  } else if prst == "downArrow" {
+    "adx1 t ary adx2 b"
+  } else if prst == "leftRightArrow" {
+    "alx ady1 arx ady2"
+  } else if prst == "upDownArrow" {
+    "adx1 aly adx2 ary"
+  } else if prst == "chevron" {
+    "l t chx b"
+  } else if prst == "star4" {
+    "x1 y1 x2 y2"
+  } else if prst == "star5" || prst == "star6" || prst == "star8" ||
+    prst == "star10" ||
+    prst == "star12" ||
+    prst == "star16" ||
+    prst == "star24" ||
+    prst == "star32" {
+    "x1 y1 x2 y2"
+  } else if prst == "pie" || prst == "arc" {
+    "wd4 hd4 3wd4 3hd4"
+  } else if prst == "donut" {
+    "wd4 hd4 3wd4 3hd4"
+  } else if prst == "gear6" || prst == "gear9" {
+    "wd4 hd4 3wd4 3hd4"
+  } else if prst == "octagon" {
+    "ol t orr b"
+  } else if prst == "flowChartInputOutput" || prst == "flowChartManualInput" {
+    "wd6 hd4 5wd6 b"
+  } else if prst == "flowChartExtract" || prst == "flowChartMerge" {
+    "wd4 hd4 3wd4 3hd4"
+  } else if prst == "flowChartOffpageConnector" {
+    "l t r ofy"
+  } else {
+    ""
+  }
+}
+
+///|
+/// Compute text rectangle for a preset geometry shape.
+/// Returns (l, t, w, h) in pixels, where l/t are offsets from shape origin.
+/// If the shape has no custom text rect, returns (0, 0, cx_p, cy_p).
+fn compute_preset_text_rect(
+  prst : String,
+  adj_values : Array[Int],
+  cx_p : Int,
+  cy_p : Int,
+) -> (Int, Int, Int, Int) {
+  let rect_def = get_preset_text_rect(prst)
+  if rect_def.is_empty() {
+    return (0, 0, cx_p, cy_p)
+  }
+  // Get the preset definition to evaluate guides
+  let def = match get_preset_def(prst) {
+    None => return (0, 0, cx_p, cy_p)
+    Some(d) => d
+  }
+  let w = cx_p.to_double()
+  let h = cy_p.to_double()
+  let env = GuideEnv::new()
+  env.init_builtins(w, h)
+  // Add convenience variables for text rect formulas
+  env.set("3wd4", w * 3.0 / 4.0)
+  env.set("3hd4", h * 3.0 / 4.0)
+  env.set("5wd6", w * 5.0 / 6.0)
+  apply_adjustments(env, def.avlst, adj_values)
+  eval_guide_list(env, def.gdlst)
+  // Add text-rect-specific guide variables for common shapes
+  add_text_rect_guides(env, prst, w, h)
+  // Parse rect definition: "l t r b"
+  let parts = @xml.split_by_space(rect_def)
+  if parts.length() < 4 {
+    return (0, 0, cx_p, cy_p)
+  }
+  let rl = env.resolve(parts[0])
+  let rt = env.resolve(parts[1])
+  let rr = env.resolve(parts[2])
+  let rb = env.resolve(parts[3])
+  // Clamp to shape bounds
+  let l = if rl < 0.0 { 0 } else { rl.to_int() }
+  let t = if rt < 0.0 { 0 } else { rt.to_int() }
+  let r_val = if rr > w { cx_p } else { rr.to_int() }
+  let b_val = if rb > h { cy_p } else { rb.to_int() }
+  (l, t, r_val - l, b_val - t)
+}
+
+///|
+/// Add text-rect-specific guide variables that aren't part of the shape's gdlst.
+fn add_text_rect_guides(
+  env : GuideEnv,
+  prst : String,
+  w : Double,
+  h : Double,
+) -> Unit {
+  if prst == "triangle" || prst == "isosTriangle" {
+    // Inscribed rectangle: narrower at top, wider at bottom
+    let adj = env.resolve("adj")
+    let dx = adj * w / 200000.0
+    env.set("trl", w / 2.0 - dx)
+    env.set("trr", w / 2.0 + dx)
+  } else if prst == "rtTriangle" {
+    // Right triangle: text in lower-left area
+    env.set("trt", h / 2.0)
+    env.set("trr", w / 2.0)
+  } else if prst == "hexagon" {
+    let adj = env.resolve("adj")
+    let dx = adj * w / 100000.0
+    env.set("hxl", dx)
+    env.set("hxr", w - dx)
+  } else if prst == "parallelogram" {
+    let adj = env.resolve("adj")
+    let dx = adj * w / 200000.0
+    env.set("prl", dx)
+    env.set("prr", w - dx)
+  } else if prst == "trapezoid" {
+    let adj = env.resolve("adj")
+    let dx = adj * w / 200000.0
+    env.set("tzl", dx)
+    env.set("tzr", w - dx)
+  } else if prst == "rightArrow" || prst == "notchedRightArrow" {
+    let adj1 = env.resolve("adj1")
+    let adj2 = env.resolve("adj2")
+    let dy = adj1 * h / 200000.0
+    env.set("ady1", h / 2.0 - dy)
+    env.set("arx", w - adj2 * w / 100000.0)
+  } else if prst == "leftArrow" {
+    let adj1 = env.resolve("adj1")
+    let adj2 = env.resolve("adj2")
+    let dy = adj1 * h / 200000.0
+    env.set("ady1", h / 2.0 - dy)
+    env.set("alx", adj2 * w / 100000.0)
+  } else if prst == "upArrow" {
+    let adj1 = env.resolve("adj1")
+    let adj2 = env.resolve("adj2")
+    let dx = adj1 * w / 200000.0
+    env.set("adx1", w / 2.0 - dx)
+    env.set("adx2", w / 2.0 + dx)
+    env.set("aly", adj2 * h / 100000.0)
+  } else if prst == "downArrow" {
+    let adj1 = env.resolve("adj1")
+    let adj2 = env.resolve("adj2")
+    let dx = adj1 * w / 200000.0
+    env.set("adx1", w / 2.0 - dx)
+    env.set("adx2", w / 2.0 + dx)
+    env.set("ary", h - adj2 * h / 100000.0)
+  } else if prst == "leftRightArrow" {
+    let adj1 = env.resolve("adj1")
+    let adj2 = env.resolve("adj2")
+    let dy = adj1 * h / 200000.0
+    env.set("ady1", h / 2.0 - dy)
+    env.set("ady2", h / 2.0 + dy)
+    env.set("alx", adj2 * w / 100000.0)
+    env.set("arx", w - adj2 * w / 100000.0)
+  } else if prst == "upDownArrow" {
+    let adj1 = env.resolve("adj1")
+    let adj2 = env.resolve("adj2")
+    let dx = adj1 * w / 200000.0
+    env.set("adx1", w / 2.0 - dx)
+    env.set("adx2", w / 2.0 + dx)
+    env.set("aly", adj2 * h / 100000.0)
+    env.set("ary", h - adj2 * h / 100000.0)
+  } else if prst == "chevron" {
+    let adj = env.resolve("adj")
+    env.set("chx", w - adj * w / 100000.0)
+  } else if prst == "octagon" {
+    let adj = env.resolve("adj")
+    let dx = adj * w / 100000.0
+    env.set("ol", dx / 2.0)
+    env.set("orr", w - dx / 2.0)
+  } else if prst == "flowChartOffpageConnector" {
+    env.set("ofy", h * 4.0 / 5.0)
+  } else {
+    ignore(w)
+    ignore(h)
+  }
+}
+
+///|
+/// Compute text rectangle for custom geometry.
+/// Uses guide formulas and the a:rect definition from the custom geom data.
+fn compute_custom_text_rect(
+  data : @ooxml.CustomGeomData,
+  cx_p : Int,
+  cy_p : Int,
+) -> (Int, Int, Int, Int) {
+  if data.rect_l.is_empty() && data.rect_t.is_empty() && data.rect_r.is_empty() &&
+    data.rect_b.is_empty() {
+    return (0, 0, cx_p, cy_p)
+  }
+  let w = cx_p.to_double()
+  let h = cy_p.to_double()
+  let env = GuideEnv::new()
+  env.init_builtins(w, h)
+  env.set("3wd4", w * 3.0 / 4.0)
+  env.set("3hd4", h * 3.0 / 4.0)
+  eval_guide_list(env, data.gdlst)
+  let rl = if data.rect_l.is_empty() { 0.0 } else { env.resolve(data.rect_l) }
+  let rt = if data.rect_t.is_empty() { 0.0 } else { env.resolve(data.rect_t) }
+  let rr = if data.rect_r.is_empty() { w } else { env.resolve(data.rect_r) }
+  let rb = if data.rect_b.is_empty() { h } else { env.resolve(data.rect_b) }
+  let l = if rl < 0.0 { 0 } else { rl.to_int() }
+  let t = if rt < 0.0 { 0 } else { rt.to_int() }
+  let r_val = if rr > w { cx_p } else { rr.to_int() }
+  let b_val = if rb > h { cy_p } else { rb.to_int() }
+  (l, t, r_val - l, b_val - t)
 }
 
 ///|

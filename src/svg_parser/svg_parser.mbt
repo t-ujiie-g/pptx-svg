@@ -344,6 +344,11 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
         paths: cust_paths,
         path_w: cust_pw,
         path_h: cust_ph,
+        rect_l: get_da(g_node, "cust-rl"),
+        rect_t: get_da(g_node, "cust-rt"),
+        rect_r: get_da(g_node, "cust-rr"),
+        rect_b: get_da(g_node, "cust-rb"),
+        cxn_lst: get_da(g_node, "cust-cxn"),
       })
     } else {
       let adj_str = get_da(g_node, "cxn-adj")
@@ -509,6 +514,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     body_props,
     ph_type,
     ph_idx,
+    st_cxn_id: get_dai(g_node, "st-cxn-id"),
+    st_cxn_idx: get_dai(g_node, "st-cxn-idx"),
+    end_cxn_id: get_dai(g_node, "end-cxn-id"),
+    end_cxn_idx: get_dai(g_node, "end-cxn-idx"),
   }
 }
 

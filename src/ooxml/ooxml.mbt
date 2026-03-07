@@ -864,6 +864,11 @@ pub(all) struct CustomGeomData {
   paths : String // compact path: "M x y L x y Z" ("|" separates sub-paths)
   path_w : Int // path coordinate space width (0 = use shape width)
   path_h : Int // path coordinate space height (0 = use shape height)
+  rect_l : String // text rect left guide name (empty = use shape bound)
+  rect_t : String // text rect top guide name
+  rect_r : String // text rect right guide name
+  rect_b : String // text rect bottom guide name
+  cxn_lst : String // connection points: "x1,y1,ang1;x2,y2,ang2;..." (guide names)
 }
 
 ///|
@@ -1006,6 +1011,10 @@ pub(all) struct Shape {
   body_props : BodyProps // text body properties (anchor, insets)
   ph_type : String // "title","body","ctrTitle","subTitle","dt","ftr","sldNum","" (non-PH)
   ph_idx : Int // -1 = none
+  st_cxn_id : Int // start connection shape id (-1 = none)
+  st_cxn_idx : Int // start connection point index (-1 = none)
+  end_cxn_id : Int // end connection shape id (-1 = none)
+  end_cxn_idx : Int // end connection point index (-1 = none)
 }
 
 ///|
@@ -1039,6 +1048,10 @@ pub fn Shape::default_with(
     body_props: BodyProps::default(),
     ph_type: "",
     ph_idx: -1,
+    st_cxn_id: -1,
+    st_cxn_idx: -1,
+    end_cxn_id: -1,
+    end_cxn_idx: -1,
   }
 }
 

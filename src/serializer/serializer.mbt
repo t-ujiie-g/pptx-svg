@@ -674,7 +674,75 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
     }
     pi = pi + 1
   }
-  out + "</a:pathLst></a:custGeom>"
+  out = out + "</a:pathLst>"
+  // Serialize a:cxnLst if connection points are defined
+  if not(data.cxn_lst.is_empty()) {
+    out = out + "<a:cxnLst>"
+    // Parse "x,y,ang;x2,y2,ang2;..."
+    let clen = data.cxn_lst.length()
+    let mut cstart = 0
+    let mut ci = 0
+    while ci <= clen {
+      if ci == clen || data.cxn_lst.get_char(ci).unwrap() == ';' {
+        if ci > cstart {
+          let entry = @xml.str_substring(data.cxn_lst, cstart, ci)
+          // Parse "x,y,ang"
+          let mut c1 = 0
+          let mut c2 = 0
+          let elen = entry.length()
+          let mut ei = 0
+          let mut comma_count = 0
+          while ei < elen {
+            if entry.get_char(ei).unwrap() == ',' {
+              if comma_count == 0 {
+                c1 = ei
+              } else {
+                c2 = ei
+              }
+              comma_count = comma_count + 1
+            }
+            ei = ei + 1
+          }
+          if comma_count >= 2 {
+            let cx = @xml.str_substring(entry, 0, c1)
+            let cy = @xml.str_substring(entry, c1 + 1, c2)
+            let ang = @xml.str_substring(entry, c2 + 1, elen)
+            out = out +
+              "<a:cxn ang=\"" +
+              ang +
+              "\"><a:pos x=\"" +
+              cx +
+              "\" y=\"" +
+              cy +
+              "\"/></a:cxn>"
+          }
+        }
+        cstart = ci + 1
+      }
+      ci = ci + 1
+    }
+    out = out + "</a:cxnLst>"
+  }
+  // Serialize a:rect if text rect is defined
+  if not(data.rect_l.is_empty()) || not(data.rect_t.is_empty()) ||
+    not(data.rect_r.is_empty()) ||
+    not(data.rect_b.is_empty()) {
+    let rl = if data.rect_l.is_empty() { "l" } else { data.rect_l }
+    let rt = if data.rect_t.is_empty() { "t" } else { data.rect_t }
+    let rr = if data.rect_r.is_empty() { "r" } else { data.rect_r }
+    let rb = if data.rect_b.is_empty() { "b" } else { data.rect_b }
+    out = out +
+      "<a:rect l=\"" +
+      rl +
+      "\" t=\"" +
+      rt +
+      "\" r=\"" +
+      rr +
+      "\" b=\"" +
+      rb +
+      "\"/>"
+  }
+  out + "</a:custGeom>"
 }
 
 ///|
@@ -797,94 +865,96 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     not(shape.stroke_head_type.is_empty()) ||
     not(shape.stroke_tail_type.is_empty())
   if has_stroke {
-    let w = if shape.stroke_w > 0 {
-      shape.stroke_w
-    } else {
-      @ooxml.default_stroke_w
-    }
-    let mut ln_attrs = " w=\"" + int_to_str(w) + "\""
-    if not(shape.stroke_cap.is_empty()) {
-      ln_attrs = ln_attrs + " cap=\"" + shape.stroke_cap + "\""
-    }
-    if not(shape.stroke_cmpd.is_empty()) {
-      ln_attrs = ln_attrs + " cmpd=\"" + shape.stroke_cmpd + "\""
-    }
-    out = out + "<a:ln" + ln_attrs + ">"
-    // Fill or noFill
-    if shape.stroke_no_fill {
-      out = out + "<a:noFill/>"
-    } else if not(shape.stroke.is_none()) {
-      out = out + serialize_color(shape.stroke)
-    }
-    // Preset dash or custom dash
-    if @xml.str_starts_with(shape.stroke_dash, @ooxml.cust_dash_prefix) {
-      let data = @xml.str_suffix(shape.stroke_dash, @ooxml.cust_dash_prefix_len)
-      out = out + "<a:custDash>"
-      // Parse "d1,sp1;d2,sp2;..."
-      let data_len = data.length()
-      let mut pos = 0
-      while pos < data_len {
-        // Parse d value
-        let mut d_end = pos
-        while d_end < data_len && data.get_char(d_end).unwrap() != ',' {
-          d_end = d_end + 1
-        }
-        let d_val = @xml.parse_int(@xml.str_substring(data, pos, d_end))
-        // Parse sp value
-        let sp_start = d_end + 1
-        let mut sp_end = sp_start
-        while sp_end < data_len && data.get_char(sp_end).unwrap() != ';' {
-          sp_end = sp_end + 1
-        }
-        let sp_val = @xml.parse_int(@xml.str_substring(data, sp_start, sp_end))
-        out = out +
-          "<a:ds d=\"" +
-          int_to_str(d_val) +
-          "\" sp=\"" +
-          int_to_str(sp_val) +
-          "\"/>"
-        pos = sp_end + 1
-      }
-      out = out + "</a:custDash>"
-    } else if not(shape.stroke_dash.is_empty()) {
-      out = out + "<a:prstDash val=\"" + shape.stroke_dash + "\"/>"
-    }
-    // Line join
-    if shape.stroke_join == "round" {
-      out = out + "<a:round/>"
-    } else if shape.stroke_join == "bevel" {
-      out = out + "<a:bevel/>"
-    } else if shape.stroke_join == "miter" {
-      if shape.stroke_miter_limit > 0 {
-        out = out +
-          "<a:miter lim=\"" +
-          int_to_str(shape.stroke_miter_limit) +
-          "\"/>"
-      } else {
-        out = out + "<a:miter/>"
-      }
-    }
-    // Arrow head/tail
-    out = out +
-      serialize_arrow_end(
-        "a:headEnd",
-        shape.stroke_head_type,
-        shape.stroke_head_w,
-        shape.stroke_head_len,
-      )
-    out = out +
-      serialize_arrow_end(
-        "a:tailEnd",
-        shape.stroke_tail_type,
-        shape.stroke_tail_w,
-        shape.stroke_tail_len,
-      )
-    out = out + "</a:ln>"
+    out = out + serialize_stroke(shape)
   }
   out = out + "</p:spPr>"
   // Text body
   out = out + serialize_text_body(shape.paragraphs, shape.body_props)
   out + "</p:sp>"
+}
+
+///|
+fn serialize_stroke(shape : @ooxml.Shape) -> String {
+  let w = if shape.stroke_w > 0 {
+    shape.stroke_w
+  } else {
+    @ooxml.default_stroke_w
+  }
+  let mut ln_attrs = " w=\"" + int_to_str(w) + "\""
+  if not(shape.stroke_cap.is_empty()) {
+    ln_attrs = ln_attrs + " cap=\"" + shape.stroke_cap + "\""
+  }
+  if not(shape.stroke_cmpd.is_empty()) {
+    ln_attrs = ln_attrs + " cmpd=\"" + shape.stroke_cmpd + "\""
+  }
+  let mut out = "<a:ln" + ln_attrs + ">"
+  // Fill or noFill
+  if shape.stroke_no_fill {
+    out = out + "<a:noFill/>"
+  } else if not(shape.stroke.is_none()) {
+    out = out + serialize_color(shape.stroke)
+  }
+  // Preset dash or custom dash
+  if @xml.str_starts_with(shape.stroke_dash, @ooxml.cust_dash_prefix) {
+    let data = @xml.str_suffix(shape.stroke_dash, @ooxml.cust_dash_prefix_len)
+    out = out + "<a:custDash>"
+    let data_len = data.length()
+    let mut pos = 0
+    while pos < data_len {
+      let mut d_end = pos
+      while d_end < data_len && data.get_char(d_end).unwrap() != ',' {
+        d_end = d_end + 1
+      }
+      let d_val = @xml.parse_int(@xml.str_substring(data, pos, d_end))
+      let sp_start = d_end + 1
+      let mut sp_end = sp_start
+      while sp_end < data_len && data.get_char(sp_end).unwrap() != ';' {
+        sp_end = sp_end + 1
+      }
+      let sp_val = @xml.parse_int(@xml.str_substring(data, sp_start, sp_end))
+      out = out +
+        "<a:ds d=\"" +
+        int_to_str(d_val) +
+        "\" sp=\"" +
+        int_to_str(sp_val) +
+        "\"/>"
+      pos = sp_end + 1
+    }
+    out = out + "</a:custDash>"
+  } else if not(shape.stroke_dash.is_empty()) {
+    out = out + "<a:prstDash val=\"" + shape.stroke_dash + "\"/>"
+  }
+  // Line join
+  if shape.stroke_join == "round" {
+    out = out + "<a:round/>"
+  } else if shape.stroke_join == "bevel" {
+    out = out + "<a:bevel/>"
+  } else if shape.stroke_join == "miter" {
+    if shape.stroke_miter_limit > 0 {
+      out = out +
+        "<a:miter lim=\"" +
+        int_to_str(shape.stroke_miter_limit) +
+        "\"/>"
+    } else {
+      out = out + "<a:miter/>"
+    }
+  }
+  // Arrow head/tail
+  out = out +
+    serialize_arrow_end(
+      "a:headEnd",
+      shape.stroke_head_type,
+      shape.stroke_head_w,
+      shape.stroke_head_len,
+    )
+  out = out +
+    serialize_arrow_end(
+      "a:tailEnd",
+      shape.stroke_tail_type,
+      shape.stroke_tail_w,
+      shape.stroke_tail_len,
+    )
+  out + "</a:ln>"
 }
 
 ///|
@@ -1018,12 +1088,67 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
 ///|
 fn serialize_shape(shape : @ooxml.Shape) -> String {
   match shape.kind {
-    @ooxml.ShapeKind::AutoShape(geom) => serialize_autoshape(shape, geom)
+    @ooxml.ShapeKind::AutoShape(geom) => {
+      // Connectors with connection refs serialize as p:cxnSp
+      let is_cxn = match geom {
+        @ooxml.ShapeGeom::Connector(_, _) => true
+        @ooxml.ShapeGeom::Line => true
+        _ => false
+      }
+      if is_cxn && (shape.st_cxn_id >= 0 || shape.end_cxn_id >= 0) {
+        serialize_connector(shape, geom)
+      } else {
+        serialize_autoshape(shape, geom)
+      }
+    }
     @ooxml.ShapeKind::Picture(rid) => serialize_picture(shape, rid)
     @ooxml.ShapeKind::TableShape(table) => serialize_table(shape, table)
     @ooxml.ShapeKind::GroupShape(grp) => serialize_group(shape, grp)
     _ => ""
   }
+}
+
+///|
+fn serialize_connector(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
+  let mut out = "<p:cxnSp>"
+  // Non-visual properties
+  out = out + "<p:nvCxnSpPr>"
+  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + "<p:cNvCxnSpPr>"
+  if shape.st_cxn_id >= 0 {
+    out = out +
+      "<a:stCxn id=\"" +
+      int_to_str(shape.st_cxn_id) +
+      "\" idx=\"" +
+      int_to_str(if shape.st_cxn_idx >= 0 { shape.st_cxn_idx } else { 0 }) +
+      "\"/>"
+  }
+  if shape.end_cxn_id >= 0 {
+    out = out +
+      "<a:endCxn id=\"" +
+      int_to_str(shape.end_cxn_id) +
+      "\" idx=\"" +
+      int_to_str(if shape.end_cxn_idx >= 0 { shape.end_cxn_idx } else { 0 }) +
+      "\"/>"
+  }
+  out = out + "</p:cNvCxnSpPr>"
+  out = out + "<p:nvPr/>"
+  out = out + "</p:nvCxnSpPr>"
+  // Shape properties
+  out = out + "<p:spPr>"
+  out = out + serialize_transform(shape.transform)
+  out = out + serialize_prst_geom(geom)
+  // Stroke
+  let has_stroke = not(shape.stroke.is_none()) ||
+    shape.stroke_no_fill ||
+    not(shape.stroke_dash.is_empty()) ||
+    not(shape.stroke_head_type.is_empty()) ||
+    not(shape.stroke_tail_type.is_empty())
+  if has_stroke {
+    out = out + serialize_stroke(shape)
+  }
+  out = out + "</p:spPr>"
+  out + "</p:cxnSp>"
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

@@ -20,16 +20,12 @@
 - [x] **コネクタ**: `p:cxnSp` 直線/折れ線/曲線 + 矢印 + 調整値 round-trip
 - [x] **プリセットジオメトリ**: `a:prstGeom` ガイド式エバリュエータ + ~154 種 SVG path 生成
 - [x] **カスタムジオメトリ**: `a:custGeom` パース + ガイド式 + pathLst → SVG path + round-trip
+- [x] **テキスト矩形**: `a:rect` プリセット/カスタムジオメトリのテキスト配置領域計算
+- [x] **接続ポイント**: `a:cxnLst` パース + `stCxnId/endCxnId` コネクタ接続 round-trip
+- [x] **ギア歯**: gear6/gear9 正確な歯型パス (6/9 歯 + 中心穴)
 - [x] **ライブラリ化**: TypeScript 分割 (lib/ → dist/) + PptxRenderer クラス + Wasm 3-tier フォールバック
 
 ---
-
-## 5. シェイプ — 残タスク [P1]
-
-### 5.1 プリセットジオメトリ 残り
-- [ ] `a:rect` (テキスト矩形) 計算
-- [ ] `a:cxnLst` (接続ポイント) — コネクタ接続用
-- [ ] gear6/9 の正確なギア歯パス (現在は円で近似)
 
 ---
 
