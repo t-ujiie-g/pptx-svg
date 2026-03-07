@@ -24,18 +24,18 @@
 - [x] **接続ポイント**: `a:cxnLst` パース + `stCxnId/endCxnId` コネクタ接続 round-trip
 - [x] **ギア歯**: gear6/gear9 正確な歯型パス (6/9 歯 + 中心穴)
 - [x] **ライブラリ化**: TypeScript 分割 (lib/ → dist/) + PptxRenderer クラス + Wasm 3-tier フォールバック
+- [x] **画像クロップ**: `srcRect` → SVG `<clipPath>` (Picture + AutoShape blipFill 両対応)
+- [x] **画像アルファ**: `a:alphaModFix` パース + SVG `opacity` 属性
+- [x] **外部画像参照**: `TargetMode="External"` — Relationship に target_mode 追加 + 外部 URL 直接参照
 
 ---
 
-## 7. 画像 — 高度機能 [P2]
+## 7. 画像 — 残機能 [P2]
 
-- [ ] 画像クロップ SVG 描画 — `srcRect` パース済み → SVG `<clipPath>` or viewBox
 - [ ] SVG 画像 (`a:blip` + SVG extension `a:extLst`)
 - [ ] 画像エフェクト (`a:clrChange`, brightness/contrast)
 - [ ] Duotone (`a:duotone`)
-- [ ] 画像のアルファ (`a:alphaModFix`)
 - [ ] EMF / WMF / TIFF — ラスタライズ
-- [ ] 外部画像参照 (`TargetMode="External"`)
 
 ---
 
@@ -115,5 +115,6 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 | **P0** | 基盤/テーマ/マスター継承/テキスト完全対応 | **完了** |
 | **P1** | 塗り/線/グループ/コネクタ/ジオメトリ/テーブル完全対応 | **完了** |
 | **P1** | スライド・シェイプ残機能, ライブラリ公開 | 未着手 |
-| **P2** | 画像高度/エフェクト/チャート/テキスト高度 | 未着手 |
+| **P2** | 画像 (クロップ/アルファ/外部参照 完了, SVG画像/エフェクト/EMF 未着手) | **一部完了** |
+| **P2** | エフェクト/チャート/テキスト高度 | 未着手 |
 | **P3** | SmartArt/OLE/メディア/数式/ノート/埋め込みフォント | 未着手 |

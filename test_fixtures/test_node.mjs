@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 42', slideCount === 42, `got ${slideCount}`);
+  assert('slide count = 44', slideCount === 44, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 42; i++) {
+  for (let i = 1; i <= 44; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 42; i++) {
+  for (let i = 1; i <= 44; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -890,6 +890,39 @@ async function testFeaturesPptx() {
     assert('slide42 has red diagonal FF0000', slide42.includes('FF0000'));
     assert('slide42 has blue diagonal 0000FF', slide42.includes('0000FF'));
     assert('slide42 has green diagonal 008800', slide42.includes('008800'));
+  }
+
+  // ── Slide 43: Image crop + alpha ──
+  {
+    console.log('\n── test_features.pptx — Slide 43: image crop + alpha ──');
+    const slide43 = textFiles.get('ppt/slides/slide43.xml');
+    assert('slide43 exists', !!slide43);
+    assert('slide43 has p:pic', hasTag(slide43, 'p:pic'));
+    assert('slide43 has a:blip', hasTag(slide43, 'a:blip'));
+    // Crop attributes
+    assert('slide43 has a:srcRect', hasTag(slide43, 'a:srcRect'));
+    assert('slide43 has crop l="25000"', slide43.includes('l="25000"'));
+    assert('slide43 has crop t="25000"', slide43.includes('t="25000"'));
+    // Alpha
+    assert('slide43 has a:alphaModFix', hasTag(slide43, 'a:alphaModFix'));
+    assert('slide43 has amt="50000"', slide43.includes('amt="50000"'));
+    assert('slide43 has amt="75000"', slide43.includes('amt="75000"'));
+    // AutoShape with blipFill crop
+    assert('slide43 has a:blipFill', hasTag(slide43, 'a:blipFill'));
+    assert('slide43 has blipFill crop t="50000"', slide43.includes('t="50000"'));
+  }
+
+  // ── Slide 44: External image reference ──
+  {
+    console.log('\n── test_features.pptx — Slide 44: external image reference ──');
+    const slide44 = textFiles.get('ppt/slides/slide44.xml');
+    assert('slide44 exists', !!slide44);
+    assert('slide44 has p:pic', hasTag(slide44, 'p:pic'));
+    const rels44 = textFiles.get('ppt/slides/_rels/slide44.xml.rels');
+    assert('slide44 rels exists', !!rels44);
+    assert('slide44 has TargetMode="External"', rels44.includes('TargetMode="External"'));
+    assert('slide44 has wikimedia URL', rels44.includes('upload.wikimedia.org'));
+    assert('slide44 has picsum URL', rels44.includes('picsum.photos'));
   }
 }
 

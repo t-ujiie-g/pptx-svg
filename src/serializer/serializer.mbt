@@ -47,8 +47,8 @@ fn xml_escape(s : String) -> String {
 ///  No solidFill wrapper — used for gradient stops, pattFill fg/bg, etc.
 fn serialize_color_inner(color : @ooxml.Color) -> String {
   if color.alpha < 255 {
-    // alpha → OOXML 1/1000th percent: alpha * 100000 / 255
-    let alpha_val = color.alpha * 100000 / 255
+    // alpha → OOXML 1/1000th percent: alpha * pct_100 / 255
+    let alpha_val = color.alpha * @ooxml.pct_100 / 255
     "<a:srgbClr val=\"" +
     color.to_hex_rgb() +
     "\"><a:alpha val=\"" +
@@ -134,7 +134,13 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
 ///|
 fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
   let mut out = "<a:blipFill>"
-  out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
+  if bf.alpha > 0 && bf.alpha < @ooxml.pct_100 {
+    out = out + "<a:blip r:embed=\"" + bf.rid + "\">" +
+      "<a:alphaModFix amt=\"" + int_to_str(bf.alpha) + "\"/>" +
+      "</a:blip>"
+  } else {
+    out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
+  }
   if bf.src_l > 0 || bf.src_t > 0 || bf.src_r > 0 || bf.src_b > 0 {
     out = out + "<a:srcRect"
     if bf.src_l > 0 {

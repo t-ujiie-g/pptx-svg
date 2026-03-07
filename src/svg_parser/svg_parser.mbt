@@ -472,6 +472,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
       tile_sy: blip_tile_sy,
       tile_flip: blip_tile_flip,
       tile_algn: blip_tile_algn,
+      alpha: get_dai(g_node, "blip-alpha"),
     }
   }
   // PatternFill from data attributes

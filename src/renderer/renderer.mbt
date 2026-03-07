@@ -63,7 +63,7 @@ let baseline_shift_extra_denom : Int = 5
 // ── OOXML unit constants ─────────────────────────────────────────────────────
 
 ///|
-let ooxml_pct_denom : Int = 100000 // OOXML percentage denominator (100000 = 100%)
+let ooxml_pct_denom : Int = @ooxml.pct_100 // OOXML percentage denominator (100000 = 100%)
 
 ///|
 let ooxml_angle_unit : Int = 60000 // 1 degree = 60000 units in OOXML
@@ -450,9 +450,82 @@ fn mime_from_ext(path : String) -> String {
   }
 }
 
-// ── Scale ratio formatting (for group transforms) ──────────────────────────
+///|
+/// Resolve image relationship to an href string (external URL or base64 data URI).
+/// Returns "" if the image cannot be resolved.
+fn resolve_image_href(
+  rels : Array[@ooxml.Relationship],
+  rid : String,
+) -> String {
+  let rel = @ooxml.find_rel(rels, rid)
+  let target = match rel {
+    Some(r) => r.target
+    None => ""
+  }
+  if target.is_empty() {
+    return ""
+  }
+  match rel {
+    Some(r) =>
+      if r.target_mode == "External" {
+        return target
+      }
+    None => ()
+  }
+  let img_path = resolve_image_path(target)
+  let b64 = @ffi.ffi_get_file_base64(img_path)
+  if b64.is_empty() {
+    ""
+  } else {
+    let mime = mime_from_ext(img_path)
+    "data:" + mime + ";base64," + b64
+  }
+}
 
-///| Format an integer ratio num/den as a decimal string (e.g. "1.5", "0.75").
+///|
+/// Generate SVG opacity attribute from BlipFill alpha value.
+/// Returns "" if fully opaque or unset.
+fn blip_opacity_attr(bf : @ooxml.BlipFill) -> String {
+  if bf.alpha > 0 && bf.alpha < ooxml_pct_denom {
+    " opacity=\"" + format_pct_decimal(bf.alpha) + "\""
+  } else {
+    ""
+  }
+}
+
+///|
+/// Render a cropped image as SVG (clipPath + scaled image).
+fn render_cropped_image(
+  bf : @ooxml.BlipFill,
+  href : String,
+  x_p : Int,
+  y_p : Int,
+  cx_p : Int,
+  cy_p : Int,
+  clip_id : String,
+  opacity : String,
+  rot : String,
+) -> String {
+  let vis_w = ooxml_pct_denom - bf.src_l - bf.src_r
+  let vis_h = ooxml_pct_denom - bf.src_t - bf.src_b
+  let img_w = if vis_w > 0 { cx_p * ooxml_pct_denom / vis_w } else { cx_p }
+  let img_h = if vis_h > 0 { cy_p * ooxml_pct_denom / vis_h } else { cy_p }
+  let img_x = x_p - img_w * bf.src_l / ooxml_pct_denom
+  let img_y = y_p - img_h * bf.src_t / ooxml_pct_denom
+  "<defs><clipPath id=\"" + clip_id + "\">" +
+  "<rect" + ai("x", x_p) + ai("y", y_p) +
+  ai("width", cx_p) + ai("height", cy_p) + "/>" +
+  "</clipPath></defs>" +
+  "<image" +
+  ai("x", img_x) + ai("y", img_y) +
+  ai("width", img_w) + ai("height", img_h) +
+  " preserveAspectRatio=\"none\"" +
+  a("href", href) +
+  " clip-path=\"url(#" + clip_id + ")\"" +
+  opacity + rot + "/>"
+}
+
+// ── Scale ratio formatting (for group transforms) ──────────────────────────
 
 ///|
 /// Used for SVG scale() transform values.
@@ -483,6 +556,12 @@ fn format_ratio(num : Int, den : Int) -> String {
     int_to_str(d1)
   }
   int_to_str(whole) + "." + f
+}
+
+///|
+/// Format OOXML percentage (0-100000) as decimal string (e.g. 50000 → "0.5").
+fn format_pct_decimal(val : Int) -> String {
+  format_ratio(val, ooxml_pct_denom)
 }
 
 ///|
@@ -1074,7 +1153,8 @@ fn render_shape(
       dai("blip-tile-sx", shape.blip_fill.tile_sx) +
       dai("blip-tile-sy", shape.blip_fill.tile_sy) +
       da("blip-tile-flip", shape.blip_fill.tile_flip) +
-      da("blip-tile-algn", shape.blip_fill.tile_algn)
+      da("blip-tile-algn", shape.blip_fill.tile_algn) +
+      dai("blip-alpha", shape.blip_fill.alpha)
     } else {
       ""
     }) +
@@ -1238,51 +1318,48 @@ fn render_shape(
       // BlipFill: render image inside shape
       let blip_svg = if not(shape.blip_fill.is_none()) {
         let bf = shape.blip_fill
-        let target = @ooxml.find_rel_target(rels, bf.rid)
-        if target.is_empty() {
+        let href = resolve_image_href(rels, bf.rid)
+        if href.is_empty() {
           ""
         } else {
-          let img_path = resolve_image_path(target)
-          let b64 = @ffi.ffi_get_file_base64(img_path)
-          if b64.is_empty() {
-            ""
+          let opacity = blip_opacity_attr(bf)
+          if not(bf.stretch) && bf.tile_sx > 0 {
+            // Tile mode: create <pattern> definition
+            let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
+            let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
+            let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
+            let th = int_to_str(if tile_h > 0 { tile_h } else { cy_p })
+            "<defs><pattern id=\"" +
+            blip_tile_id +
+            "\" patternUnits=\"userSpaceOnUse\"" +
+            ai("x", x_p) +
+            ai("y", y_p) +
+            " width=\"" +
+            tw +
+            "\" height=\"" +
+            th +
+            "\">" +
+            "<image width=\"" +
+            tw +
+            "\" height=\"" +
+            th +
+            "\" preserveAspectRatio=\"none\"" +
+            a("href", href) +
+            opacity +
+            "/>" +
+            "</pattern></defs>"
+          } else if bf.has_crop() {
+            let clip_id = "blipclip_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+            render_cropped_image(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot)
           } else {
-            let mime = mime_from_ext(img_path)
-            if not(bf.stretch) && bf.tile_sx > 0 {
-              // Tile mode: create <pattern> definition (will be added to defs)
-              let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
-              let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
-              let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
-              let th = int_to_str(if tile_h > 0 { tile_h } else { cy_p })
-              "<defs><pattern id=\"" +
-              blip_tile_id +
-              "\" patternUnits=\"userSpaceOnUse\"" +
-              ai("x", x_p) +
-              ai("y", y_p) +
-              " width=\"" +
-              tw +
-              "\" height=\"" +
-              th +
-              "\">" +
-              "<image width=\"" +
-              tw +
-              "\" height=\"" +
-              th +
-              "\" preserveAspectRatio=\"none\"" +
-              a("href", "data:" + mime + ";base64," + b64) +
-              "/>" +
-              "</pattern></defs>"
-            } else {
-              "<image" +
-              ai("x", x_p) +
-              ai("y", y_p) +
-              ai("width", cx_p) +
-              ai("height", cy_p) +
-              " preserveAspectRatio=\"none\"" +
-              a("href", "data:" + mime + ";base64," + b64) +
-              rot +
-              "/>"
-            }
+            "<image" +
+            ai("x", x_p) +
+            ai("y", y_p) +
+            ai("width", cx_p) +
+            ai("height", cy_p) +
+            " preserveAspectRatio=\"none\"" +
+            a("href", href) +
+            opacity + rot + "/>"
           }
         }
       } else {
@@ -1323,7 +1400,7 @@ fn render_shape(
       )
     }
     @ooxml.ShapeKind::Picture(rid) => {
-      let target = @ooxml.find_rel_target(rels, rid)
+      let href = resolve_image_href(rels, rid)
       let placeholder = "<rect" +
         ai("x", x_p) +
         ai("y", y_p) +
@@ -1334,24 +1411,23 @@ fn render_shape(
         "\"" +
         rot +
         "/>"
-      if target.is_empty() {
+      if href.is_empty() {
         placeholder
       } else {
-        let img_path = resolve_image_path(target)
-        let b64 = @ffi.ffi_get_file_base64(img_path)
-        if b64.is_empty() {
-          placeholder
+        let bf = shape.blip_fill
+        let opacity = blip_opacity_attr(bf)
+        if bf.has_crop() {
+          let clip_id = "picclip_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+          render_cropped_image(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot)
         } else {
-          let mime = mime_from_ext(img_path)
           "<image" +
           ai("x", x_p) +
           ai("y", y_p) +
           ai("width", cx_p) +
           ai("height", cy_p) +
           " preserveAspectRatio=\"xMidYMid meet\"" +
-          a("href", "data:" + mime + ";base64," + b64) +
-          rot +
-          "/>"
+          a("href", href) +
+          opacity + rot + "/>"
         }
       }
     }

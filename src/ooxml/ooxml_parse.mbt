@@ -349,79 +349,93 @@ fn parse_stroke(
 // ── Blip fill parser ──────────────────────────────────────────────────────────
 
 ///|
+/// Parse blipFill node internals → BlipFill (shared by a:blipFill and p:blipFill).
+fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
+  let bf_ch = @xml.get_children(bf_node)
+  let mut rid = ""
+  let mut alpha = 0
+  match @xml.find_child(bf_ch, "a:blip") {
+    None => ()
+    Some(blip) => {
+      rid = match @xml.get_attr(blip, "r:embed") {
+        Some(v) => v
+        None => ""
+      }
+      // Parse a:alphaModFix from blip children
+      let blip_ch = @xml.get_children(blip)
+      match @xml.find_child(blip_ch, "a:alphaModFix") {
+        Some(amf) => alpha = attr_int(amf, "amt")
+        None => ()
+      }
+    }
+  }
+  if rid.is_empty() {
+    return BlipFill::none()
+  }
+  let stretch = match @xml.find_child(bf_ch, "a:stretch") {
+    Some(_) => true
+    None => false
+  }
+  let mut src_l = 0
+  let mut src_t = 0
+  let mut src_r = 0
+  let mut src_b = 0
+  match @xml.find_child(bf_ch, "a:srcRect") {
+    Some(sr) => {
+      src_l = attr_int(sr, "l")
+      src_t = attr_int(sr, "t")
+      src_r = attr_int(sr, "r")
+      src_b = attr_int(sr, "b")
+    }
+    None => ()
+  }
+  // Parse a:tile element
+  let mut tile_tx = 0
+  let mut tile_ty = 0
+  let mut tile_sx = 0
+  let mut tile_sy = 0
+  let mut tile_flip = ""
+  let mut tile_algn = ""
+  match @xml.find_child(bf_ch, "a:tile") {
+    Some(tile) => {
+      tile_tx = attr_int(tile, "tx")
+      tile_ty = attr_int(tile, "ty")
+      tile_sx = attr_int(tile, "sx")
+      tile_sy = attr_int(tile, "sy")
+      tile_flip = match @xml.get_attr(tile, "flip") {
+        Some(v) => v
+        None => ""
+      }
+      tile_algn = match @xml.get_attr(tile, "algn") {
+        Some(v) => v
+        None => ""
+      }
+    }
+    None => ()
+  }
+  {
+    rid,
+    stretch,
+    src_l,
+    src_t,
+    src_r,
+    src_b,
+    tile_tx,
+    tile_ty,
+    tile_sx,
+    tile_sy,
+    tile_flip,
+    tile_algn,
+    alpha,
+  }
+}
+
+///|
 /// Parse a:blipFill from spPr children → BlipFill.
 fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
   match @xml.find_child(nodes, "a:blipFill") {
     None => BlipFill::none()
-    Some(bf_node) => {
-      let bf_ch = @xml.get_children(bf_node)
-      let rid = match @xml.find_child(bf_ch, "a:blip") {
-        None => ""
-        Some(blip) =>
-          match @xml.get_attr(blip, "r:embed") {
-            Some(v) => v
-            None => ""
-          }
-      }
-      if rid.is_empty() {
-        return BlipFill::none()
-      }
-      let stretch = match @xml.find_child(bf_ch, "a:stretch") {
-        Some(_) => true
-        None => false
-      }
-      let mut src_l = 0
-      let mut src_t = 0
-      let mut src_r = 0
-      let mut src_b = 0
-      match @xml.find_child(bf_ch, "a:srcRect") {
-        Some(sr) => {
-          src_l = attr_int(sr, "l")
-          src_t = attr_int(sr, "t")
-          src_r = attr_int(sr, "r")
-          src_b = attr_int(sr, "b")
-        }
-        None => ()
-      }
-      // Parse a:tile element
-      let mut tile_tx = 0
-      let mut tile_ty = 0
-      let mut tile_sx = 0
-      let mut tile_sy = 0
-      let mut tile_flip = ""
-      let mut tile_algn = ""
-      match @xml.find_child(bf_ch, "a:tile") {
-        Some(tile) => {
-          tile_tx = attr_int(tile, "tx")
-          tile_ty = attr_int(tile, "ty")
-          tile_sx = attr_int(tile, "sx")
-          tile_sy = attr_int(tile, "sy")
-          tile_flip = match @xml.get_attr(tile, "flip") {
-            Some(v) => v
-            None => ""
-          }
-          tile_algn = match @xml.get_attr(tile, "algn") {
-            Some(v) => v
-            None => ""
-          }
-        }
-        None => ()
-      }
-      {
-        rid,
-        stretch,
-        src_l,
-        src_t,
-        src_r,
-        src_b,
-        tile_tx,
-        tile_ty,
-        tile_sx,
-        tile_sy,
-        tile_flip,
-        tile_algn,
-      }
-    }
+    Some(bf_node) => parse_blip_fill_node(bf_node)
   }
 }
 
@@ -572,20 +586,12 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     Some(n) => n
   }
   let transform = parse_xfrm(@xml.get_children(sppr))
-  // Image relationship ID from <p:blipFill><a:blip r:embed="rIdN"/>
-  let rid = match @xml.find_child(ch, "p:blipFill") {
-    None => ""
-    Some(bf) =>
-      match @xml.find_child(@xml.get_children(bf), "a:blip") {
-        None => ""
-        Some(blip) =>
-          match @xml.get_attr(blip, "r:embed") {
-            Some(v) => v
-            None => ""
-          }
-      }
+  // Parse p:blipFill (same structure as a:blipFill) for rid, crop, alpha
+  let bf = match @xml.find_child(ch, "p:blipFill") {
+    None => BlipFill::none()
+    Some(bf_node) => parse_blip_fill_node(bf_node)
   }
-  Shape::default_with(ShapeKind::Picture(rid), transform)
+  Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
 }
 
 ///|
@@ -1265,8 +1271,12 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
           Some(v) => v
           None => ""
         }
+        let target_mode = match @xml.get_attr(rn, "TargetMode") {
+          Some(v) => v
+          None => ""
+        }
         if not(id.is_empty()) {
-          rels.push({ id, target, type_ })
+          rels.push({ id, target, type_, target_mode })
         }
         i = i + 1
       }
@@ -1287,6 +1297,20 @@ pub fn find_rel_target(rels : Array[Relationship], id : String) -> String {
     i = i + 1
   }
   ""
+}
+
+///|
+/// Look up a full Relationship by ID.
+pub fn find_rel(rels : Array[Relationship], id : String) -> Relationship? {
+  let n = rels.length()
+  let mut i = 0
+  while i < n {
+    if rels[i].id == id {
+      return Some(rels[i])
+    }
+    i = i + 1
+  }
+  None
 }
 
 // ── Slide size ────────────────────────────────────────────────────────────────

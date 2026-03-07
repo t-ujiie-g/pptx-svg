@@ -45,6 +45,8 @@ Slides:
  40. Connection points (a:cxnLst) — custom geometry with connection points + connector refs
  41. Table cell merge (gridSpan + rowSpan/vMerge) + borders + margins + anchor
  42. Table diagonal borders + tblPr flags (firstRow/lastRow/bandRow/bandCol) + tblStyleId
+ 43. Image crop (srcRect) + alpha (alphaModFix) — p:pic crop/alpha, AutoShape blipFill crop
+ 44. External image reference (TargetMode="External") — Wikimedia + picsum.photos
 """
 
 from pptx import Presentation
@@ -3116,6 +3118,215 @@ lbl42 = slide42.shapes.add_textbox(Inches(0.3), Inches(6.5), Inches(9), Inches(0
 lbl42.text_frame.paragraphs[0].text = "Table: diagonal borders (lnTlToBr/lnBlToTr) + tblPr flags + tblStyleId"
 lbl42.text_frame.paragraphs[0].font.size = Pt(10)
 lbl42.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
+
+# ── Slide 43: Image crop (srcRect) + alpha (alphaModFix) ──────────────────────
+
+slide43 = prs.slides.add_slide(blank)
+
+# Create a test image: 2x2 pixel PNG with 4 colored quadrants (red/green/blue/yellow)
+import struct, zlib
+def make_test_png_4color():
+    """Create a 4x4 PNG with colored quadrants: TL=red, TR=green, BL=blue, BR=yellow."""
+    width, height = 4, 4
+    def px(r, g, b):
+        return bytes([r, g, b])
+    rows = []
+    for y in range(height):
+        row = b'\x00'  # filter byte
+        for x in range(width):
+            if y < 2 and x < 2:
+                row += px(255, 0, 0)      # TL = red
+            elif y < 2 and x >= 2:
+                row += px(0, 255, 0)      # TR = green
+            elif y >= 2 and x < 2:
+                row += px(0, 0, 255)      # BL = blue
+            else:
+                row += px(255, 255, 0)    # BR = yellow
+        rows.append(row)
+    raw = b''.join(rows)
+    def png_chunk(chunk_type, data):
+        c = chunk_type + data
+        crc = struct.pack('>I', zlib.crc32(c) & 0xFFFFFFFF)
+        return struct.pack('>I', len(data)) + c + crc
+    ihdr = struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
+    return (b'\x89PNG\r\n\x1a\n' +
+            png_chunk(b'IHDR', ihdr) +
+            png_chunk(b'IDAT', zlib.compress(raw)) +
+            png_chunk(b'IEND', b''))
+
+test_png = make_test_png_4color()
+tmp_img43 = os.path.join(tempfile.gettempdir(), '_test_crop.png')
+with open(tmp_img43, 'wb') as f:
+    f.write(test_png)
+
+img_part43, img_rid43 = slide43.part.get_or_add_image_part(tmp_img43)
+os.unlink(tmp_img43)
+
+# Shape 1: Picture with srcRect crop (crop 25% from each side — shows center)
+ns_p = '{http://schemas.openxmlformats.org/presentationml/2006/main}'
+ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+ns_r = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+
+pic43_crop = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="100" name="CropPic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid43}"/>
+    <a:srcRect l="25000" t="25000" r="25000" b="25000"/>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="457200" y="914400"/>
+      <a:ext cx="2743200" cy="2743200"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+# Shape 2: Picture with alphaModFix (50% opacity)
+pic43_alpha = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="101" name="AlphaPic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid43}">
+      <a:alphaModFix amt="50000"/>
+    </a:blip>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="3657600" y="914400"/>
+      <a:ext cx="2743200" cy="2743200"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+# Shape 3: Picture with crop + alpha combined (crop left 50%, alpha 75%)
+pic43_both = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="102" name="CropAlphaPic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid43}">
+      <a:alphaModFix amt="75000"/>
+    </a:blip>
+    <a:srcRect l="50000"/>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="6858000" y="914400"/>
+      <a:ext cx="2286000" cy="2743200"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+# Shape 4: AutoShape with blipFill + srcRect crop
+s43_autoshape = slide43.shapes.add_shape(1, Inches(0.5), Inches(4.5), Inches(3), Inches(2.5))
+s43_autoshape.text = ""
+set_fill_xml(s43_autoshape, f'''<a:blipFill xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <a:blip r:embed="{img_rid43}"/>
+  <a:srcRect l="0" t="50000" r="0" b="0"/>
+  <a:stretch><a:fillRect/></a:stretch>
+</a:blipFill>''')
+
+spTree43 = slide43._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree43.append(etree.fromstring(pic43_crop))
+spTree43.append(etree.fromstring(pic43_alpha))
+spTree43.append(etree.fromstring(pic43_both))
+
+lbl43 = slide43.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl43.text_frame.paragraphs[0].text = "Slide 43: Image crop (srcRect) + alpha (alphaModFix)"
+lbl43.text_frame.paragraphs[0].font.size = Pt(18)
+lbl43.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 44: External image reference (TargetMode="External") ───────────────
+
+slide44 = prs.slides.add_slide(blank)
+
+# Use stable, CORS-friendly public image URLs
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+
+# Image 1: Wikimedia Commons PNG (small, stable, CORS-friendly)
+ext_url1 = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png"
+ext_rid1 = slide44.part.relate_to(ext_url1, RT.IMAGE, is_external=True)
+
+# Image 2: picsum.photos direct image (stable, specific ID = no redirect)
+ext_url2 = "https://picsum.photos/id/237/200/300"
+ext_rid2 = slide44.part.relate_to(ext_url2, RT.IMAGE, is_external=True)
+
+pic44_ext1 = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="200" name="ExtPic1"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{ext_rid1}"/>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="457200" y="914400"/>
+      <a:ext cx="3657600" cy="3657600"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+pic44_ext2 = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="201" name="ExtPic2"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{ext_rid2}"/>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="4572000" y="914400"/>
+      <a:ext cx="2743200" cy="3657600"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+spTree44 = slide44._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree44.append(etree.fromstring(pic44_ext1))
+spTree44.append(etree.fromstring(pic44_ext2))
+
+lbl44 = slide44.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl44.text_frame.paragraphs[0].text = "Slide 44: External image reference (TargetMode=External)"
+lbl44.text_frame.paragraphs[0].font.size = Pt(18)
+lbl44.text_frame.paragraphs[0].font.bold = True
+
+lbl44b = slide44.shapes.add_textbox(Inches(0.5), Inches(5.2), Inches(9), Inches(1.5))
+lbl44b.text_frame.paragraphs[0].text = f"Left: Wikimedia Commons PNG\nRight: picsum.photos (id=237)"
+lbl44b.text_frame.paragraphs[0].font.size = Pt(12)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

@@ -275,6 +275,7 @@ pub(all) struct BlipFill {
   tile_sy : Int // a:tile sy scale
   tile_flip : String // "none","x","y","xy"; "" = unset
   tile_algn : String // alignment: "tl","t","tr","l","ctr","r","bl","b","br"; "" = unset
+  alpha : Int // a:alphaModFix amt (0-100000); 100000 = fully opaque; 0 = default (treat as opaque)
 }
 
 ///|
@@ -292,12 +293,18 @@ pub fn BlipFill::none() -> BlipFill {
     tile_sy: 0,
     tile_flip: "",
     tile_algn: "",
+    alpha: 0,
   }
 }
 
 ///|
 pub fn BlipFill::is_none(self : BlipFill) -> Bool {
   self.rid.is_empty()
+}
+
+///|
+pub fn BlipFill::has_crop(self : BlipFill) -> Bool {
+  self.src_l > 0 || self.src_t > 0 || self.src_r > 0 || self.src_b > 0
 }
 
 // ── Pattern fill ────────────────────────────────────────────────────────
@@ -1149,6 +1156,45 @@ pub fn Shape::default_with(
   }
 }
 
+///|
+/// Create a default Shape with a specific BlipFill (for Picture shapes with crop/alpha).
+pub fn Shape::default_with_blip(
+  kind : ShapeKind,
+  transform : ShapeTransform,
+  blip_fill : BlipFill,
+) -> Shape {
+  {
+    kind,
+    transform,
+    fill: Color::none(),
+    grad_fill: GradientFill::none(),
+    blip_fill,
+    patt_fill: PatternFill::none(),
+    stroke: Color::none(),
+    stroke_w: 0,
+    stroke_dash: "",
+    stroke_cap: "",
+    stroke_join: "",
+    stroke_miter_limit: 0,
+    stroke_head_type: "",
+    stroke_head_w: "",
+    stroke_head_len: "",
+    stroke_tail_type: "",
+    stroke_tail_w: "",
+    stroke_tail_len: "",
+    stroke_cmpd: "",
+    stroke_no_fill: false,
+    paragraphs: [],
+    body_props: BodyProps::default(),
+    ph_type: "",
+    ph_idx: -1,
+    st_cxn_id: -1,
+    st_cxn_idx: -1,
+    end_cxn_id: -1,
+    end_cxn_idx: -1,
+  }
+}
+
 // ── Slide data ────────────────────────────────────────────────────────────────
 
 ///|
@@ -1178,4 +1224,5 @@ pub(all) struct Relationship {
   id : String
   target : String
   type_ : String
+  target_mode : String // "External" for external URLs; "" = internal
 }
