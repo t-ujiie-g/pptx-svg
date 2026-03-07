@@ -336,42 +336,11 @@ fn stroke_markers(
   result
 }
 
-// Escape text for SVG content.
+// Escape text for SVG content — delegates to shared xml_escape in xml package.
 
 ///|
 fn svg_escape(s : String) -> String {
-  let len = s.length()
-  let mut needs = false
-  let mut k = 0
-  while k < len {
-    let c = s.get_char(k).unwrap()
-    if c == '<' || c == '>' || c == '&' || c == '"' {
-      needs = true
-      break
-    }
-    k = k + 1
-  }
-  if not(needs) {
-    return s
-  }
-  let mut result = ""
-  let mut i = 0
-  while i < len {
-    let c = s.get_char(i).unwrap()
-    if c == '<' {
-      result = result + "&lt;"
-    } else if c == '>' {
-      result = result + "&gt;"
-    } else if c == '&' {
-      result = result + "&amp;"
-    } else if c == '"' {
-      result = result + "&quot;"
-    } else {
-      result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
-    }
-    i = i + 1
-  }
-  result
+  @xml.xml_escape(s)
 }
 
 // ── EMU → pixel conversion ────────────────────────────────────────────────────

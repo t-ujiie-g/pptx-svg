@@ -1,5 +1,4 @@
 import {
   "pptx-svg/xml" @xml,
   "pptx-svg/ooxml" @ooxml,
-  "pptx-svg/ffi" @ffi,
 }

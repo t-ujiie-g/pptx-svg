@@ -602,6 +602,45 @@ pub fn str_substring(s : String, from : Int, to : Int) -> String {
 }
 
 ///|
+/// Escape XML special characters: < > & " '
+pub fn xml_escape(s : String) -> String {
+  let len = s.length()
+  let mut needs = false
+  let mut k = 0
+  while k < len {
+    let c = s.get_char(k).unwrap()
+    if c == '<' || c == '>' || c == '&' || c == '"' || c == '\'' {
+      needs = true
+      break
+    }
+    k = k + 1
+  }
+  if not(needs) {
+    return s
+  }
+  let mut result = ""
+  let mut i = 0
+  while i < len {
+    let c = s.get_char(i).unwrap()
+    if c == '<' {
+      result = result + "&lt;"
+    } else if c == '>' {
+      result = result + "&gt;"
+    } else if c == '&' {
+      result = result + "&amp;"
+    } else if c == '"' {
+      result = result + "&quot;"
+    } else if c == '\'' {
+      result = result + "&apos;"
+    } else {
+      result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    }
+    i = i + 1
+  }
+  result
+}
+
+///|
 /// Split a string by spaces into an array of tokens.
 pub fn split_by_space(s : String) -> Array[String] {
   let tokens : Array[String] = []
