@@ -40,11 +40,13 @@
 
 ## 7. 画像 — 高度機能 [P2]
 
+- [ ] 画像クロップ描画 — `srcRect` はパース済み(`BlipFill.src_l/t/r/b`)だが SVG 未反映
 - [ ] SVG 画像 (`a:blip` + SVG extension `a:extLst`)
 - [ ] 画像エフェクト (`a:clrChange`, brightness/contrast)
 - [ ] Duotone (`a:duotone`)
 - [ ] 画像のアルファ (`a:alphaModFix`)
 - [ ] EMF / WMF / TIFF — ラスタライズ
+- [ ] 外部画像参照 (`TargetMode="External"`)
 
 ---
 
@@ -56,6 +58,7 @@
 - [ ] ソフトエッジ (`a:softEdge rad`) → SVG feGaussianBlur
 - [ ] リフレクション (`a:reflection`)
 - [ ] 3D — ベベル / 押し出し / 照明 (ベストエフォート)
+- [ ] テキスト単位の影・エフェクト (`a:rPr` 内 `a:effectLst`)
 
 ---
 
@@ -70,23 +73,44 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 ---
 
-## 10. SmartArt [P3]
+## 10. テキスト — 高度機能 [P2]
+
+- [ ] テキストワープ (`a:prstTxWarp`) — WordArt 的な曲線パス上テキスト
+- [ ] テキストアウトライン (`a:rPr/a:ln`) — 文字の輪郭線
+- [ ] テキストグラデーション塗り (`a:rPr/a:gradFill`) — 文字へのグラデーション
+
+---
+
+## 11. スライド・シェイプ — 残機能 [P1]
+
+- [ ] 画像クロップ SVG 描画 (`srcRect` → SVG `<clipPath>` or viewBox)
+- [ ] プレースホルダ自動内容 — 日付 (`ph type="dt"`) / スライド番号 (`sldNum`) / フッター (`ftr`)
+- [ ] 背景 blip/パターン — `p:bg/p:bgPr` の `a:blipFill` / `a:pattFill` (現状 solid+gradient のみ)
+- [ ] シェイプリンク — 図形自体の `a:hlinkClick` / `a:hlinkHover` (テキストリンクとは別)
+- [ ] 線のグラデーション/パターン塗り (`a:ln/a:gradFill`, `a:ln/a:pattFill`)
+- [ ] 複数スライドマスター対応 (現状1つ目のみ読み込み)
+- [ ] カラー修飾子追加 — `comp` / `inv` / `gamma` / `hueMod` (現状 lumMod/lumOff/shade/tint/satMod/alpha)
+
+---
+
+## 12. SmartArt [P3]
 
 - [ ] `dgm:*` (DiagramML) パース + レイアウトアルゴリズム
 - [ ] フォールバック: SmartArt の画像キャッシュ利用
 
 ---
 
-## 11. その他のオブジェクト [P3]
+## 13. その他のオブジェクト [P3]
 
 - [ ] OLE / 埋め込み (`p:oleObj` — フォールバック画像表示)
 - [ ] メディア (ビデオポスターフレーム / オーディオアイコン)
 - [ ] 数式 (OMML `m:oMath`)
 - [ ] スピーカーノート / コメント (API 経由取得)
+- [ ] 埋め込みフォント (`a:fontScheme` + fontdata)
 
 ---
 
-## 12. ライブラリ公開 — 残タスク [P1]
+## 14. ライブラリ公開 — 残タスク [P1]
 
 - [ ] `dist/pptx-svg.wasm` ビルド成果物コピー (ビルドスクリプト)
 - [ ] npm publish ワークフロー
@@ -101,7 +125,7 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 | 優先度 | 内容 | 状態 |
 |--------|------|------|
 | **P0** | マスター/レイアウト継承, テキスト完全対応 | **完了** |
-| **P1** | 塗り/線/グループ/コネクタ/プリセットGeom (~154種)/カスタムGeom/テキスト矩形/接続ポイント/ギア歯 | **完了** |
-| **P1** | テーブル高度機能, ライブラリ公開 | 未着手 |
-| **P2** | 画像高度/エフェクト/チャート | 未着手 |
-| **P3** | SmartArt/OLE/メディア/数式 | 未着手 |
+| **P1** | 塗り/線/グループ/コネクタ/プリセットGeom/カスタムGeom/テキスト矩形/接続ポイント/ギア歯 | **完了** |
+| **P1** | テーブル高度, スライド・シェイプ残機能, ライブラリ公開 | 未着手 |
+| **P2** | 画像高度/エフェクト/チャート/テキスト高度 | 未着手 |
+| **P3** | SmartArt/OLE/メディア/数式/ノート/埋め込みフォント | 未着手 |
