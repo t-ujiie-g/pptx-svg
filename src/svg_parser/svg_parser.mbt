@@ -319,7 +319,11 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     @ooxml.ShapeKind::Picture("")
   } else if shape_type == "table" {
     // Table shapes carry no inline data in SVG for now — use empty table
-    let table_data : @ooxml.TableData = { col_widths: [], rows: [] }
+    let table_data : @ooxml.TableData = {
+      col_widths: [], rows: [], style_id: "",
+      first_row: false, last_row: false, first_col: false,
+      last_col: false, band_row: false, band_col: false,
+    }
     @ooxml.ShapeKind::TableShape(table_data)
   } else if shape_type == "group" {
     // Parse group children from inner <g> containing child shape <g> elements

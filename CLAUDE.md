@@ -96,9 +96,11 @@ TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_s
 TextRun { text, bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid }
 BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap, rot, vert, num_cols, col_spacing }
 
-TableData { col_widths: Array[Int], rows: Array[TableRow] }
+TableData { col_widths: Array[Int], rows: Array[TableRow], style_id: String, first_row/last_row/first_col/last_col/band_row/band_col: Bool }
+TableStyleCell { fill, grad_fill, bdr_l/r/t/b_w, bdr_l/r/t/b_color, bold, italic, font_color }
+TableStyleDef { id, whole_tbl, band1_h, band2_h, band1_v, band2_v, first_row, last_row, first_col, last_col: TableStyleCell }
 TableRow { height: Int, cells: Array[TableCell] }
-TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_span: Int, v_merge: Bool, bdr_l/r/t/b_w: Int, bdr_l/r/t/b_color: Color, mar_l/r/t/b: Int, anchor: String }
+TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_span: Int, v_merge: Bool, bdr_l/r/t/b_w: Int, bdr_l/r/t/b_color: Color, bdr_tl_br_w/color, bdr_bl_tr_w/color, mar_l/r/t/b: Int, anchor: String }
 
 Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
 ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }

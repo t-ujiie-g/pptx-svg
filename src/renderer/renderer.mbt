@@ -975,6 +975,7 @@ fn render_shape(
   scale : Int,
   shape_idx : Int,
   theme : @ooxml.ThemeData,
+  table_styles : Array[@ooxml.TableStyleDef],
 ) -> String {
   let t = shape.transform
   let x_p = px(t.x, scale)
@@ -1355,9 +1356,9 @@ fn render_shape(
       }
     }
     @ooxml.ShapeKind::TableShape(table) =>
-      render_table(table, t, scale, theme, rels)
+      render_table(table, t, scale, theme, rels, table_styles)
     @ooxml.ShapeKind::GroupShape(grp) =>
-      render_group(grp, t, rels, slide_num, scale, shape_idx, theme)
+      render_group(grp, t, rels, slide_num, scale, shape_idx, theme, table_styles)
     _ => ""
   }
 
@@ -1379,6 +1380,7 @@ fn render_group(
   scale : Int,
   shape_idx : Int,
   theme : @ooxml.ThemeData,
+  table_styles : Array[@ooxml.TableStyleDef],
 ) -> String {
   let nc = grp.children.length()
   if nc == 0 {
@@ -1462,7 +1464,7 @@ fn render_group(
         )
     }
     children_svg = children_svg +
-      render_shape(child, rels, slide_num, scale, child_idx, theme)
+      render_shape(child, rels, slide_num, scale, child_idx, theme, table_styles)
     ci = ci + 1
   }
   let defs_section = if defs.is_empty() {
@@ -1491,7 +1493,6 @@ fn render_table_cell_text(
   paragraphs : Array[@ooxml.TextParagraph],
   cell_x : Int,
   cell_y : Int,
-  _cell_w : Int,
   cell_h : Int,
   pad_l : Int,
   pad_t : Int,
@@ -1588,12 +1589,107 @@ fn render_table_border_line(
 }
 
 ///|
+fn eff_bdr_w(cell_w : Int, style_w : Int) -> Int {
+  if cell_w != 0 { cell_w } else { style_w }
+}
+
+///|
+fn eff_bdr_c(cell_c : @ooxml.Color, style_c : @ooxml.Color) -> @ooxml.Color {
+  if not(cell_c.is_none()) { cell_c } else { style_c }
+}
+
+///|
+fn find_table_style(
+  style_id : String,
+  table_styles : Array[@ooxml.TableStyleDef],
+) -> @ooxml.TableStyleDef {
+  if style_id.is_empty() {
+    return @ooxml.TableStyleDef::none()
+  }
+  let n = table_styles.length()
+  let mut i = 0
+  while i < n {
+    if table_styles[i].id == style_id {
+      return table_styles[i]
+    }
+    i = i + 1
+  }
+  @ooxml.TableStyleDef::none()
+}
+
+///|
+fn resolve_table_style_cell(
+  style : @ooxml.TableStyleDef,
+  table : @ooxml.TableData,
+  row_idx : Int,
+  col_idx : Int,
+  nrows : Int,
+  ncols : Int,
+) -> @ooxml.TableStyleCell {
+  // Priority: firstRow/lastRow/firstCol/lastCol > band > wholeTbl
+  // Check special row/column positions first
+  if table.first_row && row_idx == 0 {
+    if not(style.first_row.is_none()) {
+      return style.first_row
+    }
+  }
+  if table.last_row && row_idx == nrows - 1 {
+    if not(style.last_row.is_none()) {
+      return style.last_row
+    }
+  }
+  if table.first_col && col_idx == 0 {
+    if not(style.first_col.is_none()) {
+      return style.first_col
+    }
+  }
+  if table.last_col && col_idx == ncols - 1 {
+    if not(style.last_col.is_none()) {
+      return style.last_col
+    }
+  }
+  // Band rows (skip header row if firstRow is enabled)
+  if table.band_row {
+    let effective_row = if table.first_row { row_idx - 1 } else { row_idx }
+    if effective_row >= 0 {
+      if effective_row % 2 == 0 {
+        if not(style.band1_h.is_none()) {
+          return style.band1_h
+        }
+      } else {
+        if not(style.band2_h.is_none()) {
+          return style.band2_h
+        }
+      }
+    }
+  }
+  // Band columns (skip first col if firstCol is enabled)
+  if table.band_col {
+    let effective_col = if table.first_col { col_idx - 1 } else { col_idx }
+    if effective_col >= 0 {
+      if effective_col % 2 == 0 {
+        if not(style.band1_v.is_none()) {
+          return style.band1_v
+        }
+      } else {
+        if not(style.band2_v.is_none()) {
+          return style.band2_v
+        }
+      }
+    }
+  }
+  // Fallback to wholeTbl
+  style.whole_tbl
+}
+
+///|
 fn render_table(
   table : @ooxml.TableData,
   t : @ooxml.ShapeTransform,
   scale : Int,
   theme : @ooxml.ThemeData,
   rels : Array[@ooxml.Relationship],
+  table_styles : Array[@ooxml.TableStyleDef],
 ) -> String {
   let base_x = px(t.x, scale)
   let base_y = px(t.y, scale)
@@ -1618,6 +1714,8 @@ fn render_table(
     ry_accum = ry_accum + table.rows[ri2].height
     ri2 = ri2 + 1
   }
+  // Look up table style definition
+  let style = find_table_style(table.style_id, table_styles)
   // Render cells (vMerge=true cells are skipped)
   let mut ri = 0
   while ri < nrows {
@@ -1653,11 +1751,17 @@ fn render_table(
       let cx_px = base_x + px(col_x_emu[col_idx], scale)
       let cw = px(merged_w_emu, scale)
       let ch = px(merged_h_emu, scale)
-      // Cell background
-      let cell_fill = if cell.fill.is_none() {
-        "none"
-      } else {
+      // Resolve table style for this cell position
+      let style_cell = resolve_table_style_cell(
+        style, table, ri, col_idx, nrows, ncols,
+      )
+      // Cell background: explicit fill > style fill > none
+      let cell_fill = if not(cell.fill.is_none()) {
         cell.fill.to_css()
+      } else if not(style_cell.fill.is_none()) {
+        style_cell.fill.to_css()
+      } else {
+        "none"
       }
       out = out +
         "<rect" +
@@ -1667,15 +1771,18 @@ fn render_table(
         ai("height", ch) +
         a("fill", cell_fill) +
         " stroke=\"none\"/>"
-      // Cell borders (individual lines)
-      // Top border
-      out = out + render_table_border_line(cx_px, ry, cx_px + cw, ry, cell.bdr_t_w, cell.bdr_t_color, scale)
-      // Bottom border
-      out = out + render_table_border_line(cx_px, ry + ch, cx_px + cw, ry + ch, cell.bdr_b_w, cell.bdr_b_color, scale)
-      // Left border
-      out = out + render_table_border_line(cx_px, ry, cx_px, ry + ch, cell.bdr_l_w, cell.bdr_l_color, scale)
-      // Right border
-      out = out + render_table_border_line(cx_px + cw, ry, cx_px + cw, ry + ch, cell.bdr_r_w, cell.bdr_r_color, scale)
+      // Cell borders: explicit > style > default (top, bottom, left, right)
+      out = out + render_table_border_line(cx_px, ry, cx_px + cw, ry, eff_bdr_w(cell.bdr_t_w, style_cell.bdr_t_w), eff_bdr_c(cell.bdr_t_color, style_cell.bdr_t_color), scale)
+      out = out + render_table_border_line(cx_px, ry + ch, cx_px + cw, ry + ch, eff_bdr_w(cell.bdr_b_w, style_cell.bdr_b_w), eff_bdr_c(cell.bdr_b_color, style_cell.bdr_b_color), scale)
+      out = out + render_table_border_line(cx_px, ry, cx_px, ry + ch, eff_bdr_w(cell.bdr_l_w, style_cell.bdr_l_w), eff_bdr_c(cell.bdr_l_color, style_cell.bdr_l_color), scale)
+      out = out + render_table_border_line(cx_px + cw, ry, cx_px + cw, ry + ch, eff_bdr_w(cell.bdr_r_w, style_cell.bdr_r_w), eff_bdr_c(cell.bdr_r_color, style_cell.bdr_r_color), scale)
+      // Diagonal borders
+      if cell.bdr_tl_br_w > 0 {
+        out = out + render_table_border_line(cx_px, ry, cx_px + cw, ry + ch, cell.bdr_tl_br_w, cell.bdr_tl_br_color, scale)
+      }
+      if cell.bdr_bl_tr_w > 0 {
+        out = out + render_table_border_line(cx_px, ry + ch, cx_px + cw, ry, cell.bdr_bl_tr_w, cell.bdr_bl_tr_color, scale)
+      }
       // Compute cell margins in pixels
       let pad_l = px(if cell.mar_l >= 0 { cell.mar_l } else { default_cell_mar_lr }, scale)
       let pad_t = px(if cell.mar_t >= 0 { cell.mar_t } else { default_cell_mar_tb }, scale)
@@ -1686,7 +1793,6 @@ fn render_table(
           cell.paragraphs,
           cx_px,
           ry,
-          cw,
           ch,
           pad_l,
           pad_t,
@@ -1714,6 +1820,7 @@ pub fn render_slide_svg(
   slide_num : Int,
   theme : @ooxml.ThemeData,
   bg_shapes : Array[@ooxml.Shape],
+  table_styles : Array[@ooxml.TableStyleDef],
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
@@ -1807,7 +1914,7 @@ pub fn render_slide_svg(
   let mut bi = 0
   while bi < nbg {
     bg_shapes_svg = bg_shapes_svg +
-      render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme)
+      render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme, table_styles)
     bi = bi + 1
   }
   // Render slide shapes
@@ -1815,7 +1922,7 @@ pub fn render_slide_svg(
   let mut i = 0
   while i < n {
     shapes_svg = shapes_svg +
-      render_shape(slide.shapes[i], rels, slide_num, scale, i, theme)
+      render_shape(slide.shapes[i], rels, slide_num, scale, i, theme, table_styles)
     i = i + 1
   }
   header + defs_section + bg_rect + bg_shapes_svg + shapes_svg + "</svg>"

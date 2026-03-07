@@ -638,6 +638,10 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let mut bdr_r_color = Color::none()
   let mut bdr_t_color = Color::none()
   let mut bdr_b_color = Color::none()
+  let mut bdr_tl_br_w = 0
+  let mut bdr_tl_br_color = Color::none()
+  let mut bdr_bl_tr_w = 0
+  let mut bdr_bl_tr_color = Color::none()
   match @xml.find_child(ch, "a:tcPr") {
     None => ()
     Some(tcpr) => {
@@ -676,6 +680,13 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
       let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
       bdr_b_w = bw
       bdr_b_color = bc
+      // Diagonal borders
+      let (tlbr_w, tlbr_c) = parse_tc_border(tcpr_ch, "a:lnTlToBr", theme)
+      bdr_tl_br_w = tlbr_w
+      bdr_tl_br_color = tlbr_c
+      let (bltr_w, bltr_c) = parse_tc_border(tcpr_ch, "a:lnBlToTr", theme)
+      bdr_bl_tr_w = bltr_w
+      bdr_bl_tr_color = bltr_c
     }
   }
   {
@@ -683,6 +694,7 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     grid_span, row_span, v_merge,
     bdr_l_w, bdr_r_w, bdr_t_w, bdr_b_w,
     bdr_l_color, bdr_r_color, bdr_t_color, bdr_b_color,
+    bdr_tl_br_w, bdr_tl_br_color, bdr_bl_tr_w, bdr_bl_tr_color,
     mar_l, mar_r, mar_t, mar_b, anchor,
   }
 }
@@ -718,6 +730,29 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
     None => empty_shape()
     Some(tbl_node) => {
       let tbl_ch = @xml.get_children(tbl_node)
+      // Parse table properties from <a:tblPr>
+      let mut style_id = ""
+      let mut first_row = false
+      let mut last_row = false
+      let mut first_col = false
+      let mut last_col = false
+      let mut band_row = false
+      let mut band_col = false
+      match @xml.find_child(tbl_ch, "a:tblPr") {
+        None => ()
+        Some(tbl_pr) => {
+          style_id = match @xml.get_attr(tbl_pr, "tblStyleId") {
+            Some(v) => v
+            None => ""
+          }
+          first_row = attr_int(tbl_pr, "firstRow") == 1
+          last_row = attr_int(tbl_pr, "lastRow") == 1
+          first_col = attr_int(tbl_pr, "firstCol") == 1
+          last_col = attr_int(tbl_pr, "lastCol") == 1
+          band_row = attr_int(tbl_pr, "bandRow") == 1
+          band_col = attr_int(tbl_pr, "bandCol") == 1
+        }
+      }
       // Parse column widths from <a:tblGrid>/<a:gridCol w="...">
       let col_widths : Array[Int] = []
       match @xml.find_child(tbl_ch, "a:tblGrid") {
@@ -751,7 +786,10 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         rows.push({ height: row_h, cells })
         tri = tri + 1
       }
-      let table_data : TableData = { col_widths, rows }
+      let table_data : TableData = {
+        col_widths, rows, style_id,
+        first_row, last_row, first_col, last_col, band_row, band_col,
+      }
       Shape::default_with(ShapeKind::TableShape(table_data), transform)
     }
   }
@@ -1389,4 +1427,125 @@ fn parse_shapes_from_tree(
   theme : ThemeData,
 ) -> Array[Shape] {
   parse_shapes_from_children(@xml.get_children(tree), theme)
+}
+
+// ── Table style parsing ─────────────────────────────────────────────────────
+
+///|
+fn parse_table_style_cell(node : @xml.XmlNode, theme : ThemeData) -> TableStyleCell {
+  let ch = @xml.get_children(node)
+  let mut fill = Color::none()
+  let mut grad_fill = GradientFill::none()
+  let mut bold = false
+  let mut italic = false
+  let mut font_color = Color::none()
+  let mut bdr_l_w = 0
+  let mut bdr_r_w = 0
+  let mut bdr_t_w = 0
+  let mut bdr_b_w = 0
+  let mut bdr_l_color = Color::none()
+  let mut bdr_r_color = Color::none()
+  let mut bdr_t_color = Color::none()
+  let mut bdr_b_color = Color::none()
+  // Parse a:tcPr (cell properties within style)
+  match @xml.find_child(ch, "a:tcPr") {
+    None => ()
+    Some(tcpr) => {
+      let tcpr_ch = @xml.get_children(tcpr)
+      let gf = parse_gradient_fill(tcpr_ch, theme)
+      if not(gf.is_none()) {
+        grad_fill = gf
+      } else {
+        fill = parse_solid_fill(tcpr_ch, theme)
+      }
+      let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
+      bdr_l_w = lw
+      bdr_l_color = lc
+      let (rw, rc) = parse_tc_border(tcpr_ch, "a:lnR", theme)
+      bdr_r_w = rw
+      bdr_r_color = rc
+      let (tw, tc_) = parse_tc_border(tcpr_ch, "a:lnT", theme)
+      bdr_t_w = tw
+      bdr_t_color = tc_
+      let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
+      bdr_b_w = bw
+      bdr_b_color = bc
+    }
+  }
+  // Parse a:tcTxBody → a:lstStyle / a:defRPr for font style
+  match @xml.find_child(ch, "a:tcTxBody") {
+    None => ()
+    Some(txb) => {
+      let txb_ch = @xml.get_children(txb)
+      // Look for a:lstStyle → a:defPPr → a:defRPr or direct a:p → a:pPr → a:defRPr
+      match @xml.find_child(txb_ch, "a:lstStyle") {
+        None => ()
+        Some(lst) => {
+          let lst_ch = @xml.get_children(lst)
+          // Check lvl1pPr
+          match @xml.find_child(lst_ch, "a:lvl1pPr") {
+            None => ()
+            Some(ppr) => {
+              match @xml.find_child(@xml.get_children(ppr), "a:defRPr") {
+                None => ()
+                Some(rpr) => {
+                  bold = attr_int(rpr, "b") == 1
+                  italic = attr_int(rpr, "i") == 1
+                  font_color = parse_solid_fill(@xml.get_children(rpr), theme)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  {
+    fill, grad_fill,
+    bdr_l_w, bdr_r_w, bdr_t_w, bdr_b_w,
+    bdr_l_color, bdr_r_color, bdr_t_color, bdr_b_color,
+    bold, italic, font_color,
+  }
+}
+
+///|
+pub fn parse_table_styles(xml_str : String, theme : ThemeData) -> Array[TableStyleDef] {
+  let styles : Array[TableStyleDef] = []
+  let nodes = @xml.parse_xml(xml_str)
+  // root = <a:tblStyleLst>
+  let lst_node = match @xml.find_child(nodes, "a:tblStyleLst") {
+    Some(n) => n
+    None => return styles // no table styles
+  }
+  let style_nodes = @xml.find_children(@xml.get_children(lst_node), "a:tblStyle")
+  let ns = style_nodes.length()
+  let mut si = 0
+  while si < ns {
+    let sn = style_nodes[si]
+    let id = match @xml.get_attr(sn, "styleId") {
+      Some(v) => v
+      None => ""
+    }
+    let sn_ch = @xml.get_children(sn)
+    let parse = fn(tag : String) -> TableStyleCell {
+      match @xml.find_child(sn_ch, tag) {
+        Some(n) => parse_table_style_cell(n, theme)
+        None => TableStyleCell::none()
+      }
+    }
+    styles.push({
+      id,
+      whole_tbl: parse("a:wholeTbl"),
+      band1_h: parse("a:band1H"),
+      band2_h: parse("a:band2H"),
+      band1_v: parse("a:band1V"),
+      band2_v: parse("a:band2V"),
+      first_row: parse("a:firstRow"),
+      last_row: parse("a:lastRow"),
+      first_col: parse("a:firstCol"),
+      last_col: parse("a:lastCol"),
+    })
+    si = si + 1
+  }
+  styles
 }

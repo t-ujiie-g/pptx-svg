@@ -844,6 +844,11 @@ pub(all) struct TableCell {
   bdr_r_color : Color
   bdr_t_color : Color
   bdr_b_color : Color
+  // Diagonal borders
+  bdr_tl_br_w : Int // top-left to bottom-right
+  bdr_tl_br_color : Color
+  bdr_bl_tr_w : Int // bottom-left to top-right
+  bdr_bl_tr_color : Color
   // Cell margins in EMU (-1 = use default)
   mar_l : Int
   mar_r : Int
@@ -863,6 +868,75 @@ pub(all) struct TableRow {
 pub(all) struct TableData {
   col_widths : Array[Int] // EMU per column
   rows : Array[TableRow]
+  // Table properties from a:tblPr
+  style_id : String // tblStyleId UUID (empty = none)
+  first_row : Bool
+  last_row : Bool
+  first_col : Bool
+  last_col : Bool
+  band_row : Bool
+  band_col : Bool
+}
+
+// ── Table style model ────────────────────────────────────────────────────────
+
+///|
+pub(all) struct TableStyleCell {
+  fill : Color
+  grad_fill : GradientFill
+  bdr_l_w : Int
+  bdr_r_w : Int
+  bdr_t_w : Int
+  bdr_b_w : Int
+  bdr_l_color : Color
+  bdr_r_color : Color
+  bdr_t_color : Color
+  bdr_b_color : Color
+  bold : Bool
+  italic : Bool
+  font_color : Color
+}
+
+///|
+pub(all) struct TableStyleDef {
+  id : String
+  whole_tbl : TableStyleCell
+  band1_h : TableStyleCell
+  band2_h : TableStyleCell
+  band1_v : TableStyleCell
+  band2_v : TableStyleCell
+  first_row : TableStyleCell
+  last_row : TableStyleCell
+  first_col : TableStyleCell
+  last_col : TableStyleCell
+}
+
+///|
+pub fn TableStyleCell::none() -> TableStyleCell {
+  {
+    fill: Color::none(), grad_fill: GradientFill::none(),
+    bdr_l_w: 0, bdr_r_w: 0, bdr_t_w: 0, bdr_b_w: 0,
+    bdr_l_color: Color::none(), bdr_r_color: Color::none(),
+    bdr_t_color: Color::none(), bdr_b_color: Color::none(),
+    bold: false, italic: false, font_color: Color::none(),
+  }
+}
+
+///|
+pub fn TableStyleCell::is_none(self : TableStyleCell) -> Bool {
+  self.fill.is_none() && self.font_color.is_none() && not(self.bold) && not(self.italic) &&
+    self.bdr_l_w == 0 && self.bdr_r_w == 0 && self.bdr_t_w == 0 && self.bdr_b_w == 0
+}
+
+///|
+pub fn TableStyleDef::none() -> TableStyleDef {
+  {
+    id: "", whole_tbl: TableStyleCell::none(),
+    band1_h: TableStyleCell::none(), band2_h: TableStyleCell::none(),
+    band1_v: TableStyleCell::none(), band2_v: TableStyleCell::none(),
+    first_row: TableStyleCell::none(), last_row: TableStyleCell::none(),
+    first_col: TableStyleCell::none(), last_col: TableStyleCell::none(),
+  }
 }
 
 // ── Shape geometry ────────────────────────────────────────────────────────────

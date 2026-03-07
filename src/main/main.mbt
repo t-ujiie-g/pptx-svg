@@ -65,6 +65,9 @@ let g_masters : Ref[Array[(@ooxml.SlideMasterData, String)]] = { val: [] }
 ///|
 let g_layout_to_master : Ref[Array[(String, String)]] = { val: [] }
 
+///|
+let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [] }
+
 // ── Path resolution helpers ──────────────────────────────────────────────────
 
 ///|
@@ -284,6 +287,16 @@ pub fn initialize_pptx() -> String {
         g_theme.val = @ooxml.parse_theme(theme_xml)
         @ffi.ffi_log("Theme loaded from " + theme_path)
       }
+    }
+  }
+  // ── Parse table styles from ppt/tableStyles.xml ──
+  let tbl_styles_xml = @ffi.ffi_get_file("ppt/tableStyles.xml")
+  if not(tbl_styles_xml.is_empty()) {
+    g_table_styles.val = @ooxml.parse_table_styles(tbl_styles_xml, g_theme.val)
+    if g_table_styles.val.length() > 0 {
+      @ffi.ffi_log(
+        "Table styles loaded: " + int_to_str(g_table_styles.val.length()),
+      )
     }
   }
   // ── Resolve slide → layout → master relationships ──
@@ -612,7 +625,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   }
   // Render to SVG
   @renderer.render_slide_svg(
-    resolved_slide, rels, slide_num, effective_theme, bg_shapes,
+    resolved_slide, rels, slide_num, effective_theme, bg_shapes, g_table_styles.val,
   )
 }
 

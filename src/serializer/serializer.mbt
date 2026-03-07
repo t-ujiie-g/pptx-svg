@@ -1011,6 +1011,8 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   out = out + serialize_tc_border("a:lnR", cell.bdr_r_w, cell.bdr_r_color)
   out = out + serialize_tc_border("a:lnT", cell.bdr_t_w, cell.bdr_t_color)
   out = out + serialize_tc_border("a:lnB", cell.bdr_b_w, cell.bdr_b_color)
+  out = out + serialize_tc_border("a:lnTlToBr", cell.bdr_tl_br_w, cell.bdr_tl_br_color)
+  out = out + serialize_tc_border("a:lnBlToTr", cell.bdr_bl_tr_w, cell.bdr_bl_tr_color)
   // Fill
   if not(cell.grad_fill.is_none()) {
     out = out + serialize_gradient_fill(cell.grad_fill)
@@ -1044,7 +1046,18 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   out = out +
     "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/table\">"
   out = out + "<a:tbl>"
-  out = out + "<a:tblPr firstRow=\"1\" bandRow=\"1\"/>"
+  // Table properties
+  out = out + "<a:tblPr"
+  if not(table.style_id.is_empty()) {
+    out = out + " tblStyleId=\"" + table.style_id + "\""
+  }
+  if table.first_row { out = out + " firstRow=\"1\"" }
+  if table.last_row { out = out + " lastRow=\"1\"" }
+  if table.first_col { out = out + " firstCol=\"1\"" }
+  if table.last_col { out = out + " lastCol=\"1\"" }
+  if table.band_row { out = out + " bandRow=\"1\"" }
+  if table.band_col { out = out + " bandCol=\"1\"" }
+  out = out + "/>"
   // Grid columns
   out = out + "<a:tblGrid>"
   let ncols = table.col_widths.length()
