@@ -9,7 +9,7 @@
 
 - [x] **基盤**: ZIP 解凍 (JS DecompressionStream) + Wasm FFI + 3-tier js-string 互換 + 汎用 XML パーサー
 - [x] **シェイプ基本**: AutoShape (rect/ellipse/roundRect/line) + 回転/フリップ + Picture (data URI base64)
-- [x] **テーブル**: `p:graphicFrame` + `a:tbl` — セル背景/テキスト/グラデーション
+- [x] **テーブル**: `p:graphicFrame` + `a:tbl` — セル背景/テキスト/グラデーション + セル結合 (gridSpan/rowSpan/vMerge) + ボーダー (lnL/lnR/lnT/lnB + noFill) + マージン (marL/R/T/B) + アンカー (anchor)
 - [x] **テーマ解決**: theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod
 - [x] **Round-trip**: data-ooxml-* SVG ↔ SlideData ↔ OOXML ↔ ZIP
 - [x] **マスター/レイアウト継承**: slideMaster/slideLayout パース + placeholder transform/bodyProps/背景/テキストスタイル継承 + `p:clrMapOvr` + マスターシェイプ描画
@@ -27,12 +27,9 @@
 
 ---
 
-## 6. テーブル — 残タスク [P1]
+## 6. テーブル — 残タスク [P2]
 
-- [ ] セル結合 — 水平 (`gridSpan`) / 垂直 (`vMerge` / `rowSpan`)
-- [ ] セルボーダー (`a:tcBorders` — `lnL/lnR/lnT/lnB/lnTlToBr/lnBlToTr`)
-- [ ] セルマージン (`a:tcPr marL/marR/marT/marB`)
-- [ ] セルアンカー (`a:tcPr anchor="ctr/b/t"`)
+- [ ] セルボーダー対角線 (`lnTlToBr/lnBlToTr`)
 - [ ] テーブルスタイル (`a:tblStyleId` → theme のテーブルスタイル定義)
 - [ ] バンド行/列条件書式 (`firstRow/lastRow/firstCol/lastCol/bandRow/bandCol`)
 
@@ -40,7 +37,7 @@
 
 ## 7. 画像 — 高度機能 [P2]
 
-- [ ] 画像クロップ描画 — `srcRect` はパース済み(`BlipFill.src_l/t/r/b`)だが SVG 未反映
+- [ ] 画像クロップ SVG 描画 — `srcRect` パース済み → SVG `<clipPath>` or viewBox
 - [ ] SVG 画像 (`a:blip` + SVG extension `a:extLst`)
 - [ ] 画像エフェクト (`a:clrChange`, brightness/contrast)
 - [ ] Duotone (`a:duotone`)
@@ -83,7 +80,6 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 ## 11. スライド・シェイプ — 残機能 [P1]
 
-- [ ] 画像クロップ SVG 描画 (`srcRect` → SVG `<clipPath>` or viewBox)
 - [ ] プレースホルダ自動内容 — 日付 (`ph type="dt"`) / スライド番号 (`sldNum`) / フッター (`ftr`)
 - [ ] 背景 blip/パターン — `p:bg/p:bgPr` の `a:blipFill` / `a:pattFill` (現状 solid+gradient のみ)
 - [ ] シェイプリンク — 図形自体の `a:hlinkClick` / `a:hlinkHover` (テキストリンクとは別)
@@ -124,8 +120,8 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 | 優先度 | 内容 | 状態 |
 |--------|------|------|
-| **P0** | マスター/レイアウト継承, テキスト完全対応 | **完了** |
-| **P1** | 塗り/線/グループ/コネクタ/プリセットGeom/カスタムGeom/テキスト矩形/接続ポイント/ギア歯 | **完了** |
-| **P1** | テーブル高度, スライド・シェイプ残機能, ライブラリ公開 | 未着手 |
-| **P2** | 画像高度/エフェクト/チャート/テキスト高度 | 未着手 |
+| **P0** | 基盤/テーマ/マスター継承/テキスト完全対応 | **完了** |
+| **P1** | 塗り/線/グループ/コネクタ/ジオメトリ/テーブル基本+高度 | **完了** |
+| **P1** | スライド・シェイプ残機能, ライブラリ公開 | 未着手 |
+| **P2** | テーブル残(スタイル/バンド), 画像高度/エフェクト/チャート/テキスト高度 | 未着手 |
 | **P3** | SmartArt/OLE/メディア/数式/ノート/埋め込みフォント | 未着手 |

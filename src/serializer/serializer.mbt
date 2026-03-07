@@ -947,8 +947,40 @@ fn serialize_picture(shape : @ooxml.Shape, rid : String) -> String {
 }
 
 ///|
+fn serialize_tc_border(tag : String, w : Int, color : @ooxml.Color) -> String {
+  if w == 0 && color.is_none() {
+    return ""
+  }
+  let mut out = "<" + tag
+  if w == -1 {
+    out = out + ">"
+    out = out + "<a:noFill/>"
+    out = out + "</" + tag + ">"
+    return out
+  }
+  if w > 0 {
+    out = out + " w=\"" + int_to_str(w) + "\""
+  }
+  out = out + ">"
+  if not(color.is_none()) {
+    out = out + serialize_color(color)
+  }
+  out + "</" + tag + ">"
+}
+
+///|
 fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
-  let mut out = "<a:tc>"
+  let mut out = "<a:tc"
+  if cell.grid_span > 1 {
+    out = out + " gridSpan=\"" + int_to_str(cell.grid_span) + "\""
+  }
+  if cell.row_span > 1 {
+    out = out + " rowSpan=\"" + int_to_str(cell.row_span) + "\""
+  }
+  if cell.v_merge {
+    out = out + " vMerge=\"1\""
+  }
+  out = out + ">"
   // Text body
   if cell.paragraphs.length() > 0 {
     out = out + serialize_table_text_body(cell.paragraphs)
@@ -957,7 +989,29 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
       "<a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang=\"en-US\"/></a:p></a:txBody>"
   }
   // Cell properties
-  out = out + "<a:tcPr>"
+  out = out + "<a:tcPr"
+  if cell.mar_l >= 0 {
+    out = out + " marL=\"" + int_to_str(cell.mar_l) + "\""
+  }
+  if cell.mar_r >= 0 {
+    out = out + " marR=\"" + int_to_str(cell.mar_r) + "\""
+  }
+  if cell.mar_t >= 0 {
+    out = out + " marT=\"" + int_to_str(cell.mar_t) + "\""
+  }
+  if cell.mar_b >= 0 {
+    out = out + " marB=\"" + int_to_str(cell.mar_b) + "\""
+  }
+  if cell.anchor != "" {
+    out = out + " anchor=\"" + cell.anchor + "\""
+  }
+  out = out + ">"
+  // Borders
+  out = out + serialize_tc_border("a:lnL", cell.bdr_l_w, cell.bdr_l_color)
+  out = out + serialize_tc_border("a:lnR", cell.bdr_r_w, cell.bdr_r_color)
+  out = out + serialize_tc_border("a:lnT", cell.bdr_t_w, cell.bdr_t_color)
+  out = out + serialize_tc_border("a:lnB", cell.bdr_b_w, cell.bdr_b_color)
+  // Fill
   if not(cell.grad_fill.is_none()) {
     out = out + serialize_gradient_fill(cell.grad_fill)
   } else if not(cell.fill.is_none()) {

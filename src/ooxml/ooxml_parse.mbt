@@ -589,22 +589,102 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
 }
 
 ///|
+fn parse_tc_border(tcpr_ch : Array[@xml.XmlNode], tag : String, theme : ThemeData) -> (Int, Color) {
+  match @xml.find_child(tcpr_ch, tag) {
+    None => (0, Color::none())
+    Some(ln_node) => {
+      let w = attr_int(ln_node, "w")
+      let ln_ch = @xml.get_children(ln_node)
+      // Check for <a:noFill>
+      match @xml.find_child(ln_ch, "a:noFill") {
+        Some(_) => (-1, Color::none())
+        None => {
+          let color = parse_solid_fill(ln_ch, theme)
+          (w, color)
+        }
+      }
+    }
+  }
+}
+
+///|
 fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let ch = @xml.get_children(tc)
+  // Parse cell merge attributes
+  let grid_span = { let v = attr_int(tc, "gridSpan"); if v > 0 { v } else { 1 } }
+  let row_span = { let v = attr_int(tc, "rowSpan"); if v > 0 { v } else { 1 } }
+  let v_merge = match @xml.get_attr(tc, "vMerge") {
+    Some("1") => true
+    _ => false
+  }
   // Parse cell text from <a:txBody>
   let (paragraphs, _) = match @xml.find_child(ch, "a:txBody") {
     None => ([], BodyProps::default())
     Some(txb) => parse_text_body(txb, theme)
   }
-  // Parse cell fill from <a:tcPr> → solidFill
-  let fill = match @xml.find_child(ch, "a:tcPr") {
-    None => Color::none()
+  // Parse cell properties from <a:tcPr>
+  let mut fill = Color::none()
+  let mut grad_fill = GradientFill::none()
+  let mut mar_l = -1
+  let mut mar_r = -1
+  let mut mar_t = -1
+  let mut mar_b = -1
+  let mut anchor = ""
+  let mut bdr_l_w = 0
+  let mut bdr_r_w = 0
+  let mut bdr_t_w = 0
+  let mut bdr_b_w = 0
+  let mut bdr_l_color = Color::none()
+  let mut bdr_r_color = Color::none()
+  let mut bdr_t_color = Color::none()
+  let mut bdr_b_color = Color::none()
+  match @xml.find_child(ch, "a:tcPr") {
+    None => ()
     Some(tcpr) => {
-      let c = parse_solid_fill(@xml.get_children(tcpr), theme)
-      c
+      let tcpr_ch = @xml.get_children(tcpr)
+      // Fill
+      let gf = parse_gradient_fill(tcpr_ch, theme)
+      if not(gf.is_none()) {
+        grad_fill = gf
+      } else {
+        fill = parse_solid_fill(tcpr_ch, theme)
+      }
+      // Margins
+      let ml = attr_int(tcpr, "marL")
+      let mr = attr_int(tcpr, "marR")
+      let mt = attr_int(tcpr, "marT")
+      let mb = attr_int(tcpr, "marB")
+      if ml > 0 { mar_l = ml }
+      if mr > 0 { mar_r = mr }
+      if mt > 0 { mar_t = mt }
+      if mb > 0 { mar_b = mb }
+      // Anchor
+      anchor = match @xml.get_attr(tcpr, "anchor") {
+        Some(v) => v
+        None => ""
+      }
+      // Borders (a:lnL, a:lnR, a:lnT, a:lnB)
+      let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
+      bdr_l_w = lw
+      bdr_l_color = lc
+      let (rw, rc) = parse_tc_border(tcpr_ch, "a:lnR", theme)
+      bdr_r_w = rw
+      bdr_r_color = rc
+      let (tw, tc_) = parse_tc_border(tcpr_ch, "a:lnT", theme)
+      bdr_t_w = tw
+      bdr_t_color = tc_
+      let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
+      bdr_b_w = bw
+      bdr_b_color = bc
     }
   }
-  { paragraphs, fill, grad_fill: GradientFill::none() }
+  {
+    paragraphs, fill, grad_fill,
+    grid_span, row_span, v_merge,
+    bdr_l_w, bdr_r_w, bdr_t_w, bdr_b_w,
+    bdr_l_color, bdr_r_color, bdr_t_color, bdr_b_color,
+    mar_l, mar_r, mar_t, mar_b, anchor,
+  }
 }
 
 ///|

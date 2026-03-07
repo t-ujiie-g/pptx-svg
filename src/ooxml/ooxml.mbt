@@ -831,6 +831,26 @@ pub(all) struct TableCell {
   paragraphs : Array[TextParagraph]
   fill : Color
   grad_fill : GradientFill
+  // Cell merge
+  grid_span : Int // horizontal merge span (1 = no merge)
+  row_span : Int // vertical merge span (1 = no merge)
+  v_merge : Bool // true = this cell is merged into the cell above
+  // Cell borders (line width in EMU, 0 = default, -1 = none)
+  bdr_l_w : Int
+  bdr_r_w : Int
+  bdr_t_w : Int
+  bdr_b_w : Int
+  bdr_l_color : Color
+  bdr_r_color : Color
+  bdr_t_color : Color
+  bdr_b_color : Color
+  // Cell margins in EMU (-1 = use default)
+  mar_l : Int
+  mar_r : Int
+  mar_t : Int
+  mar_b : Int
+  // Cell anchor: "t" (top, default), "ctr" (center), "b" (bottom)
+  anchor : String
 }
 
 ///|

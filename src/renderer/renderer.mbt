@@ -38,8 +38,6 @@ let line_height_numer : Int = 12 // line-height = font-size * line_height_numer 
 ///|
 let line_height_denom : Int = 10
 
-///|
-let table_cell_pad : Int = 4 // padding inside table cells (px)
 
 ///|
 let default_text_fill : String = "black"
@@ -48,7 +46,7 @@ let default_text_fill : String = "black"
 let image_placeholder_fill : String = "#dddddd"
 
 ///|
-let table_border_color : String = "#999999"
+let table_border_color : String = "#999999" // fallback when no border color specified
 
 ///|
 let round_rect_radius_divisor : Int = 20 // corner radius = width / 20
@@ -1483,12 +1481,22 @@ fn render_group(
 // ── Table rendering ─────────────────────────────────────────────────────────
 
 ///|
+let default_cell_mar_lr : Int = 91440 // OOXML default L/R margin: 0.1 inch
+
+///|
+let default_cell_mar_tb : Int = 45720 // OOXML default T/B margin: 0.05 inch
+
+///|
 fn render_table_cell_text(
   paragraphs : Array[@ooxml.TextParagraph],
   cell_x : Int,
   cell_y : Int,
   _cell_w : Int,
   cell_h : Int,
+  pad_l : Int,
+  pad_t : Int,
+  pad_b : Int,
+  anchor : String,
   scale : Int,
   theme : @ooxml.ThemeData,
   rels : Array[@ooxml.Relationship],
@@ -1496,15 +1504,28 @@ fn render_table_cell_text(
   if paragraphs.length() == 0 {
     return ""
   }
-  let tx = cell_x + table_cell_pad
+  let tx = cell_x + pad_l
   let def_sz = px(default_font_size_emu(), scale)
-  let font_sz = if def_sz > cell_h - table_cell_pad * 2 {
-    cell_h - table_cell_pad * 2
+  let font_sz = if def_sz > cell_h - pad_t - pad_b {
+    cell_h - pad_t - pad_b
   } else {
     def_sz
   }
+  if font_sz <= 0 {
+    return ""
+  }
   let line_h = font_sz * line_height_numer / line_height_denom
   let font_face = theme.minor_font + ", sans-serif"
+  let np = paragraphs.length()
+  let text_height = np * line_h
+  let available_h = cell_h - pad_t - pad_b
+  let y_offset = if anchor == "ctr" {
+    pad_t + (available_h - text_height) / 2
+  } else if anchor == "b" {
+    pad_t + available_h - text_height
+  } else {
+    pad_t
+  }
   let mut out = "<text" +
     ai("x", tx) +
     a("xml:space", "preserve") +
@@ -1512,8 +1533,7 @@ fn render_table_cell_text(
     ai("font-size", font_sz) +
     a("fill", default_text_fill) +
     ">"
-  let mut cur_y = cell_y + table_cell_pad + font_sz
-  let np = paragraphs.length()
+  let mut cur_y = cell_y + y_offset + font_sz
   let mut pi = 0
   while pi < np {
     let para = paragraphs[pi]
@@ -1540,11 +1560,31 @@ fn render_table_cell_text(
     }
     pi = pi + 1
     // Stop if we overflow the cell
-    if cur_y > cell_y + cell_h - table_cell_pad {
+    if cur_y > cell_y + cell_h - pad_b {
       break
     }
   }
   out + "</text>"
+}
+
+///|
+fn render_table_border_line(
+  x1 : Int,
+  y1 : Int,
+  x2 : Int,
+  y2 : Int,
+  w : Int,
+  color : @ooxml.Color,
+  scale : Int,
+) -> String {
+  // w == 0 → default 1px border, w == -1 → no border
+  if w == -1 {
+    return ""
+  }
+  let sw = if w > 0 { let v = px(w, scale); if v < 1 { 1 } else { v } } else { 1 }
+  let sc = if color.is_none() { table_border_color } else { color.to_css() }
+  "<line" + ai("x1", x1) + ai("y1", y1) + ai("x2", x2) + ai("y2", y2) +
+    a("stroke", sc) + ai("stroke-width", sw) + "/>"
 }
 
 ///|
@@ -1558,30 +1598,61 @@ fn render_table(
   let base_x = px(t.x, scale)
   let base_y = px(t.y, scale)
   let mut out = ""
-  // Precompute column x-offsets in pixels
+  // Precompute column x-offsets in EMU
   let ncols = table.col_widths.length()
-  let col_x : Array[Int] = []
+  let col_x_emu : Array[Int] = []
   let mut cx_accum = 0
   let mut ci = 0
   while ci < ncols {
-    col_x.push(px(cx_accum, scale))
+    col_x_emu.push(cx_accum)
     cx_accum = cx_accum + table.col_widths[ci]
     ci = ci + 1
   }
-  // Render rows
+  // Precompute row y-offsets in EMU
   let nrows = table.rows.length()
-  let mut row_y_emu = 0
+  let row_y_emu : Array[Int] = []
+  let mut ry_accum = 0
+  let mut ri2 = 0
+  while ri2 < nrows {
+    row_y_emu.push(ry_accum)
+    ry_accum = ry_accum + table.rows[ri2].height
+    ri2 = ri2 + 1
+  }
+  // Render cells (vMerge=true cells are skipped)
   let mut ri = 0
   while ri < nrows {
     let row = table.rows[ri]
-    let ry = base_y + px(row_y_emu, scale)
-    let rh = px(row.height, scale)
+    let ry = base_y + px(row_y_emu[ri], scale)
     let ncells = row.cells.length()
     let mut cj = 0
-    while cj < ncells && cj < ncols {
+    let mut col_idx = 0 // actual grid column index
+    while cj < ncells && col_idx < ncols {
       let cell = row.cells[cj]
-      let cx_px = base_x + col_x[cj]
-      let cw = px(table.col_widths[cj], scale)
+      // Skip vertically merged continuation cells
+      if cell.v_merge {
+        col_idx = col_idx + cell.grid_span
+        cj = cj + 1
+        continue
+      }
+      // Compute merged cell width (sum of grid_span columns)
+      let span = cell.grid_span
+      let mut merged_w_emu = 0
+      let mut si = 0
+      while si < span && (col_idx + si) < ncols {
+        merged_w_emu = merged_w_emu + table.col_widths[col_idx + si]
+        si = si + 1
+      }
+      // Compute merged cell height (sum of row_span rows)
+      let rspan = cell.row_span
+      let mut merged_h_emu = 0
+      let mut sri = 0
+      while sri < rspan && (ri + sri) < nrows {
+        merged_h_emu = merged_h_emu + table.rows[ri + sri].height
+        sri = sri + 1
+      }
+      let cx_px = base_x + px(col_x_emu[col_idx], scale)
+      let cw = px(merged_w_emu, scale)
+      let ch = px(merged_h_emu, scale)
       // Cell background
       let cell_fill = if cell.fill.is_none() {
         "none"
@@ -1593,11 +1664,22 @@ fn render_table(
         ai("x", cx_px) +
         ai("y", ry) +
         ai("width", cw) +
-        ai("height", rh) +
+        ai("height", ch) +
         a("fill", cell_fill) +
-        " stroke=\"" +
-        table_border_color +
-        "\" stroke-width=\"1\"/>"
+        " stroke=\"none\"/>"
+      // Cell borders (individual lines)
+      // Top border
+      out = out + render_table_border_line(cx_px, ry, cx_px + cw, ry, cell.bdr_t_w, cell.bdr_t_color, scale)
+      // Bottom border
+      out = out + render_table_border_line(cx_px, ry + ch, cx_px + cw, ry + ch, cell.bdr_b_w, cell.bdr_b_color, scale)
+      // Left border
+      out = out + render_table_border_line(cx_px, ry, cx_px, ry + ch, cell.bdr_l_w, cell.bdr_l_color, scale)
+      // Right border
+      out = out + render_table_border_line(cx_px + cw, ry, cx_px + cw, ry + ch, cell.bdr_r_w, cell.bdr_r_color, scale)
+      // Compute cell margins in pixels
+      let pad_l = px(if cell.mar_l >= 0 { cell.mar_l } else { default_cell_mar_lr }, scale)
+      let pad_t = px(if cell.mar_t >= 0 { cell.mar_t } else { default_cell_mar_tb }, scale)
+      let pad_b = px(if cell.mar_b >= 0 { cell.mar_b } else { default_cell_mar_tb }, scale)
       // Cell text
       out = out +
         render_table_cell_text(
@@ -1605,14 +1687,18 @@ fn render_table(
           cx_px,
           ry,
           cw,
-          rh,
+          ch,
+          pad_l,
+          pad_t,
+          pad_b,
+          cell.anchor,
           scale,
           theme,
           rels,
         )
+      col_idx = col_idx + span
       cj = cj + 1
     }
-    row_y_emu = row_y_emu + row.height
     ri = ri + 1
   }
   out

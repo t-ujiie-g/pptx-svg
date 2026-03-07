@@ -98,7 +98,7 @@ BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_red
 
 TableData { col_widths: Array[Int], rows: Array[TableRow] }
 TableRow { height: Int, cells: Array[TableCell] }
-TableCell { paragraphs: Array[TextParagraph], fill: Color, grad_fill: GradientFill }
+TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_span: Int, v_merge: Bool, bdr_l/r/t/b_w: Int, bdr_l/r/t/b_color: Color, mar_l/r/t/b: Int, anchor: String }
 
 Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
 ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }

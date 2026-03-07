@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 40', slideCount === 40, `got ${slideCount}`);
+  assert('slide count = 41', slideCount === 41, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 40; i++) {
+  for (let i = 1; i <= 41; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 40; i++) {
+  for (let i = 1; i <= 41; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -848,6 +848,28 @@ async function testFeaturesPptx() {
     assert('slide40 has a:pos', hasTag(slide40, 'a:pos'));
     assert('slide40 has a:custGeom', hasTag(slide40, 'a:custGeom'));
     assert('slide40 has a:rect', hasTag(slide40, 'a:rect'));
+  }
+
+  // ── Slide 41: Table cell merge + borders + margins + anchor ──
+  {
+    console.log('\n── test_features.pptx — Slide 41: table cell merge/borders/margins/anchor ──');
+    const slide41 = textFiles.get('ppt/slides/slide41.xml');
+    assert('slide41 exists', !!slide41);
+    assert('slide41 has a:tbl', hasTag(slide41, 'a:tbl'));
+    assert('slide41 has gridSpan', slide41.includes('gridSpan'));
+    assert('slide41 has rowSpan', slide41.includes('rowSpan'));
+    assert('slide41 has vMerge', slide41.includes('vMerge'));
+    assert('slide41 has a:lnL', hasTag(slide41, 'a:lnL'));
+    assert('slide41 has a:lnR', hasTag(slide41, 'a:lnR'));
+    assert('slide41 has a:lnT', hasTag(slide41, 'a:lnT'));
+    assert('slide41 has a:lnB', hasTag(slide41, 'a:lnB'));
+    assert('slide41 has anchor="ctr"', slide41.includes('anchor="ctr"'));
+    assert('slide41 has anchor="b"', slide41.includes('anchor="b"'));
+    assert('slide41 has marL', slide41.includes('marL'));
+    assert('slide41 has marT', slide41.includes('marT'));
+    assert('slide41 has a:noFill in border', slide41.includes('<a:lnL') && slide41.includes('<a:noFill'));
+    assert('slide41 has red border FF0000', slide41.includes('FF0000'));
+    assert('slide41 has green border 00AA00', slide41.includes('00AA00'));
   }
 }
 
