@@ -52,6 +52,7 @@ Slides:
  47. Background pattern fill (a:pattFill in p:bgPr)
  48. Line gradient fill (a:gradFill in a:ln) + line pattern fill (a:pattFill in a:ln)
  49. Shape hyperlinks (a:hlinkClick/a:hlinkHover on p:cNvPr) + color modifiers (comp/inv/hueMod)
+ 50. Shape effects (a:effectLst — outerShdw / innerShdw / glow / softEdge)
 """
 
 from pptx import Presentation
@@ -3734,6 +3735,118 @@ lbl49.text_frame.paragraphs[0].font.bold = True
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 slide49_part = slide49.part
 slide49_part.rels.get_or_add_ext_rel(RT.HYPERLINK, 'https://example.com/shape-link')
+
+# ── Slide 50: Shape effects (outerShdw, innerShdw, glow, softEdge) ──
+slide50 = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+
+sp50_outer_shadow_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="301" name="OuterShadow"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="1371600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:effectLst>
+      <a:outerShdw blurRad="152400" dist="114300" dir="5400000" algn="ctr" rotWithShape="0">
+        <a:srgbClr val="000000"><a:alpha val="40000"/></a:srgbClr>
+      </a:outerShdw>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>Outer Shadow</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+sp50_inner_shadow_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="302" name="InnerShadow"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="3657600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="70AD47"/></a:solidFill>
+    <a:effectLst>
+      <a:innerShdw blurRad="114300" dist="76200" dir="2700000">
+        <a:srgbClr val="000000"><a:alpha val="50000"/></a:srgbClr>
+      </a:innerShdw>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>Inner Shadow</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+sp50_glow_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="303" name="Glow"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="1371600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+    <a:effectLst>
+      <a:glow rad="228600">
+        <a:srgbClr val="FFC000"><a:alpha val="60000"/></a:srgbClr>
+      </a:glow>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>Glow Effect</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+sp50_softedge_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="304" name="SoftEdge"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="3657600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="A855F7"/></a:solidFill>
+    <a:effectLst>
+      <a:softEdge rad="317500"/>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>Soft Edge</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+spTree50 = slide50._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree50.append(etree.fromstring(sp50_outer_shadow_xml))
+spTree50.append(etree.fromstring(sp50_inner_shadow_xml))
+spTree50.append(etree.fromstring(sp50_glow_xml))
+spTree50.append(etree.fromstring(sp50_softedge_xml))
+
+lbl50 = slide50.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl50.text_frame.paragraphs[0].text = "Slide 50: Shape effects (outerShdw / innerShdw / glow / softEdge)"
+lbl50.text_frame.paragraphs[0].font.size = Pt(18)
+lbl50.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

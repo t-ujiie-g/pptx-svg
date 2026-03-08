@@ -890,10 +890,84 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   if has_stroke {
     out = out + serialize_stroke(shape)
   }
+  out = out + serialize_effect_lst(shape.effects)
   out = out + "</p:spPr>"
   // Text body
   out = out + serialize_text_body(shape.paragraphs, shape.body_props)
   out + "</p:sp>"
+}
+
+///|
+/// Conditionally emit an XML integer attribute (non-zero only).
+fn xml_int_attr(name : String, val : Int) -> String {
+  if val > 0 { " " + name + "=\"" + int_to_str(val) + "\"" } else { "" }
+}
+
+///|
+/// Conditionally emit an XML integer attribute when it differs from a default.
+fn xml_int_attr_ne(name : String, val : Int, default : Int) -> String {
+  if val != default { " " + name + "=\"" + int_to_str(val) + "\"" } else { "" }
+}
+
+///|
+fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
+  if eff.is_none() {
+    return ""
+  }
+  let mut inner = ""
+  if not(eff.outer_shadow.is_none()) {
+    let os = eff.outer_shadow
+    let attrs = xml_int_attr("blurRad", os.blur_rad) +
+      xml_int_attr("dist", os.dist) +
+      xml_int_attr("dir", os.dir) +
+      xml_int_attr_ne("sx", os.sx, 100000) +
+      xml_int_attr_ne("sy", os.sy, 100000) +
+      (if not(os.algn.is_empty()) { " algn=\"" + os.algn + "\"" } else { "" }) +
+      (if not(os.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
+    inner = inner + "<a:outerShdw" + attrs + ">" + serialize_eff_color(os.color) + "</a:outerShdw>"
+  }
+  if not(eff.inner_shadow.is_none()) {
+    let ishdw = eff.inner_shadow
+    let attrs = xml_int_attr("blurRad", ishdw.blur_rad) +
+      xml_int_attr("dist", ishdw.dist) +
+      xml_int_attr("dir", ishdw.dir)
+    inner = inner + "<a:innerShdw" + attrs + ">" + serialize_eff_color(ishdw.color) + "</a:innerShdw>"
+  }
+  if not(eff.glow.is_none()) {
+    inner = inner + "<a:glow" + xml_int_attr("rad", eff.glow.rad) + ">" + serialize_eff_color(eff.glow.color) + "</a:glow>"
+  }
+  if not(eff.soft_edge.is_none()) {
+    inner = inner + "<a:softEdge rad=\"" + int_to_str(eff.soft_edge.rad) + "\"/>"
+  }
+  if not(eff.reflection.is_none()) {
+    let r = eff.reflection
+    let attrs = xml_int_attr("blurRad", r.blur_rad) +
+      xml_int_attr("dist", r.dist) +
+      xml_int_attr("dir", r.dir) +
+      xml_int_attr_ne("stA", r.st_alpha, 100000) +
+      xml_int_attr("endA", r.end_alpha) +
+      xml_int_attr("fadeDir", r.fade_dir) +
+      xml_int_attr_ne("sx", r.sx, 100000) +
+      xml_int_attr_ne("sy", r.sy, 100000) +
+      (if not(r.algn.is_empty()) { " algn=\"" + r.algn + "\"" } else { "" }) +
+      (if not(r.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
+    inner = inner + "<a:reflection" + attrs + "/>"
+  }
+  "<a:effectLst>" + inner + "</a:effectLst>"
+}
+
+///|
+fn serialize_eff_color(c : @ooxml.Color) -> String {
+  if c.is_none() {
+    ""
+  } else {
+    let hex = c.to_hex()
+    if c.alpha < 255 {
+      "<a:srgbClr val=\"" + hex + "\"><a:alpha val=\"" + int_to_str(c.alpha * 100000 / 255) + "\"/></a:srgbClr>"
+    } else {
+      "<a:srgbClr val=\"" + hex + "\"/>"
+    }
+  }
 }
 
 ///|
@@ -1241,6 +1315,7 @@ fn serialize_connector(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   if has_stroke {
     out = out + serialize_stroke(shape)
   }
+  out = out + serialize_effect_lst(shape.effects)
   out = out + "</p:spPr>"
   out + "</p:cxnSp>"
 }

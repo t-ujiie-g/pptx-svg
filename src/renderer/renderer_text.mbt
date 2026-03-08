@@ -5,6 +5,25 @@
 // ── Text helpers ─────────────────────────────────────────────────────────────
 
 ///|
+/// Build a comma-separated font-family string from sym/cs/ea/latin fonts.
+/// Returns empty string if no fonts are specified.
+fn build_font_family(
+  sym : String,
+  cs : String,
+  ea : String,
+  latin : String,
+) -> String {
+  let mut ff = ""
+  if not(sym.is_empty()) { ff = sym }
+  if not(cs.is_empty()) { ff = if ff.is_empty() { cs } else { ff + ", " + cs } }
+  if not(ea.is_empty()) { ff = if ff.is_empty() { ea } else { ff + ", " + ea } }
+  if not(latin.is_empty()) {
+    ff = if ff.is_empty() { latin } else { ff + ", " + latin }
+  }
+  ff
+}
+
+///|
 /// Convert ASCII lowercase letters to uppercase.
 fn to_upper_ascii(s : String) -> String {
   let len = s.length()
@@ -372,33 +391,8 @@ fn render_run_tspan(
       )
   }
   // font-family: sym_font, cs_font, ea_font, latin_font, sans-serif
-  let has_ff = not(run.font_face.is_empty()) ||
-    not(run.ea_font.is_empty()) ||
-    not(run.cs_font.is_empty()) ||
-    not(run.sym_font.is_empty())
-  if has_ff {
-    let mut ff = ""
-    if not(run.sym_font.is_empty()) {
-      ff = run.sym_font
-    }
-    if not(run.cs_font.is_empty()) {
-      if not(ff.is_empty()) {
-        ff = ff + ", "
-      }
-      ff = ff + run.cs_font
-    }
-    if not(run.ea_font.is_empty()) {
-      if not(ff.is_empty()) {
-        ff = ff + ", "
-      }
-      ff = ff + run.ea_font
-    }
-    if not(run.font_face.is_empty()) {
-      if not(ff.is_empty()) {
-        ff = ff + ", "
-      }
-      ff = ff + run.font_face
-    }
+  let ff = build_font_family(run.sym_font, run.cs_font, run.ea_font, run.font_face)
+  if not(ff.is_empty()) {
     span = span + a("font-family", ff + ", sans-serif")
   }
   // Color: explicit color, or theme hlink/folHlink color for hyperlinks

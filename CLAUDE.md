@@ -83,7 +83,8 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   stroke_grad_fill: GradientFill, stroke_patt_fill: PatternFill,
   paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int,
   st_cxn_id: Int, st_cxn_idx: Int, end_cxn_id: Int, end_cxn_idx: Int,
-  sh_link_rid: String, sh_link_hover_rid: String }
+  sh_link_rid: String, sh_link_hover_rid: String,
+  effects: EffectList }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | Other
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
@@ -96,6 +97,13 @@ GradientStop { pos: Int, color: Color }  // pos: 0-100000
 GradientFill { stops, angle, path_type, rot_with_shape, fill_to_l/t/r/b, tile_flip }
 BlipFill { rid, stretch, src_l/t/r/b, tile_tx/ty/sx/sy, tile_flip, tile_algn, alpha, svg_rid, bright, contrast, duotone_1/2: Color, clr_from/to: Color }
 PatternFill { prst, fg_color: Color, bg_color: Color }
+
+EffectList { outer_shadow: OuterShadow, inner_shadow: InnerShadow, glow: Glow, soft_edge: SoftEdge, reflection: Reflection }
+OuterShadow { blur_rad, dist, dir: Int, color: Color, sx, sy: Int, algn: String, rot_with_shape: Bool }
+InnerShadow { blur_rad, dist, dir: Int, color: Color }
+Glow { rad: Int, color: Color }
+SoftEdge { rad: Int }
+Reflection { blur_rad, dist, dir, st_alpha, end_alpha, fade_dir, sx, sy: Int, algn: String, rot_with_shape: Bool }
 
 TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, bullet_img_rid, tab_stops, rtl }
 TextRun { text, bold, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid }
@@ -123,7 +131,7 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_
 | `src/ooxml/ooxml_parse.mbt` | Shape/Slide/Fill parsing + rels + slide size |
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape/Table rendering + public API |
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
-| `src/renderer/renderer_fill.mbt` | Gradient/pattern fill SVG rendering |
+| `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
 | `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |

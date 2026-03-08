@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 49', slideCount === 49, `got ${slideCount}`);
+  assert('slide count = 50', slideCount === 50, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 49; i++) {
+  for (let i = 1; i <= 50; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 49; i++) {
+  for (let i = 1; i <= 50; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -980,6 +980,20 @@ async function testFeaturesPptx() {
     assert('slide49 has a:inv', hasTag(slide49, 'a:inv'));
     assert('slide49 has a:hueMod', hasTag(slide49, 'a:hueMod'));
     assert('slide49 has hueMod val 50000', slide49.includes('50000'));
+  }
+
+  // ── Slide 50: Shape effects ──
+  section('test_features.pptx — Slide 50: shape effects');
+  {
+    const slide50 = textFiles.get('ppt/slides/slide50.xml') ?? '';
+    assert('slide50 has a:effectLst', hasTag(slide50, 'a:effectLst'));
+    assert('slide50 has a:outerShdw', hasTag(slide50, 'a:outerShdw'));
+    assert('slide50 has a:innerShdw', hasTag(slide50, 'a:innerShdw'));
+    assert('slide50 has a:glow', hasTag(slide50, 'a:glow'));
+    assert('slide50 has a:softEdge', hasTag(slide50, 'a:softEdge'));
+    assert('slide50 outerShdw blurRad', slide50.includes('blurRad="152400"'));
+    assert('slide50 outerShdw dir', slide50.includes('dir="5400000"'));
+    assert('slide50 glow rad', slide50.includes('rad="228600"'));
   }
 }
 

@@ -222,7 +222,7 @@ fn inject_placeholder_auto_content(
     } else if ph == "dt" {
       // Try to get date text from layout/master placeholder
       let ph_text = find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
-      if not(ph_text.is_empty()) { ph_text } else { "" }
+      ph_text
     } else if ph == "ftr" {
       // Try to get footer text from layout/master placeholder
       find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)

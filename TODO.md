@@ -36,6 +36,7 @@
 - [x] **背景 blip/パターン**: `p:bg/p:bgPr` の `a:blipFill`/`a:pattFill` パース/レンダリング/シリアライズ
 - [x] **線グラデーション/パターン**: `a:ln` 内 `a:gradFill`/`a:pattFill` パース/SVGレンダリング/シリアライズ
 - [x] **プレースホルダ自動内容**: スライド番号(`sldNum`)/日付(`dt`)/フッター(`ftr`) 空プレースホルダへの自動テキスト注入
+- [x] **エフェクト基本**: `a:effectLst` パース + 外側シャドウ(`a:outerShdw`→feDropShadow) + 内側シャドウ(`a:innerShdw`) + グロー(`a:glow`) + ソフトエッジ(`a:softEdge`→feGaussianBlur) — データモデル/パース/SVGフィルタ/round-trip/シリアライズ
 
 ---
 
@@ -51,11 +52,11 @@
 
 ## 9. エフェクト [P2]
 
-- [ ] 外側シャドウ (`a:outerShdw`) → SVG `<filter>` feDropShadow
-- [ ] 内側シャドウ (`a:innerShdw`)
-- [ ] グロー (`a:glow rad`)
-- [ ] ソフトエッジ (`a:softEdge rad`) → SVG feGaussianBlur
-- [ ] リフレクション (`a:reflection`)
+- [x] 外側シャドウ (`a:outerShdw`) → SVG `<filter>` feDropShadow
+- [x] 内側シャドウ (`a:innerShdw`)
+- [x] グロー (`a:glow rad`)
+- [x] ソフトエッジ (`a:softEdge rad`) → SVG feGaussianBlur
+- [ ] リフレクション (`a:reflection`) — 構造的アプローチ (フィルタではなくシェイプ複製+反転+フェード)
 - [ ] 3D — ベベル / 押し出し / 照明 (ベストエフォート)
 - [ ] テキスト単位の影・エフェクト (`a:rPr` 内 `a:effectLst`)
 
@@ -104,5 +105,7 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 | **P1** | スライド・シェイプ残機能 (カラー修飾子/背景blip・パターン/シェイプリンク/線グラデ・パターン/PH自動内容) | **完了** |
 | **P1** | ライブラリ公開 (ビルド/npm/テスト/ドキュメント) | 未着手 |
 | **P2** | 画像 (クロップ/アルファ/外部参照/SVG画像/エフェクト/Duotone/clrChange) | **完了** |
-| **P2** | エフェクト/チャート/テキスト高度 | 未着手 |
+| **P2** | エフェクト基本 (outerShdw/innerShdw/glow/softEdge) | **完了** |
+| **P2** | エフェクト残 (リフレクション/3D/テキストエフェクト) | 未着手 |
+| **P2** | チャート/テキスト高度 | 未着手 |
 | **—** | EMF/WMF/TIFF/SmartArt/OLE/メディア/数式/ノート/フォント | **保留** |

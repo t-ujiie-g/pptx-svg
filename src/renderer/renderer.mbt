@@ -105,6 +105,12 @@ fn stroke_patt_id(slide_num : Int, shape_idx : Int) -> String {
 }
 
 ///|
+/// Build an effect filter ID.
+fn effect_filter_id(slide_num : Int, shape_idx : Int) -> String {
+  "eff_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+}
+
+///|
 /// Build a blip filter ID.
 fn blip_filter_id(slide_num : Int, shape_idx : Int) -> String {
   "blipfx_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
@@ -1235,6 +1241,56 @@ fn render_shape(
     dai("end-cxn-idx", shape.end_cxn_idx) +
     da("sh-link-rid", shape.sh_link_rid) +
     da("sh-link-hover-rid", shape.sh_link_hover_rid) +
+    // Effect data attributes for round-trip
+    (if not(shape.effects.is_none()) {
+      let eff = shape.effects
+      let mut ea = ""
+      if not(eff.outer_shadow.is_none()) {
+        let os = eff.outer_shadow
+        ea = ea +
+          dai("eff-os-blur", os.blur_rad) +
+          dai("eff-os-dist", os.dist) +
+          dai("eff-os-dir", os.dir) +
+          da("eff-os-clr", os.color.to_hex()) +
+          dai("eff-os-sx", os.sx) +
+          dai("eff-os-sy", os.sy) +
+          da("eff-os-algn", os.algn) +
+          da("eff-os-rot", if os.rot_with_shape { "1" } else { "0" })
+      }
+      if not(eff.inner_shadow.is_none()) {
+        let ishdw = eff.inner_shadow
+        ea = ea +
+          dai("eff-is-blur", ishdw.blur_rad) +
+          dai("eff-is-dist", ishdw.dist) +
+          dai("eff-is-dir", ishdw.dir) +
+          da("eff-is-clr", ishdw.color.to_hex())
+      }
+      if not(eff.glow.is_none()) {
+        ea = ea +
+          dai("eff-gl-rad", eff.glow.rad) +
+          da("eff-gl-clr", eff.glow.color.to_hex())
+      }
+      if not(eff.soft_edge.is_none()) {
+        ea = ea + dai("eff-se-rad", eff.soft_edge.rad)
+      }
+      if not(eff.reflection.is_none()) {
+        let r = eff.reflection
+        ea = ea +
+          dai("eff-refl-blur", r.blur_rad) +
+          dai("eff-refl-dist", r.dist) +
+          dai("eff-refl-dir", r.dir) +
+          dai("eff-refl-sta", r.st_alpha) +
+          dai("eff-refl-enda", r.end_alpha) +
+          dai("eff-refl-fadedir", r.fade_dir) +
+          dai("eff-refl-sx", r.sx) +
+          dai("eff-refl-sy", r.sy) +
+          da("eff-refl-algn", r.algn) +
+          da("eff-refl-rot", if r.rot_with_shape { "1" } else { "0" })
+      }
+      ea
+    } else {
+      ""
+    }) +
     da("anchor", shape.body_props.anchor) +
     dai("l-ins", shape.body_props.l_ins) +
     dai("t-ins", shape.body_props.t_ins) +
@@ -1587,7 +1643,17 @@ fn render_shape(
   if inner.is_empty() {
     ""
   } else {
-    "<g" + g_attrs + ">" + inner + "</g>"
+    let eff_attr = if not(shape.effects.is_none()) {
+      let (_, fa) = render_effect_filter(
+        shape.effects,
+        effect_filter_id(slide_num, shape_idx),
+        scale,
+      )
+      fa
+    } else {
+      ""
+    }
+    "<g" + g_attrs + eff_attr + ">" + inner + "</g>"
   }
 }
 
@@ -2137,6 +2203,15 @@ pub fn render_slide_svg(
           sh.stroke_tail_len,
           sh.stroke,
         )
+    }
+    // Effect filter defs
+    if not(sh.effects.is_none()) {
+      let (eff_def, _) = render_effect_filter(
+        sh.effects,
+        effect_filter_id(slide_num, di),
+        scale,
+      )
+      defs = defs + eff_def
     }
     di = di + 1
   }

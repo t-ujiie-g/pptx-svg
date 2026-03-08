@@ -1097,6 +1097,159 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
   }
 }
 
+// ── Effects ──────────────────────────────────────────────────────────────────
+
+///|
+/// Outer shadow (a:outerShdw).
+/// blurRad/dist in EMU, dir in 60000ths of a degree (0=right, 5400000=bottom).
+pub(all) struct OuterShadow {
+  blur_rad : Int // blurRad in EMU; 0 = no blur
+  dist : Int // dist in EMU; 0 = no offset
+  dir : Int // dir in 60000ths of degree; 0 = right
+  color : Color // shadow color with alpha
+  sx : Int // sx scale %; 0 = default (100000)
+  sy : Int // sy scale %; 0 = default (100000)
+  algn : String // alignment: "tl","t","tr","l","ctr","r","bl","b","br"; "" = default ("b")
+  rot_with_shape : Bool // rotWithShape
+}
+
+///|
+pub fn OuterShadow::none() -> OuterShadow {
+  {
+    blur_rad: 0,
+    dist: 0,
+    dir: 0,
+    color: Color::none(),
+    sx: 0,
+    sy: 0,
+    algn: "",
+    rot_with_shape: true,
+  }
+}
+
+///|
+pub fn OuterShadow::is_none(self : OuterShadow) -> Bool {
+  self.color.is_none()
+}
+
+///|
+/// Inner shadow (a:innerShdw).
+pub(all) struct InnerShadow {
+  blur_rad : Int // blurRad in EMU
+  dist : Int // dist in EMU
+  dir : Int // dir in 60000ths of degree
+  color : Color // shadow color with alpha
+}
+
+///|
+pub fn InnerShadow::none() -> InnerShadow {
+  { blur_rad: 0, dist: 0, dir: 0, color: Color::none() }
+}
+
+///|
+pub fn InnerShadow::is_none(self : InnerShadow) -> Bool {
+  self.color.is_none()
+}
+
+///|
+/// Glow effect (a:glow).
+pub(all) struct Glow {
+  rad : Int // rad in EMU; 0 = no glow
+  color : Color // glow color with alpha
+}
+
+///|
+pub fn Glow::none() -> Glow {
+  { rad: 0, color: Color::none() }
+}
+
+///|
+pub fn Glow::is_none(self : Glow) -> Bool {
+  self.rad == 0 && self.color.is_none()
+}
+
+///|
+/// Soft edge effect (a:softEdge).
+pub(all) struct SoftEdge {
+  rad : Int // rad in EMU; 0 = no soft edge
+}
+
+///|
+pub fn SoftEdge::none() -> SoftEdge {
+  { rad: 0 }
+}
+
+///|
+pub fn SoftEdge::is_none(self : SoftEdge) -> Bool {
+  self.rad == 0
+}
+
+///|
+/// Reflection effect (a:reflection).
+pub(all) struct Reflection {
+  blur_rad : Int // blurRad in EMU
+  dist : Int // dist in EMU (gap between shape and reflection)
+  dir : Int // dir in 60000ths of degree
+  st_alpha : Int // stA start alpha (0-100000); 100000 = opaque
+  end_alpha : Int // endA end alpha (0-100000); 0 = transparent
+  fade_dir : Int // fadeDir direction for alpha gradient (60000ths of degree)
+  sx : Int // sx scale %
+  sy : Int // sy scale %
+  algn : String // alignment
+  rot_with_shape : Bool
+}
+
+///|
+pub fn Reflection::none() -> Reflection {
+  {
+    blur_rad: 0,
+    dist: 0,
+    dir: 0,
+    st_alpha: 0,
+    end_alpha: 0,
+    fade_dir: 0,
+    sx: 0,
+    sy: 0,
+    algn: "",
+    rot_with_shape: true,
+  }
+}
+
+///|
+pub fn Reflection::is_none(self : Reflection) -> Bool {
+  self.st_alpha == 0 && self.end_alpha == 0 && self.blur_rad == 0
+}
+
+///|
+/// Effect list applied to a shape (a:effectLst).
+pub(all) struct EffectList {
+  outer_shadow : OuterShadow
+  inner_shadow : InnerShadow
+  glow : Glow
+  soft_edge : SoftEdge
+  reflection : Reflection
+}
+
+///|
+pub fn EffectList::none() -> EffectList {
+  {
+    outer_shadow: OuterShadow::none(),
+    inner_shadow: InnerShadow::none(),
+    glow: Glow::none(),
+    soft_edge: SoftEdge::none(),
+    reflection: Reflection::none(),
+  }
+}
+
+///|
+pub fn EffectList::is_none(self : EffectList) -> Bool {
+  self.outer_shadow.is_none() &&
+  self.inner_shadow.is_none() &&
+  self.glow.is_none() &&
+  self.soft_edge.is_none() &&
+  self.reflection.is_none()
+}
+
 // ── Shape ─────────────────────────────────────────────────────────────────────
 
 ///|
@@ -1210,6 +1363,7 @@ pub(all) struct Shape {
   end_cxn_idx : Int // end connection point index (-1 = none)
   sh_link_rid : String // shape hyperlink r:id (a:hlinkClick on p:cNvPr)
   sh_link_hover_rid : String // shape hover link r:id (a:hlinkHover on p:cNvPr)
+  effects : EffectList // a:effectLst; EffectList::none() = no effects
 }
 
 ///|
@@ -1251,6 +1405,7 @@ pub fn Shape::default_with(
     end_cxn_idx: -1,
     sh_link_rid: "",
     sh_link_hover_rid: "",
+    effects: EffectList::none(),
   }
 }
 

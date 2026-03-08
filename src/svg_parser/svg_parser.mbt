@@ -18,6 +18,13 @@ fn parse_hex_color(s : String) -> @ooxml.Color {
   }
 }
 
+///|
+/// Parse a hex color from a data attribute, returning Color::none() if empty.
+fn color_or_none(node : @xml.XmlNode, attr : String) -> @ooxml.Color {
+  let v = get_data_attr(node, attr)
+  if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) }
+}
+
 // ── Attribute helpers ────────────────────────────────────────────────────────
 
 ///|
@@ -42,6 +49,82 @@ fn get_da(node : @xml.XmlNode, name : String) -> String {
 ///|
 fn get_dai(node : @xml.XmlNode, name : String) -> Int {
   get_data_int(node, "data-ooxml-" + name)
+}
+
+// ── Effect parsing from SVG data attributes ─────────────────────────────────
+
+///|
+/// Parse effects from data-ooxml-* attributes on a shape element.
+fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
+  let os_blur = get_dai(node, "eff-os-blur")
+  let os_dist = get_dai(node, "eff-os-dist")
+  let os_dir = get_dai(node, "eff-os-dir")
+  let os_clr = get_da(node, "eff-os-clr")
+  let os = if os_clr.is_empty() {
+    @ooxml.OuterShadow::none()
+  } else {
+    {
+      blur_rad: os_blur,
+      dist: os_dist,
+      dir: os_dir,
+      color: parse_hex_color(os_clr),
+      sx: get_dai(node, "eff-os-sx"),
+      sy: get_dai(node, "eff-os-sy"),
+      algn: get_da(node, "eff-os-algn"),
+      rot_with_shape: get_da(node, "eff-os-rot") != "0",
+    }
+  }
+  let is_clr = get_da(node, "eff-is-clr")
+  let ishdw = if is_clr.is_empty() {
+    @ooxml.InnerShadow::none()
+  } else {
+    {
+      blur_rad: get_dai(node, "eff-is-blur"),
+      dist: get_dai(node, "eff-is-dist"),
+      dir: get_dai(node, "eff-is-dir"),
+      color: parse_hex_color(is_clr),
+    }
+  }
+  let gl_rad = get_dai(node, "eff-gl-rad")
+  let gl_clr = get_da(node, "eff-gl-clr")
+  let gl = if gl_rad == 0 && gl_clr.is_empty() {
+    @ooxml.Glow::none()
+  } else {
+    {
+      rad: gl_rad,
+      color: if gl_clr.is_empty() {
+        @ooxml.Color::none()
+      } else {
+        parse_hex_color(gl_clr)
+      },
+    }
+  }
+  let se_rad = get_dai(node, "eff-se-rad")
+  let se : @ooxml.SoftEdge = { rad: se_rad }
+  let refl_sta = get_dai(node, "eff-refl-sta")
+  let refl = if refl_sta == 0 {
+    @ooxml.Reflection::none()
+  } else {
+    {
+      blur_rad: get_dai(node, "eff-refl-blur"),
+      dist: get_dai(node, "eff-refl-dist"),
+      dir: get_dai(node, "eff-refl-dir"),
+      st_alpha: refl_sta,
+      end_alpha: get_dai(node, "eff-refl-enda"),
+      fade_dir: get_dai(node, "eff-refl-fadedir"),
+      sx: get_dai(node, "eff-refl-sx"),
+      sy: get_dai(node, "eff-refl-sy"),
+      algn: get_da(node, "eff-refl-algn"),
+      rot_with_shape: get_da(node, "eff-refl-rot") != "0",
+    }
+  }
+  {
+    outer_shadow: os,
+    inner_shadow: ishdw,
+    glow: gl,
+    soft_edge: se,
+    reflection: refl,
+  }
 }
 
 // ── Gradient parsing from SVG data attributes ───────────────────────────────
@@ -463,10 +546,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
       svg_rid: get_da(g_node, "blip-svg-rid"),
       bright: get_dai(g_node, "blip-bright"),
       contrast: get_dai(g_node, "blip-contrast"),
-      duotone_1: { let v = get_da(g_node, "blip-duotone1"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
-      duotone_2: { let v = get_da(g_node, "blip-duotone2"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
-      clr_from: { let v = get_da(g_node, "blip-clr-from"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
-      clr_to: { let v = get_da(g_node, "blip-clr-to"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
+      duotone_1: color_or_none(g_node, "blip-duotone1"),
+      duotone_2: color_or_none(g_node, "blip-duotone2"),
+      clr_from: color_or_none(g_node, "blip-clr-from"),
+      clr_to: color_or_none(g_node, "blip-clr-to"),
     }
   }
   // PatternFill from data attributes
@@ -521,6 +604,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     end_cxn_idx: get_dai(g_node, "end-cxn-idx"),
     sh_link_rid: get_da(g_node, "sh-link-rid"),
     sh_link_hover_rid: get_da(g_node, "sh-link-hover-rid"),
+    effects: parse_effects_from_da(g_node),
   }
 }
 

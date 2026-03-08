@@ -351,6 +351,99 @@ fn parse_stroke(
   }
 }
 
+// ── Effect list parsing ──────────────────────────────────────────────────────
+
+///|
+/// Parse a:effectLst from shape property children.
+fn parse_effect_lst(
+  sppr_ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> EffectList {
+  match @xml.find_child(sppr_ch, "a:effectLst") {
+    None => EffectList::none()
+    Some(eff) => {
+      let eff_ch = @xml.get_children(eff)
+      let os = match @xml.find_child(eff_ch, "a:outerShdw") {
+        None => OuterShadow::none()
+        Some(node) => {
+          let ch = @xml.get_children(node)
+          let color = parse_color_from_children(ch, theme)
+          {
+            blur_rad: attr_int(node, "blurRad"),
+            dist: attr_int(node, "dist"),
+            dir: attr_int(node, "dir"),
+            color,
+            sx: attr_int(node, "sx"),
+            sy: attr_int(node, "sy"),
+            algn: match @xml.get_attr(node, "algn") {
+              Some(v) => v
+              None => ""
+            },
+            rot_with_shape: match @xml.get_attr(node, "rotWithShape") {
+              Some(v) => v != "0"
+              None => true
+            },
+          }
+        }
+      }
+      let ishdw = match @xml.find_child(eff_ch, "a:innerShdw") {
+        None => InnerShadow::none()
+        Some(node) => {
+          let ch = @xml.get_children(node)
+          let color = parse_color_from_children(ch, theme)
+          {
+            blur_rad: attr_int(node, "blurRad"),
+            dist: attr_int(node, "dist"),
+            dir: attr_int(node, "dir"),
+            color,
+          }
+        }
+      }
+      let gl = match @xml.find_child(eff_ch, "a:glow") {
+        None => Glow::none()
+        Some(node) => {
+          let ch = @xml.get_children(node)
+          let color = parse_color_from_children(ch, theme)
+          { rad: attr_int(node, "rad"), color }
+        }
+      }
+      let se = match @xml.find_child(eff_ch, "a:softEdge") {
+        None => SoftEdge::none()
+        Some(node) => { rad: attr_int(node, "rad") }
+      }
+      let refl = match @xml.find_child(eff_ch, "a:reflection") {
+        None => Reflection::none()
+        Some(node) =>
+          {
+            blur_rad: attr_int(node, "blurRad"),
+            dist: attr_int(node, "dist"),
+            dir: attr_int(node, "dir"),
+            st_alpha: attr_int(node, "stA"),
+            end_alpha: attr_int(node, "endA"),
+            fade_dir: attr_int(node, "fadeDir"),
+            sx: attr_int(node, "sx"),
+            sy: attr_int(node, "sy"),
+            algn: match @xml.get_attr(node, "algn") {
+              Some(v) => v
+              None => ""
+            },
+            rot_with_shape: match @xml.get_attr(node, "rotWithShape") {
+              Some(v) => v != "0"
+              None => true
+            },
+          }
+      }
+      {
+        outer_shadow: os,
+        inner_shadow: ishdw,
+        glow: gl,
+        soft_edge: se,
+        reflection: refl,
+      }
+    }
+  }
+}
+
 // ── Blip color helpers ───────────────────────────────────────────────────────
 
 ///|
@@ -743,6 +836,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     end_cxn_idx: -1,
     sh_link_rid,
     sh_link_hover_rid,
+    effects: parse_effect_lst(sppr_ch, theme),
   }
 }
 

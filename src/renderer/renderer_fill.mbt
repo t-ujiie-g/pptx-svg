@@ -456,3 +456,160 @@ fn render_pattern_def(pf : @ooxml.PatternFill, id : String) -> String {
   content +
   "</pattern>"
 }
+
+// ── Effect filter rendering ──────────────────────────────────────────────────
+
+///|
+/// Return CSS opacity string for an effect color, with a fallback default.
+fn eff_alpha_str(clr : @ooxml.Color, fallback : String) -> String {
+  if clr.alpha < 255 && not(clr.is_none()) {
+    @ooxml.alpha_to_css_str(clr.alpha)
+  } else {
+    fallback
+  }
+}
+
+///|
+/// Convert OOXML EMU to SVG pixel value for filter attributes.
+fn emu_to_filter_px(emu : Int, scale : Int) -> Int {
+  if scale > 0 { emu / scale } else { emu / default_emu_per_px }
+}
+
+///|
+/// Render SVG filter definition for shape effects (a:effectLst).
+/// Returns (filter_defs, filter_attr) — defs SVG string and filter="url(#id)" attribute.
+fn render_effect_filter(
+  eff : @ooxml.EffectList,
+  filter_id : String,
+  scale : Int,
+) -> (String, String) {
+  if eff.is_none() {
+    return ("", "")
+  }
+  let mut filters = ""
+  // Outer shadow: SVG feDropShadow or feGaussianBlur+feOffset+feFlood+feComposite
+  if not(eff.outer_shadow.is_none()) {
+    let os = eff.outer_shadow
+    let blur = emu_to_filter_px(os.blur_rad, scale)
+    let dist = emu_to_filter_px(os.dist, scale)
+    // dir is in 60000ths of a degree — convert to radians for dx/dy
+    // 0 = right, 5400000 = bottom, etc.
+    let angle_deg = os.dir / 60000
+    let dx = dist * cos_deg(angle_deg) / 100
+    let dy = dist * sin_deg(angle_deg) / 100
+    let std_dev = blur / 2
+    let clr = os.color
+    let alpha_str = eff_alpha_str(clr, "0.5")
+    filters = filters +
+      "<feDropShadow dx=\"" +
+      int_to_str(dx) +
+      "\" dy=\"" +
+      int_to_str(dy) +
+      "\" stdDeviation=\"" +
+      int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+      "\" flood-color=\"" +
+      clr.to_css() +
+      "\" flood-opacity=\"" +
+      alpha_str +
+      "\" result=\"shadow\"/>"
+    ()
+  }
+  // Glow: feGaussianBlur + feFlood + feComposite + feMerge
+  if not(eff.glow.is_none()) {
+    let rad = emu_to_filter_px(eff.glow.rad, scale)
+    let std_dev = rad / 2
+    let clr = eff.glow.color
+    let alpha_str = eff_alpha_str(clr, "0.7")
+    filters = filters +
+      "<feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"" +
+      int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+      "\" result=\"glowBlur\"/>" +
+      "<feFlood flood-color=\"" +
+      clr.to_css() +
+      "\" flood-opacity=\"" +
+      alpha_str +
+      "\" result=\"glowColor\"/>" +
+      "<feComposite in=\"glowColor\" in2=\"glowBlur\" operator=\"in\" result=\"glowFill\"/>" +
+      "<feMerge><feMergeNode in=\"glowFill\"/><feMergeNode in=\"SourceGraphic\"/></feMerge>"
+    ()
+  }
+  // Soft edge: feGaussianBlur on alpha, composite with source
+  if not(eff.soft_edge.is_none()) {
+    let rad = emu_to_filter_px(eff.soft_edge.rad, scale)
+    let std_dev = rad / 2
+    filters = filters +
+      "<feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"" +
+      int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+      "\" result=\"softAlpha\"/>" +
+      "<feComposite in=\"SourceGraphic\" in2=\"softAlpha\" operator=\"in\"/>"
+    ()
+  }
+  // Inner shadow: feGaussianBlur+feOffset on inverted alpha, flood+composite, merge
+  if not(eff.inner_shadow.is_none()) {
+    let ishdw = eff.inner_shadow
+    let blur = emu_to_filter_px(ishdw.blur_rad, scale)
+    let dist = emu_to_filter_px(ishdw.dist, scale)
+    let angle_deg = ishdw.dir / 60000
+    let dx = dist * cos_deg(angle_deg) / 100
+    let dy = dist * sin_deg(angle_deg) / 100
+    let std_dev = blur / 2
+    let clr = ishdw.color
+    let alpha_str = eff_alpha_str(clr, "0.5")
+    // Inner shadow: blur source alpha, offset, invert, flood+composite, merge with source
+    filters = filters +
+      "<feComponentTransfer in=\"SourceAlpha\" result=\"invAlpha\">" +
+      "<feFuncA type=\"table\" tableValues=\"1 0\"/>" +
+      "</feComponentTransfer>" +
+      "<feGaussianBlur in=\"invAlpha\" stdDeviation=\"" +
+      int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+      "\" result=\"isBlur\"/>" +
+      "<feOffset in=\"isBlur\" dx=\"" +
+      int_to_str(dx) +
+      "\" dy=\"" +
+      int_to_str(dy) +
+      "\" result=\"isOff\"/>" +
+      "<feFlood flood-color=\"" +
+      clr.to_css() +
+      "\" flood-opacity=\"" +
+      alpha_str +
+      "\"/>" +
+      "<feComposite in2=\"isOff\" operator=\"in\" result=\"isFill\"/>" +
+      "<feComposite in=\"isFill\" in2=\"SourceAlpha\" operator=\"in\" result=\"isClip\"/>" +
+      "<feMerge><feMergeNode in=\"SourceGraphic\"/><feMergeNode in=\"isClip\"/></feMerge>"
+    ()
+  }
+  // Note: Reflection requires structural approach (shape duplication), not SVG filter.
+  let def = "<filter id=\"" +
+    filter_id +
+    "\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\">" +
+    filters +
+    "</filter>"
+  (def, " filter=\"url(#" + filter_id + ")\"")
+}
+
+///|
+/// Simple cos approximation for shadow direction (degrees → *100 result for int math).
+fn cos_deg(deg : Int) -> Int {
+  // cos for 0,45,90,135,180,225,270,315 quadrants
+  let d = ((deg % 360) + 360) % 360
+  if d == 0 { 100 } else if d == 90 { 0 } else if d == 180 {
+    -100
+  } else if d == 270 {
+    0
+  } else if d < 90 {
+    // Linear interpolation: cos(45)≈71
+    100 - d * 100 / 90
+  } else if d < 180 {
+    -(d - 90) * 100 / 90
+  } else if d < 270 {
+    -100 + (d - 180) * 100 / 90
+  } else {
+    (d - 270) * 100 / 90
+  }
+}
+
+///|
+/// Simple sin approximation for shadow direction (degrees → *100 result for int math).
+fn sin_deg(deg : Int) -> Int {
+  cos_deg(deg - 90)
+}
