@@ -429,6 +429,8 @@ pub fn initialize_pptx() -> String {
       slide_size: g_slide_size.val,
       background: @ooxml.Color::none(),
       bg_grad: @ooxml.GradientFill::none(),
+      bg_blip_fill: @ooxml.BlipFill::none(),
+      bg_patt_fill: @ooxml.PatternFill::none(),
       shapes: [],
     })
     modified.push(false)
@@ -552,6 +554,13 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   )
   // ── Placeholder inheritance: resolve transforms from layout/master ──
   resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
+  // ── Placeholder auto-content: inject slide number/date/footer text ──
+  inject_placeholder_auto_content(
+    slide_data.shapes,
+    slide_num,
+    layout_opt,
+    master_opt,
+  )
   // ── Background inheritance: slide → layout → master → white ──
   let mut bg = slide_data.background
   if bg.is_none() {
@@ -590,6 +599,8 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     slide_size: slide_data.slide_size,
     background: bg,
     bg_grad: slide_data.bg_grad,
+    bg_blip_fill: slide_data.bg_blip_fill,
+    bg_patt_fill: slide_data.bg_patt_fill,
     shapes: slide_data.shapes,
   }
   g_slides.val[slide_idx] = resolved_slide

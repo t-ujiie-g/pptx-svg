@@ -72,7 +72,7 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 ## Data model (ooxml.mbt)
 
 ```
-SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, shapes: Array[Shape] }
+SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, bg_blip_fill: BlipFill, bg_patt_fill: PatternFill, shapes: Array[Shape] }
 Shape { kind: ShapeKind, transform: ShapeTransform,
   fill: Color, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill,
   stroke: Color, stroke_w: Int,
@@ -80,16 +80,21 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   stroke_head_type: String, stroke_head_w: String, stroke_head_len: String,
   stroke_tail_type: String, stroke_tail_w: String, stroke_tail_len: String,
   stroke_cmpd: String, stroke_no_fill: Bool,
-  paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int }
+  stroke_grad_fill: GradientFill, stroke_patt_fill: PatternFill,
+  paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int,
+  st_cxn_id: Int, st_cxn_idx: Int, end_cxn_id: Int, end_cxn_idx: Int,
+  sh_link_rid: String, sh_link_hover_rid: String }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | Other
-ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int])
+ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
 GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
+CustomGeomData { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b: String, cxn_lst: String }
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
+StrokeProps { color, width, dash, cap, join, miter_limit, head_type/w/len, tail_type/w/len, cmpd, no_fill, grad_fill, patt_fill }
 
 GradientStop { pos: Int, color: Color }  // pos: 0-100000
 GradientFill { stops, angle, path_type, rot_with_shape, fill_to_l/t/r/b, tile_flip }
-BlipFill { rid, stretch, src_l/t/r/b, tile_tx/ty/sx/sy, tile_flip, tile_algn }
+BlipFill { rid, stretch, src_l/t/r/b, tile_tx/ty/sx/sy, tile_flip, tile_algn, alpha, svg_rid, bright, contrast, duotone_1/2: Color, clr_from/to: Color }
 PatternFill { prst, fg_color: Color, bg_color: Color }
 
 TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, bullet_img_rid, tab_stops, rtl }

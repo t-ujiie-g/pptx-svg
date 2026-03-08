@@ -49,6 +49,9 @@ Slides:
  44. External image reference (TargetMode="External") — Wikimedia + picsum.photos
  45. Image effects — brightness/contrast (a:lum bright/contrast)
  46. Duotone (a:duotone) + color change (a:clrChange)
+ 47. Background pattern fill (a:pattFill in p:bgPr)
+ 48. Line gradient fill (a:gradFill in a:ln) + line pattern fill (a:pattFill in a:ln)
+ 49. Shape hyperlinks (a:hlinkClick/a:hlinkHover on p:cNvPr) + color modifiers (comp/inv/hueMod)
 """
 
 from pptx import Presentation
@@ -3520,6 +3523,217 @@ lbl46.text_frame.paragraphs[0].font.bold = True
 lbl46b = slide46.shapes.add_textbox(Inches(0.5), Inches(5.2), Inches(9), Inches(1))
 lbl46b.text_frame.paragraphs[0].text = "Left: Duotone (navy→yellow) | Right: clrChange (red→green, data preserved)"
 lbl46b.text_frame.paragraphs[0].font.size = Pt(12)
+
+########################################
+# Slide 47: Background pattern fill
+########################################
+slide47 = prs.slides.add_slide(prs.slide_layouts[6])
+
+# Inject pattern fill background via raw XML
+ns_a = '{http://schemas.openxmlformats.org/drawingml/2006/main}'
+bg47_xml = f"""<p:bg xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:bgPr>
+    <a:pattFill prst="ltDnDiag">
+      <a:fgClr><a:srgbClr val="3366CC"/></a:fgClr>
+      <a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>
+    </a:pattFill>
+    <a:effectLst/>
+  </p:bgPr>
+</p:bg>"""
+csld47 = slide47._element.find(f'.//{ns_p}cSld')
+# Remove existing bg if any
+old_bg47 = csld47.find(f'{ns_p}bg')
+if old_bg47 is not None:
+    csld47.remove(old_bg47)
+bg47_elem = etree.fromstring(bg47_xml)
+csld47.insert(0, bg47_elem)
+
+lbl47 = slide47.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl47.text_frame.paragraphs[0].text = "Slide 47: Background pattern fill (ltDnDiag)"
+lbl47.text_frame.paragraphs[0].font.size = Pt(18)
+lbl47.text_frame.paragraphs[0].font.bold = True
+
+########################################
+# Slide 48: Line gradient / pattern fill
+########################################
+slide48 = prs.slides.add_slide(prs.slide_layouts[6])
+
+# Shape 1: Rectangle with gradient stroke
+sp48_grad_xml = f"""<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="100" name="GradStrokeRect"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="1371600"/><a:ext cx="3657600" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="F0F0F0"/></a:solidFill>
+    <a:ln w="76200">
+      <a:gradFill>
+        <a:gsLst>
+          <a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>
+          <a:gs pos="50000"><a:srgbClr val="00FF00"/></a:gs>
+          <a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs>
+        </a:gsLst>
+        <a:lin ang="0" scaled="1"/>
+      </a:gradFill>
+    </a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr/>
+    <a:lstStyle/>
+    <a:p><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Gradient stroke</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+# Shape 2: Ellipse with pattern stroke
+sp48_patt_xml = f"""<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="101" name="PattStrokeEllipse"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="1371600"/><a:ext cx="3657600" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="FFFFCC"/></a:solidFill>
+    <a:ln w="57150">
+      <a:pattFill prst="smCheck">
+        <a:fgClr><a:srgbClr val="990000"/></a:fgClr>
+        <a:bgClr><a:srgbClr val="FFCC00"/></a:bgClr>
+      </a:pattFill>
+    </a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr/>
+    <a:lstStyle/>
+    <a:p><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Pattern stroke</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+spTree48 = slide48._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree48.append(etree.fromstring(sp48_grad_xml))
+spTree48.append(etree.fromstring(sp48_patt_xml))
+
+lbl48 = slide48.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl48.text_frame.paragraphs[0].text = "Slide 48: Line gradient fill + Line pattern fill"
+lbl48.text_frame.paragraphs[0].font.size = Pt(18)
+lbl48.text_frame.paragraphs[0].font.bold = True
+
+########################################
+# Slide 49: Shape hyperlinks + color modifiers
+########################################
+slide49 = prs.slides.add_slide(prs.slide_layouts[6])
+
+# Shape with hlinkClick on cNvPr
+sp49_link_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="200" name="LinkedShape">
+      <a:hlinkClick r:id="rId99"/>
+    </p:cNvPr>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="1371600"/><a:ext cx="3657600" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:ln w="25400"><a:solidFill><a:srgbClr val="2F5597"/></a:solidFill></a:ln>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1600" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>Click me (shape link)</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+# Shape with color modifier: complement
+sp49_comp_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="201" name="CompColor"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="1371600"/><a:ext cx="3657600" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="FF6600"><a:comp/></a:srgbClr></a:solidFill>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"/><a:t>comp(#FF6600) = complementary hue</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+# Shape with color modifier: inv
+sp49_inv_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="202" name="InvColor"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="3657600"/><a:ext cx="3657600" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="3366CC"><a:inv/></a:srgbClr></a:solidFill>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"/><a:t>inv(#3366CC) → #CC9933</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+# Shape with hueMod
+sp49_huemod_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="203" name="HueModColor"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="3657600"/><a:ext cx="3657600" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="FF0000"><a:hueMod val="50000"/></a:srgbClr></a:solidFill>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400"/><a:t>hueMod 50% of red</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+spTree49 = slide49._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree49.append(etree.fromstring(sp49_link_xml))
+spTree49.append(etree.fromstring(sp49_comp_xml))
+spTree49.append(etree.fromstring(sp49_inv_xml))
+spTree49.append(etree.fromstring(sp49_huemod_xml))
+
+lbl49 = slide49.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl49.text_frame.paragraphs[0].text = "Slide 49: Shape hyperlinks + Color modifiers (comp/inv/hueMod)"
+lbl49.text_frame.paragraphs[0].font.size = Pt(18)
+lbl49.text_frame.paragraphs[0].font.bold = True
+
+# Add a fake relationship for the shape link (rId99)
+# We need to add this to the slide49 rels
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+slide49_part = slide49.part
+slide49_part.rels.get_or_add_ext_rel(RT.HYPERLINK, 'https://example.com/shape-link')
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

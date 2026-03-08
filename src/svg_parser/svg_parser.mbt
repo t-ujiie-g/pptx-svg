@@ -47,19 +47,6 @@ fn get_dai(node : @xml.XmlNode, name : String) -> Int {
 // ── Gradient parsing from SVG data attributes ───────────────────────────────
 
 ///|
-/// Extract substring by building char-by-char (avoids deprecated substring / CreatingViewError).
-fn extract_sub(s : String, from : Int, to : Int) -> String {
-  let mut out = ""
-  let mut k = from
-  while k < to {
-    let c = s.get_char(k).unwrap()
-    out = out + @ffi.ffi_char_code_to_str(Char::to_int(c))
-    k = k + 1
-  }
-  out
-}
-
-///|
 /// Parse gradient stops from "pos,RRGGBB;pos,RRGGBB;..." string.
 fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
   let stops : Array[@ooxml.GradientStop] = []
@@ -83,8 +70,8 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
           ci = ci + 1
         }
         if comma > start {
-          let pos_str = extract_sub(s, start, comma)
-          let hex_str = extract_sub(s, comma + 1, i)
+          let pos_str = @xml.str_substring(s, start, comma)
+          let hex_str = @xml.str_substring(s, comma + 1, i)
           let pos = @xml.parse_int(pos_str)
           let color = @ooxml.parse_hex_color(hex_str)
           stops.push({ pos, color })
@@ -522,6 +509,8 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     stroke_tail_len,
     stroke_cmpd,
     stroke_no_fill,
+    stroke_grad_fill: @ooxml.GradientFill::none(),
+    stroke_patt_fill: @ooxml.PatternFill::none(),
     paragraphs,
     body_props,
     ph_type,
@@ -530,6 +519,8 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     st_cxn_idx: get_dai(g_node, "st-cxn-idx"),
     end_cxn_id: get_dai(g_node, "end-cxn-id"),
     end_cxn_idx: get_dai(g_node, "end-cxn-idx"),
+    sh_link_rid: get_da(g_node, "sh-link-rid"),
+    sh_link_hover_rid: get_da(g_node, "sh-link-hover-rid"),
   }
 }
 
@@ -631,7 +622,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
       return {
         slide_size: @ooxml.SlideSize::default(),
         background: @ooxml.Color::white(),
-        bg_grad: @ooxml.GradientFill::none(),
+        bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(),
         shapes: [],
       }
   }
@@ -671,5 +662,5 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     i = i + 1
   }
 
-  { slide_size, background, bg_grad: @ooxml.GradientFill::none(), shapes }
+  { slide_size, background, bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(), shapes }
 }

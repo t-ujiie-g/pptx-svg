@@ -215,12 +215,15 @@ fn parse_stroke(
         Some(_) => true
         None => false
       }
+      let ln_gf_early = parse_gradient_fill(ln_ch, theme)
+      let ln_pf_early = parse_pattern_fill(ln_ch, theme)
+      let has_alt_fill = not(ln_gf_early.is_none()) || not(ln_pf_early.is_none())
       let color = if no_fill {
         Color::none()
       } else {
         let clr = parse_solid_fill(ln_ch, theme)
         if clr.is_none() {
-          Color::black()
+          if has_alt_fill { Color::none() } else { Color::black() }
         } else {
           clr
         }
@@ -341,6 +344,8 @@ fn parse_stroke(
         tail_len,
         cmpd,
         no_fill,
+        grad_fill: ln_gf_early,
+        patt_fill: ln_pf_early,
       }
     }
   }
@@ -591,6 +596,39 @@ fn parse_pattern_fill(
   }
 }
 
+// ── Shape link helpers ────────────────────────────────────────────────────────
+
+///|
+/// Parse hyperlinks from p:cNvPr element (a:hlinkClick, a:hlinkHover).
+/// Returns (click_rid, hover_rid).
+fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
+  let mut click_rid = ""
+  let mut hover_rid = ""
+  match @xml.find_child(nv_ch, "p:cNvPr") {
+    None => ()
+    Some(cnvpr) => {
+      let cnvpr_ch = @xml.get_children(cnvpr)
+      match @xml.find_child(cnvpr_ch, "a:hlinkClick") {
+        None => ()
+        Some(hc) =>
+          click_rid = match @xml.get_attr(hc, "r:id") {
+            Some(v) => v
+            None => ""
+          }
+      }
+      match @xml.find_child(cnvpr_ch, "a:hlinkHover") {
+        None => ()
+        Some(hh) =>
+          hover_rid = match @xml.get_attr(hh, "r:id") {
+            Some(v) => v
+            None => ""
+          }
+      }
+    }
+  }
+  (click_rid, hover_rid)
+}
+
 // ── Shape parsers ─────────────────────────────────────────────────────────────
 
 ///|
@@ -599,10 +637,16 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   // Extract placeholder info from p:nvSpPr/p:nvPr/p:ph
   let mut ph_type = ""
   let mut ph_idx = -1
+  let mut sh_link_rid = ""
+  let mut sh_link_hover_rid = ""
   match @xml.find_child(ch, "p:nvSpPr") {
     None => ()
     Some(nvsp) => {
       let nvsp_ch = @xml.get_children(nvsp)
+      // Parse shape hyperlinks from p:cNvPr
+      let (lr, hr) = parse_cnvpr_links(nvsp_ch)
+      sh_link_rid = lr
+      sh_link_hover_rid = hr
       match @xml.find_child(nvsp_ch, "p:nvPr") {
         None => ()
         Some(nvpr) => {
@@ -687,6 +731,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     stroke_tail_len: sp.tail_len,
     stroke_cmpd: sp.cmpd,
     stroke_no_fill: sp.no_fill,
+    stroke_grad_fill: sp.grad_fill,
+    stroke_patt_fill: sp.patt_fill,
     paragraphs: paras,
     body_props,
     ph_type,
@@ -695,6 +741,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     st_cxn_idx: -1,
     end_cxn_id: -1,
     end_cxn_idx: -1,
+    sh_link_rid,
+    sh_link_hover_rid,
   }
 }
 
@@ -711,7 +759,17 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     None => BlipFill::none()
     Some(bf_node) => parse_blip_fill_node(bf_node)
   }
-  Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
+  // Parse shape hyperlinks from p:nvPicPr/p:cNvPr
+  let (sh_link_rid, sh_link_hover_rid) = match @xml.find_child(ch, "p:nvPicPr") {
+    None => ("", "")
+    Some(nvpic) => parse_cnvpr_links(@xml.get_children(nvpic))
+  }
+  let mut s = Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
+  // Immutable struct — reconstruct with links if present
+  if not(sh_link_rid.is_empty()) || not(sh_link_hover_rid.is_empty()) {
+    s = { ..s, sh_link_rid, sh_link_hover_rid }
+  }
+  s
 }
 
 ///|
@@ -929,12 +987,7 @@ fn shape_with_stroke(
   sp : StrokeProps,
 ) -> Shape {
   {
-    kind,
-    transform,
-    fill: Color::none(),
-    grad_fill: GradientFill::none(),
-    blip_fill: BlipFill::none(),
-    patt_fill: PatternFill::none(),
+    ..Shape::default_with(kind, transform),
     stroke: sp.color,
     stroke_w: sp.width,
     stroke_dash: sp.dash,
@@ -949,14 +1002,8 @@ fn shape_with_stroke(
     stroke_tail_len: sp.tail_len,
     stroke_cmpd: sp.cmpd,
     stroke_no_fill: sp.no_fill,
-    paragraphs: [],
-    body_props: BodyProps::default(),
-    ph_type: "",
-    ph_idx: -1,
-    st_cxn_id: -1,
-    st_cxn_idx: -1,
-    end_cxn_id: -1,
-    end_cxn_idx: -1,
+    stroke_grad_fill: sp.grad_fill,
+    stroke_patt_fill: sp.patt_fill,
   }
 }
 
@@ -1322,6 +1369,8 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
     st_cxn_idx: st_idx,
     end_cxn_id: end_id,
     end_cxn_idx: end_idx,
+    sh_link_rid: "",
+    sh_link_hover_rid: "",
   }
 }
 
@@ -1478,36 +1527,62 @@ pub fn parse_slide(
         slide_size,
         background: Color::none(),
         bg_grad: GradientFill::none(),
+        bg_blip_fill: BlipFill::none(),
+        bg_patt_fill: PatternFill::none(),
         shapes,
       }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
       // Parse background: p:bg → p:bgPr → solidFill / gradFill
       // Color::none() = no explicit bg (inherit from layout/master)
-      let (bg, bg_grad) = match @xml.find_child(csld_ch, "p:bg") {
-        None => (Color::none(), GradientFill::none())
+      let (bg, bg_grad, bg_bf, bg_pf) = match @xml.find_child(csld_ch, "p:bg") {
+        None =>
+          (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
         Some(bg_node) => {
           let bg_ch = @xml.get_children(bg_node)
           match @xml.find_child(bg_ch, "p:bgPr") {
-            None => (Color::none(), GradientFill::none())
+            None =>
+              (
+                Color::none(),
+                GradientFill::none(),
+                BlipFill::none(),
+                PatternFill::none(),
+              )
             Some(bgpr) => {
               let bgpr_ch = @xml.get_children(bgpr)
               let c = parse_solid_fill(bgpr_ch, theme)
               let gf = parse_gradient_fill(bgpr_ch, theme)
-              (c, gf)
+              let bf = parse_blip_fill(bgpr_ch)
+              let pf = parse_pattern_fill(bgpr_ch, theme)
+              (c, gf, bf, pf)
             }
           }
         }
       }
       // Navigate to p:spTree
       match @xml.find_child(csld_ch, "p:spTree") {
-        None => { slide_size, background: bg, bg_grad, shapes }
+        None =>
+          {
+            slide_size,
+            background: bg,
+            bg_grad,
+            bg_blip_fill: bg_bf,
+            bg_patt_fill: bg_pf,
+            shapes,
+          }
         Some(tree) => {
           let parsed = parse_shapes_from_children(
             @xml.get_children(tree),
             theme,
           )
-          { slide_size, background: bg, bg_grad, shapes: parsed }
+          {
+            slide_size,
+            background: bg,
+            bg_grad,
+            bg_blip_fill: bg_bf,
+            bg_patt_fill: bg_pf,
+            shapes: parsed,
+          }
         }
       }
     }

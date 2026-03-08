@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 46', slideCount === 46, `got ${slideCount}`);
+  assert('slide count = 49', slideCount === 49, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 46; i++) {
+  for (let i = 1; i <= 49; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 46; i++) {
+  for (let i = 1; i <= 49; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -948,6 +948,38 @@ async function testFeaturesPptx() {
     assert('slide46 has a:clrChange', hasTag(slide46, 'a:clrChange'));
     assert('slide46 has a:clrFrom', hasTag(slide46, 'a:clrFrom'));
     assert('slide46 has a:clrTo', hasTag(slide46, 'a:clrTo'));
+  }
+
+  // ── Slide 47: Background pattern fill ──
+  section('test_features.pptx — Slide 47: background pattern fill');
+  {
+    const slide47 = textFiles.get('ppt/slides/slide47.xml') ?? '';
+    assert('slide47 has p:bg', hasTag(slide47, 'p:bg'));
+    assert('slide47 has p:bgPr', hasTag(slide47, 'p:bgPr'));
+    assert('slide47 has a:pattFill', hasTag(slide47, 'a:pattFill'));
+    assert('slide47 has ltDnDiag', slide47.includes('ltDnDiag'));
+    assert('slide47 has fg color 3366CC', slide47.includes('3366CC'));
+  }
+
+  // ── Slide 48: Line gradient/pattern fill ──
+  section('test_features.pptx — Slide 48: line gradient/pattern fill');
+  {
+    const slide48 = textFiles.get('ppt/slides/slide48.xml') ?? '';
+    assert('slide48 has a:ln with gradFill', slide48.includes('<a:gradFill>') || slide48.includes('<a:gradFill '));
+    assert('slide48 has a:ln with pattFill', slide48.includes('smCheck'));
+    assert('slide48 has gradient stop FF0000', slide48.includes('FF0000'));
+    assert('slide48 has gradient stop 0000FF', slide48.includes('0000FF'));
+  }
+
+  // ── Slide 49: Shape hyperlinks + color modifiers ──
+  section('test_features.pptx — Slide 49: shape hyperlinks + color modifiers');
+  {
+    const slide49 = textFiles.get('ppt/slides/slide49.xml') ?? '';
+    assert('slide49 has a:hlinkClick', hasTag(slide49, 'a:hlinkClick'));
+    assert('slide49 has a:comp', hasTag(slide49, 'a:comp'));
+    assert('slide49 has a:inv', hasTag(slide49, 'a:inv'));
+    assert('slide49 has a:hueMod', hasTag(slide49, 'a:hueMod'));
+    assert('slide49 has hueMod val 50000', slide49.includes('50000'));
   }
 }
 

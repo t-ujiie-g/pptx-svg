@@ -424,6 +424,23 @@ fn max3(a : Int, b : Int, c : Int) -> Int {
   }
 }
 
+// ── Integer square root (for gamma approximation) ───────────────────────────
+
+///|
+/// Integer square root via Newton's method.
+fn int_sqrt(n : Int) -> Int {
+  if n <= 0 {
+    return 0
+  }
+  let mut x = n
+  let mut y = (x + 1) / 2
+  while y < x {
+    x = y
+    y = (x + n / x) / 2
+  }
+  x
+}
+
 // ── HSL color space constants (integer-scaled) ──────────────────────────────
 // Hue: 0-3600 (tenths of a degree), Saturation/Lightness: 0-1000 (tenths of %)
 
@@ -579,6 +596,61 @@ pub fn apply_color_modifiers(
         } else if tag == "a:alphaModFix" {
           // Fixed alpha modulation
           alpha_val = alpha_val * val / pct_100
+        } else if tag == "a:comp" {
+          // Complement: rotate hue by 180°
+          let (h, s, l) = rgb_to_hsl(r, g, b)
+          let new_h = (h + 1800) % 3600
+          let c2 = hsl_to_rgb(new_h, s, l)
+          r = c2.r
+          g = c2.g
+          b = c2.b
+        } else if tag == "a:inv" {
+          // Invert RGB channels
+          r = rgb_max - r
+          g = rgb_max - g
+          b = rgb_max - b
+        } else if tag == "a:gamma" {
+          // Gamma correction — sRGB linearize (approximate)
+          // Standard gamma ≈ 2.2; this maps sRGB → linear
+          // Use integer approximation: (v/255)^2.2 * 255 ≈ v*v/255
+          r = r * r / rgb_max
+          g = g * g / rgb_max
+          b = b * b / rgb_max
+        } else if tag == "a:invGamma" {
+          // Inverse gamma — linear → sRGB (approximate)
+          // (v/255)^(1/2.2) * 255 ≈ isqrt(v*255)
+          r = int_sqrt(r * rgb_max)
+          g = int_sqrt(g * rgb_max)
+          b = int_sqrt(b * rgb_max)
+        } else if tag == "a:hueMod" {
+          // Hue modulation: val is percentage (100000 = no change)
+          let (h, s, l) = rgb_to_hsl(r, g, b)
+          let new_h = h * val / pct_100 % 3600
+          let c2 = hsl_to_rgb(new_h, s, l)
+          r = c2.r
+          g = c2.g
+          b = c2.b
+        } else if tag == "a:hueOff" {
+          // Hue offset: val is in 60000ths of a degree
+          let (h, s, l) = rgb_to_hsl(r, g, b)
+          let offset = val / 600 * 10 // convert 60000/deg to tenths of degree
+          let mut new_h = h + offset
+          if new_h < 0 { new_h = new_h + 3600 }
+          new_h = new_h % 3600
+          let c2 = hsl_to_rgb(new_h, s, l)
+          r = c2.r
+          g = c2.g
+          b = c2.b
+        } else if tag == "a:satOff" {
+          // Saturation offset: val is percentage (0-100000)
+          let (h, s, l) = rgb_to_hsl(r, g, b)
+          let mut new_s = s + val * hsl_scale / pct_100
+          if new_s < 0 { new_s = 0 }
+          if new_s > hsl_scale { new_s = hsl_scale }
+          let c2 = hsl_to_rgb(h, new_s, l)
+          r = c2.r
+          g = c2.g
+          b = c2.b
         }
       }
       _ => ()
@@ -1078,6 +1150,8 @@ pub(all) struct StrokeProps {
   tail_len : String
   cmpd : String
   no_fill : Bool
+  grad_fill : GradientFill // line gradient fill; GradientFill::none() = none
+  patt_fill : PatternFill // line pattern fill; PatternFill::none() = none
 }
 
 ///|
@@ -1097,6 +1171,8 @@ pub fn StrokeProps::default() -> StrokeProps {
     tail_len: "",
     cmpd: "",
     no_fill: false,
+    grad_fill: GradientFill::none(),
+    patt_fill: PatternFill::none(),
   }
 }
 
@@ -1122,6 +1198,8 @@ pub(all) struct Shape {
   stroke_tail_len : String // arrow tail length
   stroke_cmpd : String // compound line: sng/dbl/thickThin/thinThick/tri. "" = default (sng)
   stroke_no_fill : Bool // explicit a:noFill on a:ln (line exists but invisible)
+  stroke_grad_fill : GradientFill // line gradient fill; GradientFill::none() = none
+  stroke_patt_fill : PatternFill // line pattern fill; PatternFill::none() = none
   paragraphs : Array[TextParagraph]
   body_props : BodyProps // text body properties (anchor, insets)
   ph_type : String // "title","body","ctrTitle","subTitle","dt","ftr","sldNum","" (non-PH)
@@ -1130,6 +1208,8 @@ pub(all) struct Shape {
   st_cxn_idx : Int // start connection point index (-1 = none)
   end_cxn_id : Int // end connection shape id (-1 = none)
   end_cxn_idx : Int // end connection point index (-1 = none)
+  sh_link_rid : String // shape hyperlink r:id (a:hlinkClick on p:cNvPr)
+  sh_link_hover_rid : String // shape hover link r:id (a:hlinkHover on p:cNvPr)
 }
 
 ///|
@@ -1159,6 +1239,8 @@ pub fn Shape::default_with(
     stroke_tail_len: "",
     stroke_cmpd: "",
     stroke_no_fill: false,
+    stroke_grad_fill: GradientFill::none(),
+    stroke_patt_fill: PatternFill::none(),
     paragraphs: [],
     body_props: BodyProps::default(),
     ph_type: "",
@@ -1167,6 +1249,8 @@ pub fn Shape::default_with(
     st_cxn_idx: -1,
     end_cxn_id: -1,
     end_cxn_idx: -1,
+    sh_link_rid: "",
+    sh_link_hover_rid: "",
   }
 }
 
@@ -1177,36 +1261,7 @@ pub fn Shape::default_with_blip(
   transform : ShapeTransform,
   blip_fill : BlipFill,
 ) -> Shape {
-  {
-    kind,
-    transform,
-    fill: Color::none(),
-    grad_fill: GradientFill::none(),
-    blip_fill,
-    patt_fill: PatternFill::none(),
-    stroke: Color::none(),
-    stroke_w: 0,
-    stroke_dash: "",
-    stroke_cap: "",
-    stroke_join: "",
-    stroke_miter_limit: 0,
-    stroke_head_type: "",
-    stroke_head_w: "",
-    stroke_head_len: "",
-    stroke_tail_type: "",
-    stroke_tail_w: "",
-    stroke_tail_len: "",
-    stroke_cmpd: "",
-    stroke_no_fill: false,
-    paragraphs: [],
-    body_props: BodyProps::default(),
-    ph_type: "",
-    ph_idx: -1,
-    st_cxn_id: -1,
-    st_cxn_idx: -1,
-    end_cxn_id: -1,
-    end_cxn_idx: -1,
-  }
+  { ..Shape::default_with(kind, transform), blip_fill }
 }
 
 // ── Slide data ────────────────────────────────────────────────────────────────
@@ -1228,6 +1283,8 @@ pub(all) struct SlideData {
   slide_size : SlideSize
   background : Color
   bg_grad : GradientFill // background gradient; GradientFill::none() = solid
+  bg_blip_fill : BlipFill // background image fill; BlipFill::none() = no image
+  bg_patt_fill : PatternFill // background pattern fill; PatternFill::none() = no pattern
   shapes : Array[Shape]
 }
 

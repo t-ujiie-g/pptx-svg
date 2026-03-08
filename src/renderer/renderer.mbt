@@ -93,6 +93,18 @@ fn patt_id(slide_num : Int, shape_idx : Int) -> String {
 }
 
 ///|
+/// Build a stroke gradient definition ID.
+fn stroke_grad_id(slide_num : Int, shape_idx : Int) -> String {
+  "sgrad-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+}
+
+///|
+/// Build a stroke pattern definition ID.
+fn stroke_patt_id(slide_num : Int, shape_idx : Int) -> String {
+  "spatt-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+}
+
+///|
 /// Build a blip filter ID.
 fn blip_filter_id(slide_num : Int, shape_idx : Int) -> String {
   "blipfx_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
@@ -1221,6 +1233,8 @@ fn render_shape(
     dai("st-cxn-idx", shape.st_cxn_idx) +
     dai("end-cxn-id", shape.end_cxn_id) +
     dai("end-cxn-idx", shape.end_cxn_idx) +
+    da("sh-link-rid", shape.sh_link_rid) +
+    da("sh-link-hover-rid", shape.sh_link_hover_rid) +
     da("anchor", shape.body_props.anchor) +
     dai("l-ins", shape.body_props.l_ins) +
     dai("t-ins", shape.body_props.t_ins) +
@@ -1347,7 +1361,9 @@ fn render_shape(
           fill_base
         }
       }
-      let stroke = if shape.stroke.is_none() && not(shape.stroke_no_fill) {
+      let stroke = if shape.stroke.is_none() && not(shape.stroke_no_fill) &&
+        shape.stroke_grad_fill.is_none() &&
+        shape.stroke_patt_fill.is_none() {
         " stroke=\"none\""
       } else if shape.stroke_no_fill {
         " stroke=\"none\""
@@ -1360,7 +1376,14 @@ fn render_shape(
           },
           scale,
         )
-        let base = a("stroke", shape.stroke.to_css()) + ai("stroke-width", sw)
+        let stroke_color = if not(shape.stroke_grad_fill.is_none()) {
+          "url(#" + stroke_grad_id(slide_num, shape_idx) + ")"
+        } else if not(shape.stroke_patt_fill.is_none()) {
+          "url(#" + stroke_patt_id(slide_num, shape_idx) + ")"
+        } else {
+          shape.stroke.to_css()
+        }
+        let base = a("stroke", stroke_color) + ai("stroke-width", sw)
         let dash_attr = stroke_dasharray(shape.stroke_dash, sw)
         let cap_attr = stroke_linecap(shape.stroke_cap)
         let join_attr = stroke_linejoin(
@@ -2047,6 +2070,22 @@ pub fn render_slide_svg(
     defs = defs +
       render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
   }
+  // Background pattern
+  if not(slide.bg_patt_fill.is_none()) {
+    defs = defs +
+      render_pattern_def(
+        slide.bg_patt_fill,
+        "patt-bg-s" + int_to_str(slide_num),
+      )
+  }
+  // Background blip fill filter
+  if not(slide.bg_blip_fill.is_none()) && blip_has_effects(slide.bg_blip_fill) {
+    let (fd, _) = render_blip_filter(
+      slide.bg_blip_fill,
+      "bfilt-bg-s" + int_to_str(slide_num),
+    )
+    defs = defs + fd
+  }
   // Background shapes defs (master/layout non-placeholder shapes)
   let nbg = bg_shapes.length()
   let mut bdi = 0
@@ -2069,6 +2108,15 @@ pub fn render_slide_svg(
     }
     if not(sh.patt_fill.is_none()) {
       defs = defs + render_pattern_def(sh.patt_fill, patt_id(slide_num, di))
+    }
+    // Stroke gradient/pattern defs
+    if not(sh.stroke_grad_fill.is_none()) {
+      defs = defs +
+        render_gradient_def(sh.stroke_grad_fill, stroke_grad_id(slide_num, di))
+    }
+    if not(sh.stroke_patt_fill.is_none()) {
+      defs = defs +
+        render_pattern_def(sh.stroke_patt_fill, stroke_patt_id(slide_num, di))
     }
     if has_arrow(sh.stroke_head_type) {
       defs = defs +
@@ -2100,6 +2148,8 @@ pub fn render_slide_svg(
 
   let bg_fill = if not(slide.bg_grad.is_none()) {
     "url(#grad-bg-s" + int_to_str(slide_num) + ")"
+  } else if not(slide.bg_patt_fill.is_none()) {
+    "url(#patt-bg-s" + int_to_str(slide_num) + ")"
   } else {
     slide.background.to_css()
   }
@@ -2108,6 +2158,39 @@ pub fn render_slide_svg(
     ai("height", h) +
     a("fill", bg_fill) +
     "/>"
+  // Background blip fill (image)
+  let bg_blip_svg = if not(slide.bg_blip_fill.is_none()) {
+    let bf = slide.bg_blip_fill
+    let href = resolve_blip_href(rels, bf)
+    if href.is_empty() {
+      ""
+    } else {
+      let opacity = blip_opacity_attr(bf)
+      let filter_attr = if blip_has_effects(bf) {
+        " filter=\"url(#bfilt-bg-s" + int_to_str(slide_num) + ")\""
+      } else {
+        ""
+      }
+      if bf.has_crop() {
+        let clip_id = "bgclip-s" + int_to_str(slide_num)
+        render_cropped_image_with_filter(
+          bf, href, 0, 0, w, h, clip_id, opacity, "", filter_attr,
+        )
+      } else {
+        "<image" +
+        " x=\"0\" y=\"0\"" +
+        ai("width", w) +
+        ai("height", h) +
+        " preserveAspectRatio=\"none\"" +
+        a("href", href) +
+        opacity +
+        filter_attr +
+        "/>"
+      }
+    }
+  } else {
+    ""
+  }
   // Render master/layout background shapes (non-placeholder)
   let mut bg_shapes_svg = ""
   let mut bi = 0
@@ -2124,5 +2207,5 @@ pub fn render_slide_svg(
       render_shape(slide.shapes[i], rels, slide_num, scale, i, theme, table_styles)
     i = i + 1
   }
-  header + defs_section + bg_rect + bg_shapes_svg + shapes_svg + "</svg>"
+  header + defs_section + bg_rect + bg_blip_svg + bg_shapes_svg + shapes_svg + "</svg>"
 }

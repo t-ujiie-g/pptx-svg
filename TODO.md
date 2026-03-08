@@ -31,10 +31,25 @@
 - [x] **画像エフェクト**: `a:lum` brightness/contrast → SVG `<filter>` feComponentTransfer
 - [x] **Duotone**: `a:duotone` パース + SVG filter (grayscale→2色マッピング)
 - [x] **Color change**: `a:clrChange` パース + round-trip (SVG filter での精密再現は不可 — データ保持のみ)
+- [x] **カラー修飾子拡張**: comp/inv/gamma/invGamma/hueMod/hueOff/satOff
+- [x] **シェイプリンク**: `a:hlinkClick`/`a:hlinkHover` on `p:cNvPr` (パース/SVG属性/round-trip/シリアライズ)
+- [x] **背景 blip/パターン**: `p:bg/p:bgPr` の `a:blipFill`/`a:pattFill` パース/レンダリング/シリアライズ
+- [x] **線グラデーション/パターン**: `a:ln` 内 `a:gradFill`/`a:pattFill` パース/SVGレンダリング/シリアライズ
+- [x] **プレースホルダ自動内容**: スライド番号(`sldNum`)/日付(`dt`)/フッター(`ftr`) 空プレースホルダへの自動テキスト注入
 
 ---
 
-## 8. エフェクト [P2]
+## 8. ライブラリ公開 [P1]
+
+- [ ] `dist/pptx-svg.wasm` ビルド成果物コピー (ビルドスクリプト)
+- [ ] npm publish ワークフロー
+- [ ] エラーハンドリング設計
+- [ ] テスト (Vitest / ビジュアルリグレッション / ブラウザ互換)
+- [ ] ドキュメント (README / CHANGELOG / JSDoc)
+
+---
+
+## 9. エフェクト [P2]
 
 - [ ] 外側シャドウ (`a:outerShdw`) → SVG `<filter>` feDropShadow
 - [ ] 内側シャドウ (`a:innerShdw`)
@@ -46,7 +61,7 @@
 
 ---
 
-## 9. チャート [P2]
+## 10. チャート [P2]
 
 ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要。
 
@@ -57,32 +72,11 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 ---
 
-## 10. テキスト — 高度機能 [P2]
+## 11. テキスト — 高度機能 [P2]
 
 - [ ] テキストワープ (`a:prstTxWarp`) — WordArt 的な曲線パス上テキスト
 - [ ] テキストアウトライン (`a:rPr/a:ln`) — 文字の輪郭線
 - [ ] テキストグラデーション塗り (`a:rPr/a:gradFill`) — 文字へのグラデーション
-
----
-
-## 11. スライド・シェイプ — 残機能 [P1]
-
-- [ ] プレースホルダ自動内容 — 日付 (`ph type="dt"`) / スライド番号 (`sldNum`) / フッター (`ftr`)
-- [ ] 背景 blip/パターン — `p:bg/p:bgPr` の `a:blipFill` / `a:pattFill` (現状 solid+gradient のみ)
-- [ ] シェイプリンク — 図形自体の `a:hlinkClick` / `a:hlinkHover` (テキストリンクとは別)
-- [ ] 線のグラデーション/パターン塗り (`a:ln/a:gradFill`, `a:ln/a:pattFill`)
-- [ ] 複数スライドマスター対応 (現状1つ目のみ読み込み)
-- [ ] カラー修飾子追加 — `comp` / `inv` / `gamma` / `hueMod` (現状 lumMod/lumOff/shade/tint/satMod/alpha)
-
----
-
-## 12. ライブラリ公開 — 残タスク [P1]
-
-- [ ] `dist/pptx-svg.wasm` ビルド成果物コピー (ビルドスクリプト)
-- [ ] npm publish ワークフロー
-- [ ] エラーハンドリング設計
-- [ ] テスト (Vitest / ビジュアルリグレッション / ブラウザ互換)
-- [ ] ドキュメント (README / CHANGELOG / JSDoc)
 
 ---
 
@@ -107,7 +101,8 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 |--------|------|------|
 | **P0** | 基盤/テーマ/マスター継承/テキスト完全対応 | **完了** |
 | **P1** | 塗り/線/グループ/コネクタ/ジオメトリ/テーブル完全対応 | **完了** |
-| **P1** | スライド・シェイプ残機能, ライブラリ公開 | 未着手 |
+| **P1** | スライド・シェイプ残機能 (カラー修飾子/背景blip・パターン/シェイプリンク/線グラデ・パターン/PH自動内容) | **完了** |
+| **P1** | ライブラリ公開 (ビルド/npm/テスト/ドキュメント) | 未着手 |
 | **P2** | 画像 (クロップ/アルファ/外部参照/SVG画像/エフェクト/Duotone/clrChange) | **完了** |
 | **P2** | エフェクト/チャート/テキスト高度 | 未着手 |
 | **—** | EMF/WMF/TIFF/SmartArt/OLE/メディア/数式/ノート/フォント | **保留** |

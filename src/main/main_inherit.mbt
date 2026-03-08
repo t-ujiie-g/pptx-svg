@@ -174,6 +174,158 @@ fn apply_text_defaults(
   }
 }
 
+// ── Placeholder auto-content ─────────────────────────────────────────────
+
+///|
+/// Check if all paragraphs in a shape have no text.
+fn has_no_text(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
+  let np = paragraphs.length()
+  if np == 0 {
+    return true
+  }
+  let mut i = 0
+  while i < np {
+    let nr = paragraphs[i].runs.length()
+    let mut j = 0
+    while j < nr {
+      if not(paragraphs[i].runs[j].text.is_empty()) {
+        return false
+      }
+      j = j + 1
+    }
+    i = i + 1
+  }
+  true
+}
+
+///|
+/// Inject auto-content text for empty dt/sldNum/ftr placeholders.
+/// slide_num is 1-indexed.
+fn inject_placeholder_auto_content(
+  shapes : Array[@ooxml.Shape],
+  slide_num : Int,
+  layout_opt : @ooxml.SlideLayoutData?,
+  master_opt : @ooxml.SlideMasterData?,
+) -> Unit {
+  let ns = shapes.length()
+  let mut i = 0
+  while i < ns {
+    let shape = shapes[i]
+    let ph = shape.ph_type
+    if ph.is_empty() || not(has_no_text(shape.paragraphs)) {
+      i = i + 1
+      continue
+    }
+    // Only process dt/sldNum/ftr
+    let auto_text = if ph == "sldNum" {
+      int_to_str(slide_num)
+    } else if ph == "dt" {
+      // Try to get date text from layout/master placeholder
+      let ph_text = find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
+      if not(ph_text.is_empty()) { ph_text } else { "" }
+    } else if ph == "ftr" {
+      // Try to get footer text from layout/master placeholder
+      find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
+    } else {
+      ""
+    }
+    if not(auto_text.is_empty()) {
+      // Create a single paragraph with the auto text
+      let run : @ooxml.TextRun = {
+        text: auto_text,
+        bold: false,
+        italic: false,
+        font_size: 0,
+        color: @ooxml.Color::none(),
+        font_face: "",
+        ea_font: "",
+        cs_font: "",
+        sym_font: "",
+        underline: "",
+        strike: "",
+        baseline: 0,
+        char_spacing: 0,
+        kern: 0,
+        cap: "",
+        hlink_rid: "",
+        hlink_mouse_over_rid: "",
+      }
+      let para : @ooxml.TextParagraph = {
+        runs: [run],
+        align: "",
+        level: 0,
+        spc_before: 0,
+        spc_after: 0,
+        line_spacing: 0,
+        mar_l: 0,
+        indent: 0,
+        bullet: "",
+        bullet_auto: "",
+        bullet_none: false,
+        bullet_font: "",
+        bullet_size: 0,
+        bullet_color: @ooxml.Color::none(),
+        bullet_img_rid: "",
+        tab_stops: [],
+        rtl: false,
+      }
+      shapes[i] = { ..shape, paragraphs: [para] }
+    }
+    i = i + 1
+  }
+}
+
+///|
+/// Find text content from a placeholder in layout or master.
+fn find_ph_text(
+  ph_type : String,
+  ph_idx : Int,
+  layout_opt : @ooxml.SlideLayoutData?,
+  master_opt : @ooxml.SlideMasterData?,
+) -> String {
+  // Try layout first
+  match layout_opt {
+    Some(layout) =>
+      match find_placeholder(layout.shapes, ph_type, ph_idx) {
+        Some(ph) => {
+          let text = extract_text(ph.paragraphs)
+          if not(text.is_empty()) {
+            return text
+          }
+        }
+        None => ()
+      }
+    None => ()
+  }
+  // Try master
+  match master_opt {
+    Some(master) =>
+      match find_placeholder(master.shapes, ph_type, ph_idx) {
+        Some(ph) => extract_text(ph.paragraphs)
+        None => ""
+      }
+    None => ""
+  }
+}
+
+///|
+/// Extract plain text from paragraphs.
+fn extract_text(paragraphs : Array[@ooxml.TextParagraph]) -> String {
+  let np = paragraphs.length()
+  let mut result = ""
+  let mut pi = 0
+  while pi < np {
+    let nr = paragraphs[pi].runs.length()
+    let mut ri = 0
+    while ri < nr {
+      result = result + paragraphs[pi].runs[ri].text
+      ri = ri + 1
+    }
+    pi = pi + 1
+  }
+  result
+}
+
 // ── Theme path resolution ────────────────────────────────────────────────────
 
 ///|

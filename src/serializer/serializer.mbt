@@ -5,6 +5,25 @@
 //
 // NOTE: No StringBuilder — all strings built via `+` (wasm:js-string "concat").
 
+// ── Non-visual property helpers ──────────────────────────────────────────────
+
+///|
+/// Serialize p:cNvPr with optional hyperlinks.
+fn serialize_cnvpr(id : String, link_rid : String, hover_rid : String) -> String {
+  if link_rid.is_empty() && hover_rid.is_empty() {
+    "<p:cNvPr id=\"" + id + "\" name=\"\"/>"
+  } else {
+    let mut inner = ""
+    if not(link_rid.is_empty()) {
+      inner = inner + "<a:hlinkClick xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" + link_rid + "\"/>"
+    }
+    if not(hover_rid.is_empty()) {
+      inner = inner + "<a:hlinkHover xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" + hover_rid + "\"/>"
+    }
+    "<p:cNvPr id=\"" + id + "\" name=\"\">" + inner + "</p:cNvPr>"
+  }
+}
+
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 ///|
@@ -834,7 +853,7 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   let mut out = "<p:sp>"
   // Non-visual properties
   out = out + "<p:nvSpPr>"
-  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + serialize_cnvpr("0", shape.sh_link_rid, shape.sh_link_hover_rid)
   out = out + "<p:cNvSpPr/>"
   if not(shape.ph_type.is_empty()) {
     let mut ph = "<p:nvPr><p:ph type=\"" + shape.ph_type + "\""
@@ -895,6 +914,10 @@ fn serialize_stroke(shape : @ooxml.Shape) -> String {
   // Fill or noFill
   if shape.stroke_no_fill {
     out = out + "<a:noFill/>"
+  } else if not(shape.stroke_grad_fill.is_none()) {
+    out = out + serialize_gradient_fill(shape.stroke_grad_fill)
+  } else if not(shape.stroke_patt_fill.is_none()) {
+    out = out + serialize_pattern_fill(shape.stroke_patt_fill)
   } else if not(shape.stroke.is_none()) {
     out = out + serialize_color(shape.stroke)
   }
@@ -1236,7 +1259,15 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
     " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
   out = out + "<p:cSld>"
   // Background
-  if not(slide.bg_grad.is_none()) {
+  if not(slide.bg_blip_fill.is_none()) {
+    out = out + "<p:bg><p:bgPr>"
+    out = out + serialize_blip_fill(slide.bg_blip_fill)
+    out = out + "<a:effectLst/></p:bgPr></p:bg>"
+  } else if not(slide.bg_patt_fill.is_none()) {
+    out = out + "<p:bg><p:bgPr>"
+    out = out + serialize_pattern_fill(slide.bg_patt_fill)
+    out = out + "<a:effectLst/></p:bgPr></p:bg>"
+  } else if not(slide.bg_grad.is_none()) {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_gradient_fill(slide.bg_grad)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"
