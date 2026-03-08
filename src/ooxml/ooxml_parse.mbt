@@ -346,6 +346,46 @@ fn parse_stroke(
   }
 }
 
+// ── Blip color helpers ───────────────────────────────────────────────────────
+
+///|
+/// Parse a single color from children (a:srgbClr only, no theme needed).
+fn parse_first_color(children : Array[@xml.XmlNode]) -> Color {
+  match @xml.find_child(children, "a:srgbClr") {
+    Some(clr) =>
+      match @xml.get_attr(clr, "val") {
+        Some(v) => parse_hex_color(v)
+        None => Color::none()
+      }
+    None => Color::none()
+  }
+}
+
+///|
+/// Parse a list of colors from children (for a:duotone which has 2 color elements).
+fn parse_color_list(children : Array[@xml.XmlNode]) -> Array[Color] {
+  let colors : Array[Color] = []
+  let n = children.length()
+  let mut i = 0
+  while i < n {
+    match children[i] {
+      @xml.XmlNode::Element(tag, _, _) =>
+        if tag == "a:srgbClr" {
+          match @xml.get_attr(children[i], "val") {
+            Some(v) => colors.push(parse_hex_color(v))
+            None => ()
+          }
+        } else if tag == "a:schemeClr" {
+          // For duotone with scheme colors, use a placeholder (rare case)
+          colors.push(Color::none())
+        }
+      _ => ()
+    }
+    i = i + 1
+  }
+  colors
+}
+
 // ── Blip fill parser ──────────────────────────────────────────────────────────
 
 ///|
@@ -354,6 +394,13 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
   let bf_ch = @xml.get_children(bf_node)
   let mut rid = ""
   let mut alpha = 0
+  let mut svg_rid = ""
+  let mut bright = 0
+  let mut contrast = 0
+  let mut duotone_1 = Color::none()
+  let mut duotone_2 = Color::none()
+  let mut clr_from = Color::none()
+  let mut clr_to = Color::none()
   match @xml.find_child(bf_ch, "a:blip") {
     None => ()
     Some(blip) => {
@@ -361,10 +408,76 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
         Some(v) => v
         None => ""
       }
-      // Parse a:alphaModFix from blip children
       let blip_ch = @xml.get_children(blip)
+      // Parse a:alphaModFix
       match @xml.find_child(blip_ch, "a:alphaModFix") {
         Some(amf) => alpha = attr_int(amf, "amt")
+        None => ()
+      }
+      // Parse a:lum (brightness/contrast)
+      match @xml.find_child(blip_ch, "a:lum") {
+        Some(lum) => {
+          bright = attr_int(lum, "bright")
+          contrast = attr_int(lum, "contrast")
+        }
+        None => ()
+      }
+      // Parse a:duotone — contains 2 color children
+      match @xml.find_child(blip_ch, "a:duotone") {
+        Some(dt) => {
+          let dt_ch = @xml.get_children(dt)
+          let colors = parse_color_list(dt_ch)
+          if colors.length() >= 2 {
+            duotone_1 = colors[0]
+            duotone_2 = colors[1]
+          }
+        }
+        None => ()
+      }
+      // Parse a:clrChange — from/to color
+      match @xml.find_child(blip_ch, "a:clrChange") {
+        Some(cc) => {
+          let cc_ch = @xml.get_children(cc)
+          match @xml.find_child(cc_ch, "a:clrFrom") {
+            Some(from_node) =>
+              clr_from = parse_first_color(@xml.get_children(from_node))
+            None => ()
+          }
+          match @xml.find_child(cc_ch, "a:clrTo") {
+            Some(to_node) =>
+              clr_to = parse_first_color(@xml.get_children(to_node))
+            None => ()
+          }
+        }
+        None => ()
+      }
+      // Parse asvg:svgBlip from a:extLst
+      match @xml.find_child(blip_ch, "a:extLst") {
+        Some(ext_lst) => {
+          let exts = @xml.get_children(ext_lst)
+          let n = exts.length()
+          let mut i = 0
+          while i < n {
+            let ext_ch = @xml.get_children(exts[i])
+            // Look for asvg:svgBlip or any svgBlip tag
+            let m = ext_ch.length()
+            let mut j = 0
+            while j < m {
+              match ext_ch[j] {
+                @xml.XmlNode::Element(tag, _, _) =>
+                  if tag == "asvg:svgBlip" || tag == "a16:svgBlip" {
+                    svg_rid = match @xml.get_attr(ext_ch[j], "r:embed") {
+                      Some(v) => v
+                      None => ""
+                    }
+                  }
+                _ => ()
+              }
+              j = j + 1
+            }
+            i = i + 1
+          }
+        }
         None => ()
       }
     }
@@ -427,6 +540,13 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
     tile_flip,
     tile_algn,
     alpha,
+    svg_rid,
+    bright,
+    contrast,
+    duotone_1,
+    duotone_2,
+    clr_from,
+    clr_to,
   }
 }
 

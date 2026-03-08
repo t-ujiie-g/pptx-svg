@@ -27,15 +27,10 @@
 - [x] **画像クロップ**: `srcRect` → SVG `<clipPath>` (Picture + AutoShape blipFill 両対応)
 - [x] **画像アルファ**: `a:alphaModFix` パース + SVG `opacity` 属性
 - [x] **外部画像参照**: `TargetMode="External"` — Relationship に target_mode 追加 + 外部 URL 直接参照
-
----
-
-## 7. 画像 — 残機能 [P2]
-
-- [ ] SVG 画像 (`a:blip` + SVG extension `a:extLst`)
-- [ ] 画像エフェクト (`a:clrChange`, brightness/contrast)
-- [ ] Duotone (`a:duotone`)
-- [ ] EMF / WMF / TIFF — ラスタライズ
+- [x] **SVG 画像**: `a:extLst` 内 `asvg:svgBlip` / `a16:svgBlip` パース + SVG 画像優先表示
+- [x] **画像エフェクト**: `a:lum` brightness/contrast → SVG `<filter>` feComponentTransfer
+- [x] **Duotone**: `a:duotone` パース + SVG filter (grayscale→2色マッピング)
+- [x] **Color change**: `a:clrChange` パース + round-trip (SVG filter での精密再現は不可 — データ保持のみ)
 
 ---
 
@@ -81,30 +76,28 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 
 ---
 
-## 12. SmartArt [P3]
-
-- [ ] `dgm:*` (DiagramML) パース + レイアウトアルゴリズム
-- [ ] フォールバック: SmartArt の画像キャッシュ利用
-
----
-
-## 13. その他のオブジェクト [P3]
-
-- [ ] OLE / 埋め込み (`p:oleObj` — フォールバック画像表示)
-- [ ] メディア (ビデオポスターフレーム / オーディオアイコン)
-- [ ] 数式 (OMML `m:oMath`)
-- [ ] スピーカーノート / コメント (API 経由取得)
-- [ ] 埋め込みフォント (`a:fontScheme` + fontdata)
-
----
-
-## 14. ライブラリ公開 — 残タスク [P1]
+## 12. ライブラリ公開 — 残タスク [P1]
 
 - [ ] `dist/pptx-svg.wasm` ビルド成果物コピー (ビルドスクリプト)
 - [ ] npm publish ワークフロー
 - [ ] エラーハンドリング設計
 - [ ] テスト (Vitest / ビジュアルリグレッション / ブラウザ互換)
 - [ ] ドキュメント (README / CHANGELOG / JSDoc)
+
+---
+
+## 保留 — 対応予定なし
+
+以下は技術的制約により対応しない項目。データとしては保持するが、レンダリングは行わない。
+
+- [ ] **EMF / WMF** — GDI 描画命令の逐次解釈が必要 (仕様 ~500 ページ)。純粋 Wasm での再実装は工数対効果が極めて低い
+- [ ] **TIFF** — ブラウザ `<img>` 非対応。複数圧縮方式 (LZW/CCITT/ZIP) のデコーダ自作が必要。遭遇頻度が低い
+- [ ] **SmartArt** (`dgm:*` DiagramML) — レイアウトアルゴリズムの再実装が必要。フォールバック画像利用は検討余地あり
+- [ ] **OLE / 埋め込み** (`p:oleObj`) — フォールバック画像表示のみ検討余地あり
+- [ ] **メディア** — ビデオポスターフレーム / オーディオアイコン
+- [ ] **数式** (OMML `m:oMath`) — 数式レンダラーの自作が必要
+- [ ] **スピーカーノート / コメント** — レンダリング対象外 (API 経由取得は検討余地あり)
+- [ ] **埋め込みフォント** (`a:fontScheme` + fontdata)
 
 ---
 
@@ -115,6 +108,6 @@ ChartML (ECMA-376 Part 1 Chapter 21) パーサー + SVG レンダラーが必要
 | **P0** | 基盤/テーマ/マスター継承/テキスト完全対応 | **完了** |
 | **P1** | 塗り/線/グループ/コネクタ/ジオメトリ/テーブル完全対応 | **完了** |
 | **P1** | スライド・シェイプ残機能, ライブラリ公開 | 未着手 |
-| **P2** | 画像 (クロップ/アルファ/外部参照 完了, SVG画像/エフェクト/EMF 未着手) | **一部完了** |
+| **P2** | 画像 (クロップ/アルファ/外部参照/SVG画像/エフェクト/Duotone/clrChange) | **完了** |
 | **P2** | エフェクト/チャート/テキスト高度 | 未着手 |
-| **P3** | SmartArt/OLE/メディア/数式/ノート/埋め込みフォント | 未着手 |
+| **—** | EMF/WMF/TIFF/SmartArt/OLE/メディア/数式/ノート/フォント | **保留** |

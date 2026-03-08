@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 44', slideCount === 44, `got ${slideCount}`);
+  assert('slide count = 46', slideCount === 46, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 44; i++) {
+  for (let i = 1; i <= 46; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 44; i++) {
+  for (let i = 1; i <= 46; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -923,6 +923,31 @@ async function testFeaturesPptx() {
     assert('slide44 has TargetMode="External"', rels44.includes('TargetMode="External"'));
     assert('slide44 has wikimedia URL', rels44.includes('upload.wikimedia.org'));
     assert('slide44 has picsum URL', rels44.includes('picsum.photos'));
+  }
+
+  // ── Slide 45: Image effects — brightness/contrast (a:lum) ──
+  section('test_features.pptx — Slide 45: brightness/contrast');
+  {
+    const slide45 = textFiles.get('ppt/slides/slide45.xml') ?? '';
+    assert('slide45 has p:pic', hasTag(slide45, 'p:pic'));
+    assert('slide45 has a:lum', hasTag(slide45, 'a:lum'));
+    assert('slide45 has bright="50000"', slide45.includes('bright="50000"'));
+    assert('slide45 has contrast="-30000"', slide45.includes('contrast="-30000"'));
+    assert('slide45 has bright="20000"', slide45.includes('bright="20000"'));
+    assert('slide45 has contrast="40000"', slide45.includes('contrast="40000"'));
+  }
+
+  // ── Slide 46: Duotone + color change ──
+  section('test_features.pptx — Slide 46: duotone + clrChange');
+  {
+    const slide46 = textFiles.get('ppt/slides/slide46.xml') ?? '';
+    assert('slide46 has p:pic', hasTag(slide46, 'p:pic'));
+    assert('slide46 has a:duotone', hasTag(slide46, 'a:duotone'));
+    assert('slide46 has duotone color 000080', slide46.includes('val="000080"'));
+    assert('slide46 has duotone color FFFF00', slide46.includes('val="FFFF00"'));
+    assert('slide46 has a:clrChange', hasTag(slide46, 'a:clrChange'));
+    assert('slide46 has a:clrFrom', hasTag(slide46, 'a:clrFrom'));
+    assert('slide46 has a:clrTo', hasTag(slide46, 'a:clrTo'));
   }
 }
 

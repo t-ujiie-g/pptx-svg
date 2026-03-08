@@ -47,6 +47,8 @@ Slides:
  42. Table diagonal borders + tblPr flags (firstRow/lastRow/bandRow/bandCol) + tblStyleId
  43. Image crop (srcRect) + alpha (alphaModFix) — p:pic crop/alpha, AutoShape blipFill crop
  44. External image reference (TargetMode="External") — Wikimedia + picsum.photos
+ 45. Image effects — brightness/contrast (a:lum bright/contrast)
+ 46. Duotone (a:duotone) + color change (a:clrChange)
 """
 
 from pptx import Presentation
@@ -3327,6 +3329,197 @@ lbl44.text_frame.paragraphs[0].font.bold = True
 lbl44b = slide44.shapes.add_textbox(Inches(0.5), Inches(5.2), Inches(9), Inches(1.5))
 lbl44b.text_frame.paragraphs[0].text = f"Left: Wikimedia Commons PNG\nRight: picsum.photos (id=237)"
 lbl44b.text_frame.paragraphs[0].font.size = Pt(12)
+
+# ── Slide 45: Image effects — brightness/contrast (a:lum) + duotone (a:duotone) ──
+slide45 = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+
+# Reuse the test PNG for effects
+tmp_img45 = os.path.join(tempfile.gettempdir(), '_test_effects.png')
+with open(tmp_img45, 'wb') as f:
+    f.write(test_png)
+img_part45, img_rid45 = slide45.part.get_or_add_image_part(tmp_img45)
+os.unlink(tmp_img45)
+# Add second image for duotone
+tmp_img45b = os.path.join(tempfile.gettempdir(), '_test_effects2.png')
+with open(tmp_img45b, 'wb') as f:
+    f.write(test_png)
+img_part45b, img_rid45b = slide45.part.get_or_add_image_part(tmp_img45b)
+os.unlink(tmp_img45b)
+# Third image for combined brightness + contrast
+tmp_img45c = os.path.join(tempfile.gettempdir(), '_test_effects3.png')
+with open(tmp_img45c, 'wb') as f:
+    f.write(test_png)
+img_part45c, img_rid45c = slide45.part.get_or_add_image_part(tmp_img45c)
+os.unlink(tmp_img45c)
+
+# Shape 1: Picture with brightness +50% (a:lum bright="50000")
+pic45_bright = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="300" name="BrightPic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid45}">
+      <a:lum bright="50000"/>
+    </a:blip>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="457200" y="914400"/>
+      <a:ext cx="2286000" cy="2286000"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+# Shape 2: Picture with contrast -30% (a:lum contrast="-30000")
+pic45_contrast = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="301" name="ContrastPic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid45b}">
+      <a:lum contrast="-30000"/>
+    </a:blip>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="3429000" y="914400"/>
+      <a:ext cx="2286000" cy="2286000"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+# Shape 3: Picture with bright+contrast combined (a:lum bright="20000" contrast="40000")
+pic45_both = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="302" name="BrightContrastPic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid45c}">
+      <a:lum bright="20000" contrast="40000"/>
+    </a:blip>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="6400800" y="914400"/>
+      <a:ext cx="2286000" cy="2286000"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+spTree45 = slide45._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree45.append(etree.fromstring(pic45_bright))
+spTree45.append(etree.fromstring(pic45_contrast))
+spTree45.append(etree.fromstring(pic45_both))
+
+lbl45 = slide45.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl45.text_frame.paragraphs[0].text = "Slide 45: Image effects — brightness/contrast (a:lum)"
+lbl45.text_frame.paragraphs[0].font.size = Pt(18)
+lbl45.text_frame.paragraphs[0].font.bold = True
+
+lbl45b = slide45.shapes.add_textbox(Inches(0.5), Inches(4.3), Inches(9), Inches(1))
+lbl45b.text_frame.paragraphs[0].text = "Left: bright +50% | Center: contrast -30% | Right: bright +20% contrast +40%"
+lbl45b.text_frame.paragraphs[0].font.size = Pt(12)
+
+# ── Slide 46: Duotone (a:duotone) + color change (a:clrChange) ──
+slide46 = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+
+# Image for duotone
+tmp_img46 = os.path.join(tempfile.gettempdir(), '_test_duotone.png')
+with open(tmp_img46, 'wb') as f:
+    f.write(test_png)
+img_part46, img_rid46 = slide46.part.get_or_add_image_part(tmp_img46)
+os.unlink(tmp_img46)
+# Image for clrChange
+tmp_img46b = os.path.join(tempfile.gettempdir(), '_test_clrchange.png')
+with open(tmp_img46b, 'wb') as f:
+    f.write(test_png)
+img_part46b, img_rid46b = slide46.part.get_or_add_image_part(tmp_img46b)
+os.unlink(tmp_img46b)
+
+# Shape 1: Picture with duotone (dark blue → light yellow)
+pic46_duotone = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="400" name="DuotonePic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid46}">
+      <a:duotone>
+        <a:srgbClr val="000080"/>
+        <a:srgbClr val="FFFF00"/>
+      </a:duotone>
+    </a:blip>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="457200" y="914400"/>
+      <a:ext cx="3657600" cy="3657600"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+# Shape 2: Picture with clrChange (white → transparent)
+pic46_clrchange = f'''<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvPicPr>
+    <p:cNvPr id="401" name="ClrChangePic"/>
+    <p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>
+    <p:nvPr/>
+  </p:nvPicPr>
+  <p:blipFill>
+    <a:blip r:embed="{img_rid46b}">
+      <a:clrChange>
+        <a:clrFrom><a:srgbClr val="FF0000"/></a:clrFrom>
+        <a:clrTo><a:srgbClr val="00FF00"/></a:clrTo>
+      </a:clrChange>
+    </a:blip>
+    <a:stretch><a:fillRect/></a:stretch>
+  </p:blipFill>
+  <p:spPr>
+    <a:xfrm>
+      <a:off x="4572000" y="914400"/>
+      <a:ext cx="3657600" cy="3657600"/>
+    </a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+  </p:spPr>
+</p:pic>'''
+
+spTree46 = slide46._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree46.append(etree.fromstring(pic46_duotone))
+spTree46.append(etree.fromstring(pic46_clrchange))
+
+lbl46 = slide46.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl46.text_frame.paragraphs[0].text = "Slide 46: Duotone (a:duotone) + Color change (a:clrChange)"
+lbl46.text_frame.paragraphs[0].font.size = Pt(18)
+lbl46.text_frame.paragraphs[0].font.bold = True
+
+lbl46b = slide46.shapes.add_textbox(Inches(0.5), Inches(5.2), Inches(9), Inches(1))
+lbl46b.text_frame.paragraphs[0].text = "Left: Duotone (navy→yellow) | Right: clrChange (red→green, data preserved)"
+lbl46b.text_frame.paragraphs[0].font.size = Pt(12)
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

@@ -276,6 +276,13 @@ pub(all) struct BlipFill {
   tile_flip : String // "none","x","y","xy"; "" = unset
   tile_algn : String // alignment: "tl","t","tr","l","ctr","r","bl","b","br"; "" = unset
   alpha : Int // a:alphaModFix amt (0-100000); 100000 = fully opaque; 0 = default (treat as opaque)
+  svg_rid : String // asvg:svgBlip r:embed for SVG image; "" = none
+  bright : Int // a:lum bright (-100000..100000); 0 = default
+  contrast : Int // a:lum contrast (-100000..100000); 0 = default
+  duotone_1 : Color // a:duotone first color; Color::none() = no duotone
+  duotone_2 : Color // a:duotone second color
+  clr_from : Color // a:clrChange from color; Color::none() = no color change
+  clr_to : Color // a:clrChange to color
 }
 
 ///|
@@ -294,6 +301,13 @@ pub fn BlipFill::none() -> BlipFill {
     tile_flip: "",
     tile_algn: "",
     alpha: 0,
+    svg_rid: "",
+    bright: 0,
+    contrast: 0,
+    duotone_1: Color::none(),
+    duotone_2: Color::none(),
+    clr_from: Color::none(),
+    clr_to: Color::none(),
   }
 }
 

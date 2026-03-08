@@ -134,14 +134,45 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
 ///|
 fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
   let mut out = "<a:blipFill>"
+  // Build blip children (effects + SVG extension)
+  let mut blip_inner = ""
   if bf.alpha > 0 && bf.alpha < @ooxml.pct_100 {
-    out = out + "<a:blip r:embed=\"" + bf.rid + "\">" +
-      "<a:alphaModFix amt=\"" + int_to_str(bf.alpha) + "\"/>" +
-      "</a:blip>"
-  } else {
-    out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
+    blip_inner = blip_inner + "<a:alphaModFix amt=\"" + int_to_str(bf.alpha) + "\"/>"
   }
-  if bf.src_l > 0 || bf.src_t > 0 || bf.src_r > 0 || bf.src_b > 0 {
+  if bf.bright != 0 || bf.contrast != 0 {
+    blip_inner = blip_inner + "<a:lum"
+    if bf.bright != 0 {
+      blip_inner = blip_inner + " bright=\"" + int_to_str(bf.bright) + "\""
+    }
+    if bf.contrast != 0 {
+      blip_inner = blip_inner + " contrast=\"" + int_to_str(bf.contrast) + "\""
+    }
+    blip_inner = blip_inner + "/>"
+  }
+  if not(bf.duotone_1.is_none()) && not(bf.duotone_2.is_none()) {
+    blip_inner = blip_inner + "<a:duotone>" +
+      "<a:srgbClr val=\"" + bf.duotone_1.to_hex_rgb() + "\"/>" +
+      "<a:srgbClr val=\"" + bf.duotone_2.to_hex_rgb() + "\"/>" +
+      "</a:duotone>"
+  }
+  if not(bf.clr_from.is_none()) && not(bf.clr_to.is_none()) {
+    blip_inner = blip_inner + "<a:clrChange>" +
+      "<a:clrFrom><a:srgbClr val=\"" + bf.clr_from.to_hex_rgb() + "\"/></a:clrFrom>" +
+      "<a:clrTo><a:srgbClr val=\"" + bf.clr_to.to_hex_rgb() + "\"/></a:clrTo>" +
+      "</a:clrChange>"
+  }
+  if not(bf.svg_rid.is_empty()) {
+    blip_inner = blip_inner +
+      "<a:extLst><a:ext uri=\"{96DAC541-7B7A-43D3-8B79-37D633B846F1}\">" +
+      "<asvg:svgBlip xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\" r:embed=\"" +
+      bf.svg_rid + "\"/></a:ext></a:extLst>"
+  }
+  if blip_inner.is_empty() {
+    out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
+  } else {
+    out = out + "<a:blip r:embed=\"" + bf.rid + "\">" + blip_inner + "</a:blip>"
+  }
+  if bf.has_crop() {
     out = out + "<a:srcRect"
     if bf.src_l > 0 {
       out = out + " l=\"" + int_to_str(bf.src_l) + "\""

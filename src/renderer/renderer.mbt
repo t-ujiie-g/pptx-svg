@@ -92,6 +92,18 @@ fn patt_id(slide_num : Int, shape_idx : Int) -> String {
   "patt-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
 }
 
+///|
+/// Build a blip filter ID.
+fn blip_filter_id(slide_num : Int, shape_idx : Int) -> String {
+  "blipfx_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+}
+
+///|
+/// Build a blip clip path ID.
+fn blip_clip_id(prefix : String, slide_num : Int, shape_idx : Int) -> String {
+  prefix + "_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+}
+
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 ///|
@@ -494,8 +506,8 @@ fn blip_opacity_attr(bf : @ooxml.BlipFill) -> String {
 }
 
 ///|
-/// Render a cropped image as SVG (clipPath + scaled image).
-fn render_cropped_image(
+/// Render a cropped image with optional filter attribute.
+fn render_cropped_image_with_filter(
   bf : @ooxml.BlipFill,
   href : String,
   x_p : Int,
@@ -505,6 +517,7 @@ fn render_cropped_image(
   clip_id : String,
   opacity : String,
   rot : String,
+  filter_attr : String,
 ) -> String {
   let vis_w = ooxml_pct_denom - bf.src_l - bf.src_r
   let vis_h = ooxml_pct_denom - bf.src_t - bf.src_b
@@ -522,7 +535,102 @@ fn render_cropped_image(
   " preserveAspectRatio=\"none\"" +
   a("href", href) +
   " clip-path=\"url(#" + clip_id + ")\"" +
-  opacity + rot + "/>"
+  opacity + filter_attr + rot + "/>"
+}
+
+///|
+/// Resolve image href with SVG preference: if svg_rid is set and resolves, use SVG.
+fn resolve_blip_href(
+  rels : Array[@ooxml.Relationship],
+  bf : @ooxml.BlipFill,
+) -> String {
+  // Prefer SVG image if available
+  if not(bf.svg_rid.is_empty()) {
+    let svg_href = resolve_image_href(rels, bf.svg_rid)
+    if not(svg_href.is_empty()) {
+      return svg_href
+    }
+  }
+  resolve_image_href(rels, bf.rid)
+}
+
+///|
+/// Check if BlipFill has any image effects that need SVG filters.
+fn blip_has_effects(bf : @ooxml.BlipFill) -> Bool {
+  // Note: clrChange is NOT included — it can't be rendered via SVG filters
+  // (requires exact pixel color matching). Data is preserved in round-trip only.
+  bf.bright != 0 ||
+  bf.contrast != 0 ||
+  not(bf.duotone_1.is_none())
+}
+
+///|
+/// Generate SVG filter definition for blip image effects.
+/// Returns (filter_defs, filter_attr) — defs SVG string and filter="url(#id)" attribute.
+fn render_blip_filter(
+  bf : @ooxml.BlipFill,
+  filter_id : String,
+) -> (String, String) {
+  if not(blip_has_effects(bf)) {
+    return ("", "")
+  }
+  let mut filters = ""
+  let mut result_name = "SourceGraphic"
+  // Brightness / contrast (a:lum)
+  if bf.bright != 0 || bf.contrast != 0 {
+    // bright: -100000..100000 → offset -1..1 (additive)
+    // contrast: -100000..100000 → slope 0..2 (multiplicative)
+    // SVG feComponentTransfer: slope * value + intercept
+    // slope = 1 + contrast/100000 (range: 0..2)
+    let slope = if bf.contrast != 0 {
+      format_pct_decimal(ooxml_pct_denom + bf.contrast)
+    } else {
+      "1"
+    }
+    let intercept = if bf.bright != 0 {
+      format_pct_decimal(bf.bright)
+    } else {
+      "0"
+    }
+    filters = filters +
+      "<feComponentTransfer result=\"lum\">" +
+      "<feFuncR type=\"linear\" slope=\"" + slope + "\" intercept=\"" + intercept + "\"/>" +
+      "<feFuncG type=\"linear\" slope=\"" + slope + "\" intercept=\"" + intercept + "\"/>" +
+      "<feFuncB type=\"linear\" slope=\"" + slope + "\" intercept=\"" + intercept + "\"/>" +
+      "</feComponentTransfer>"
+    result_name = "lum"
+  }
+  // Duotone (a:duotone)
+  if not(bf.duotone_1.is_none()) && not(bf.duotone_2.is_none()) {
+    let c1 = bf.duotone_1
+    let c2 = bf.duotone_2
+    // Step 1: Convert to grayscale
+    filters = filters +
+      "<feColorMatrix type=\"saturate\" values=\"0\" in=\"" + result_name + "\" result=\"gray\"/>"
+    // Step 2: Map grayscale to duotone via component transfer
+    // dark pixels → color1, light pixels → color2
+    // slope = (c2 - c1) / 255, intercept = c1 / 255
+    let r1 = format_ratio(c1.r, 255)
+    let g1 = format_ratio(c1.g, 255)
+    let b1 = format_ratio(c1.b, 255)
+    let r_slope = format_ratio(c2.r - c1.r, 255)
+    let g_slope = format_ratio(c2.g - c1.g, 255)
+    let b_slope = format_ratio(c2.b - c1.b, 255)
+    filters = filters +
+      "<feComponentTransfer in=\"gray\" result=\"duotone\">" +
+      "<feFuncR type=\"linear\" slope=\"" + r_slope + "\" intercept=\"" + r1 + "\"/>" +
+      "<feFuncG type=\"linear\" slope=\"" + g_slope + "\" intercept=\"" + g1 + "\"/>" +
+      "<feFuncB type=\"linear\" slope=\"" + b_slope + "\" intercept=\"" + b1 + "\"/>" +
+      "</feComponentTransfer>"
+    result_name = "duotone"
+  }
+  // Color change (a:clrChange) — not renderable via SVG filters
+  // (requires exact pixel color matching which SVG filters can't do)
+  // Data is preserved in round-trip via data-ooxml-* attributes
+  ignore(result_name)
+  let defs = "<defs><filter id=\"" + filter_id + "\">" + filters + "</filter></defs>"
+  let attr = " filter=\"url(#" + filter_id + ")\""
+  (defs, attr)
 }
 
 // ── Scale ratio formatting (for group transforms) ──────────────────────────
@@ -1154,7 +1262,18 @@ fn render_shape(
       dai("blip-tile-sy", shape.blip_fill.tile_sy) +
       da("blip-tile-flip", shape.blip_fill.tile_flip) +
       da("blip-tile-algn", shape.blip_fill.tile_algn) +
-      dai("blip-alpha", shape.blip_fill.alpha)
+      dai("blip-alpha", shape.blip_fill.alpha) +
+      da("blip-svg-rid", shape.blip_fill.svg_rid) +
+      dai("blip-bright", shape.blip_fill.bright) +
+      dai("blip-contrast", shape.blip_fill.contrast) +
+      (if not(shape.blip_fill.duotone_1.is_none()) {
+        da("blip-duotone1", shape.blip_fill.duotone_1.to_hex()) +
+        da("blip-duotone2", shape.blip_fill.duotone_2.to_hex())
+      } else { "" }) +
+      (if not(shape.blip_fill.clr_from.is_none()) {
+        da("blip-clr-from", shape.blip_fill.clr_from.to_hex()) +
+        da("blip-clr-to", shape.blip_fill.clr_to.to_hex())
+      } else { "" })
     } else {
       ""
     }) +
@@ -1200,10 +1319,7 @@ fn render_shape(
 
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
-      let blip_tile_id = "bliptile_s" +
-        int_to_str(slide_num) +
-        "_" +
-        int_to_str(shape_idx)
+      let blip_tile_id = blip_clip_id("bliptile", slide_num, shape_idx)
       let fill = if not(shape.blip_fill.is_none()) &&
         not(shape.blip_fill.stretch) &&
         shape.blip_fill.tile_sx > 0 {
@@ -1318,17 +1434,20 @@ fn render_shape(
       // BlipFill: render image inside shape
       let blip_svg = if not(shape.blip_fill.is_none()) {
         let bf = shape.blip_fill
-        let href = resolve_image_href(rels, bf.rid)
+        let href = resolve_blip_href(rels, bf)
         if href.is_empty() {
           ""
         } else {
           let opacity = blip_opacity_attr(bf)
+          let filter_id = blip_filter_id(slide_num, shape_idx)
+          let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
           if not(bf.stretch) && bf.tile_sx > 0 {
             // Tile mode: create <pattern> definition
             let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
             let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
             let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
             let th = int_to_str(if tile_h > 0 { tile_h } else { cy_p })
+            filter_defs +
             "<defs><pattern id=\"" +
             blip_tile_id +
             "\" patternUnits=\"userSpaceOnUse\"" +
@@ -1345,13 +1464,14 @@ fn render_shape(
             th +
             "\" preserveAspectRatio=\"none\"" +
             a("href", href) +
-            opacity +
+            opacity + filter_attr +
             "/>" +
             "</pattern></defs>"
           } else if bf.has_crop() {
-            let clip_id = "blipclip_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
-            render_cropped_image(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot)
+            let clip_id = blip_clip_id("blipclip", slide_num, shape_idx)
+            filter_defs + render_cropped_image_with_filter(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr)
           } else {
+            filter_defs +
             "<image" +
             ai("x", x_p) +
             ai("y", y_p) +
@@ -1359,7 +1479,7 @@ fn render_shape(
             ai("height", cy_p) +
             " preserveAspectRatio=\"none\"" +
             a("href", href) +
-            opacity + rot + "/>"
+            opacity + filter_attr + rot + "/>"
           }
         }
       } else {
@@ -1399,8 +1519,9 @@ fn render_shape(
         rels,
       )
     }
-    @ooxml.ShapeKind::Picture(rid) => {
-      let href = resolve_image_href(rels, rid)
+    @ooxml.ShapeKind::Picture(_) => {
+      let bf = shape.blip_fill
+      let href = resolve_blip_href(rels, bf)
       let placeholder = "<rect" +
         ai("x", x_p) +
         ai("y", y_p) +
@@ -1414,12 +1535,14 @@ fn render_shape(
       if href.is_empty() {
         placeholder
       } else {
-        let bf = shape.blip_fill
         let opacity = blip_opacity_attr(bf)
+        let filter_id = blip_filter_id(slide_num, shape_idx)
+        let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
         if bf.has_crop() {
-          let clip_id = "picclip_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
-          render_cropped_image(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot)
+          let clip_id = blip_clip_id("picclip", slide_num, shape_idx)
+          filter_defs + render_cropped_image_with_filter(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr)
         } else {
+          filter_defs +
           "<image" +
           ai("x", x_p) +
           ai("y", y_p) +
@@ -1427,7 +1550,7 @@ fn render_shape(
           ai("height", cy_p) +
           " preserveAspectRatio=\"xMidYMid meet\"" +
           a("href", href) +
-          opacity + rot + "/>"
+          opacity + filter_attr + rot + "/>"
         }
       }
     }

@@ -473,6 +473,13 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
       tile_flip: blip_tile_flip,
       tile_algn: blip_tile_algn,
       alpha: get_dai(g_node, "blip-alpha"),
+      svg_rid: get_da(g_node, "blip-svg-rid"),
+      bright: get_dai(g_node, "blip-bright"),
+      contrast: get_dai(g_node, "blip-contrast"),
+      duotone_1: { let v = get_da(g_node, "blip-duotone1"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
+      duotone_2: { let v = get_da(g_node, "blip-duotone2"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
+      clr_from: { let v = get_da(g_node, "blip-clr-from"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
+      clr_to: { let v = get_da(g_node, "blip-clr-to"); if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) } },
     }
   }
   // PatternFill from data attributes
