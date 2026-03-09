@@ -53,6 +53,7 @@ Slides:
  48. Line gradient fill (a:gradFill in a:ln) + line pattern fill (a:pattFill in a:ln)
  49. Shape hyperlinks (a:hlinkClick/a:hlinkHover on p:cNvPr) + color modifiers (comp/inv/hueMod)
  50. Shape effects (a:effectLst — outerShdw / innerShdw / glow / softEdge)
+ 51. 3D effects (a:scene3d / a:sp3d / bevelT / extrusion) + text shadow/glow (a:rPr/a:effectLst)
 """
 
 from pptx import Presentation
@@ -3847,6 +3848,111 @@ lbl50 = slide50.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl50.text_frame.paragraphs[0].text = "Slide 50: Shape effects (outerShdw / innerShdw / glow / softEdge)"
 lbl50.text_frame.paragraphs[0].font.size = Pt(18)
 lbl50.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 51: 3D effects (bevel, scene3d, sp3d) + text shadow ──
+slide51 = prs.slides.add_slide(prs.slide_layouts[6])  # blank
+
+sp51_bevel_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="401" name="Bevel3D"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="1371600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:scene3d>
+      <a:camera prst="orthographicFront"/>
+      <a:lightRig rig="threePt" dir="t"/>
+    </a:scene3d>
+    <a:sp3d prstMaterial="plastic">
+      <a:bevelT w="152400" h="50800" prst="relaxedInset"/>
+    </a:sp3d>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>3D Bevel</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+sp51_text_shadow_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="402" name="TextShadow"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="1371600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="2400" b="1">
+      <a:solidFill><a:srgbClr val="333333"/></a:solidFill>
+      <a:effectLst>
+        <a:outerShdw blurRad="38100" dist="38100" dir="5400000">
+          <a:srgbClr val="000000"><a:alpha val="40000"/></a:srgbClr>
+        </a:outerShdw>
+      </a:effectLst>
+    </a:rPr><a:t>Text with Shadow</a:t></a:r></a:p>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="2000">
+      <a:solidFill><a:srgbClr val="FF4444"/></a:solidFill>
+      <a:effectLst>
+        <a:glow rad="101600">
+          <a:srgbClr val="FF0000"><a:alpha val="50000"/></a:srgbClr>
+        </a:glow>
+      </a:effectLst>
+    </a:rPr><a:t>Text with Glow</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+sp51_extrusion_xml = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="403" name="Extrusion3D"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="3657600"/><a:ext cx="3200400" cy="1828800"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="70AD47"/></a:solidFill>
+    <a:scene3d>
+      <a:camera prst="isometricLeftDown"/>
+      <a:lightRig rig="balanced" dir="t"/>
+    </a:scene3d>
+    <a:sp3d extrusionH="76200" contourW="12700" prstMaterial="warmMatte">
+      <a:bevelT w="101600" h="38100" prst="circle"/>
+      <a:bevelB w="50800" h="25400"/>
+      <a:extrusionClr><a:srgbClr val="5B8C3C"/></a:extrusionClr>
+      <a:contourClr><a:srgbClr val="2E5B14"/></a:contourClr>
+    </a:sp3d>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>3D Extrusion</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>"""
+
+spTree51 = slide51._element.find(f'.//{ns_p}cSld/{ns_p}spTree')
+spTree51.append(etree.fromstring(sp51_bevel_xml))
+spTree51.append(etree.fromstring(sp51_text_shadow_xml))
+spTree51.append(etree.fromstring(sp51_extrusion_xml))
+
+lbl51 = slide51.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl51.text_frame.paragraphs[0].text = "Slide 51: 3D effects (bevel/extrusion/scene3d) + text shadow/glow"
+lbl51.text_frame.paragraphs[0].font.size = Pt(18)
+lbl51.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

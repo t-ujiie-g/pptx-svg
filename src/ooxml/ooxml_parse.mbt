@@ -355,6 +355,47 @@ fn parse_stroke(
 
 ///|
 /// Parse a:effectLst from shape property children.
+///|
+fn parse_outer_shadow(node : @xml.XmlNode, theme : ThemeData) -> OuterShadow {
+  let ch = @xml.get_children(node)
+  let color = parse_color_from_children(ch, theme)
+  {
+    blur_rad: attr_int(node, "blurRad"),
+    dist: attr_int(node, "dist"),
+    dir: attr_int(node, "dir"),
+    color,
+    sx: attr_int(node, "sx"),
+    sy: attr_int(node, "sy"),
+    algn: match @xml.get_attr(node, "algn") {
+      Some(v) => v
+      None => ""
+    },
+    rot_with_shape: match @xml.get_attr(node, "rotWithShape") {
+      Some(v) => v != "0"
+      None => true
+    },
+  }
+}
+
+///|
+fn parse_inner_shadow(node : @xml.XmlNode, theme : ThemeData) -> InnerShadow {
+  let ch = @xml.get_children(node)
+  let color = parse_color_from_children(ch, theme)
+  {
+    blur_rad: attr_int(node, "blurRad"),
+    dist: attr_int(node, "dist"),
+    dir: attr_int(node, "dir"),
+    color,
+  }
+}
+
+///|
+fn parse_glow(node : @xml.XmlNode, theme : ThemeData) -> Glow {
+  let ch = @xml.get_children(node)
+  let color = parse_color_from_children(ch, theme)
+  { rad: attr_int(node, "rad"), color }
+}
+
 fn parse_effect_lst(
   sppr_ch : Array[@xml.XmlNode],
   theme : ThemeData,
@@ -365,47 +406,15 @@ fn parse_effect_lst(
       let eff_ch = @xml.get_children(eff)
       let os = match @xml.find_child(eff_ch, "a:outerShdw") {
         None => OuterShadow::none()
-        Some(node) => {
-          let ch = @xml.get_children(node)
-          let color = parse_color_from_children(ch, theme)
-          {
-            blur_rad: attr_int(node, "blurRad"),
-            dist: attr_int(node, "dist"),
-            dir: attr_int(node, "dir"),
-            color,
-            sx: attr_int(node, "sx"),
-            sy: attr_int(node, "sy"),
-            algn: match @xml.get_attr(node, "algn") {
-              Some(v) => v
-              None => ""
-            },
-            rot_with_shape: match @xml.get_attr(node, "rotWithShape") {
-              Some(v) => v != "0"
-              None => true
-            },
-          }
-        }
+        Some(node) => parse_outer_shadow(node, theme)
       }
       let ishdw = match @xml.find_child(eff_ch, "a:innerShdw") {
         None => InnerShadow::none()
-        Some(node) => {
-          let ch = @xml.get_children(node)
-          let color = parse_color_from_children(ch, theme)
-          {
-            blur_rad: attr_int(node, "blurRad"),
-            dist: attr_int(node, "dist"),
-            dir: attr_int(node, "dir"),
-            color,
-          }
-        }
+        Some(node) => parse_inner_shadow(node, theme)
       }
       let gl = match @xml.find_child(eff_ch, "a:glow") {
         None => Glow::none()
-        Some(node) => {
-          let ch = @xml.get_children(node)
-          let color = parse_color_from_children(ch, theme)
-          { rad: attr_int(node, "rad"), color }
-        }
+        Some(node) => parse_glow(node, theme)
       }
       let se = match @xml.find_child(eff_ch, "a:softEdge") {
         None => SoftEdge::none()
@@ -439,6 +448,109 @@ fn parse_effect_lst(
         glow: gl,
         soft_edge: se,
         reflection: refl,
+      }
+    }
+  }
+}
+
+// ── 3D parsing ──────────────────────────────────────────────────────────────
+
+///|
+fn parse_scene_3d(sppr_ch : Array[@xml.XmlNode]) -> Scene3d {
+  match @xml.find_child(sppr_ch, "a:scene3d") {
+    None => Scene3d::none()
+    Some(scene) => {
+      let sch = @xml.get_children(scene)
+      let (cam_prst, rig, rig_dir) = match @xml.find_child(sch, "a:camera") {
+        None => ("", "", "")
+        Some(cam) => {
+          let cp = match @xml.get_attr(cam, "prst") {
+            Some(v) => v
+            None => ""
+          }
+          let lr = match @xml.find_child(sch, "a:lightRig") {
+            None => ("", "")
+            Some(lr_node) => {
+              let r = match @xml.get_attr(lr_node, "rig") {
+                Some(v) => v
+                None => ""
+              }
+              let d = match @xml.get_attr(lr_node, "dir") {
+                Some(v) => v
+                None => ""
+              }
+              (r, d)
+            }
+          }
+          (cp, lr.0, lr.1)
+        }
+      }
+      { camera_prst: cam_prst, light_rig: rig, light_dir: rig_dir }
+    }
+  }
+}
+
+///|
+fn parse_bevel(parent_ch : Array[@xml.XmlNode], tag : String) -> Bevel {
+  match @xml.find_child(parent_ch, tag) {
+    None => Bevel::none()
+    Some(b) => {
+      let w = match @xml.get_attr(b, "w") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+      let h = match @xml.get_attr(b, "h") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+      let prst = match @xml.get_attr(b, "prst") {
+        Some(v) => v
+        None => ""
+      }
+      { w, h, prst }
+    }
+  }
+}
+
+///|
+fn parse_sp_3d(sppr_ch : Array[@xml.XmlNode]) -> Shape3d {
+  match @xml.find_child(sppr_ch, "a:sp3d") {
+    None => Shape3d::none()
+    Some(sp3d) => {
+      let sp_ch = @xml.get_children(sp3d)
+      let ext_h = match @xml.get_attr(sp3d, "extrusionH") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+      let cnt_w = match @xml.get_attr(sp3d, "contourW") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+      let z_val = match @xml.get_attr(sp3d, "z") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+      let mat = match @xml.get_attr(sp3d, "prstMaterial") {
+        Some(v) => v
+        None => ""
+      }
+      let ext_clr = match @xml.find_child(sp_ch, "a:extrusionClr") {
+        None => Color::none()
+        Some(ec) => parse_first_color(@xml.get_children(ec))
+      }
+      let cnt_clr = match @xml.find_child(sp_ch, "a:contourClr") {
+        None => Color::none()
+        Some(cc) => parse_first_color(@xml.get_children(cc))
+      }
+      {
+        bevel_t: parse_bevel(sp_ch, "a:bevelT"),
+        bevel_b: parse_bevel(sp_ch, "a:bevelB"),
+        extrusion_h: ext_h,
+        contour_w: cnt_w,
+        extrusion_clr: ext_clr,
+        contour_clr: cnt_clr,
+        prst_material: mat,
+        z: z_val,
       }
     }
   }
@@ -837,6 +949,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     sh_link_rid,
     sh_link_hover_rid,
     effects: parse_effect_lst(sppr_ch, theme),
+    scene_3d: parse_scene_3d(sppr_ch),
+    sp_3d: parse_sp_3d(sppr_ch),
   }
 }
 

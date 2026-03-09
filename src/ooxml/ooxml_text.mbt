@@ -1,4 +1,8 @@
-// OOXML Text body parsing
+// OOXML Text body parsing — paragraphs, runs, bodyPr
+//
+// Parses <a:bodyPr>, <a:p>, <a:r>, <a:rPr>, <a:pPr> elements into
+// TextParagraph/TextRun/BodyProps structs. Handles bullets (char/auto/image),
+// spacing, indentation, tabs, RTL, run-level effects, and font resolution.
 //
 // Same package as ooxml.mbt — all types and helpers are shared.
 
@@ -400,6 +404,38 @@ fn parse_run_props(
     cap,
     hlink_rid,
     hlink_mouse_over_rid,
+    effects: parse_run_effect_lst(rpr_ch, theme),
+  }
+}
+
+///|
+fn parse_run_effect_lst(rpr_ch : Array[@xml.XmlNode], theme : ThemeData) -> EffectList {
+  // a:effectLst can appear as a child of a:rPr
+  match @xml.find_child(rpr_ch, "a:effectLst") {
+    None => EffectList::none()
+    Some(eff) => {
+      let eff_ch = @xml.get_children(eff)
+      // Reuse the shape-level effect parsing (only need outerShdw for text typically)
+      let os = match @xml.find_child(eff_ch, "a:outerShdw") {
+        None => OuterShadow::none()
+        Some(osn) => parse_outer_shadow(osn, theme)
+      }
+      let ishdw = match @xml.find_child(eff_ch, "a:innerShdw") {
+        None => InnerShadow::none()
+        Some(isn) => parse_inner_shadow(isn, theme)
+      }
+      let gl = match @xml.find_child(eff_ch, "a:glow") {
+        None => Glow::none()
+        Some(gn) => parse_glow(gn, theme)
+      }
+      {
+        outer_shadow: os,
+        inner_shadow: ishdw,
+        glow: gl,
+        soft_edge: SoftEdge::none(),
+        reflection: Reflection::none(),
+      }
+    }
   }
 }
 
@@ -534,6 +570,7 @@ fn parse_text_body(
             cap: "",
             hlink_rid: "",
             hlink_mouse_over_rid: "",
+            effects: EffectList::none(),
           }
         Some(rpr) => {
           let rp = parse_run_props(

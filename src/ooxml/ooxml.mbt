@@ -835,6 +835,7 @@ pub(all) struct TextRun {
   cap : String // "all", "small"; "" = none
   hlink_rid : String // hyperlink relationship ID from <a:hlinkClick r:id="...">; "" = none
   hlink_mouse_over_rid : String // hover hyperlink from <a:hlinkHover r:id="...">; "" = none
+  effects : EffectList // a:effectLst on a:rPr; text-level effects (shadow, glow, etc.)
 }
 
 ///|
@@ -1250,6 +1251,79 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
   self.reflection.is_none()
 }
 
+// ── 3D ───────────────────────────────────────────────────────────────────────
+
+///|
+/// Bevel definition (a:bevelT / a:bevelB).
+pub(all) struct Bevel {
+  w : Int // width in EMU
+  h : Int // height in EMU
+  prst : String // preset type (e.g. "relaxedInset", "circle", "slope")
+}
+
+///|
+pub fn Bevel::none() -> Bevel {
+  { w: 0, h: 0, prst: "" }
+}
+
+///|
+pub fn Bevel::is_none(self : Bevel) -> Bool {
+  self.w == 0 && self.h == 0 && self.prst.is_empty()
+}
+
+///|
+/// 3D shape properties (a:sp3d).
+pub(all) struct Shape3d {
+  bevel_t : Bevel
+  bevel_b : Bevel
+  extrusion_h : Int // extrusionH in EMU
+  contour_w : Int // contourW in EMU
+  extrusion_clr : Color
+  contour_clr : Color
+  prst_material : String // e.g. "matte", "warmMatte", "plastic"
+  z : Int // z coordinate in EMU
+}
+
+///|
+pub fn Shape3d::none() -> Shape3d {
+  {
+    bevel_t: Bevel::none(),
+    bevel_b: Bevel::none(),
+    extrusion_h: 0,
+    contour_w: 0,
+    extrusion_clr: Color::none(),
+    contour_clr: Color::none(),
+    prst_material: "",
+    z: 0,
+  }
+}
+
+///|
+pub fn Shape3d::is_none(self : Shape3d) -> Bool {
+  self.bevel_t.is_none() &&
+  self.bevel_b.is_none() &&
+  self.extrusion_h == 0 &&
+  self.contour_w == 0
+}
+
+///|
+/// 3D scene properties (a:scene3d — camera + lightRig).
+pub(all) struct Scene3d {
+  camera_prst : String // preset camera type
+  light_rig : String // light rig preset
+  light_dir : String // light direction
+}
+
+///|
+pub fn Scene3d::none() -> Scene3d {
+  { camera_prst: "", light_rig: "", light_dir: "" }
+}
+
+///|
+pub fn Scene3d::is_none(self : Scene3d) -> Bool {
+  self.camera_prst.is_empty() && self.light_rig.is_empty()
+}
+
 // ── Shape ─────────────────────────────────────────────────────────────────────
 
 ///|
@@ -1364,6 +1438,8 @@ pub(all) struct Shape {
   sh_link_rid : String // shape hyperlink r:id (a:hlinkClick on p:cNvPr)
   sh_link_hover_rid : String // shape hover link r:id (a:hlinkHover on p:cNvPr)
   effects : EffectList // a:effectLst; EffectList::none() = no effects
+  scene_3d : Scene3d // a:scene3d
+  sp_3d : Shape3d // a:sp3d
 }
 
 ///|
@@ -1406,6 +1482,8 @@ pub fn Shape::default_with(
     sh_link_rid: "",
     sh_link_hover_rid: "",
     effects: EffectList::none(),
+    scene_3d: Scene3d::none(),
+    sp_3d: Shape3d::none(),
   }
 }
 

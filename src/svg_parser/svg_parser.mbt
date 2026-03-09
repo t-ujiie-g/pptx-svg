@@ -127,6 +127,48 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
   }
 }
 
+///|
+/// Parse 3D scene from data attributes.
+fn parse_scene_3d_from_da(node : @xml.XmlNode) -> @ooxml.Scene3d {
+  let cam = get_data_attr(node, "3d-cam")
+  let rig = get_data_attr(node, "3d-rig")
+  let rig_dir = get_data_attr(node, "3d-rig-dir")
+  if cam.is_empty() && rig.is_empty() {
+    @ooxml.Scene3d::none()
+  } else {
+    { camera_prst: cam, light_rig: rig, light_dir: rig_dir }
+  }
+}
+
+///|
+/// Parse 3D shape properties from data attributes.
+fn parse_sp_3d_from_da(node : @xml.XmlNode) -> @ooxml.Shape3d {
+  let bt_w = get_dai(node, "3d-bt-w")
+  let bt_h = get_dai(node, "3d-bt-h")
+  let bt_prst = get_data_attr(node, "3d-bt-prst")
+  let bb_w = get_dai(node, "3d-bb-w")
+  let bb_h = get_dai(node, "3d-bb-h")
+  let bb_prst = get_data_attr(node, "3d-bb-prst")
+  let ext_h = get_dai(node, "3d-ext-h")
+  let cnt_w = get_dai(node, "3d-cnt-w")
+  let mat = get_data_attr(node, "3d-mat")
+  let z_val = get_dai(node, "3d-z")
+  if bt_w == 0 && bt_h == 0 && bb_w == 0 && bb_h == 0 && ext_h == 0 && cnt_w == 0 {
+    @ooxml.Shape3d::none()
+  } else {
+    {
+      bevel_t: { w: bt_w, h: bt_h, prst: bt_prst },
+      bevel_b: { w: bb_w, h: bb_h, prst: bb_prst },
+      extrusion_h: ext_h,
+      contour_w: cnt_w,
+      extrusion_clr: color_or_none(node, "3d-ext-clr"),
+      contour_clr: color_or_none(node, "3d-cnt-clr"),
+      prst_material: mat,
+      z: z_val,
+    }
+  }
+}
+
 // ── Gradient parsing from SVG data attributes ───────────────────────────────
 
 ///|
@@ -285,6 +327,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     cap,
                     hlink_rid,
                     hlink_mouse_over_rid,
+                    effects: @ooxml.EffectList::none(),
                   })
                 }
               @xml.XmlNode::Text(text) =>
@@ -308,6 +351,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     cap: "",
                     hlink_rid: "",
                     hlink_mouse_over_rid: "",
+                    effects: @ooxml.EffectList::none(),
                   })
                 }
             }
@@ -605,6 +649,8 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     sh_link_rid: get_da(g_node, "sh-link-rid"),
     sh_link_hover_rid: get_da(g_node, "sh-link-hover-rid"),
     effects: parse_effects_from_da(g_node),
+    scene_3d: parse_scene_3d_from_da(g_node),
+    sp_3d: parse_sp_3d_from_da(g_node),
   }
 }
 

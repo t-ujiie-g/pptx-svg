@@ -249,6 +249,7 @@ fn inject_placeholder_auto_content(
         cap: "",
         hlink_rid: "",
         hlink_mouse_over_rid: "",
+        effects: @ooxml.EffectList::none(),
       }
       let para : @ooxml.TextParagraph = {
         runs: [run],

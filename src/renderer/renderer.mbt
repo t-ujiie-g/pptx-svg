@@ -74,50 +74,62 @@ let ooxml_stop_pct : Int = 1000 // stop pos 0-100000 → percentage: divide by 1
 ///|
 let ooxml_fill_to_pct : Int = 2000 // fillToRect 0-100000 → center%: divide by 2000
 
-// ── Gradient ID helper ──────────────────────────────────────────────────────
+// ── SVG element ID builders ─────────────────────────────────────────────────
+// Each SVG <defs> element (gradient, pattern, filter, mask) needs a unique ID.
+// All IDs follow the pattern: prefix + sep + slide_num + sep + shape_idx.
+
+///|
+/// Core ID builder. All SVG element IDs are built through this function.
+fn svg_id(prefix : String, sep : String, slide_num : Int, shape_idx : Int) -> String {
+  prefix + sep + int_to_str(slide_num) + sep + int_to_str(shape_idx)
+}
 
 ///|
 /// Build a gradient definition ID. Negative shape_idx uses "-n" prefix.
 fn grad_id(slide_num : Int, shape_idx : Int) -> String {
   if shape_idx >= 0 {
-    "grad-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+    svg_id("grad-s", "-", slide_num, shape_idx)
   } else {
     "grad-s" + int_to_str(slide_num) + "-n" + int_to_str(-shape_idx)
   }
 }
 
 ///|
-/// Build a pattern definition ID.
 fn patt_id(slide_num : Int, shape_idx : Int) -> String {
-  "patt-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+  svg_id("patt-s", "-", slide_num, shape_idx)
 }
 
 ///|
-/// Build a stroke gradient definition ID.
 fn stroke_grad_id(slide_num : Int, shape_idx : Int) -> String {
-  "sgrad-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+  svg_id("sgrad-s", "-", slide_num, shape_idx)
 }
 
 ///|
-/// Build a stroke pattern definition ID.
 fn stroke_patt_id(slide_num : Int, shape_idx : Int) -> String {
-  "spatt-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
+  svg_id("spatt-s", "-", slide_num, shape_idx)
 }
 
 ///|
-/// Build an effect filter ID.
 fn effect_filter_id(slide_num : Int, shape_idx : Int) -> String {
-  "eff_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+  svg_id("eff_s", "_", slide_num, shape_idx)
 }
 
 ///|
-/// Build a blip filter ID.
+fn refl_shape_id(slide_num : Int, shape_idx : Int) -> String {
+  svg_id("rshp_s", "_", slide_num, shape_idx)
+}
+
+///|
+fn refl_mask_id(slide_num : Int, shape_idx : Int) -> String {
+  svg_id("rmsk_s", "_", slide_num, shape_idx)
+}
+
+///|
 fn blip_filter_id(slide_num : Int, shape_idx : Int) -> String {
-  "blipfx_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
+  svg_id("blipfx_s", "_", slide_num, shape_idx)
 }
 
 ///|
-/// Build a blip clip path ID.
 fn blip_clip_id(prefix : String, slide_num : Int, shape_idx : Int) -> String {
   prefix + "_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
 }
@@ -1291,6 +1303,32 @@ fn render_shape(
     } else {
       ""
     }) +
+    // 3D data attributes for round-trip
+    (if not(shape.scene_3d.is_none()) {
+      da("3d-cam", shape.scene_3d.camera_prst) +
+      da("3d-rig", shape.scene_3d.light_rig) +
+      da("3d-rig-dir", shape.scene_3d.light_dir)
+    } else {
+      ""
+    }) +
+    (if not(shape.sp_3d.is_none()) {
+      let s3 = shape.sp_3d
+      let mut a3 = ""
+      if not(s3.bevel_t.is_none()) {
+        a3 = a3 + dai("3d-bt-w", s3.bevel_t.w) + dai("3d-bt-h", s3.bevel_t.h) + da("3d-bt-prst", s3.bevel_t.prst)
+      }
+      if not(s3.bevel_b.is_none()) {
+        a3 = a3 + dai("3d-bb-w", s3.bevel_b.w) + dai("3d-bb-h", s3.bevel_b.h) + da("3d-bb-prst", s3.bevel_b.prst)
+      }
+      a3 + dai("3d-ext-h", s3.extrusion_h) +
+        dai("3d-cnt-w", s3.contour_w) +
+        da("3d-ext-clr", s3.extrusion_clr.to_hex()) +
+        da("3d-cnt-clr", s3.contour_clr.to_hex()) +
+        da("3d-mat", s3.prst_material) +
+        dai("3d-z", s3.z)
+    } else {
+      ""
+    }) +
     da("anchor", shape.body_props.anchor) +
     dai("l-ins", shape.body_props.l_ins) +
     dai("t-ins", shape.body_props.t_ins) +
@@ -1653,7 +1691,30 @@ fn render_shape(
     } else {
       ""
     }
-    "<g" + g_attrs + eff_attr + ">" + inner + "</g>"
+    let has_refl = not(shape.effects.is_none()) &&
+      not(shape.effects.reflection.is_none())
+    let shape_id_attr = if has_refl {
+      " id=\"" + refl_shape_id(slide_num, shape_idx) + "\""
+    } else {
+      ""
+    }
+    let shape_svg = "<g" + g_attrs + eff_attr + shape_id_attr + ">" + inner + "</g>"
+    if has_refl {
+      let t = shape.transform
+      shape_svg +
+        render_reflection_element(
+          shape.effects.reflection,
+          refl_shape_id(slide_num, shape_idx),
+          refl_mask_id(slide_num, shape_idx),
+          px(t.x, scale),
+          px(t.y, scale),
+          px(t.cx, scale),
+          cy_p,
+          scale,
+        )
+    } else {
+      shape_svg
+    }
   }
 }
 
@@ -2212,6 +2273,14 @@ pub fn render_slide_svg(
         scale,
       )
       defs = defs + eff_def
+      // Reflection mask gradient
+      if not(sh.effects.reflection.is_none()) {
+        defs = defs +
+          render_reflection_mask_def(
+            sh.effects.reflection,
+            refl_mask_id(slide_num, di),
+          )
+      }
     }
     di = di + 1
   }

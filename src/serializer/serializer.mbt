@@ -527,6 +527,9 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     if not(run.sym_font.is_empty()) {
       rpr = rpr + "<a:sym typeface=\"" + xml_escape(run.sym_font) + "\"/>"
     }
+    if not(run.effects.is_none()) {
+      rpr = rpr + serialize_effect_lst(run.effects)
+    }
     if not(run.hlink_rid.is_empty()) {
       rpr = rpr + "<a:hlinkClick r:id=\"" + run.hlink_rid + "\"/>"
     }
@@ -891,6 +894,8 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     out = out + serialize_stroke(shape)
   }
   out = out + serialize_effect_lst(shape.effects)
+  out = out + serialize_scene_3d(shape.scene_3d)
+  out = out + serialize_sp_3d(shape.sp_3d)
   out = out + "</p:spPr>"
   // Text body
   out = out + serialize_text_body(shape.paragraphs, shape.body_props)
@@ -954,6 +959,45 @@ fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
     inner = inner + "<a:reflection" + attrs + "/>"
   }
   "<a:effectLst>" + inner + "</a:effectLst>"
+}
+
+///|
+fn serialize_scene_3d(s : @ooxml.Scene3d) -> String {
+  if s.is_none() { return "" }
+  let cam = "<a:camera prst=\"" + s.camera_prst + "\"/>"
+  let lr = if not(s.light_rig.is_empty()) {
+    "<a:lightRig rig=\"" + s.light_rig + "\"" +
+      (if not(s.light_dir.is_empty()) { " dir=\"" + s.light_dir + "\"" } else { "" }) +
+      "/>"
+  } else {
+    ""
+  }
+  "<a:scene3d>" + cam + lr + "</a:scene3d>"
+}
+
+///|
+fn serialize_bevel(tag : String, b : @ooxml.Bevel) -> String {
+  if b.is_none() { return "" }
+  let mut attrs = ""
+  if b.w > 0 { attrs = attrs + " w=\"" + int_to_str(b.w) + "\"" }
+  if b.h > 0 { attrs = attrs + " h=\"" + int_to_str(b.h) + "\"" }
+  if not(b.prst.is_empty()) { attrs = attrs + " prst=\"" + b.prst + "\"" }
+  "<" + tag + attrs + "/>"
+}
+
+///|
+fn serialize_sp_3d(s : @ooxml.Shape3d) -> String {
+  if s.is_none() { return "" }
+  let mut attrs = ""
+  if s.extrusion_h > 0 { attrs = attrs + " extrusionH=\"" + int_to_str(s.extrusion_h) + "\"" }
+  if s.contour_w > 0 { attrs = attrs + " contourW=\"" + int_to_str(s.contour_w) + "\"" }
+  if not(s.prst_material.is_empty()) { attrs = attrs + " prstMaterial=\"" + s.prst_material + "\"" }
+  if s.z != 0 { attrs = attrs + " z=\"" + int_to_str(s.z) + "\"" }
+  let inner = serialize_bevel("a:bevelT", s.bevel_t) +
+    serialize_bevel("a:bevelB", s.bevel_b) +
+    (if not(s.extrusion_clr.is_none()) { "<a:extrusionClr>" + serialize_eff_color(s.extrusion_clr) + "</a:extrusionClr>" } else { "" }) +
+    (if not(s.contour_clr.is_none()) { "<a:contourClr>" + serialize_eff_color(s.contour_clr) + "</a:contourClr>" } else { "" })
+  "<a:sp3d" + attrs + ">" + inner + "</a:sp3d>"
 }
 
 ///|
@@ -1316,6 +1360,8 @@ fn serialize_connector(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     out = out + serialize_stroke(shape)
   }
   out = out + serialize_effect_lst(shape.effects)
+  out = out + serialize_scene_3d(shape.scene_3d)
+  out = out + serialize_sp_3d(shape.sp_3d)
   out = out + "</p:spPr>"
   out + "</p:cxnSp>"
 }

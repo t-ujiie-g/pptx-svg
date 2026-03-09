@@ -1,5 +1,9 @@
 // SVG renderer — Text rendering
 //
+// Handles paragraph layout, bullet rendering, text wrapping (Latin word-break
+// and CJK character-break), line spacing, tab stops, super/subscript,
+// capitalization, hyperlinks, and text-level effects (shadow/glow via CSS filter).
+//
 // Same package as renderer.mbt — all constants and helpers are shared.
 
 // ── Text helpers ─────────────────────────────────────────────────────────────
@@ -362,6 +366,51 @@ fn para_line_height(
 }
 
 ///|
+/// Build CSS rgba() color string from Color + alpha fallback.
+fn css_rgba(clr : @ooxml.Color, alpha_fallback : String) -> String {
+  "rgba(" + int_to_str(clr.r) + "," + int_to_str(clr.g) + "," +
+  int_to_str(clr.b) + "," + eff_alpha_str(clr, alpha_fallback) + ")"
+}
+
+///|
+/// Generate CSS style attribute with filter for text-level effects (shadow/glow).
+/// Returns empty string if no visual effects, or ` style="filter: ..."` attribute.
+fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
+  if eff.is_none() {
+    return ""
+  }
+  let mut filters = ""
+  // Outer shadow → CSS drop-shadow(dx dy blur color)
+  if not(eff.outer_shadow.is_none()) {
+    let os = eff.outer_shadow
+    let blur = emu_to_filter_px(os.blur_rad, scale)
+    let dist = emu_to_filter_px(os.dist, scale)
+    let angle_deg = os.dir / ooxml_angle_unit
+    let dx = dist * cos_deg(angle_deg) / 100
+    let dy = dist * sin_deg(angle_deg) / 100
+    let std_dev = if blur / 2 > 0 { blur / 2 } else { 1 }
+    filters = filters + "drop-shadow(" +
+      int_to_str(dx) + "px " + int_to_str(dy) + "px " +
+      int_to_str(std_dev) + "px " + css_rgba(os.color, "0.5") + ")"
+  }
+  // Glow → approximation as drop-shadow with no offset
+  if not(eff.glow.is_none()) {
+    let rad = emu_to_filter_px(eff.glow.rad, scale)
+    let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
+    if not(filters.is_empty()) {
+      filters = filters + " "
+    }
+    filters = filters + "drop-shadow(0px 0px " +
+      int_to_str(std_dev) + "px " + css_rgba(eff.glow.color, "0.7") + ")"
+  }
+  if filters.is_empty() {
+    ""
+  } else {
+    " style=\"filter: " + filters + "\""
+  }
+}
+
+///|
 /// Render a single text run as a <tspan> element.
 fn render_run_tspan(
   run : @ooxml.TextRun,
@@ -454,7 +503,26 @@ fn render_run_tspan(
     dai("kern", run.kern) +
     da("cap", run.cap) +
     da("hlink-rid", run.hlink_rid) +
-    da("hlink-hover-rid", run.hlink_mouse_over_rid)
+    da("hlink-hover-rid", run.hlink_mouse_over_rid) +
+    // Text-level effect data attributes (round-trip only)
+    (if not(run.effects.is_none()) {
+      let eff = run.effects
+      let mut ea = ""
+      if not(eff.outer_shadow.is_none()) {
+        let os = eff.outer_shadow
+        ea = ea + dai("reff-os-blur", os.blur_rad) +
+          dai("reff-os-dist", os.dist) +
+          dai("reff-os-dir", os.dir) +
+          da("reff-os-clr", os.color.to_hex())
+      }
+      if not(eff.glow.is_none()) {
+        ea = ea + dai("reff-gl-rad", eff.glow.rad) +
+          da("reff-gl-clr", eff.glow.color.to_hex())
+      }
+      ea
+    } else { "" }) +
+    // CSS filter for text-level effects (shadow/glow visual rendering)
+    render_text_effect_style(run.effects, scale)
   // Wrap in hyperlink if present
   let inner = svg_escape(display_text)
   if not(run.hlink_rid.is_empty()) {

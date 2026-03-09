@@ -494,7 +494,7 @@ fn render_effect_filter(
     let dist = emu_to_filter_px(os.dist, scale)
     // dir is in 60000ths of a degree — convert to radians for dx/dy
     // 0 = right, 5400000 = bottom, etc.
-    let angle_deg = os.dir / 60000
+    let angle_deg = os.dir / ooxml_angle_unit
     let dx = dist * cos_deg(angle_deg) / 100
     let dy = dist * sin_deg(angle_deg) / 100
     let std_dev = blur / 2
@@ -549,7 +549,7 @@ fn render_effect_filter(
     let ishdw = eff.inner_shadow
     let blur = emu_to_filter_px(ishdw.blur_rad, scale)
     let dist = emu_to_filter_px(ishdw.dist, scale)
-    let angle_deg = ishdw.dir / 60000
+    let angle_deg = ishdw.dir / ooxml_angle_unit
     let dx = dist * cos_deg(angle_deg) / 100
     let dy = dist * sin_deg(angle_deg) / 100
     let std_dev = blur / 2
@@ -585,6 +585,64 @@ fn render_effect_filter(
     filters +
     "</filter>"
   (def, " filter=\"url(#" + filter_id + ")\"")
+}
+
+// ── Reflection rendering ─────────────────────────────────────────────────────
+
+///|
+/// Render a <linearGradient> + <mask> def for reflection fade.
+/// The gradient goes from st_alpha (top of reflection) to end_alpha (bottom).
+fn render_reflection_mask_def(
+  r : @ooxml.Reflection,
+  mask_id : String,
+) -> String {
+  // stA/endA are in 100000ths (100000 = 100% opaque)
+  let st_opacity = format_ratio(r.st_alpha, @ooxml.pct_100)
+  let end_opacity = format_ratio(r.end_alpha, @ooxml.pct_100)
+  let grad_id = mask_id + "-g"
+  "<linearGradient id=\"" + grad_id + "\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">" +
+    "<stop offset=\"0%\" stop-color=\"white\" stop-opacity=\"" + st_opacity + "\"/>" +
+    "<stop offset=\"100%\" stop-color=\"white\" stop-opacity=\"" + end_opacity + "\"/>" +
+    "</linearGradient>" +
+    "<mask id=\"" + mask_id + "\">" +
+    "<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"url(#" + grad_id + ")\"/>" +
+    "</mask>"
+}
+
+///|
+/// Render the reflection element: a flipped, faded copy of the shape below it.
+fn render_reflection_element(
+  r : @ooxml.Reflection,
+  shape_id : String,
+  mask_id : String,
+  _x_p : Int,
+  y_p : Int,
+  cx_p : Int,
+  cy_p : Int,
+  scale : Int,
+) -> String {
+  // sy is scale % (typically -100000 for full vertical flip, but OOXML default is 100000)
+  // For reflection, we flip vertically: scaleY(-1) relative to the bottom of the shape
+  let gap = emu_to_filter_px(r.dist, scale)
+  // The reflection appears below the shape, flipped
+  // Position: translate to bottom of shape + gap, then scaleY(-1) to flip
+  let refl_y = y_p + cy_p + gap
+  // blur (optional)
+  let blur_attr = if r.blur_rad > 0 {
+    let blur_px = emu_to_filter_px(r.blur_rad, scale)
+    " filter=\"blur(" + int_to_str(if blur_px > 0 { blur_px } else { 1 }) + "px)\""
+  } else {
+    ""
+  }
+  "<g transform=\"translate(0," + int_to_str(refl_y + cy_p) +
+    ") scale(1,-1) translate(0," + int_to_str(-refl_y) +
+    ")\" mask=\"url(#" + mask_id +
+    ")\" opacity=\"0.5\"" + blur_attr +
+    " style=\"pointer-events:none\">" +
+    "<use href=\"#" + shape_id +
+    "\" x=\"0\" y=\"0\" width=\"" + int_to_str(cx_p) +
+    "\" height=\"" + int_to_str(cy_p) +
+    "\"/></g>"
 }
 
 ///|

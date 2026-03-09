@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 50', slideCount === 50, `got ${slideCount}`);
+  assert('slide count = 51', slideCount === 51, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 1; i <= 51; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 1; i <= 51; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -994,6 +994,23 @@ async function testFeaturesPptx() {
     assert('slide50 outerShdw blurRad', slide50.includes('blurRad="152400"'));
     assert('slide50 outerShdw dir', slide50.includes('dir="5400000"'));
     assert('slide50 glow rad', slide50.includes('rad="228600"'));
+  }
+
+  // ── Slide 51: 3D effects + text shadow ──
+  section('test_features.pptx — Slide 51: 3D effects + text shadow');
+  {
+    const slide51 = textFiles.get('ppt/slides/slide51.xml') ?? '';
+    assert('slide51 has a:scene3d', hasTag(slide51, 'a:scene3d'));
+    assert('slide51 has a:camera', hasTag(slide51, 'a:camera'));
+    assert('slide51 has a:lightRig', hasTag(slide51, 'a:lightRig'));
+    assert('slide51 has a:sp3d', hasTag(slide51, 'a:sp3d'));
+    assert('slide51 has a:bevelT', hasTag(slide51, 'a:bevelT'));
+    assert('slide51 has a:extrusionClr', hasTag(slide51, 'a:extrusionClr'));
+    assert('slide51 has a:contourClr', hasTag(slide51, 'a:contourClr'));
+    assert('slide51 has text effectLst', slide51.includes('<a:effectLst>'));
+    assert('slide51 has text outerShdw', slide51.includes('a:outerShdw'));
+    assert('slide51 has text glow', slide51.includes('a:glow'));
+    assert('slide51 has prstMaterial', slide51.includes('prstMaterial'));
   }
 }
 
