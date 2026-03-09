@@ -56,6 +56,9 @@ let chart_pie_pad : Int = 4 // radius padding for pie/donut charts
 ///|
 let chart_bubble_max_r : Int = 20 // max bubble radius in px
 
+///|
+let chart_err_bar_cap_w : Int = 4 // half-width of error bar cap in px
+
 // ── Chart style constants ─────────────────────────────────────────────────
 
 ///|
@@ -291,8 +294,8 @@ fn render_bar_chart(
     let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
     let nv = values.length()
-    let mut ci = 0
-    while ci < nc && ci < nv {
+    let n_pts = if nv < nc { nv } else { nc }
+    for ci in 0..<n_pts {
       let val = values[ci]
       if val > 0 {
         let pt_color = point_color(ser, ci, color)
@@ -314,7 +317,6 @@ fn render_bar_chart(
             int_to_str(bar_len) + "\" fill=\"" + pt_color + "\"/>"
         }
       }
-      ci = ci + 1
     }
   }
   // Data labels
@@ -322,6 +324,11 @@ fn render_bar_chart(
     svg = svg + render_bar_data_labels(
       group, px_, py, pw, ph, max_val, is_horizontal, units_per_cat, gap_pct,
     )
+  }
+  // Trendlines + error bars (vertical column charts only)
+  if not(is_horizontal) {
+    svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
+    svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   }
   svg
 }
@@ -354,29 +361,26 @@ fn render_line_chart(
     let nv = values.length()
     // Build polyline points
     let mut points = ""
-    let mut ci = 0
-    while ci < nc && ci < nv {
+    let n_pts = if nv < nc { nv } else { nc }
+    for ci in 0..<n_pts {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y = py + ph - values[ci] * ph / max_val
       if not(points.is_empty()) {
         points = points + " "
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
-      ci = ci + 1
     }
     if not(points.is_empty()) {
       svg = svg + "<polyline points=\"" + points +
         "\" fill=\"none\" stroke=\"" + color +
         "\" stroke-width=\"2\"/>"
       // Draw markers
-      ci = 0
-      while ci < nc && ci < nv {
+      for ci in 0..<n_pts {
         let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
         let y = py + ph - values[ci] * ph / max_val
         svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
           int_to_str(y) + "\" r=\"" + int_to_str(chart_line_marker_r) +
           "\" fill=\"" + color + "\"/>"
-        ci = ci + 1
       }
     }
   }
@@ -384,6 +388,9 @@ fn render_line_chart(
   if group.data_labels.is_visible() {
     svg = svg + render_xy_data_labels(group, px_, py, pw, ph, max_val, nc)
   }
+  // Trendlines + error bars
+  svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
+  svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   svg
 }
 
@@ -576,20 +583,18 @@ fn render_area_chart(
     let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
     let nv = values.length()
+    let actual = if nv < nc { nv } else { nc }
     // Build polygon points: top line + baseline
     let mut points = ""
-    let mut ci = 0
-    while ci < nc && ci < nv {
+    for ci in 0..<actual {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y = py + ph - values[ci] * ph / max_val
       if not(points.is_empty()) {
         points = points + " "
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
-      ci = ci + 1
     }
     // Close to baseline
-    let actual = if nv < nc { nv } else { nc }
     if actual > 0 {
       let last_x = px_ + ((actual - 1) * 2 + 1) * pw / (nc * 2)
       let first_x = px_ + pw / (nc * 2)
@@ -1072,8 +1077,13 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
       if max_val == 0 { 1 } else { max_val }
     }
     _ => {
-      let (_, max_val) = get_series_range(group.series)
-      max_val
+      // Consider all groups for composite charts
+      let mut max_val = 0
+      for gi in 0..<groups.length() {
+        let (_, gmax) = get_series_range(groups[gi].series)
+        if gmax > max_val { max_val = gmax }
+      }
+      if max_val == 0 { 1 } else { max_val }
     }
   }
 }
@@ -1300,6 +1310,172 @@ fn render_pie_data_labels(
           svg_escape(label) + "</text>"
       }
       start_angle = start_angle + sweep
+    }
+  }
+  svg
+}
+
+// ── Trendline rendering ─────────────────────────────────────────────────────
+
+///|
+/// Render trendlines for a chart group (category-based: bar/line/area).
+/// Currently supports linear trendlines (least-squares fit).
+fn render_trendlines(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  max_val : Int,
+  nc : Int,
+  colors : Array[String],
+) -> String {
+  let mut svg = ""
+  for si in 0..<group.series.length() {
+    let ser = group.series[si]
+    if ser.trendlines.is_empty() {
+      continue si + 1
+    }
+    let values = get_num_values(ser.val)
+    let nv = values.length()
+    if nv < 2 {
+      continue si + 1
+    }
+    for ti in 0..<ser.trendlines.length() {
+      let tl = ser.trendlines[ti]
+      let color = if not(tl.sp_pr.stroke.is_none()) {
+        tl.sp_pr.stroke.to_css()
+      } else {
+        series_color(ser, si, colors)
+      }
+      match tl.trendline_type {
+        "linear" => {
+          // Linear regression: y = mx + b
+          // Using least squares: m = (n*Σxy - Σx*Σy) / (n*Σx² - (Σx)²)
+          let n = if nv < nc { nv } else { nc }
+          let mut sum_x = 0
+          let mut sum_y = 0
+          let mut sum_xy = 0
+          let mut sum_x2 = 0
+          for i in 0..<n {
+            sum_x = sum_x + i
+            sum_y = sum_y + values[i]
+            sum_xy = sum_xy + i * values[i]
+            sum_x2 = sum_x2 + i * i
+          }
+          let denom = n * sum_x2 - sum_x * sum_x
+          if denom != 0 {
+            // Compute endpoints using integer math (scale by 1000 for precision)
+            let m_1000 = (n * sum_xy - sum_x * sum_y) * 1000 / denom
+            let b_1000 = (sum_y * 1000 - m_1000 * sum_x) / n
+            // Start point (x=0)
+            let y0 = b_1000
+            let x_start = px_ + pw / (nc * 2)
+            let y_start = py + ph - y0 * ph / (max_val * 1000)
+            // End point (x=n-1)
+            let yn = m_1000 * (n - 1) + b_1000
+            let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
+            let y_end = py + ph - yn * ph / (max_val * 1000)
+            svg = svg + "<line x1=\"" + int_to_str(x_start) + "\" y1=\"" +
+              int_to_str(y_start) + "\" x2=\"" + int_to_str(x_end) +
+              "\" y2=\"" + int_to_str(y_end) +
+              "\" stroke=\"" + color +
+              "\" stroke-width=\"1.5\" stroke-dasharray=\"6,3\"/>"
+          }
+        }
+        // Other trendline types (exp/log/poly/power/movingAvg)
+        // rendered as a simple straight line from first to last point
+        _ => {
+          let n = if nv < nc { nv } else { nc }
+          if n >= 2 {
+            let x_start = px_ + pw / (nc * 2)
+            let y_start = py + ph - values[0] * ph / max_val
+            let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
+            let y_end = py + ph - values[n - 1] * ph / max_val
+            svg = svg + "<line x1=\"" + int_to_str(x_start) + "\" y1=\"" +
+              int_to_str(y_start) + "\" x2=\"" + int_to_str(x_end) +
+              "\" y2=\"" + int_to_str(y_end) +
+              "\" stroke=\"" + color +
+              "\" stroke-width=\"1.5\" stroke-dasharray=\"6,3\"/>"
+          }
+        }
+      }
+    }
+  }
+  svg
+}
+
+// ── Error bar rendering ──────────────────────────────────────────────────────
+
+///|
+/// Render error bars for a chart group (category-based: bar/line).
+fn render_err_bars(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  max_val : Int,
+  nc : Int,
+  colors : Array[String],
+) -> String {
+  let mut svg = ""
+  for si in 0..<group.series.length() {
+    let ser = group.series[si]
+    if ser.err_bars.is_none() {
+      continue si + 1
+    }
+    let eb = ser.err_bars
+    let values = get_num_values(ser.val)
+    let nv = values.length()
+    let color = series_color(ser, si, colors)
+    for ci in 0..<nc {
+      if ci >= nv {
+        continue ci + 1
+      }
+      let val = values[ci]
+      // Calculate error magnitude
+      let err = match eb.err_val_type {
+        "fixedVal" => eb.val
+        "percentage" => val * eb.val / 100
+        _ => val / 10 // fallback: 10% of value
+      }
+      if err <= 0 {
+        continue ci + 1
+      }
+      let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
+      let y_center = py + ph - val * ph / max_val
+      let show_plus = eb.err_bar_type == "both" || eb.err_bar_type == "plus"
+      let show_minus = eb.err_bar_type == "both" || eb.err_bar_type == "minus"
+      let y_top = if show_plus {
+        py + ph - (val + err) * ph / max_val
+      } else {
+        y_center
+      }
+      let y_bottom = if show_minus {
+        py + ph - (val - err) * ph / max_val
+      } else {
+        y_center
+      }
+      // Vertical line
+      svg = svg + "<line x1=\"" + int_to_str(x) + "\" y1=\"" +
+        int_to_str(y_top) + "\" x2=\"" + int_to_str(x) + "\" y2=\"" +
+        int_to_str(y_bottom) +
+        "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+      // Top cap
+      if show_plus {
+        svg = svg + "<line x1=\"" + int_to_str(x - chart_err_bar_cap_w) + "\" y1=\"" +
+          int_to_str(y_top) + "\" x2=\"" + int_to_str(x + chart_err_bar_cap_w) +
+          "\" y2=\"" + int_to_str(y_top) +
+          "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+      }
+      // Bottom cap
+      if show_minus {
+        svg = svg + "<line x1=\"" + int_to_str(x - chart_err_bar_cap_w) + "\" y1=\"" +
+          int_to_str(y_bottom) + "\" x2=\"" + int_to_str(x + chart_err_bar_cap_w) +
+          "\" y2=\"" + int_to_str(y_bottom) +
+          "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+      }
     }
   }
   svg

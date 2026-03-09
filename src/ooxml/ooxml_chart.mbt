@@ -54,6 +54,61 @@ pub(all) struct ChartDataPoint {
   sp_pr : ChartSpPr // point-level formatting
 }
 
+// ── Trendline ───────────────────────────────────────────────────────────────
+
+///|
+/// Trendline type (c:trendlineType).
+pub(all) struct ChartTrendline {
+  trendline_type : String // "linear"|"exp"|"log"|"poly"|"power"|"movingAvg"
+  order : Int // polynomial order (c:order, default 2)
+  period : Int // moving average period (c:period, default 2)
+  forward : Int // forward extrapolation (c:forward, in category units × 100)
+  backward : Int // backward extrapolation (c:backward, in category units × 100)
+  sp_pr : ChartSpPr // line formatting
+  name : String // custom name (c:name)
+}
+
+///|
+pub fn ChartTrendline::none() -> ChartTrendline {
+  {
+    trendline_type: "",
+    order: 2,
+    period: 2,
+    forward: 0,
+    backward: 0,
+    sp_pr: ChartSpPr::none(),
+    name: "",
+  }
+}
+
+// ── Error bars ──────────────────────────────────────────────────────────────
+
+///|
+/// Error bar configuration (c:errBars).
+pub(all) struct ChartErrBars {
+  err_dir : String // "x"|"y" (c:errDir)
+  err_bar_type : String // "both"|"plus"|"minus" (c:errBarType)
+  err_val_type : String // "fixedVal"|"percentage"|"stdDev"|"stdErr"|"cust" (c:errValType)
+  val : Int // fixed value or percentage (c:val × 1, scaled)
+  sp_pr : ChartSpPr // bar line formatting
+}
+
+///|
+pub fn ChartErrBars::none() -> ChartErrBars {
+  {
+    err_dir: "y",
+    err_bar_type: "both",
+    err_val_type: "",
+    val: 0,
+    sp_pr: ChartSpPr::none(),
+  }
+}
+
+///|
+pub fn ChartErrBars::is_none(self : ChartErrBars) -> Bool {
+  self.err_val_type.is_empty()
+}
+
 // ── Chart data types ────────────────────────────────────────────────────────
 
 ///|
@@ -151,6 +206,9 @@ pub(all) struct ChartSeries {
   explosion : Int // c:explosion (0 = none)
   // Per-point formatting
   data_points : Array[ChartDataPoint] // c:dPt list
+  // Trendlines + error bars
+  trendlines : Array[ChartTrendline] // c:trendline list
+  err_bars : ChartErrBars // c:errBars
 }
 
 ///|
@@ -612,6 +670,71 @@ fn parse_data_points(
   pts
 }
 
+// ── Trendline parsing ────────────────────────────────────────────────────────
+
+///|
+/// Parse c:trendline elements from series children.
+fn parse_trendlines(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Array[ChartTrendline] {
+  let result : Array[ChartTrendline] = []
+  let nodes = @xml.find_children(ch, "c:trendline")
+  for i in 0..<nodes.length() {
+    let tc = @xml.get_children(nodes[i])
+    let ttype = child_attr_val(tc, "c:trendlineType")
+    if not(ttype.is_empty()) {
+      let name = match @xml.find_child(tc, "c:name") {
+        None => ""
+        Some(n) => @xml.get_text_content(n)
+      }
+      result.push({
+        trendline_type: ttype,
+        order: {
+          let v = child_attr_int(tc, "c:order")
+          if v == 0 { 2 } else { v }
+        },
+        period: {
+          let v = child_attr_int(tc, "c:period")
+          if v == 0 { 2 } else { v }
+        },
+        forward: child_attr_int(tc, "c:forward"),
+        backward: child_attr_int(tc, "c:backward"),
+        sp_pr: parse_chart_sp_pr(tc, theme),
+        name,
+      })
+    }
+  }
+  result
+}
+
+// ── Error bar parsing ────────────────────────────────────────────────────────
+
+///|
+/// Parse c:errBars element from series children.
+fn parse_err_bars(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> ChartErrBars {
+  match @xml.find_child(ch, "c:errBars") {
+    None => ChartErrBars::none()
+    Some(n) => {
+      let ec = @xml.get_children(n)
+      let dir = child_attr_val(ec, "c:errDir")
+      let bar_type = child_attr_val(ec, "c:errBarType")
+      let val_type = child_attr_val(ec, "c:errValType")
+      let val = child_attr_int(ec, "c:val")
+      {
+        err_dir: if dir.is_empty() { "y" } else { dir },
+        err_bar_type: if bar_type.is_empty() { "both" } else { bar_type },
+        err_val_type: val_type,
+        val,
+        sp_pr: parse_chart_sp_pr(ec, theme),
+      }
+    }
+  }
+}
+
 // ── Series parsing ──────────────────────────────────────────────────────────
 
 ///|
@@ -649,6 +772,8 @@ fn parse_cat_series(
   let smooth = child_attr_val(ch, "c:smooth") == "1"
   let explosion = child_attr_int(ch, "c:explosion")
   let data_points = parse_data_points(ch, theme)
+  let trendlines = parse_trendlines(ch, theme)
+  let err_bars = parse_err_bars(ch, theme)
   {
     idx,
     order,
@@ -662,6 +787,8 @@ fn parse_cat_series(
     smooth,
     explosion,
     data_points,
+    trendlines,
+    err_bars,
   }
 }
 
@@ -700,6 +827,8 @@ fn parse_scatter_series_list(
       smooth: child_attr_val(sc, "c:smooth") == "1",
       explosion: 0,
       data_points: parse_data_points(sc, theme),
+      trendlines: parse_trendlines(sc, theme),
+      err_bars: parse_err_bars(sc, theme),
     })
   }
   series

@@ -66,6 +66,9 @@ Slides:
  61. Bubble chart (c:bubbleChart with xVal/yVal/bubbleSize)
  62. Stock chart (c:stockChart — Open/High/Low/Close)
  63. All chart types overview (mini charts for visual regression)
+ 64. Line chart with linear trendline (c:trendline)
+ 65. Column chart with error bars (c:errBars)
+ 66. Composite chart (column + line on same plot area)
 """
 
 from pptx import Presentation
@@ -4466,6 +4469,140 @@ lbl63 = slide63.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl63.text_frame.paragraphs[0].text = "Slide 63: All chart types overview"
 lbl63.text_frame.paragraphs[0].font.size = Pt(18)
 lbl63.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 64: Line chart with linear trendline ──────────────────────────────
+
+slide64 = prs.slides.add_slide(blank)
+
+trend_data = CategoryChartData()
+trend_data.categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+trend_data.add_series('Sales', (20, 35, 28, 45, 52, 60))
+
+chart_frame64 = slide64.shapes.add_chart(
+    XL_CHART_TYPE.LINE, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), trend_data
+)
+chart64 = chart_frame64.chart
+chart64.has_legend = True
+
+# Add trendline via lxml (python-pptx has limited trendline support)
+chart_part64 = chart64.part
+chart_elem64 = chart_part64._element
+ns_c64 = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+ns_a64 = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+
+line_chart64 = chart_elem64.findall(f'.//{{{ns_c64}}}lineChart')[0]
+ser64 = line_chart64.findall(f'{{{ns_c64}}}ser')[0]
+
+trendline_xml = f"""<c:trendline xmlns:c="{ns_c64}" xmlns:a="{ns_a64}">
+  <c:trendlineType val="linear"/>
+  <c:spPr>
+    <a:ln w="12700">
+      <a:solidFill><a:srgbClr val="FF0000"/></a:solidFill>
+      <a:prstDash val="dash"/>
+    </a:ln>
+  </c:spPr>
+</c:trendline>"""
+ser64.append(etree.fromstring(trendline_xml))
+
+lbl64 = slide64.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl64.text_frame.paragraphs[0].text = "Slide 64: Line chart with linear trendline"
+lbl64.text_frame.paragraphs[0].font.size = Pt(18)
+lbl64.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 65: Column chart with error bars ──────────────────────────────────
+
+slide65 = prs.slides.add_slide(blank)
+
+err_data = CategoryChartData()
+err_data.categories = ['Group A', 'Group B', 'Group C', 'Group D']
+err_data.add_series('Measurement', (85, 92, 78, 95))
+
+chart_frame65 = slide65.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), err_data
+)
+chart65 = chart_frame65.chart
+chart65.has_legend = True
+
+# Add error bars via lxml
+chart_part65 = chart65.part
+chart_elem65 = chart_part65._element
+ns_c65 = ns_c64
+
+bar_chart65 = chart_elem65.findall(f'.//{{{ns_c65}}}barChart')[0]
+ser65 = bar_chart65.findall(f'{{{ns_c65}}}ser')[0]
+
+errbar_xml = f"""<c:errBars xmlns:c="{ns_c65}">
+  <c:errDir val="y"/>
+  <c:errBarType val="both"/>
+  <c:errValType val="fixedVal"/>
+  <c:val val="8"/>
+</c:errBars>"""
+ser65.append(etree.fromstring(errbar_xml))
+
+lbl65 = slide65.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl65.text_frame.paragraphs[0].text = "Slide 65: Column chart with error bars (±8)"
+lbl65.text_frame.paragraphs[0].font.size = Pt(18)
+lbl65.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 66: Composite chart (column + line on same plot) ───────────────────
+
+slide66 = prs.slides.add_slide(blank)
+
+# Create a column chart first
+combo_data = CategoryChartData()
+combo_data.categories = ['Q1', 'Q2', 'Q3', 'Q4']
+combo_data.add_series('Revenue', (300, 350, 400, 450))
+
+chart_frame66 = slide66.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), combo_data
+)
+chart66 = chart_frame66.chart
+chart66.has_legend = True
+
+# Add a lineChart group to the plotArea via lxml
+chart_part66 = chart66.part
+chart_elem66 = chart_part66._element
+ns_c66 = ns_c64
+
+plot_area66 = chart_elem66.find(f'.//{{{ns_c66}}}plotArea')
+
+# Find existing barChart's axId values
+bar_chart66 = plot_area66.find(f'{{{ns_c66}}}barChart')
+ax_ids66 = bar_chart66.findall(f'{{{ns_c66}}}axId')
+ax_id_vals = [a.get('val') for a in ax_ids66]
+
+line_chart_xml = f"""<c:lineChart xmlns:c="{ns_c66}" xmlns:a="{ns_a64}">
+  <c:grouping val="standard"/>
+  <c:ser>
+    <c:idx val="1"/><c:order val="1"/>
+    <c:tx><c:strRef><c:f>Sheet1!$C$1</c:f><c:strCache><c:ptCount val="1"/>
+      <c:pt idx="0"><c:v>Profit</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:spPr><a:ln w="25400"><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:ln></c:spPr>
+    <c:cat><c:strRef><c:f>Sheet1!$A$2:$A$5</c:f><c:strCache><c:ptCount val="4"/>
+      <c:pt idx="0"><c:v>Q1</c:v></c:pt><c:pt idx="1"><c:v>Q2</c:v></c:pt>
+      <c:pt idx="2"><c:v>Q3</c:v></c:pt><c:pt idx="3"><c:v>Q4</c:v></c:pt>
+    </c:strCache></c:strRef></c:cat>
+    <c:val><c:numRef><c:f>Sheet1!$C$2:$C$5</c:f><c:numCache><c:formatCode>General</c:formatCode>
+      <c:ptCount val="4"/>
+      <c:pt idx="0"><c:v>80</c:v></c:pt><c:pt idx="1"><c:v>120</c:v></c:pt>
+      <c:pt idx="2"><c:v>150</c:v></c:pt><c:pt idx="3"><c:v>200</c:v></c:pt>
+    </c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:axId val="{ax_id_vals[0] if ax_id_vals else '10000001'}"/>
+  <c:axId val="{ax_id_vals[1] if len(ax_id_vals) > 1 else '10000002'}"/>
+</c:lineChart>"""
+
+# Insert lineChart after barChart
+bar_idx = list(plot_area66).index(bar_chart66)
+plot_area66.insert(bar_idx + 1, etree.fromstring(line_chart_xml))
+
+lbl66 = slide66.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl66.text_frame.paragraphs[0].text = "Slide 66: Composite chart (column + line)"
+lbl66.text_frame.paragraphs[0].font.size = Pt(18)
+lbl66.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

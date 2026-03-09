@@ -9,41 +9,27 @@
 
 - [x] **基盤**: ZIP 解凍 (JS DecompressionStream) + Wasm FFI + 3-tier js-string 互換 + 汎用 XML パーサー
 - [x] **シェイプ基本**: AutoShape (rect/ellipse/roundRect/line) + 回転/フリップ + Picture (data URI base64)
-- [x] **テーブル完全対応**: `p:graphicFrame` + `a:tbl` — セル背景/テキスト/グラデーション + セル結合 (gridSpan/rowSpan/vMerge) + ボーダー (lnL/R/T/B + 対角線 lnTlToBr/lnBlToTr + noFill) + マージン (marL/R/T/B) + アンカー + テーブルスタイル (tblStyleId + tableStyles.xml パース) + 条件書式 (firstRow/lastRow/firstCol/lastCol/bandRow/bandCol)
-- [x] **テーマ解決**: theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod
+- [x] **テーブル完全対応**: セル背景/テキスト/グラデーション + セル結合 + ボーダー (対角線含む) + マージン + アンカー + テーブルスタイル + 条件書式
+- [x] **テーマ解決**: theme1.xml カラー 12 色 + フォントスキーム + lumMod/lumOff/shade/tint/satMod + comp/inv/gamma/invGamma/hueMod/hueOff/satOff
 - [x] **Round-trip**: data-ooxml-* SVG ↔ SlideData ↔ OOXML ↔ ZIP
-- [x] **マスター/レイアウト継承**: slideMaster/slideLayout パース + placeholder transform/bodyProps/背景/テキストスタイル継承 + `p:clrMapOvr` + マスターシェイプ描画
-- [x] **テキスト完全対応**: 段落書式 (spacing/indent/tab/RTL) + バレット全種 (文字/自動番号/画像/フォント/サイズ/色) + ラン装飾 (下線/取消線/上下付き/間隔/kern/cap) + フォント (EA/CS/Sym/テーマ参照) + bodyPr (anchor/insets/autofit/wrap/vert/rot/columns) + ハイパーリンク (click/hover/色)
-- [x] **塗りつぶし完全対応**: グラデーション (linear/path/tileFlip) + パターン (全 48 種) + 画像フィル (stretch/tile/crop) + アルファ/透過
-- [x] **線/ストローク完全対応**: 破線 11 種 + カスタム破線 + 矢印 5 種 + 線結合/線端/複合線/noFill + Line ジオメトリ `<line>` SVG
-- [x] **グループシェイプ**: `p:grpSp` 再帰パース + 座標変換 + ネスト + SVG `<g>`
+- [x] **マスター/レイアウト継承**: slideMaster/slideLayout パース + placeholder 継承 + `p:clrMapOvr`
+- [x] **テキスト完全対応**: 段落書式 + バレット全種 + ラン装飾 + フォント + bodyPr + ハイパーリンク
+- [x] **塗りつぶし完全対応**: グラデーション + パターン (全 48 種) + 画像フィル (stretch/tile/crop) + アルファ/透過
+- [x] **線/ストローク完全対応**: 破線 11 種 + 矢印 5 種 + 線結合/線端/複合線 + グラデーション/パターン
+- [x] **グループシェイプ**: `p:grpSp` 再帰パース + 座標変換 + ネスト
 - [x] **コネクタ**: `p:cxnSp` 直線/折れ線/曲線 + 矢印 + 調整値 round-trip
-- [x] **プリセットジオメトリ**: `a:prstGeom` ガイド式エバリュエータ + ~154 種 SVG path 生成
-- [x] **カスタムジオメトリ**: `a:custGeom` パース + ガイド式 + pathLst → SVG path + round-trip
-- [x] **テキスト矩形**: `a:rect` プリセット/カスタムジオメトリのテキスト配置領域計算
-- [x] **接続ポイント**: `a:cxnLst` パース + `stCxnId/endCxnId` コネクタ接続 round-trip
-- [x] **ギア歯**: gear6/gear9 正確な歯型パス (6/9 歯 + 中心穴)
+- [x] **ジオメトリ**: プリセット ~154 種 + カスタム (`a:custGeom`) + テキスト矩形 + 接続ポイント + gear6/gear9
 - [x] **ライブラリ化**: TypeScript 分割 (lib/ → dist/) + PptxRenderer クラス + Wasm 3-tier フォールバック
-- [x] **画像クロップ**: `srcRect` → SVG `<clipPath>` (Picture + AutoShape blipFill 両対応)
-- [x] **画像アルファ**: `a:alphaModFix` パース + SVG `opacity` 属性
-- [x] **外部画像参照**: `TargetMode="External"` — Relationship に target_mode 追加 + 外部 URL 直接参照
-- [x] **SVG 画像**: `a:extLst` 内 `asvg:svgBlip` / `a16:svgBlip` パース + SVG 画像優先表示
-- [x] **画像エフェクト**: `a:lum` brightness/contrast → SVG `<filter>` feComponentTransfer
-- [x] **Duotone**: `a:duotone` パース + SVG filter (grayscale→2色マッピング)
-- [x] **Color change**: `a:clrChange` パース + round-trip (SVG filter での精密再現は不可 — データ保持のみ)
-- [x] **カラー修飾子拡張**: comp/inv/gamma/invGamma/hueMod/hueOff/satOff
-- [x] **シェイプリンク**: `a:hlinkClick`/`a:hlinkHover` on `p:cNvPr` (パース/SVG属性/round-trip/シリアライズ)
-- [x] **背景 blip/パターン**: `p:bg/p:bgPr` の `a:blipFill`/`a:pattFill` パース/レンダリング/シリアライズ
-- [x] **線グラデーション/パターン**: `a:ln` 内 `a:gradFill`/`a:pattFill` パース/SVGレンダリング/シリアライズ
-- [x] **プレースホルダ自動内容**: スライド番号(`sldNum`)/日付(`dt`)/フッター(`ftr`) 空プレースホルダへの自動テキスト注入
-- [x] **エフェクト完全対応**: `a:effectLst` 全種 (outerShdw/innerShdw/glow/softEdge → SVGフィルタ, reflection → 構造的SVG) + 3D (`a:scene3d`/`a:sp3d`/bevel/extrusion — データ保持) + テキストエフェクト (`a:rPr`内`a:effectLst` — CSS filter drop-shadow + パース/round-trip/シリアライズ)
-- [x] **チャート基本対応**: ChartML パーサー (`c:chartSpace` → ChartData) + 棒(縦・横)/折れ線/円/ドーナツ/散布/面/レーダー SVG レンダリング + 軸/凡例/タイトル + 整数三角関数ルックアップテーブル
-- [x] **チャート高度対応**: データラベル (`c:dLbls` showVal/showPercent/showCatName/showSerName) + データポイント個別書式 (`c:dPt`) + 系列書式 (`c:spPr` 色反映) + テーマカラー連動 (accent1-6)
-- [x] **チャート種別追加**: バブルチャート (`c:bubbleChart`) + 株価チャート (`c:stockChart` OHLC)
+- [x] **画像**: クロップ + アルファ + 外部参照 + SVG 画像 + エフェクト (lum/duotone/clrChange)
+- [x] **シェイプリンク**: `a:hlinkClick`/`a:hlinkHover` on `p:cNvPr`
+- [x] **背景**: `p:bg/p:bgPr` の blipFill/pattFill
+- [x] **プレースホルダ自動内容**: スライド番号/日付/フッター
+- [x] **エフェクト完全対応**: `a:effectLst` 全種 SVGフィルタ + リフレクション + 3D データ保持 + テキストエフェクト
+- [x] **チャート完全対応**: 棒/折れ線/円/ドーナツ/散布/面/レーダー/バブル/株価 + データラベル + dPt + テーマカラー + トレンドライン (線形回帰) + エラーバー + 複合チャート
 
 ---
 
-## 8. ライブラリ公開 [P1]
+## 1. ライブラリ公開 [P1]
 
 - [ ] `dist/pptx-svg.wasm` ビルド成果物コピー (ビルドスクリプト)
 - [ ] npm publish ワークフロー
@@ -53,18 +39,7 @@
 
 ---
 
-## 9. チャート残機能 [P2]
-
-ChartML (ECMA-376 Part 1 Chapter 21) — 基本9種 + データラベル/dPt/系列色/テーマカラーは完了。
-
-- [ ] 等高線チャート (3D 投影が必要)
-- [ ] 複合チャート (複数チャート種別を1プロットエリアに — パース済み、レンダリング改善余地あり)
-- [ ] 3D チャート (2D 投影で近似)
-- [ ] トレンドライン (`c:trendline`) / エラーバー (`c:errBars`)
-
----
-
-## 10. テキスト — 高度機能 [P2]
+## 2. テキスト — 高度機能 [P2]
 
 - [ ] テキストワープ (`a:prstTxWarp`) — WordArt 的な曲線パス上テキスト
 - [ ] テキストアウトライン (`a:rPr/a:ln`) — 文字の輪郭線
@@ -72,17 +47,26 @@ ChartML (ECMA-376 Part 1 Chapter 21) — 基本9種 + データラベル/dPt/系
 
 ---
 
+## 3. チャート残機能 [P3]
+
+3D 投影が必要なため、現時点では対応しない。
+
+- [ ] 等高線チャート (`c:surfaceChart` — 3D 投影が必要)
+- [ ] 3D チャート (2D 投影で近似)
+
+---
+
 ## 保留 — 対応予定なし
 
 以下は技術的制約により対応しない項目。データとしては保持するが、レンダリングは行わない。
 
-- [ ] **EMF / WMF** — GDI 描画命令の逐次解釈が必要 (仕様 ~500 ページ)。純粋 Wasm での再実装は工数対効果が極めて低い
-- [ ] **TIFF** — ブラウザ `<img>` 非対応。複数圧縮方式 (LZW/CCITT/ZIP) のデコーダ自作が必要。遭遇頻度が低い
-- [ ] **SmartArt** (`dgm:*` DiagramML) — レイアウトアルゴリズムの再実装が必要。フォールバック画像利用は検討余地あり
+- [ ] **EMF / WMF** — GDI 描画命令の逐次解釈が必要 (仕様 ~500 ページ)
+- [ ] **TIFF** — ブラウザ `<img>` 非対応。複数圧縮方式のデコーダ自作が必要
+- [ ] **SmartArt** (`dgm:*` DiagramML) — レイアウトアルゴリズムの再実装が必要
 - [ ] **OLE / 埋め込み** (`p:oleObj`) — フォールバック画像表示のみ検討余地あり
 - [ ] **メディア** — ビデオポスターフレーム / オーディオアイコン
 - [ ] **数式** (OMML `m:oMath`) — 数式レンダラーの自作が必要
-- [ ] **スピーカーノート / コメント** — レンダリング対象外 (API 経由取得は検討余地あり)
+- [ ] **スピーカーノート / コメント** — レンダリング対象外
 - [ ] **埋め込みフォント** (`a:fontScheme` + fontdata)
 
 ---
@@ -93,10 +77,10 @@ ChartML (ECMA-376 Part 1 Chapter 21) — 基本9種 + データラベル/dPt/系
 |--------|------|------|
 | **P0** | 基盤/テーマ/マスター継承/テキスト完全対応 | **完了** |
 | **P1** | 塗り/線/グループ/コネクタ/ジオメトリ/テーブル完全対応 | **完了** |
-| **P1** | スライド・シェイプ残機能 (カラー修飾子/背景blip・パターン/シェイプリンク/線グラデ・パターン/PH自動内容) | **完了** |
+| **P1** | スライド・シェイプ残機能 (カラー修飾子/背景/シェイプリンク/PH自動内容) | **完了** |
+| **P1** | 画像 + エフェクト完全対応 | **完了** |
+| **P1** | チャート完全対応 (11種+ラベル+dPt+トレンドライン+エラーバー+複合) | **完了** |
 | **P1** | ライブラリ公開 (ビルド/npm/テスト/ドキュメント) | 未着手 |
-| **P2** | 画像 (クロップ/アルファ/外部参照/SVG画像/エフェクト/Duotone/clrChange) | **完了** |
-| **P2** | エフェクト完全対応 (全SVGフィルタ + リフレクション + 3Dデータ保持 + テキストエフェクト) | **完了** |
-| **P2** | チャート (9種+ラベル+dPt+系列色+テーマ色+バブル+株価) | **完了** |
-| **P2** | チャート残 (等高線/3D/トレンドライン) / テキスト高度 | 未着手 |
+| **P2** | テキスト高度機能 (ワープ/アウトライン/グラデーション) | 未着手 |
+| **P3** | チャート残 (等高線/3D) | 未着手 |
 | **—** | EMF/WMF/TIFF/SmartArt/OLE/メディア/数式/ノート/フォント | **保留** |

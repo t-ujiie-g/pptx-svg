@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 63', slideCount === 63, `got ${slideCount}`);
+  assert('slide count = 66', slideCount === 66, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 63; i++) {
+  for (let i = 1; i <= 66; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 63; i++) {
+  for (let i = 1; i <= 66; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1190,6 +1190,54 @@ async function testFeaturesPptx() {
     const slide63 = textFiles.get('ppt/slides/slide63.xml') || '';
     section('test_features.pptx — Slide 63: all chart types overview');
     assert('slide63 has p:graphicFrame', slide63.includes('p:graphicFrame'));
+  }
+
+  // ── Slide 64: Line chart with trendline ──
+  {
+    const slide64 = textFiles.get('ppt/slides/slide64.xml') || '';
+    section('test_features.pptx — Slide 64: line chart with trendline');
+    assert('slide64 has p:graphicFrame', slide64.includes('p:graphicFrame'));
+    const rels64 = textFiles.get('ppt/slides/_rels/slide64.xml.rels') || '';
+    const chartTarget64 = rels64.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget64) {
+      const chartPath = 'ppt/charts/' + chartTarget64[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide64 has c:lineChart', chartXml.includes('c:lineChart'));
+      assert('slide64 has c:trendline', chartXml.includes('c:trendline'));
+      assert('slide64 has trendlineType linear', chartXml.includes('trendlineType') && chartXml.includes('linear'));
+    }
+  }
+
+  // ── Slide 65: Column chart with error bars ──
+  {
+    const slide65 = textFiles.get('ppt/slides/slide65.xml') || '';
+    section('test_features.pptx — Slide 65: column chart with error bars');
+    assert('slide65 has p:graphicFrame', slide65.includes('p:graphicFrame'));
+    const rels65 = textFiles.get('ppt/slides/_rels/slide65.xml.rels') || '';
+    const chartTarget65 = rels65.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget65) {
+      const chartPath = 'ppt/charts/' + chartTarget65[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide65 has c:barChart', chartXml.includes('c:barChart'));
+      assert('slide65 has c:errBars', chartXml.includes('c:errBars'));
+      assert('slide65 has fixedVal', chartXml.includes('fixedVal'));
+    }
+  }
+
+  // ── Slide 66: Composite chart (column + line) ──
+  {
+    const slide66 = textFiles.get('ppt/slides/slide66.xml') || '';
+    section('test_features.pptx — Slide 66: composite chart');
+    assert('slide66 has p:graphicFrame', slide66.includes('p:graphicFrame'));
+    const rels66 = textFiles.get('ppt/slides/_rels/slide66.xml.rels') || '';
+    const chartTarget66 = rels66.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget66) {
+      const chartPath = 'ppt/charts/' + chartTarget66[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide66 has c:barChart', chartXml.includes('c:barChart'));
+      assert('slide66 has c:lineChart', chartXml.includes('c:lineChart'));
+      assert('slide66 has Profit series', chartXml.includes('Profit'));
+    }
   }
 }
 
