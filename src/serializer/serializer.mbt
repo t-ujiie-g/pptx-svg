@@ -1316,6 +1316,7 @@ fn serialize_shape(shape : @ooxml.Shape) -> String {
     @ooxml.ShapeKind::Picture(rid) => serialize_picture(shape, rid)
     @ooxml.ShapeKind::TableShape(table) => serialize_table(shape, table)
     @ooxml.ShapeKind::GroupShape(grp) => serialize_group(shape, grp)
+    @ooxml.ShapeKind::ChartShape(_) => "" // Charts preserved via chart_xml round-trip
     _ => ""
   }
 }

@@ -1357,6 +1357,7 @@ pub(all) enum ShapeKind {
   Picture(String) // relationship ID (r:embed)
   TableShape(TableData)
   GroupShape(GroupShapeData)
+  ChartShape(ChartData) // embedded chart (parsed from ppt/charts/*.xml)
   Other
 }
 

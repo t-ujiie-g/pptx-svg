@@ -1109,15 +1109,38 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(gf)
   // Transform from <p:xfrm> (direct child of graphicFrame, not inside spPr)
   let transform = parse_xfrm_any(ch)
-  // Navigate: <a:graphic> → <a:graphicData> → <a:tbl>
-  let tbl = match @xml.find_child(ch, "a:graphic") {
+  // Navigate: <a:graphic> → <a:graphicData>
+  let gdata = match @xml.find_child(ch, "a:graphic") {
     None => None
     Some(graphic) =>
-      match @xml.find_child(@xml.get_children(graphic), "a:graphicData") {
-        None => None
-        Some(gdata) => @xml.find_child(@xml.get_children(gdata), "a:tbl")
-      }
+      @xml.find_child(@xml.get_children(graphic), "a:graphicData")
   }
+  let gdata_node = match gdata {
+    None => return empty_shape()
+    Some(n) => n
+  }
+  let gdata_ch = @xml.get_children(gdata_node)
+  // Check for chart (c:chart) — external file via relationship
+  // Return a placeholder ChartShape with empty data; main.mbt resolves the chart XML.
+  match @xml.find_child(gdata_ch, "c:chart") {
+    Some(cn) => {
+      let rid = match @xml.get_attr(cn, "r:id") {
+        Some(v) => v
+        None => ""
+      }
+      if not(rid.is_empty()) {
+        // Store rid in chart_xml field temporarily; main.mbt will resolve it.
+        let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
+        return Shape::default_with(
+          ShapeKind::ChartShape(chart_data),
+          transform,
+        )
+      }
+    }
+    None => ()
+  }
+  // Check for table (a:tbl)
+  let tbl = @xml.find_child(gdata_ch, "a:tbl")
   match tbl {
     None => empty_shape()
     Some(tbl_node) => {

@@ -106,6 +106,42 @@ fn resolve_rel_path(base_dir : String, target : String) -> String {
 }
 
 ///|
+/// Walk shapes to find ChartShape placeholders (with rid stored in chart_xml)
+/// and resolve them by loading the actual chart XML file.
+fn resolve_chart_shapes(
+  shapes : Array[@ooxml.Shape],
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData,
+) -> Unit {
+  let n = shapes.length()
+  let mut i = 0
+  while i < n {
+    match shapes[i].kind {
+      @ooxml.ShapeKind::ChartShape(cd) =>
+        // chart_xml field temporarily holds the relationship ID
+        if not(cd.chart_xml.is_empty()) && cd.groups.is_empty() {
+          let rid = cd.chart_xml
+          let target = @ooxml.find_rel_target(rels, rid)
+          if not(target.is_empty()) {
+            let chart_path = resolve_rel_path("ppt/slides", target)
+            let chart_xml = @ffi.ffi_get_file(chart_path)
+            if not(chart_xml.is_empty()) {
+              let parsed = @ooxml.parse_chart_xml(chart_xml, theme)
+              // Replace the shape in-place
+              shapes[i] = { ..shapes[i], kind: @ooxml.ShapeKind::ChartShape(parsed) }
+            }
+          }
+        }
+      @ooxml.ShapeKind::GroupShape(grp) =>
+        // Recurse into group children
+        resolve_chart_shapes(grp.children, rels, theme)
+      _ => ()
+    }
+    i = i + 1
+  }
+}
+
+///|
 fn last_index_of(s : String, c : Char) -> Int {
   let len = s.length()
   let mut i = len - 1
@@ -552,6 +588,8 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     g_slide_size.val,
     effective_theme,
   )
+  // ── Resolve chart shapes: load chart XML and parse ChartML ──
+  resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
   // ── Placeholder inheritance: resolve transforms from layout/master ──
   resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
   // ── Placeholder auto-content: inject slide number/date/footer text ──

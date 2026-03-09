@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 51', slideCount === 51, `got ${slideCount}`);
+  assert('slide count = 55', slideCount === 55, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 51; i++) {
+  for (let i = 1; i <= 55; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 51; i++) {
+  for (let i = 1; i <= 55; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1011,6 +1011,77 @@ async function testFeaturesPptx() {
     assert('slide51 has text outerShdw', slide51.includes('a:outerShdw'));
     assert('slide51 has text glow', slide51.includes('a:glow'));
     assert('slide51 has prstMaterial', slide51.includes('prstMaterial'));
+  }
+
+  // ── Slide 52: Column chart ──
+  {
+    const slide52 = textFiles.get('ppt/slides/slide52.xml') || '';
+    const rels52 = textFiles.get('ppt/slides/_rels/slide52.xml.rels') || '';
+    section('test_features.pptx — Slide 52: column chart');
+    assert('slide52 has p:graphicFrame', slide52.includes('p:graphicFrame'));
+    assert('slide52 has a:graphicData', slide52.includes('a:graphicData'));
+    assert('slide52 has c:chart', slide52.includes('c:chart'));
+    assert('slide52 rels has chart ref', rels52.includes('/chart'));
+    // Check chart XML exists
+    const chartTarget52 = rels52.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget52) {
+      const chartPath = 'ppt/charts/' + chartTarget52[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide52 chart XML exists', chartXml.length > 0);
+      assert('slide52 has c:chartSpace', chartXml.includes('c:chartSpace'));
+      assert('slide52 has c:barChart', chartXml.includes('c:barChart'));
+      assert('slide52 has barDir col', chartXml.includes('val="col"'));
+      assert('slide52 has c:ser', chartXml.includes('c:ser'));
+      assert('slide52 has c:numCache', chartXml.includes('c:numCache'));
+      assert('slide52 has c:strCache', chartXml.includes('c:strCache'));
+      assert('slide52 has Q1 category', chartXml.includes('Q1'));
+      assert('slide52 has Sales 2024', chartXml.includes('Sales 2024'));
+    }
+  }
+
+  // ── Slide 53: Line chart ──
+  {
+    const slide53 = textFiles.get('ppt/slides/slide53.xml') || '';
+    section('test_features.pptx — Slide 53: line chart');
+    assert('slide53 has p:graphicFrame', slide53.includes('p:graphicFrame'));
+    assert('slide53 has c:chart', slide53.includes('c:chart'));
+    const rels53 = textFiles.get('ppt/slides/_rels/slide53.xml.rels') || '';
+    const chartTarget53 = rels53.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget53) {
+      const chartPath = 'ppt/charts/' + chartTarget53[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide53 chart has c:lineChart', chartXml.includes('c:lineChart'));
+      assert('slide53 chart has Revenue', chartXml.includes('Revenue'));
+      assert('slide53 chart has Jan', chartXml.includes('Jan'));
+    }
+  }
+
+  // ── Slide 54: Pie chart ──
+  {
+    const slide54 = textFiles.get('ppt/slides/slide54.xml') || '';
+    section('test_features.pptx — Slide 54: pie chart');
+    assert('slide54 has p:graphicFrame', slide54.includes('p:graphicFrame'));
+    const rels54 = textFiles.get('ppt/slides/_rels/slide54.xml.rels') || '';
+    const chartTarget54 = rels54.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget54) {
+      const chartPath = 'ppt/charts/' + chartTarget54[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide54 chart has c:pieChart', chartXml.includes('c:pieChart'));
+      assert('slide54 chart has Desktop', chartXml.includes('Desktop'));
+      assert('slide54 chart has Market Share', chartXml.includes('Market Share'));
+    }
+  }
+
+  // ── Slide 55: Bar + Donut chart ──
+  {
+    const slide55 = textFiles.get('ppt/slides/slide55.xml') || '';
+    section('test_features.pptx — Slide 55: bar + donut chart');
+    assert('slide55 has p:graphicFrame', slide55.includes('p:graphicFrame'));
+    const rels55 = textFiles.get('ppt/slides/_rels/slide55.xml.rels') || '';
+    assert('slide55 has chart refs', rels55.includes('/chart'));
+    // Check for both chart files
+    const chartTargets55 = [...rels55.matchAll(/Target="([^"]*chart[^"]*)"/g)];
+    assert('slide55 has 2 chart refs', chartTargets55.length >= 2);
   }
 }
 

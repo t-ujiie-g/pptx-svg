@@ -54,6 +54,10 @@ Slides:
  49. Shape hyperlinks (a:hlinkClick/a:hlinkHover on p:cNvPr) + color modifiers (comp/inv/hueMod)
  50. Shape effects (a:effectLst — outerShdw / innerShdw / glow / softEdge)
  51. 3D effects (a:scene3d / a:sp3d / bevelT / extrusion) + text shadow/glow (a:rPr/a:effectLst)
+ 52. Column chart (clustered, 2 series)
+ 53. Line chart (2 series, with markers)
+ 54. Pie chart (single series, with legend)
+ 55. Bar chart (horizontal) + Donut chart
 """
 
 from pptx import Presentation
@@ -3953,6 +3957,98 @@ lbl51 = slide51.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl51.text_frame.paragraphs[0].text = "Slide 51: 3D effects (bevel/extrusion/scene3d) + text shadow/glow"
 lbl51.text_frame.paragraphs[0].font.size = Pt(18)
 lbl51.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 52: Bar/Column chart ────────────────────────────────────────────────
+
+from pptx.chart.data import CategoryChartData
+from pptx.enum.chart import XL_CHART_TYPE
+
+slide52 = prs.slides.add_slide(blank)
+
+chart_data = CategoryChartData()
+chart_data.categories = ['Q1', 'Q2', 'Q3', 'Q4']
+chart_data.add_series('Sales 2024', (120, 150, 180, 200))
+chart_data.add_series('Sales 2025', (100, 130, 160, 190))
+
+chart_frame = slide52.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(5), Inches(4), chart_data
+)
+chart52 = chart_frame.chart
+chart52.has_legend = True
+
+lbl52 = slide52.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl52.text_frame.paragraphs[0].text = "Slide 52: Column chart (clustered)"
+lbl52.text_frame.paragraphs[0].font.size = Pt(18)
+lbl52.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 53: Line chart ─────────────────────────────────────────────────────
+
+slide53 = prs.slides.add_slide(blank)
+
+chart_data2 = CategoryChartData()
+chart_data2.categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May']
+chart_data2.add_series('Revenue', (80, 95, 110, 105, 130))
+chart_data2.add_series('Cost', (60, 65, 70, 75, 80))
+
+chart_frame2 = slide53.shapes.add_chart(
+    XL_CHART_TYPE.LINE, Inches(1), Inches(1.5),
+    Inches(5), Inches(4), chart_data2
+)
+chart53 = chart_frame2.chart
+chart53.has_legend = True
+
+lbl53 = slide53.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl53.text_frame.paragraphs[0].text = "Slide 53: Line chart"
+lbl53.text_frame.paragraphs[0].font.size = Pt(18)
+lbl53.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 54: Pie chart ──────────────────────────────────────────────────────
+
+slide54 = prs.slides.add_slide(blank)
+
+chart_data3 = CategoryChartData()
+chart_data3.categories = ['Desktop', 'Mobile', 'Tablet', 'Other']
+chart_data3.add_series('Market Share', (45, 35, 15, 5))
+
+chart_frame3 = slide54.shapes.add_chart(
+    XL_CHART_TYPE.PIE, Inches(2), Inches(1.5),
+    Inches(5), Inches(4), chart_data3
+)
+chart54 = chart_frame3.chart
+chart54.has_legend = True
+
+lbl54 = slide54.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl54.text_frame.paragraphs[0].text = "Slide 54: Pie chart"
+lbl54.text_frame.paragraphs[0].font.size = Pt(18)
+lbl54.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 55: Bar chart (horizontal) + Donut chart ──────────────────────────
+
+slide55 = prs.slides.add_slide(blank)
+
+chart_data4 = CategoryChartData()
+chart_data4.categories = ['Product A', 'Product B', 'Product C']
+chart_data4.add_series('Units Sold', (250, 180, 320))
+
+chart_frame4 = slide55.shapes.add_chart(
+    XL_CHART_TYPE.BAR_CLUSTERED, Inches(0.5), Inches(1.5),
+    Inches(4), Inches(4), chart_data4
+)
+
+chart_data5 = CategoryChartData()
+chart_data5.categories = ['Yes', 'No', 'Maybe']
+chart_data5.add_series('Responses', (60, 25, 15))
+
+chart_frame5 = slide55.shapes.add_chart(
+    XL_CHART_TYPE.DOUGHNUT, Inches(5), Inches(1.5),
+    Inches(4), Inches(4), chart_data5
+)
+
+lbl55 = slide55.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl55.text_frame.paragraphs[0].text = "Slide 55: Bar chart (horizontal) + Donut chart"
+lbl55.text_frame.paragraphs[0].font.size = Pt(18)
+lbl55.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

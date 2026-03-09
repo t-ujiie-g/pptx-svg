@@ -431,6 +431,9 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     // For pictures, we don't have the relationship ID in SVG
     // Use an empty string — the original rels will be preserved
     @ooxml.ShapeKind::Picture("")
+  } else if shape_type == "chart" {
+    // Chart shapes preserved via chart_xml round-trip
+    @ooxml.ShapeKind::ChartShape(@ooxml.ChartData::empty())
   } else if shape_type == "table" {
     // Table shapes carry no inline data in SVG for now — use empty table
     let table_data : @ooxml.TableData = {

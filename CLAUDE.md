@@ -86,7 +86,7 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   sh_link_rid: String, sh_link_hover_rid: String,
   effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d }
 
-ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | Other
+ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | ChartShape(ChartData) | Other
 ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
 GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
 CustomGeomData { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b: String, cxn_lst: String }
@@ -121,6 +121,13 @@ TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_spa
 
 Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
 ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }
+
+ChartData { title, chart_xml: String, groups: Array[ChartGroup], axes: Array[ChartAxis], legend: ChartLegend }
+ChartKind = BarChart | LineChart | PieChart | DoughnutChart | ScatterChart | AreaChart | RadarChart
+ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap, hole_size: Int, vary_colors: Bool }
+ChartSeries { idx, order: Int, title: String, sp_pr: ChartSpPr, cat, val, x_val, y_val: AxisDataSource }
+AxisDataSource = NumSource(String, NumData) | StrSource(String, StrData) | NoData
+ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridlines: Bool }
 ```
 
 ## Key files
@@ -133,10 +140,12 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_
 | `src/ooxml/ooxml_theme.mbt` | Theme parser + ColorMap + master/layout parsers |
 | `src/ooxml/ooxml_text.mbt` | Text body parsing (paragraphs, runs, bodyPr) |
 | `src/ooxml/ooxml_parse.mbt` | Shape/Slide/Fill parsing + rels + slide size |
+| `src/ooxml/ooxml_chart.mbt` | ChartML parser (c:chartSpace → ChartData) |
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape/Table rendering + public API |
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
 | `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
+| `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), global state |
@@ -162,11 +171,13 @@ When implementing a new OOXML feature (e.g. gradient fill, shadow, connector), *
 Follow the round-trip pipeline — update each relevant file:
 - `src/ooxml/ooxml.mbt`: Data model (struct/field definitions)
 - `src/ooxml/ooxml_parse.mbt`: XML parser for shapes, fills, transforms
+- `src/ooxml/ooxml_chart.mbt`: ChartML parser (if chart-related)
 - `src/ooxml/ooxml_text.mbt`: Text body/paragraph/run parsing (if text-related)
 - `src/ooxml/ooxml_theme.mbt`: Theme/master/layout parsing (if theme-related)
 - `src/renderer/renderer.mbt`: Shape/table SVG rendering + `data-ooxml-*` attributes
 - `src/renderer/renderer_text.mbt`: Text SVG rendering (if text-related)
 - `src/renderer/renderer_fill.mbt`: Gradient/pattern/blip fill rendering (if fill-related)
+- `src/renderer/renderer_chart.mbt`: Chart SVG rendering (if chart-related)
 - `src/svg_parser/svg_parser.mbt`: `data-ooxml-*` → SlideData round-trip parsing
 - `src/serializer/serializer.mbt`: SlideData → OOXML XML serialization
 - `src/main/main.mbt`: Wasm exports, global state

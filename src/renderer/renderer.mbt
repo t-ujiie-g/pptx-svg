@@ -1072,6 +1072,7 @@ fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
     @ooxml.ShapeKind::Picture(_) => "picture"
     @ooxml.ShapeKind::TableShape(_) => "table"
     @ooxml.ShapeKind::GroupShape(_) => "group"
+    @ooxml.ShapeKind::ChartShape(_) => "chart"
     @ooxml.ShapeKind::Other => "other"
   }
 }
@@ -1673,6 +1674,8 @@ fn render_shape(
     }
     @ooxml.ShapeKind::TableShape(table) =>
       render_table(table, t, scale, theme, rels, table_styles)
+    @ooxml.ShapeKind::ChartShape(chart) =>
+      render_chart(chart, t, scale, theme)
     @ooxml.ShapeKind::GroupShape(grp) =>
       render_group(grp, t, rels, slide_num, scale, shape_idx, theme, table_styles)
     _ => ""
