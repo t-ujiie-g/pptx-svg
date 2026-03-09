@@ -1,7 +1,7 @@
 // OOXML Chart parsing — ChartML (ECMA-376 Part 1 Chapter 21)
 //
 // Parses c:chartSpace XML from ppt/charts/*.xml into ChartData.
-// Supports: bar/column, line, pie, donut, scatter, area, radar charts.
+// Supports: bar/column, line, pie, donut, scatter, area, radar, bubble, stock charts.
 // Series data is read from numCache/strCache (not from external xlsx).
 //
 // Lazy resolution: parse_graphic_frame stores chart r:id in chart_xml field;
@@ -66,6 +66,8 @@ pub(all) enum ChartKind {
   ScatterChart // c:scatterChart
   AreaChart // c:areaChart
   RadarChart // c:radarChart
+  BubbleChart // c:bubbleChart
+  StockChart // c:stockChart
 }
 
 ///|
@@ -139,9 +141,10 @@ pub(all) struct ChartSeries {
   // Category-based (bar/line/area/pie)
   cat : AxisDataSource // c:cat
   val : AxisDataSource // c:val
-  // Scatter only
+  // Scatter/bubble
   x_val : AxisDataSource // c:xVal
   y_val : AxisDataSource // c:yVal
+  bubble_size : AxisDataSource // c:bubbleSize (bubble chart only)
   // Line/scatter
   smooth : Bool // c:smooth
   // Pie
@@ -376,6 +379,10 @@ fn parse_plot_area(
           groups.push(parse_area_chart(ch, theme))
         } else if tag == "c:radarChart" {
           groups.push(parse_radar_chart(ch, theme))
+        } else if tag == "c:bubbleChart" {
+          groups.push(parse_bubble_chart(ch, theme))
+        } else if tag == "c:stockChart" {
+          groups.push(parse_stock_chart(ch, theme))
         } else if tag == "c:catAx" || tag == "c:dateAx" {
           axes.push(parse_chart_axis(ch, false, theme))
         } else if tag == "c:valAx" {
@@ -491,6 +498,34 @@ fn parse_radar_chart(
 ) -> ChartGroup {
   {
     ..ChartGroup::default(RadarChart),
+    vary_colors: child_attr_val(ch, "c:varyColors") == "1",
+    series: parse_series_list(ch, theme),
+    ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
+  }
+}
+
+///|
+fn parse_bubble_chart(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> ChartGroup {
+  {
+    ..ChartGroup::default(BubbleChart),
+    vary_colors: child_attr_val(ch, "c:varyColors") == "1",
+    series: parse_scatter_series_list(ch, theme),
+    ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
+  }
+}
+
+///|
+fn parse_stock_chart(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> ChartGroup {
+  {
+    ..ChartGroup::default(StockChart),
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
@@ -623,6 +658,7 @@ fn parse_cat_series(
     val,
     x_val: NoData,
     y_val: NoData,
+    bubble_size: NoData,
     smooth,
     explosion,
     data_points,
@@ -647,6 +683,10 @@ fn parse_scatter_series_list(
       None => AxisDataSource::NoData
       Some(n) => parse_axis_data_source(@xml.get_children(n))
     }
+    let bubble_size = match @xml.find_child(sc, "c:bubbleSize") {
+      None => AxisDataSource::NoData
+      Some(n) => parse_axis_data_source(@xml.get_children(n))
+    }
     series.push({
       idx: child_attr_int(sc, "c:idx"),
       order: child_attr_int(sc, "c:order"),
@@ -656,6 +696,7 @@ fn parse_scatter_series_list(
       val: NoData,
       x_val,
       y_val,
+      bubble_size,
       smooth: child_attr_val(sc, "c:smooth") == "1",
       explosion: 0,
       data_points: parse_data_points(sc, theme),

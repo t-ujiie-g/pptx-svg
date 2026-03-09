@@ -61,6 +61,11 @@ Slides:
  56. Column chart with data labels (c:dLbls showVal)
  57. Pie chart with custom data point colors (c:dPt) + percentage labels
  58. Line chart with series spPr colors + data labels
+ 59. Scatter chart + Area chart
+ 60. Radar chart
+ 61. Bubble chart (c:bubbleChart with xVal/yVal/bubbleSize)
+ 62. Stock chart (c:stockChart — Open/High/Low/Close)
+ 63. All chart types overview (mini charts for visual regression)
 """
 
 from pptx import Presentation
@@ -4174,6 +4179,293 @@ lbl58 = slide58.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl58.text_frame.paragraphs[0].text = "Slide 58: Line chart with series colors + data labels"
 lbl58.text_frame.paragraphs[0].font.size = Pt(18)
 lbl58.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 59: Scatter chart + Area chart ─────────────────────────────────────
+
+from pptx.chart.data import XyChartData
+
+slide59 = prs.slides.add_slide(blank)
+
+xy_data = XyChartData()
+s1 = xy_data.add_series('Group A')
+s1.add_data_point(10, 20)
+s1.add_data_point(30, 50)
+s1.add_data_point(50, 40)
+s1.add_data_point(70, 80)
+s2 = xy_data.add_series('Group B')
+s2.add_data_point(15, 60)
+s2.add_data_point(35, 30)
+s2.add_data_point(55, 70)
+s2.add_data_point(75, 45)
+
+chart_frame59a = slide59.shapes.add_chart(
+    XL_CHART_TYPE.XY_SCATTER, Inches(0.3), Inches(1.5),
+    Inches(4.5), Inches(4), xy_data
+)
+chart59a = chart_frame59a.chart
+chart59a.has_legend = True
+
+area_data = CategoryChartData()
+area_data.categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May']
+area_data.add_series('Downloads', (120, 180, 150, 200, 250))
+area_data.add_series('Uploads', (80, 100, 130, 110, 170))
+
+chart_frame59b = slide59.shapes.add_chart(
+    XL_CHART_TYPE.AREA, Inches(5.2), Inches(1.5),
+    Inches(4.5), Inches(4), area_data
+)
+chart59b = chart_frame59b.chart
+chart59b.has_legend = True
+
+lbl59 = slide59.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl59.text_frame.paragraphs[0].text = "Slide 59: Scatter chart + Area chart"
+lbl59.text_frame.paragraphs[0].font.size = Pt(18)
+lbl59.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 60: Radar chart ────────────────────────────────────────────────────
+
+slide60 = prs.slides.add_slide(blank)
+
+radar_data = CategoryChartData()
+radar_data.categories = ['Str', 'Dex', 'Con', 'Int', 'Wis', 'Cha']
+radar_data.add_series('Character A', (15, 12, 14, 10, 8, 16))
+radar_data.add_series('Character B', (10, 16, 8, 15, 14, 12))
+
+chart_frame60 = slide60.shapes.add_chart(
+    XL_CHART_TYPE.RADAR, Inches(2), Inches(1.5),
+    Inches(5), Inches(4.5), radar_data
+)
+chart60 = chart_frame60.chart
+chart60.has_legend = True
+
+lbl60 = slide60.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl60.text_frame.paragraphs[0].text = "Slide 60: Radar chart"
+lbl60.text_frame.paragraphs[0].font.size = Pt(18)
+lbl60.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 61: Bubble chart ──────────────────────────────────────────────────
+
+from pptx.chart.data import BubbleChartData
+
+slide61 = prs.slides.add_slide(blank)
+
+bubble_data = BubbleChartData()
+bs1 = bubble_data.add_series('Product X')
+bs1.add_data_point(10, 40, 15)
+bs1.add_data_point(25, 60, 30)
+bs1.add_data_point(40, 30, 10)
+bs1.add_data_point(55, 70, 25)
+bs2 = bubble_data.add_series('Product Y')
+bs2.add_data_point(15, 55, 20)
+bs2.add_data_point(30, 35, 12)
+bs2.add_data_point(50, 50, 35)
+
+chart_frame61 = slide61.shapes.add_chart(
+    XL_CHART_TYPE.BUBBLE, Inches(1.5), Inches(1.5),
+    Inches(6), Inches(4.5), bubble_data
+)
+chart61 = chart_frame61.chart
+chart61.has_legend = True
+
+lbl61 = slide61.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl61.text_frame.paragraphs[0].text = "Slide 61: Bubble chart"
+lbl61.text_frame.paragraphs[0].font.size = Pt(18)
+lbl61.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 62: Stock chart (OHLC) ───────────────────────────────────────────
+
+slide62 = prs.slides.add_slide(blank)
+
+# python-pptx doesn't have direct stock chart support, so inject via lxml
+# Create a bar chart as placeholder, then replace with stock chart XML
+stock_placeholder = CategoryChartData()
+stock_placeholder.categories = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5']
+stock_placeholder.add_series('Open', (100, 105, 98, 110, 108))
+
+chart_frame62 = slide62.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), stock_placeholder
+)
+chart62 = chart_frame62.chart
+
+# Replace chart XML with a stock chart
+chart_part62 = chart62.part
+chart_elem62 = chart_part62._element
+ns_c = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+
+# Find plotArea and remove existing barChart
+plot_area = chart_elem62.find(f'.//{{{ns_c}}}plotArea')
+for bar in plot_area.findall(f'{{{ns_c}}}barChart'):
+    plot_area.remove(bar)
+
+# Build stock chart element
+stock_xml = f"""<c:stockChart xmlns:c="{ns_c}" xmlns:a="{ns_a}">
+  <c:ser>
+    <c:idx val="0"/><c:order val="0"/>
+    <c:tx><c:strRef><c:f>Sheet1!$B$1</c:f><c:strCache><c:ptCount val="1"/>
+      <c:pt idx="0"><c:v>Open</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:cat><c:strRef><c:f>Sheet1!$A$2:$A$6</c:f><c:strCache><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>Day 1</c:v></c:pt><c:pt idx="1"><c:v>Day 2</c:v></c:pt>
+      <c:pt idx="2"><c:v>Day 3</c:v></c:pt><c:pt idx="3"><c:v>Day 4</c:v></c:pt>
+      <c:pt idx="4"><c:v>Day 5</c:v></c:pt></c:strCache></c:strRef></c:cat>
+    <c:val><c:numRef><c:f>Sheet1!$B$2:$B$6</c:f><c:numCache><c:formatCode>General</c:formatCode>
+      <c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>100</c:v></c:pt><c:pt idx="1"><c:v>105</c:v></c:pt>
+      <c:pt idx="2"><c:v>98</c:v></c:pt><c:pt idx="3"><c:v>110</c:v></c:pt>
+      <c:pt idx="4"><c:v>108</c:v></c:pt></c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:ser>
+    <c:idx val="1"/><c:order val="1"/>
+    <c:tx><c:strRef><c:f>Sheet1!$C$1</c:f><c:strCache><c:ptCount val="1"/>
+      <c:pt idx="0"><c:v>High</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:val><c:numRef><c:f>Sheet1!$C$2:$C$6</c:f><c:numCache><c:formatCode>General</c:formatCode>
+      <c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>115</c:v></c:pt><c:pt idx="1"><c:v>118</c:v></c:pt>
+      <c:pt idx="2"><c:v>112</c:v></c:pt><c:pt idx="3"><c:v>120</c:v></c:pt>
+      <c:pt idx="4"><c:v>122</c:v></c:pt></c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:ser>
+    <c:idx val="2"/><c:order val="2"/>
+    <c:tx><c:strRef><c:f>Sheet1!$D$1</c:f><c:strCache><c:ptCount val="1"/>
+      <c:pt idx="0"><c:v>Low</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:val><c:numRef><c:f>Sheet1!$D$2:$D$6</c:f><c:numCache><c:formatCode>General</c:formatCode>
+      <c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>95</c:v></c:pt><c:pt idx="1"><c:v>100</c:v></c:pt>
+      <c:pt idx="2"><c:v>90</c:v></c:pt><c:pt idx="3"><c:v>105</c:v></c:pt>
+      <c:pt idx="4"><c:v>102</c:v></c:pt></c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:ser>
+    <c:idx val="3"/><c:order val="3"/>
+    <c:tx><c:strRef><c:f>Sheet1!$E$1</c:f><c:strCache><c:ptCount val="1"/>
+      <c:pt idx="0"><c:v>Close</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:val><c:numRef><c:f>Sheet1!$E$2:$E$6</c:f><c:numCache><c:formatCode>General</c:formatCode>
+      <c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>108</c:v></c:pt><c:pt idx="1"><c:v>102</c:v></c:pt>
+      <c:pt idx="2"><c:v>107</c:v></c:pt><c:pt idx="3"><c:v>115</c:v></c:pt>
+      <c:pt idx="4"><c:v>118</c:v></c:pt></c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:axId val="10000001"/>
+  <c:axId val="10000002"/>
+</c:stockChart>"""
+
+stock_elem = etree.fromstring(stock_xml)
+
+# Find existing axes and remove to add stock-compatible ones
+for ax in plot_area.findall(f'{{{ns_c}}}catAx') + plot_area.findall(f'{{{ns_c}}}valAx'):
+    plot_area.remove(ax)
+
+# Insert stock chart after any layout element
+layout_elem = plot_area.find(f'{{{ns_c}}}layout')
+if layout_elem is not None:
+    idx_pos = list(plot_area).index(layout_elem) + 1
+    plot_area.insert(idx_pos, stock_elem)
+else:
+    plot_area.insert(0, stock_elem)
+
+# Add catAx and valAx for stock chart
+cat_ax_xml = f"""<c:catAx xmlns:c="{ns_c}">
+  <c:axId val="10000001"/>
+  <c:scaling><c:orientation val="minMax"/></c:scaling>
+  <c:delete val="0"/>
+  <c:axPos val="b"/>
+  <c:crossAx val="10000002"/>
+</c:catAx>"""
+val_ax_xml = f"""<c:valAx xmlns:c="{ns_c}">
+  <c:axId val="10000002"/>
+  <c:scaling><c:orientation val="minMax"/></c:scaling>
+  <c:delete val="0"/>
+  <c:axPos val="l"/>
+  <c:crossAx val="10000001"/>
+  <c:majorGridlines/>
+</c:valAx>"""
+plot_area.append(etree.fromstring(cat_ax_xml))
+plot_area.append(etree.fromstring(val_ax_xml))
+
+# Set legend
+chart_node62 = chart_elem62.find(f'.//{{{ns_c}}}chart')
+legend_xml = f"""<c:legend xmlns:c="{ns_c}">
+  <c:legendPos val="r"/>
+  <c:overlay val="0"/>
+</c:legend>"""
+chart_node62.append(etree.fromstring(legend_xml))
+
+lbl62 = slide62.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl62.text_frame.paragraphs[0].text = "Slide 62: Stock chart (OHLC)"
+lbl62.text_frame.paragraphs[0].font.size = Pt(18)
+lbl62.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 63: All chart types overview ──────────────────────────────────────
+
+slide63 = prs.slides.add_slide(blank)
+
+# Mini column chart (top-left)
+mini_col = CategoryChartData()
+mini_col.categories = ['A', 'B', 'C']
+mini_col.add_series('S1', (30, 50, 40))
+
+slide63.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.3), Inches(1.2),
+    Inches(3), Inches(2.5), mini_col
+)
+
+# Mini line chart (top-center)
+mini_line = CategoryChartData()
+mini_line.categories = ['A', 'B', 'C', 'D']
+mini_line.add_series('S1', (10, 30, 20, 40))
+
+slide63.shapes.add_chart(
+    XL_CHART_TYPE.LINE, Inches(3.5), Inches(1.2),
+    Inches(3), Inches(2.5), mini_line
+)
+
+# Mini pie chart (top-right)
+mini_pie = CategoryChartData()
+mini_pie.categories = ['X', 'Y', 'Z']
+mini_pie.add_series('S1', (40, 35, 25))
+
+slide63.shapes.add_chart(
+    XL_CHART_TYPE.PIE, Inches(6.7), Inches(1.2),
+    Inches(3), Inches(2.5), mini_pie
+)
+
+# Mini bar chart (bottom-left)
+mini_bar = CategoryChartData()
+mini_bar.categories = ['P', 'Q', 'R']
+mini_bar.add_series('S1', (25, 40, 35))
+
+slide63.shapes.add_chart(
+    XL_CHART_TYPE.BAR_CLUSTERED, Inches(0.3), Inches(4.0),
+    Inches(3), Inches(2.5), mini_bar
+)
+
+# Mini scatter chart (bottom-center)
+mini_scatter = XyChartData()
+ms1 = mini_scatter.add_series('S1')
+ms1.add_data_point(5, 10)
+ms1.add_data_point(15, 30)
+ms1.add_data_point(25, 20)
+ms1.add_data_point(35, 40)
+
+slide63.shapes.add_chart(
+    XL_CHART_TYPE.XY_SCATTER, Inches(3.5), Inches(4.0),
+    Inches(3), Inches(2.5), mini_scatter
+)
+
+# Mini donut chart (bottom-right)
+mini_donut = CategoryChartData()
+mini_donut.categories = ['A', 'B', 'C']
+mini_donut.add_series('S1', (50, 30, 20))
+
+slide63.shapes.add_chart(
+    XL_CHART_TYPE.DOUGHNUT, Inches(6.7), Inches(4.0),
+    Inches(3), Inches(2.5), mini_donut
+)
+
+lbl63 = slide63.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl63.text_frame.paragraphs[0].text = "Slide 63: All chart types overview"
+lbl63.text_frame.paragraphs[0].font.size = Pt(18)
+lbl63.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

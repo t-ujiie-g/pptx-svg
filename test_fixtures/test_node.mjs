@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 58', slideCount === 58, `got ${slideCount}`);
+  assert('slide count = 63', slideCount === 63, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 58; i++) {
+  for (let i = 1; i <= 63; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 58; i++) {
+  for (let i = 1; i <= 63; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1134,6 +1134,62 @@ async function testFeaturesPptx() {
       assert('slide58 has spPr with color', chartXml.includes('srgbClr'));
       assert('slide58 has Week 1', chartXml.includes('Week 1'));
     }
+  }
+
+  // ── Slide 59: Scatter chart + Area chart ──
+  {
+    const slide59 = textFiles.get('ppt/slides/slide59.xml') || '';
+    section('test_features.pptx — Slide 59: scatter + area');
+    assert('slide59 has p:graphicFrame', slide59.includes('p:graphicFrame'));
+  }
+
+  // ── Slide 60: Radar chart ──
+  {
+    const slide60 = textFiles.get('ppt/slides/slide60.xml') || '';
+    section('test_features.pptx — Slide 60: radar chart');
+    assert('slide60 has p:graphicFrame', slide60.includes('p:graphicFrame'));
+  }
+
+  // ── Slide 61: Bubble chart ──
+  {
+    const slide61 = textFiles.get('ppt/slides/slide61.xml') || '';
+    section('test_features.pptx — Slide 61: bubble chart');
+    assert('slide61 has p:graphicFrame', slide61.includes('p:graphicFrame'));
+    const rels61 = textFiles.get('ppt/slides/_rels/slide61.xml.rels') || '';
+    const chartTarget61 = rels61.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget61) {
+      const chartPath = 'ppt/charts/' + chartTarget61[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide61 has c:bubbleChart', chartXml.includes('c:bubbleChart'));
+      assert('slide61 has c:bubbleSize', chartXml.includes('c:bubbleSize'));
+      assert('slide61 has xVal', chartXml.includes('c:xVal'));
+      assert('slide61 has yVal', chartXml.includes('c:yVal'));
+    }
+  }
+
+  // ── Slide 62: Stock chart ──
+  {
+    const slide62 = textFiles.get('ppt/slides/slide62.xml') || '';
+    section('test_features.pptx — Slide 62: stock chart');
+    assert('slide62 has p:graphicFrame', slide62.includes('p:graphicFrame'));
+    const rels62 = textFiles.get('ppt/slides/_rels/slide62.xml.rels') || '';
+    const chartTarget62 = rels62.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget62) {
+      const chartPath = 'ppt/charts/' + chartTarget62[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide62 has c:stockChart', chartXml.includes('c:stockChart'));
+      assert('slide62 has Open series', chartXml.includes('Open'));
+      assert('slide62 has High series', chartXml.includes('High'));
+      assert('slide62 has Low series', chartXml.includes('Low'));
+      assert('slide62 has Close series', chartXml.includes('Close'));
+    }
+  }
+
+  // ── Slide 63: All chart types overview ──
+  {
+    const slide63 = textFiles.get('ppt/slides/slide63.xml') || '';
+    section('test_features.pptx — Slide 63: all chart types overview');
+    assert('slide63 has p:graphicFrame', slide63.includes('p:graphicFrame'));
   }
 }
 

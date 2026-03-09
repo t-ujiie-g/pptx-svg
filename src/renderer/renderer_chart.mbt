@@ -1,7 +1,7 @@
 // SVG renderer — Chart rendering
 //
 // Renders ChartData (parsed from ChartML / ECMA-376 Part 1 Chapter 21) as SVG.
-// Supports: bar/column, line, pie, donut, scatter, area, radar charts.
+// Supports: bar/column, line, pie, donut, scatter, area, radar, bubble, stock charts.
 //
 // Layout strategy:
 //   - Title at top (if present)
@@ -52,6 +52,9 @@ let chart_scatter_marker_r : Int = 4 // circle marker radius for scatter charts
 
 ///|
 let chart_pie_pad : Int = 4 // radius padding for pie/donut charts
+
+///|
+let chart_bubble_max_r : Int = 20 // max bubble radius in px
 
 // ── Chart style constants ─────────────────────────────────────────────────
 
@@ -246,6 +249,10 @@ fn render_chart_group(
       render_scatter_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::AreaChart => render_area_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::RadarChart => render_line_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::BubbleChart =>
+      render_bubble_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::StockChart =>
+      render_stock_chart(group, px_, py, pw, ph, colors)
   }
 }
 
@@ -279,8 +286,7 @@ fn render_bar_chart(
   let units_per_cat = ns * 100 + gap_pct
   let cat_size = if is_horizontal { ph } else { pw }
   let val_size = if is_horizontal { pw } else { ph }
-  let mut si = 0
-  while si < ns {
+  for si in 0..<ns {
     let ser = group.series[si]
     let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
@@ -310,7 +316,6 @@ fn render_bar_chart(
       }
       ci = ci + 1
     }
-    si = si + 1
   }
   // Data labels
   if group.data_labels.is_visible() {
@@ -342,8 +347,7 @@ fn render_line_chart(
     return ""
   }
   let mut svg = ""
-  let mut si = 0
-  while si < ns {
+  for si in 0..<ns {
     let ser = group.series[si]
     let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
@@ -375,7 +379,6 @@ fn render_line_chart(
         ci = ci + 1
       }
     }
-    si = si + 1
   }
   // Data labels
   if group.data_labels.is_visible() {
@@ -526,49 +529,24 @@ fn render_scatter_chart(
   ph : Int,
   colors : Array[String],
 ) -> String {
-  let ns = group.series.length()
-  if ns == 0 {
+  if group.series.is_empty() {
     return ""
   }
-  // Find X/Y range across all series
-  let mut x_max = 1
-  let mut y_max = 1
-  let mut si = 0
-  while si < ns {
-    let xv = get_num_values(group.series[si].x_val)
-    let yv = get_num_values(group.series[si].y_val)
-    let nx = xv.length()
-    let ny = yv.length()
-    let mut j = 0
-    while j < nx {
-      if xv[j] > x_max { x_max = xv[j] }
-      j = j + 1
-    }
-    j = 0
-    while j < ny {
-      if yv[j] > y_max { y_max = yv[j] }
-      j = j + 1
-    }
-    si = si + 1
-  }
+  let (x_max, y_max, _) = get_xy_range(group.series)
   let mut svg = ""
-  si = 0
-  while si < ns {
+  for si in 0..<group.series.length() {
     let ser = group.series[si]
     let color = series_color(ser, si, colors)
     let xv = get_num_values(ser.x_val)
     let yv = get_num_values(ser.y_val)
     let n = if xv.length() < yv.length() { xv.length() } else { yv.length() }
-    let mut ci = 0
-    while ci < n {
+    for ci in 0..<n {
       let x = px_ + xv[ci] * pw / x_max
       let y = py + ph - yv[ci] * ph / y_max
       svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
         int_to_str(y) + "\" r=\"" + int_to_str(chart_scatter_marker_r) +
         "\" fill=\"" + color + "\"/>"
-      ci = ci + 1
     }
-    si = si + 1
   }
   svg
 }
@@ -584,18 +562,16 @@ fn render_area_chart(
   ph : Int,
   colors : Array[String],
 ) -> String {
-  let ns = group.series.length()
-  if ns == 0 {
+  if group.series.is_empty() {
     return ""
   }
-  let (_cats, max_val) = get_series_range(group.series)
+  let (_, max_val) = get_series_range(group.series)
   let nc = get_max_points(group.series)
   if nc == 0 || max_val == 0 {
     return ""
   }
   let mut svg = ""
-  let mut si = 0
-  while si < ns {
+  for si in 0..<group.series.length() {
     let ser = group.series[si]
     let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
@@ -624,7 +600,127 @@ fn render_area_chart(
         "\" fill-opacity=\"0.5\" stroke=\"" + color +
         "\" stroke-width=\"1\"/>"
     }
-    si = si + 1
+  }
+  svg
+}
+
+// ── Bubble chart ─────────────────────────────────────────────────────────
+
+///|
+fn render_bubble_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+) -> String {
+  if group.series.is_empty() {
+    return ""
+  }
+  let (x_max, y_max, bub_max) = get_xy_range(group.series)
+  let mut svg = ""
+  for si in 0..<group.series.length() {
+    let ser = group.series[si]
+    let color = series_color(ser, si, colors)
+    let xv = get_num_values(ser.x_val)
+    let yv = get_num_values(ser.y_val)
+    let bv = get_num_values(ser.bubble_size)
+    let n = if xv.length() < yv.length() { xv.length() } else { yv.length() }
+    for ci in 0..<n {
+      let x = px_ + xv[ci] * pw / x_max
+      let y = py + ph - yv[ci] * ph / y_max
+      // Bubble radius proportional to bubble_size / bub_max (linear approximation)
+      let bsize = if ci < bv.length() { bv[ci] } else { bub_max / 2 }
+      let r = if bub_max > 0 {
+        bsize * chart_bubble_max_r / bub_max
+      } else {
+        chart_scatter_marker_r
+      }
+      let r_clamped = if r < 3 { 3 } else { r }
+      svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
+        int_to_str(y) + "\" r=\"" + int_to_str(r_clamped) +
+        "\" fill=\"" + color + "\" fill-opacity=\"0.6\" stroke=\"" +
+        color + "\" stroke-width=\"1\"/>"
+    }
+  }
+  svg
+}
+
+// ── Stock chart ──────────────────────────────────────────────────────────
+
+///|
+/// Render stock chart (high-low-close).
+/// Expects 3 or 4 series: [open], high, low, close.
+/// Renders as vertical high-low lines with close markers.
+fn render_stock_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+) -> String {
+  let ns = group.series.length()
+  if ns < 3 {
+    return ""
+  }
+  // Determine series indices: 3-series = H/L/C, 4-series = O/H/L/C
+  let (high_idx, low_idx, close_idx, open_idx) = if ns >= 4 {
+    (1, 2, 3, 0)
+  } else {
+    (0, 1, 2, -1)
+  }
+  let high_vals = get_num_values(group.series[high_idx].val)
+  let low_vals = get_num_values(group.series[low_idx].val)
+  let close_vals = get_num_values(group.series[close_idx].val)
+  let open_vals = if open_idx >= 0 {
+    get_num_values(group.series[open_idx].val)
+  } else {
+    []
+  }
+  let nc = high_vals.length()
+  if nc == 0 {
+    return ""
+  }
+  // Find max value for Y axis
+  let mut max_val = 1
+  for i in 0..<nc {
+    if i < high_vals.length() && high_vals[i] > max_val {
+      max_val = high_vals[i]
+    }
+  }
+  // Add 10% headroom
+  max_val = max_val * 11 / 10
+  let mut svg = ""
+  let bar_w = pw / nc / 3 // width for open/close ticks
+  for ci in 0..<nc {
+    let cx = px_ + (ci * 2 + 1) * pw / (nc * 2)
+    let h_val = if ci < high_vals.length() { high_vals[ci] } else { 0 }
+    let l_val = if ci < low_vals.length() { low_vals[ci] } else { 0 }
+    let c_val = if ci < close_vals.length() { close_vals[ci] } else { 0 }
+    let hy = py + ph - h_val * ph / max_val
+    let ly = py + ph - l_val * ph / max_val
+    let cy_ = py + ph - c_val * ph / max_val
+    // High-low vertical line
+    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" +
+      int_to_str(hy) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" +
+      int_to_str(ly) + "\" stroke=\"" + colors[0 % colors.length()] +
+      "\" stroke-width=\"1.5\"/>"
+    // Close tick (right)
+    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" +
+      int_to_str(cy_) + "\" x2=\"" + int_to_str(cx + bar_w) +
+      "\" y2=\"" + int_to_str(cy_) + "\" stroke=\"" +
+      colors[2 % colors.length()] + "\" stroke-width=\"2\"/>"
+    // Open tick (left) if 4 series
+    if open_idx >= 0 && ci < open_vals.length() {
+      let o_val = open_vals[ci]
+      let oy = py + ph - o_val * ph / max_val
+      svg = svg + "<line x1=\"" + int_to_str(cx - bar_w) + "\" y1=\"" +
+        int_to_str(oy) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" +
+        int_to_str(oy) + "\" stroke=\"" + colors[1 % colors.length()] +
+        "\" stroke-width=\"2\"/>"
+    }
   }
   svg
 }
@@ -651,53 +747,64 @@ fn render_axes(
     "\" width=\"" + int_to_str(pw) + "\" height=\"" + int_to_str(ph) +
     "\" fill=\"none\" stroke=\"" + chart_border_color +
     "\" stroke-width=\"0.5\"/>"
-  // Category labels
-  let cats = if not(groups.is_empty()) && not(groups[0].series.is_empty()) {
-    get_cat_labels(groups[0].series[0].cat)
+  // Category / X-axis labels
+  let is_xy = if not(groups.is_empty()) {
+    match groups[0].chart_type {
+      @ooxml.ChartKind::ScatterChart | @ooxml.ChartKind::BubbleChart => true
+      _ => false
+    }
   } else {
-    []
+    false
   }
-  let nc = cats.length()
-  if nc > 0 {
-    if h_bar {
-      // Horizontal bar: category labels on left (Y axis)
-      let mut ci = 0
-      while ci < nc {
-        let y = py + (ci * 2 + 1) * ph / (nc * 2)
-        svg = svg + "<text x=\"" + int_to_str(px_ - 4) + "\" y=\"" +
-          int_to_str(y + 4) +
-          "\" text-anchor=\"end\" font-size=\"10\" fill=\"" +
-          chart_axis_label_color + "\">" +
-          svg_escape(cats[ci]) + "</text>"
-        ci = ci + 1
-      }
+  if is_xy {
+    // Scatter/bubble: numeric X-axis tick labels
+    let x_max = get_x_axis_max(groups)
+    for ti in 0..=chart_axis_ticks {
+      let x = px_ + ti * pw / chart_axis_ticks
+      let label_val = ti * x_max / chart_axis_ticks
+      svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+        int_to_str(py + ph + 14) +
+        "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
+        chart_axis_label_color + "\">" +
+        int_to_str(label_val) + "</text>"
+    }
+  } else {
+    let cats = if not(groups.is_empty()) && not(groups[0].series.is_empty()) {
+      get_cat_labels(groups[0].series[0].cat)
     } else {
-      // Vertical: category labels at bottom (X axis)
-      let mut ci = 0
-      while ci < nc {
-        let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-        svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
-          int_to_str(py + ph + 14) +
-          "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
-          chart_axis_label_color + "\">" +
-          svg_escape(cats[ci]) + "</text>"
-        ci = ci + 1
+      []
+    }
+    let nc = cats.length()
+    if nc > 0 {
+      if h_bar {
+        // Horizontal bar: category labels on left (Y axis)
+        for ci in 0..<nc {
+          let y = py + (ci * 2 + 1) * ph / (nc * 2)
+          svg = svg + "<text x=\"" + int_to_str(px_ - 4) + "\" y=\"" +
+            int_to_str(y + 4) +
+            "\" text-anchor=\"end\" font-size=\"10\" fill=\"" +
+            chart_axis_label_color + "\">" +
+            svg_escape(cats[ci]) + "</text>"
+        }
+      } else {
+        // Vertical: category labels at bottom (X axis)
+        for ci in 0..<nc {
+          let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
+          svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+            int_to_str(py + ph + 14) +
+            "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
+            chart_axis_label_color + "\">" +
+            svg_escape(cats[ci]) + "</text>"
+        }
       }
     }
   }
   // Value axis labels + gridlines
-  let na = axes.length()
-  let mut ai = 0
-  while ai < na {
+  for ai in 0..<axes.length() {
     let ax = axes[ai]
     if ax.is_val && not(ax.delete) {
-      let (_, max_val) = if not(groups.is_empty()) {
-        get_series_range(groups[0].series)
-      } else {
-        ([], 100)
-      }
-      let mut ti = 0
-      while ti <= chart_axis_ticks {
+      let max_val = get_value_axis_max(groups)
+      for ti in 0..=chart_axis_ticks {
         if h_bar {
           // Horizontal bar: value labels at bottom (X axis), vertical gridlines
           let x = px_ + ti * pw / chart_axis_ticks
@@ -731,10 +838,8 @@ fn render_axes(
             chart_axis_label_color + "\">" +
             int_to_str(label_val) + "</text>"
         }
-        ti = ti + 1
       }
     }
-    ai = ai + 1
   }
   svg
 }
@@ -914,6 +1019,73 @@ fn get_series_range(
   }
   if max_val == 0 { max_val = 1 }
   (cats, max_val)
+}
+
+///|
+/// Get X/Y/bubble-size max values across all series (scatter/bubble charts).
+/// Returns (x_max, y_max, bub_max), each at least 1.
+fn get_xy_range(
+  series : Array[@ooxml.ChartSeries],
+) -> (Int, Int, Int) {
+  let mut x_max = 0
+  let mut y_max = 0
+  let mut bub_max = 0
+  for si in 0..<series.length() {
+    let xv = get_num_values(series[si].x_val)
+    let yv = get_num_values(series[si].y_val)
+    let bv = get_num_values(series[si].bubble_size)
+    for j in 0..<xv.length() {
+      if xv[j] > x_max { x_max = xv[j] }
+    }
+    for j in 0..<yv.length() {
+      if yv[j] > y_max { y_max = yv[j] }
+    }
+    for j in 0..<bv.length() {
+      if bv[j] > bub_max { bub_max = bv[j] }
+    }
+  }
+  (if x_max == 0 { 1 } else { x_max }, if y_max == 0 { 1 } else { y_max }, if bub_max == 0 { 1 } else { bub_max })
+}
+
+///|
+/// Get the max value for the value axis, considering chart type.
+fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
+  if groups.is_empty() {
+    return 100
+  }
+  let group = groups[0]
+  match group.chart_type {
+    @ooxml.ChartKind::ScatterChart | @ooxml.ChartKind::BubbleChart => {
+      let (_, y_max, _) = get_xy_range(group.series)
+      y_max
+    }
+    @ooxml.ChartKind::StockChart => {
+      let mut max_val = 0
+      for si in 0..<group.series.length() {
+        let vals = get_num_values(group.series[si].val)
+        for vi in 0..<vals.length() {
+          if vals[vi] > max_val { max_val = vals[vi] }
+        }
+      }
+      // Add 10% headroom for stock charts
+      max_val = max_val * 11 / 10
+      if max_val == 0 { 1 } else { max_val }
+    }
+    _ => {
+      let (_, max_val) = get_series_range(group.series)
+      max_val
+    }
+  }
+}
+
+///|
+/// Get the max X value for scatter/bubble charts.
+fn get_x_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
+  if groups.is_empty() {
+    return 100
+  }
+  let (x_max, _, _) = get_xy_range(groups[0].series)
+  x_max
 }
 
 ///|
