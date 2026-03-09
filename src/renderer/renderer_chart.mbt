@@ -73,12 +73,55 @@ let chart_gridline_color : String = "#e0e0e0"
 ///|
 let chart_slice_stroke : String = "white"
 
-// Default series colors (Office theme accent palette approximation)
+// Fallback series colors (used when theme is unavailable)
 ///|
-let chart_colors : Array[String] = [
+let chart_colors_fallback : Array[String] = [
   "#4472C4", "#ED7D31", "#A5A5A5", "#FFC000", "#5B9BD5", "#70AD47",
   "#264478", "#9B5700", "#636363", "#997300", "#255E91", "#43682B",
 ]
+
+///|
+let chart_data_label_font_size : Int = 9
+
+// ── Theme color palette ──────────────────────────────────────────────────────
+
+///|
+/// Build chart color palette from theme accent colors (accent1..accent6 + darker variants).
+fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
+  let accent1 = theme.accent1
+  let accent2 = theme.accent2
+  let accent3 = theme.accent3
+  let accent4 = theme.accent4
+  let accent5 = theme.accent5
+  let accent6 = theme.accent6
+  // Check if theme has real accent colors (not all none)
+  if accent1.is_none() && accent2.is_none() {
+    return chart_colors_fallback
+  }
+  let colors : Array[String] = []
+  // Primary 6 accent colors
+  let accents = [accent1, accent2, accent3, accent4, accent5, accent6]
+  for i in 0..<6 {
+    if not(accents[i].is_none()) {
+      colors.push(accents[i].to_css())
+    } else {
+      colors.push(chart_colors_fallback[i])
+    }
+  }
+  // Darker variants (lumMod=75000 approximation: multiply RGB by 0.75)
+  for i in 0..<6 {
+    if not(accents[i].is_none()) {
+      let c = accents[i]
+      let dr = c.r * 3 / 4
+      let dg = c.g * 3 / 4
+      let db = c.b * 3 / 4
+      colors.push(({ r: dr, g: dg, b: db, alpha: 255 } : @ooxml.Color).to_css())
+    } else {
+      colors.push(chart_colors_fallback[6 + i])
+    }
+  }
+  colors
+}
 
 // ── Main chart renderer ─────────────────────────────────────────────────────
 
@@ -113,7 +156,7 @@ fn render_chart(
   chart : @ooxml.ChartData,
   t : @ooxml.ShapeTransform,
   scale : Int,
-  _theme : @ooxml.ThemeData,
+  theme : @ooxml.ThemeData,
 ) -> String {
   let ox = px(t.x, scale)
   let oy = px(t.y, scale)
@@ -165,19 +208,19 @@ fn render_chart(
   if plot_w <= 0 || plot_h <= 0 {
     return svg
   }
+  // Build color palette from theme
+  let colors = build_chart_colors(theme)
   // Render chart groups
-  let ng = chart.groups.length()
-  let mut gi = 0
-  while gi < ng {
-    let group = chart.groups[gi]
-    svg = svg + render_chart_group(group, plot_x, plot_y, plot_w, plot_h)
-    gi = gi + 1
+  for gi in 0..<chart.groups.length() {
+    svg = svg + render_chart_group(
+      chart.groups[gi], plot_x, plot_y, plot_w, plot_h, colors,
+    )
   }
   // Render axes
   svg = svg + render_axes(chart.axes, plot_x, plot_y, plot_w, plot_h, chart.groups)
   // Render legend
   if chart.legend.show {
-    svg = svg + render_legend(chart.groups, w - legend_w + 4, plot_y)
+    svg = svg + render_legend(chart.groups, w - legend_w + 4, plot_y, colors)
   }
   svg + "</g>"
 }
@@ -191,17 +234,18 @@ fn render_chart_group(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   match group.chart_type {
-    @ooxml.ChartKind::BarChart => render_bar_chart(group, px_, py, pw, ph)
-    @ooxml.ChartKind::LineChart => render_line_chart(group, px_, py, pw, ph)
-    @ooxml.ChartKind::PieChart => render_pie_chart(group, px_, py, pw, ph)
+    @ooxml.ChartKind::BarChart => render_bar_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::LineChart => render_line_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::PieChart => render_pie_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::DoughnutChart =>
-      render_donut_chart(group, px_, py, pw, ph)
+      render_donut_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::ScatterChart =>
-      render_scatter_chart(group, px_, py, pw, ph)
-    @ooxml.ChartKind::AreaChart => render_area_chart(group, px_, py, pw, ph)
-    @ooxml.ChartKind::RadarChart => render_line_chart(group, px_, py, pw, ph)
+      render_scatter_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::AreaChart => render_area_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::RadarChart => render_line_chart(group, px_, py, pw, ph, colors)
   }
 }
 
@@ -214,6 +258,7 @@ fn render_bar_chart(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   let is_horizontal = group.bar_dir == "bar"
   let ns = group.series.length()
@@ -237,13 +282,14 @@ fn render_bar_chart(
   let mut si = 0
   while si < ns {
     let ser = group.series[si]
-    let color = series_color(ser, si)
+    let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
     let nv = values.length()
     let mut ci = 0
     while ci < nc && ci < nv {
       let val = values[ci]
       if val > 0 {
+        let pt_color = point_color(ser, ci, color)
         let bar_len = val * val_size / max_val
         let cat_start = ci * cat_size / nc
         let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
@@ -254,17 +300,23 @@ fn render_bar_chart(
           svg = svg + "<rect x=\"" + int_to_str(px_) + "\" y=\"" +
             int_to_str(py + bar_off) + "\" width=\"" + int_to_str(bar_len) +
             "\" height=\"" + int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
-            "\" fill=\"" + color + "\"/>"
+            "\" fill=\"" + pt_color + "\"/>"
         } else {
           svg = svg + "<rect x=\"" + int_to_str(px_ + bar_off) + "\" y=\"" +
             int_to_str(py + ph - bar_len) + "\" width=\"" +
             int_to_str(if bar_w > 1 { bar_w } else { 1 }) + "\" height=\"" +
-            int_to_str(bar_len) + "\" fill=\"" + color + "\"/>"
+            int_to_str(bar_len) + "\" fill=\"" + pt_color + "\"/>"
         }
       }
       ci = ci + 1
     }
     si = si + 1
+  }
+  // Data labels
+  if group.data_labels.is_visible() {
+    svg = svg + render_bar_data_labels(
+      group, px_, py, pw, ph, max_val, is_horizontal, units_per_cat, gap_pct,
+    )
   }
   svg
 }
@@ -278,6 +330,7 @@ fn render_line_chart(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   let ns = group.series.length()
   if ns == 0 {
@@ -292,7 +345,7 @@ fn render_line_chart(
   let mut si = 0
   while si < ns {
     let ser = group.series[si]
-    let color = series_color(ser, si)
+    let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
     let nv = values.length()
     // Build polyline points
@@ -324,6 +377,10 @@ fn render_line_chart(
     }
     si = si + 1
   }
+  // Data labels
+  if group.data_labels.is_visible() {
+    svg = svg + render_xy_data_labels(group, px_, py, pw, ph, max_val, nc)
+  }
   svg
 }
 
@@ -336,6 +393,7 @@ fn render_pie_chart(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   if group.series.is_empty() {
     return ""
@@ -352,7 +410,13 @@ fn render_pie_chart(
   if r <= 0 {
     return ""
   }
-  render_pie_slices(values, nv, cx, cy, r, 0)
+  let mut svg = render_pie_slices(values, nv, cx, cy, r, 0, ser.data_points, colors)
+  if group.data_labels.is_visible() {
+    svg = svg + render_pie_data_labels(
+      group, values, nv, cx, cy, r, 0, ser,
+    )
+  }
+  svg
 }
 
 ///|
@@ -362,6 +426,7 @@ fn render_donut_chart(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   if group.series.is_empty() {
     return ""
@@ -379,7 +444,13 @@ fn render_donut_chart(
   if r <= 0 {
     return ""
   }
-  render_pie_slices(values, nv, cx, cy, r, inner_r)
+  let mut svg = render_pie_slices(values, nv, cx, cy, r, inner_r, ser.data_points, colors)
+  if group.data_labels.is_visible() {
+    svg = svg + render_pie_data_labels(
+      group, values, nv, cx, cy, r, inner_r, ser,
+    )
+  }
+  svg
 }
 
 ///|
@@ -393,24 +464,23 @@ fn render_pie_slices(
   cy : Int,
   r : Int,
   inner_r : Int,
+  data_points : Array[@ooxml.ChartDataPoint],
+  colors : Array[String],
 ) -> String {
   // Sum values
   let mut total = 0
-  let mut i = 0
-  while i < nv {
+  for i in 0..<nv {
     total = total + values[i]
-    i = i + 1
   }
   if total == 0 {
     return ""
   }
   let mut svg = ""
   let mut start_angle = -90 * 100 // in hundredths of degrees, start from top
-  i = 0
-  while i < nv {
+  for i in 0..<nv {
     let sweep = values[i] * 36000 / total // hundredths of degrees
     if sweep > 0 {
-      let color = chart_colors[i % chart_colors.length()]
+      let color = get_dpt_color(data_points, i, colors)
       let end_angle = start_angle + sweep
       let large_arc = if sweep > 18000 { "1" } else { "0" }
       // Outer arc
@@ -441,7 +511,6 @@ fn render_pie_slices(
       }
       start_angle = end_angle
     }
-    i = i + 1
   }
   svg
 }
@@ -455,6 +524,7 @@ fn render_scatter_chart(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   let ns = group.series.length()
   if ns == 0 {
@@ -485,7 +555,7 @@ fn render_scatter_chart(
   si = 0
   while si < ns {
     let ser = group.series[si]
-    let color = series_color(ser, si)
+    let color = series_color(ser, si, colors)
     let xv = get_num_values(ser.x_val)
     let yv = get_num_values(ser.y_val)
     let n = if xv.length() < yv.length() { xv.length() } else { yv.length() }
@@ -512,6 +582,7 @@ fn render_area_chart(
   py : Int,
   pw : Int,
   ph : Int,
+  colors : Array[String],
 ) -> String {
   let ns = group.series.length()
   if ns == 0 {
@@ -526,7 +597,7 @@ fn render_area_chart(
   let mut si = 0
   while si < ns {
     let ser = group.series[si]
-    let color = series_color(ser, si)
+    let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
     let nv = values.length()
     // Build polygon points: top line + baseline
@@ -675,75 +746,112 @@ fn render_legend(
   groups : Array[@ooxml.ChartGroup],
   lx : Int,
   ly : Int,
+  colors : Array[String],
 ) -> String {
   let mut svg = ""
   let mut y_off = 0
-  let ng = groups.length()
-  let mut gi = 0
-  while gi < ng {
+  for gi in 0..<groups.length() {
     let group = groups[gi]
-    // For pie/donut charts, legend shows category labels (one entry per slice)
     let is_pie = match group.chart_type {
-      @ooxml.ChartKind::PieChart => true
-      @ooxml.ChartKind::DoughnutChart => true
+      @ooxml.ChartKind::PieChart | @ooxml.ChartKind::DoughnutChart => true
       _ => false
     }
     if is_pie {
-      // Show category labels with per-slice colors
+      // Show category labels with per-slice colors (respecting c:dPt overrides)
       if not(group.series.is_empty()) {
         let cats = get_cat_labels(group.series[0].cat)
-        let nc = cats.length()
-        let mut ci = 0
-        while ci < nc {
-          let color = chart_colors[ci % chart_colors.length()]
-          svg = svg + "<rect x=\"" + int_to_str(lx) + "\" y=\"" +
-            int_to_str(ly + y_off) + "\" width=\"10\" height=\"10\" fill=\"" +
-            color + "\"/>"
-          svg = svg + "<text x=\"" + int_to_str(lx + 14) + "\" y=\"" +
-            int_to_str(ly + y_off + 9) +
-            "\" font-size=\"10\" fill=\"" + chart_title_color + "\">" + svg_escape(cats[ci]) +
-            "</text>"
+        let dpts = group.series[0].data_points
+        for ci in 0..<cats.length() {
+          let color = get_dpt_color(dpts, ci, colors)
+          svg = svg + render_legend_entry(lx, ly + y_off, color, cats[ci])
           y_off = y_off + 16
-          ci = ci + 1
         }
       }
     } else {
-      // Show series titles
-      let ns = group.series.length()
-      let mut si = 0
-      while si < ns {
+      for si in 0..<group.series.length() {
         let ser = group.series[si]
-        let color = series_color(ser, si)
+        let color = series_color(ser, si, colors)
         let label = if ser.title.is_empty() {
           "Series " + int_to_str(si + 1)
         } else {
           ser.title
         }
-        svg = svg + "<rect x=\"" + int_to_str(lx) + "\" y=\"" +
-          int_to_str(ly + y_off) + "\" width=\"10\" height=\"10\" fill=\"" +
-          color + "\"/>"
-        svg = svg + "<text x=\"" + int_to_str(lx + 14) + "\" y=\"" +
-          int_to_str(ly + y_off + 9) +
-          "\" font-size=\"10\" fill=\"" + chart_title_color + "\">" + svg_escape(label) + "</text>"
+        svg = svg + render_legend_entry(lx, ly + y_off, color, label)
         y_off = y_off + 16
-        si = si + 1
       }
     }
-    gi = gi + 1
   }
   svg
+}
+
+///|
+/// Render a single legend entry (color swatch + label text).
+fn render_legend_entry(
+  x : Int,
+  y : Int,
+  color : String,
+  label : String,
+) -> String {
+  "<rect x=\"" + int_to_str(x) + "\" y=\"" + int_to_str(y) +
+  "\" width=\"10\" height=\"10\" fill=\"" + color + "\"/>" +
+  "<text x=\"" + int_to_str(x + 14) + "\" y=\"" + int_to_str(y + 9) +
+  "\" font-size=\"10\" fill=\"" + chart_title_color + "\">" +
+  svg_escape(label) + "</text>"
 }
 
 // ── Helper functions ────────────────────────────────────────────────────────
 
 ///|
-/// Get series color — from spPr if set, otherwise from default palette.
-fn series_color(ser : @ooxml.ChartSeries, idx : Int) -> String {
+/// Get series color — from spPr fill or stroke (line charts) if set, otherwise from theme palette.
+fn series_color(
+  ser : @ooxml.ChartSeries,
+  idx : Int,
+  colors : Array[String],
+) -> String {
   if not(ser.sp_pr.fill.is_none()) {
     ser.sp_pr.fill.to_css()
+  } else if not(ser.sp_pr.stroke.is_none()) {
+    // Line charts set color on a:ln (stroke), not fill
+    ser.sp_pr.stroke.to_css()
   } else {
-    chart_colors[idx % chart_colors.length()]
+    colors[idx % colors.length()]
   }
+}
+
+///|
+/// Get per-data-point color — from c:dPt spPr if set, otherwise use series color.
+fn point_color(
+  ser : @ooxml.ChartSeries,
+  pt_idx : Int,
+  default_color : String,
+) -> String {
+  for i in 0..<ser.data_points.length() {
+    if ser.data_points[i].idx == pt_idx {
+      let sp = ser.data_points[i].sp_pr
+      if not(sp.fill.is_none()) {
+        return sp.fill.to_css()
+      }
+    }
+  }
+  default_color
+}
+
+///|
+/// Get color for a pie/donut slice — from c:dPt if set, otherwise from palette.
+fn get_dpt_color(
+  data_points : Array[@ooxml.ChartDataPoint],
+  idx : Int,
+  colors : Array[String],
+) -> String {
+  for i in 0..<data_points.length() {
+    if data_points[i].idx == idx {
+      let sp = data_points[i].sp_pr
+      if not(sp.fill.is_none()) {
+        return sp.fill.to_css()
+      }
+    }
+  }
+  colors[idx % colors.length()]
 }
 
 ///|
@@ -751,14 +859,10 @@ fn series_color(ser : @ooxml.ChartSeries, idx : Int) -> String {
 fn get_num_values(src : @ooxml.AxisDataSource) -> Array[Int] {
   let result : Array[Int] = []
   match src {
-    @ooxml.AxisDataSource::NumSource(_, data) => {
-      let n = data.points.length()
-      let mut i = 0
-      while i < n {
+    @ooxml.AxisDataSource::NumSource(_, data) =>
+      for i in 0..<data.points.length() {
         result.push(parse_chart_num(data.points[i].value))
-        i = i + 1
       }
-    }
     _ => ()
   }
   result
@@ -768,24 +872,14 @@ fn get_num_values(src : @ooxml.AxisDataSource) -> Array[Int] {
 /// Get category labels from AxisDataSource.
 fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
   let result : Array[String] = []
-  match src {
-    @ooxml.AxisDataSource::StrSource(_, data) => {
-      let n = data.points.length()
-      let mut i = 0
-      while i < n {
-        result.push(data.points[i].value)
-        i = i + 1
-      }
-    }
-    @ooxml.AxisDataSource::NumSource(_, data) => {
-      let n = data.points.length()
-      let mut i = 0
-      while i < n {
-        result.push(data.points[i].value)
-        i = i + 1
-      }
-    }
-    _ => ()
+  // Both StrSource and NumSource have points with .value
+  let points = match src {
+    @ooxml.AxisDataSource::StrSource(_, data) => data.points
+    @ooxml.AxisDataSource::NumSource(_, data) => data.points
+    _ => return result
+  }
+  for i in 0..<points.length() {
+    result.push(points[i].value)
   }
   result
 }
@@ -794,14 +888,9 @@ fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
 /// Get max data points across all series.
 fn get_max_points(series : Array[@ooxml.ChartSeries]) -> Int {
   let mut max_n = 0
-  let ns = series.length()
-  let mut i = 0
-  while i < ns {
-    let vals = get_num_values(series[i].val)
-    if vals.length() > max_n {
-      max_n = vals.length()
-    }
-    i = i + 1
+  for i in 0..<series.length() {
+    let n = get_num_values(series[i].val).length()
+    if n > max_n { max_n = n }
   }
   max_n
 }
@@ -817,24 +906,13 @@ fn get_series_range(
     []
   }
   let mut max_val = 0
-  let ns = series.length()
-  let mut si = 0
-  while si < ns {
+  for si in 0..<series.length() {
     let vals = get_num_values(series[si].val)
-    let nv = vals.length()
-    let mut vi = 0
-    while vi < nv {
-      if vals[vi] > max_val {
-        max_val = vals[vi]
-      }
-      vi = vi + 1
+    for vi in 0..<vals.length() {
+      if vals[vi] > max_val { max_val = vals[vi] }
     }
-    si = si + 1
   }
-  // Ensure max_val is at least 1 to avoid division by zero
-  if max_val == 0 {
-    max_val = 1
-  }
+  if max_val == 0 { max_val = 1 }
   (cats, max_val)
 }
 
@@ -868,6 +946,191 @@ fn parse_chart_num(s : String) -> Int {
     i = i + 1
   }
   if start == 1 { -result } else { result }
+}
+
+// ── Data label rendering ─────────────────────────────────────────────────────
+
+///|
+/// Build data label text for a single data point.
+fn build_label_text(
+  dl : @ooxml.ChartDataLabels,
+  val : Int,
+  total : Int,
+  cat_name : String,
+  ser_name : String,
+) -> String {
+  let parts : Array[String] = []
+  if dl.show_ser_name {
+    parts.push(ser_name)
+  }
+  if dl.show_cat_name && not(cat_name.is_empty()) {
+    parts.push(cat_name)
+  }
+  if dl.show_val {
+    parts.push(int_to_str(val))
+  }
+  if dl.show_percent && total > 0 {
+    let pct = val * 100 / total
+    parts.push(int_to_str(pct) + "%")
+  }
+  let mut result = ""
+  for i in 0..<parts.length() {
+    if i > 0 {
+      result = result + dl.separator
+    }
+    result = result + parts[i]
+  }
+  result
+}
+
+///|
+/// Render data labels for bar/column charts.
+fn render_bar_data_labels(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  max_val : Int,
+  is_horizontal : Bool,
+  units_per_cat : Int,
+  gap_pct : Int,
+) -> String {
+  let ns = group.series.length()
+  let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
+  let nc = cats.length()
+  let dl = group.data_labels
+  let cat_size = if is_horizontal { ph } else { pw }
+  let val_size = if is_horizontal { pw } else { ph }
+  let mut svg = ""
+  for si in 0..<ns {
+    let ser = group.series[si]
+    let values = get_num_values(ser.val)
+    let nv = values.length()
+    for ci in 0..<nc {
+      if ci < nv && values[ci] > 0 {
+        let label = build_label_text(
+          dl, values[ci], 0, if ci < cats.length() { cats[ci] } else { "" },
+          ser.title,
+        )
+        if not(label.is_empty()) {
+          let bar_len = values[ci] * val_size / max_val
+          let cat_start = ci * cat_size / nc
+          let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
+            nc / units_per_cat
+          let bar_w = 100 * cat_size / nc / units_per_cat
+          if is_horizontal {
+            let x = px_ + bar_len + 3
+            let y = py + bar_off + bar_w / 2 + 3
+            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              int_to_str(y) + "\" font-size=\"" +
+              int_to_str(chart_data_label_font_size) +
+              "\" fill=\"" + chart_title_color + "\">" +
+              svg_escape(label) + "</text>"
+          } else {
+            let x = px_ + bar_off + bar_w / 2
+            let y = py + ph - bar_len - 3
+            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              int_to_str(y) +
+              "\" text-anchor=\"middle\" font-size=\"" +
+              int_to_str(chart_data_label_font_size) +
+              "\" fill=\"" + chart_title_color + "\">" +
+              svg_escape(label) + "</text>"
+          }
+        }
+      }
+    }
+  }
+  svg
+}
+
+///|
+/// Render data labels for line/area charts (positioned above data points).
+fn render_xy_data_labels(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  max_val : Int,
+  nc : Int,
+) -> String {
+  let ns = group.series.length()
+  let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
+  let dl = group.data_labels
+  let mut svg = ""
+  for si in 0..<ns {
+    let ser = group.series[si]
+    let values = get_num_values(ser.val)
+    let nv = values.length()
+    for ci in 0..<nc {
+      if ci < nv {
+        let label = build_label_text(
+          dl, values[ci], 0,
+          if ci < cats.length() { cats[ci] } else { "" }, ser.title,
+        )
+        if not(label.is_empty()) {
+          let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
+          let y = py + ph - values[ci] * ph / max_val - 6
+          svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+            int_to_str(y) +
+            "\" text-anchor=\"middle\" font-size=\"" +
+            int_to_str(chart_data_label_font_size) +
+            "\" fill=\"" + chart_title_color + "\">" +
+            svg_escape(label) + "</text>"
+        }
+      }
+    }
+  }
+  svg
+}
+
+///|
+/// Render data labels for pie/donut charts (positioned at mid-angle of each slice).
+fn render_pie_data_labels(
+  group : @ooxml.ChartGroup,
+  values : Array[Int],
+  nv : Int,
+  cx : Int,
+  cy : Int,
+  r : Int,
+  inner_r : Int,
+  ser : @ooxml.ChartSeries,
+) -> String {
+  let mut total = 0
+  for i in 0..<nv {
+    total = total + values[i]
+  }
+  if total == 0 {
+    return ""
+  }
+  let dl = group.data_labels
+  let cats = get_cat_labels(ser.cat)
+  let label_r = if inner_r > 0 { (r + inner_r) / 2 } else { r * 2 / 3 }
+  let mut svg = ""
+  let mut start_angle = -90 * 100
+  for i in 0..<nv {
+    let sweep = values[i] * 36000 / total
+    if sweep > 0 {
+      let mid_angle = start_angle + sweep / 2
+      let lx = cx + label_r * cos1000(mid_angle) / 1000
+      let ly = cy + label_r * sin1000(mid_angle) / 1000
+      let label = build_label_text(
+        dl, values[i], total,
+        if i < cats.length() { cats[i] } else { "" }, ser.title,
+      )
+      if not(label.is_empty()) {
+        svg = svg + "<text x=\"" + int_to_str(lx) + "\" y=\"" +
+          int_to_str(ly + 3) +
+          "\" text-anchor=\"middle\" font-size=\"" +
+          int_to_str(chart_data_label_font_size) +
+          "\" fill=\"" + chart_title_color + "\">" +
+          svg_escape(label) + "</text>"
+      }
+      start_angle = start_angle + sweep
+    }
+  }
+  svg
 }
 
 // ── Trigonometry (integer, hundredths of degrees) ───────────────────────────

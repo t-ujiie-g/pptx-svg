@@ -124,8 +124,10 @@ ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_
 
 ChartData { title, chart_xml: String, groups: Array[ChartGroup], axes: Array[ChartAxis], legend: ChartLegend }
 ChartKind = BarChart | LineChart | PieChart | DoughnutChart | ScatterChart | AreaChart | RadarChart
-ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap, hole_size: Int, vary_colors: Bool }
-ChartSeries { idx, order: Int, title: String, sp_pr: ChartSpPr, cat, val, x_val, y_val: AxisDataSource }
+ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap, hole_size: Int, vary_colors: Bool, data_labels: ChartDataLabels }
+ChartSeries { idx, order: Int, title: String, sp_pr: ChartSpPr, cat, val, x_val, y_val: AxisDataSource, data_points: Array[ChartDataPoint] }
+ChartDataLabels { show_val, show_cat_name, show_ser_name, show_percent, show_leader_lines: Bool, separator: String }
+ChartDataPoint { idx: Int, sp_pr: ChartSpPr }
 AxisDataSource = NumSource(String, NumData) | StrSource(String, StrData) | NoData
 ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridlines: Bool }
 ```

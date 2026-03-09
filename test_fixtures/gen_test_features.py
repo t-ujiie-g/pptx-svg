@@ -58,6 +58,9 @@ Slides:
  53. Line chart (2 series, with markers)
  54. Pie chart (single series, with legend)
  55. Bar chart (horizontal) + Donut chart
+ 56. Column chart with data labels (c:dLbls showVal)
+ 57. Pie chart with custom data point colors (c:dPt) + percentage labels
+ 58. Line chart with series spPr colors + data labels
 """
 
 from pptx import Presentation
@@ -4049,6 +4052,128 @@ lbl55 = slide55.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl55.text_frame.paragraphs[0].text = "Slide 55: Bar chart (horizontal) + Donut chart"
 lbl55.text_frame.paragraphs[0].font.size = Pt(18)
 lbl55.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 56: Column chart with data labels ──────────────────────────────────
+
+slide56 = prs.slides.add_slide(blank)
+
+chart_data6 = CategoryChartData()
+chart_data6.categories = ['North', 'South', 'East', 'West']
+chart_data6.add_series('Revenue', (320, 280, 190, 410))
+
+chart_frame6 = slide56.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(5), Inches(4), chart_data6
+)
+chart56 = chart_frame6.chart
+chart56.has_legend = True
+
+# Enable data labels with values
+from pptx.util import Emu as _Emu
+plot = chart56.plots[0]
+plot.has_data_labels = True
+data_labels = plot.data_labels
+data_labels.show_value = True
+data_labels.show_category_name = False
+
+lbl56 = slide56.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl56.text_frame.paragraphs[0].text = "Slide 56: Column chart with data labels"
+lbl56.text_frame.paragraphs[0].font.size = Pt(18)
+lbl56.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 57: Pie chart with data point colors + percentage labels ────────────
+
+slide57 = prs.slides.add_slide(blank)
+
+chart_data7 = CategoryChartData()
+chart_data7.categories = ['Chrome', 'Firefox', 'Safari', 'Edge', 'Other']
+chart_data7.add_series('Browser Share', (65, 10, 18, 5, 2))
+
+chart_frame7 = slide57.shapes.add_chart(
+    XL_CHART_TYPE.PIE, Inches(2), Inches(1.5),
+    Inches(5), Inches(4), chart_data7
+)
+chart57 = chart_frame7.chart
+chart57.has_legend = True
+
+# Set per-slice colors via c:dPt
+# Access the chart part XML directly
+chart_part57 = chart57.part
+chart_xml57 = chart_part57._element
+nsmap = {
+    'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
+    'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+}
+pie_chart = chart_xml57.findall('.//c:pieChart', nsmap)[0]
+ser_elem = pie_chart.findall('c:ser', nsmap)[0]
+
+# Add dPt elements with custom colors
+dpt_colors = [
+    (0, '4285F4'),  # Chrome blue
+    (1, 'FF7139'),  # Firefox orange
+    (2, '000000'),  # Safari black
+    (3, '0078D4'),  # Edge blue
+    (4, '888888'),  # Other gray
+]
+c_ns = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+a_ns = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+for pt_idx, color_hex in dpt_colors:
+    dpt = etree.SubElement(ser_elem, f'{{{c_ns}}}dPt')
+    idx_elem = etree.SubElement(dpt, f'{{{c_ns}}}idx')
+    idx_elem.set('val', str(pt_idx))
+    spPr = etree.SubElement(dpt, f'{{{c_ns}}}spPr')
+    solidFill = etree.SubElement(spPr, f'{{{a_ns}}}solidFill')
+    srgb = etree.SubElement(solidFill, f'{{{a_ns}}}srgbClr')
+    srgb.set('val', color_hex)
+
+# Enable percentage labels
+plot57 = chart57.plots[0]
+plot57.has_data_labels = True
+dl57 = plot57.data_labels
+dl57.show_percentage = True
+dl57.show_value = False
+dl57.show_category_name = True
+
+lbl57 = slide57.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl57.text_frame.paragraphs[0].text = "Slide 57: Pie chart with custom colors + % labels"
+lbl57.text_frame.paragraphs[0].font.size = Pt(18)
+lbl57.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 58: Line chart with series spPr colors + data labels ────────────────
+
+slide58 = prs.slides.add_slide(blank)
+
+chart_data8 = CategoryChartData()
+chart_data8.categories = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
+chart_data8.add_series('Actual', (10, 25, 40, 55))
+chart_data8.add_series('Target', (15, 30, 45, 60))
+
+chart_frame8 = slide58.shapes.add_chart(
+    XL_CHART_TYPE.LINE, Inches(1), Inches(1.5),
+    Inches(5), Inches(4), chart_data8
+)
+chart58 = chart_frame8.chart
+chart58.has_legend = True
+
+# Set explicit series colors
+from pptx.chart.series import LineSeries
+for i, ser in enumerate(chart58.series):
+    ser_format = ser.format
+    if i == 0:
+        ser_format.line.color.rgb = RGBColor(0x00, 0x88, 0x00)  # Green
+    else:
+        ser_format.line.color.rgb = RGBColor(0xFF, 0x00, 0x00)  # Red
+
+# Enable data labels showing values
+plot58 = chart58.plots[0]
+plot58.has_data_labels = True
+dl58 = plot58.data_labels
+dl58.show_value = True
+
+lbl58 = slide58.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl58.text_frame.paragraphs[0].text = "Slide 58: Line chart with series colors + data labels"
+lbl58.text_frame.paragraphs[0].font.size = Pt(18)
+lbl58.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

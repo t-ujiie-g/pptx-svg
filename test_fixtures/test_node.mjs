@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 55', slideCount === 55, `got ${slideCount}`);
+  assert('slide count = 58', slideCount === 58, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 55; i++) {
+  for (let i = 1; i <= 58; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 55; i++) {
+  for (let i = 1; i <= 58; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1082,6 +1082,58 @@ async function testFeaturesPptx() {
     // Check for both chart files
     const chartTargets55 = [...rels55.matchAll(/Target="([^"]*chart[^"]*)"/g)];
     assert('slide55 has 2 chart refs', chartTargets55.length >= 2);
+  }
+
+  // ── Slide 56: Column chart with data labels ──
+  {
+    const slide56 = textFiles.get('ppt/slides/slide56.xml') || '';
+    section('test_features.pptx — Slide 56: column chart with data labels');
+    assert('slide56 has p:graphicFrame', slide56.includes('p:graphicFrame'));
+    const rels56 = textFiles.get('ppt/slides/_rels/slide56.xml.rels') || '';
+    const chartTarget56 = rels56.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget56) {
+      const chartPath = 'ppt/charts/' + chartTarget56[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide56 has c:barChart', chartXml.includes('c:barChart'));
+      assert('slide56 has c:dLbls', chartXml.includes('c:dLbls'));
+      assert('slide56 has showVal', chartXml.includes('showVal'));
+      assert('slide56 has North category', chartXml.includes('North'));
+    }
+  }
+
+  // ── Slide 57: Pie chart with dPt colors + % labels ──
+  {
+    const slide57 = textFiles.get('ppt/slides/slide57.xml') || '';
+    section('test_features.pptx — Slide 57: pie chart with dPt + % labels');
+    assert('slide57 has p:graphicFrame', slide57.includes('p:graphicFrame'));
+    const rels57 = textFiles.get('ppt/slides/_rels/slide57.xml.rels') || '';
+    const chartTarget57 = rels57.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget57) {
+      const chartPath = 'ppt/charts/' + chartTarget57[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide57 has c:pieChart', chartXml.includes('c:pieChart'));
+      assert('slide57 has c:dPt', chartXml.includes('c:dPt'));
+      assert('slide57 has srgbClr', chartXml.includes('srgbClr'));
+      assert('slide57 has showPercent', chartXml.includes('showPercent'));
+      assert('slide57 has Chrome category', chartXml.includes('Chrome'));
+    }
+  }
+
+  // ── Slide 58: Line chart with series colors + data labels ──
+  {
+    const slide58 = textFiles.get('ppt/slides/slide58.xml') || '';
+    section('test_features.pptx — Slide 58: line chart with series colors');
+    assert('slide58 has p:graphicFrame', slide58.includes('p:graphicFrame'));
+    const rels58 = textFiles.get('ppt/slides/_rels/slide58.xml.rels') || '';
+    const chartTarget58 = rels58.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget58) {
+      const chartPath = 'ppt/charts/' + chartTarget58[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide58 has c:lineChart', chartXml.includes('c:lineChart'));
+      assert('slide58 has c:dLbls', chartXml.includes('c:dLbls'));
+      assert('slide58 has spPr with color', chartXml.includes('srgbClr'));
+      assert('slide58 has Week 1', chartXml.includes('Week 1'));
+    }
   }
 }
 

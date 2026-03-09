@@ -17,6 +17,43 @@ let default_bar_gap_width : Int = 150 // ECMA-376 default gap width percentage
 ///|
 let default_donut_hole_size : Int = 50 // ECMA-376 default donut hole size percentage
 
+// ── Chart data labels ─────────────────────────────────────────────────────
+
+///|
+/// Data label configuration (c:dLbls).
+pub(all) struct ChartDataLabels {
+  show_val : Bool // c:showVal
+  show_cat_name : Bool // c:showCatName
+  show_ser_name : Bool // c:showSerName
+  show_percent : Bool // c:showPercent
+  show_leader_lines : Bool // c:showLeaderLines
+  separator : String // c:separator (default ",")
+}
+
+///|
+pub fn ChartDataLabels::none() -> ChartDataLabels {
+  {
+    show_val: false,
+    show_cat_name: false,
+    show_ser_name: false,
+    show_percent: false,
+    show_leader_lines: false,
+    separator: ", ",
+  }
+}
+
+///|
+pub fn ChartDataLabels::is_visible(self : ChartDataLabels) -> Bool {
+  self.show_val || self.show_cat_name || self.show_ser_name || self.show_percent
+}
+
+///|
+/// Per-data-point formatting override (c:dPt).
+pub(all) struct ChartDataPoint {
+  idx : Int // c:idx/@val
+  sp_pr : ChartSpPr // point-level formatting
+}
+
 // ── Chart data types ────────────────────────────────────────────────────────
 
 ///|
@@ -93,16 +130,6 @@ pub fn ChartSpPr::none() -> ChartSpPr {
 }
 
 ///|
-pub fn ChartSpPr::is_none(self : ChartSpPr) -> Bool {
-  self.fill.is_none() &&
-  self.grad_fill.is_none() &&
-  self.patt_fill.is_none() &&
-  self.stroke.is_none() &&
-  self.stroke_w == 0 &&
-  not(self.no_fill)
-}
-
-///|
 /// A single chart series (c:ser).
 pub(all) struct ChartSeries {
   idx : Int // c:idx/@val
@@ -119,22 +146,8 @@ pub(all) struct ChartSeries {
   smooth : Bool // c:smooth
   // Pie
   explosion : Int // c:explosion (0 = none)
-}
-
-///|
-pub fn ChartSeries::default() -> ChartSeries {
-  {
-    idx: 0,
-    order: 0,
-    title: "",
-    sp_pr: ChartSpPr::none(),
-    cat: NoData,
-    val: NoData,
-    x_val: NoData,
-    y_val: NoData,
-    smooth: false,
-    explosion: 0,
-  }
+  // Per-point formatting
+  data_points : Array[ChartDataPoint] // c:dPt list
 }
 
 ///|
@@ -150,6 +163,7 @@ pub(all) struct ChartGroup {
   hole_size : Int // donut: 1-90 percentage
   scatter_style : String // scatter: "lineMarker" etc.
   ax_ids : Array[Int] // axis ID references
+  data_labels : ChartDataLabels // c:dLbls
 }
 
 ///|
@@ -165,6 +179,7 @@ pub fn ChartGroup::default(ct : ChartKind) -> ChartGroup {
     hole_size: default_donut_hole_size,
     scatter_style: "",
     ax_ids: [],
+    data_labels: ChartDataLabels::none(),
   }
 }
 
@@ -308,16 +323,12 @@ fn parse_chart_title_text(chart_ch : Array[@xml.XmlNode]) -> String {
 /// Extract all text from a:p/a:r/a:t nodes.
 fn extract_all_text(nodes : Array[@xml.XmlNode]) -> String {
   let mut result = ""
-  let n = nodes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<nodes.length() {
     match nodes[i] {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "a:p" {
           let p_ch = @xml.get_children(nodes[i])
-          let np = p_ch.length()
-          let mut j = 0
-          while j < np {
+          for j in 0..<p_ch.length() {
             match p_ch[j] {
               @xml.XmlNode::Element(rtag, _, _) =>
                 if rtag == "a:r" {
@@ -331,12 +342,10 @@ fn extract_all_text(nodes : Array[@xml.XmlNode]) -> String {
                 }
               _ => ()
             }
-            j = j + 1
           }
         }
       _ => ()
     }
-    i = i + 1
   }
   result
 }
@@ -349,50 +358,32 @@ fn parse_plot_area(
 ) -> (Array[ChartGroup], Array[ChartAxis]) {
   let groups : Array[ChartGroup] = []
   let axes : Array[ChartAxis] = []
-  let n = pa_ch.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<pa_ch.length() {
     match pa_ch[i] {
       @xml.XmlNode::Element(tag, _, _) => {
-        // Chart type elements
+        let ch = @xml.get_children(pa_ch[i])
         if tag == "c:barChart" || tag == "c:bar3DChart" {
-          groups.push(parse_bar_chart(@xml.get_children(pa_ch[i]), theme))
+          groups.push(parse_bar_chart(ch, theme))
         } else if tag == "c:lineChart" || tag == "c:line3DChart" {
-          groups.push(parse_line_chart(@xml.get_children(pa_ch[i]), theme))
+          groups.push(parse_line_chart(ch, theme))
         } else if tag == "c:pieChart" || tag == "c:pie3DChart" {
-          groups.push(parse_pie_chart(@xml.get_children(pa_ch[i]), theme))
+          groups.push(parse_pie_chart(ch, theme))
         } else if tag == "c:doughnutChart" {
-          groups.push(
-            parse_donut_chart(@xml.get_children(pa_ch[i]), theme),
-          )
+          groups.push(parse_donut_chart(ch, theme))
         } else if tag == "c:scatterChart" {
-          groups.push(
-            parse_scatter_chart(@xml.get_children(pa_ch[i]), theme),
-          )
+          groups.push(parse_scatter_chart(ch, theme))
         } else if tag == "c:areaChart" || tag == "c:area3DChart" {
-          groups.push(parse_area_chart(@xml.get_children(pa_ch[i]), theme))
+          groups.push(parse_area_chart(ch, theme))
         } else if tag == "c:radarChart" {
-          groups.push(
-            parse_radar_chart(@xml.get_children(pa_ch[i]), theme),
-          )
-        } else if tag == "c:catAx" {
-          // Axis elements
-          axes.push(
-            parse_chart_axis(@xml.get_children(pa_ch[i]), false, theme),
-          )
+          groups.push(parse_radar_chart(ch, theme))
+        } else if tag == "c:catAx" || tag == "c:dateAx" {
+          axes.push(parse_chart_axis(ch, false, theme))
         } else if tag == "c:valAx" {
-          axes.push(
-            parse_chart_axis(@xml.get_children(pa_ch[i]), true, theme),
-          )
-        } else if tag == "c:dateAx" {
-          axes.push(
-            parse_chart_axis(@xml.get_children(pa_ch[i]), false, theme),
-          )
+          axes.push(parse_chart_axis(ch, true, theme))
         }
       }
       _ => ()
     }
-    i = i + 1
   }
   (groups, axes)
 }
@@ -414,6 +405,7 @@ fn parse_bar_chart(
     overlap: child_attr_int(ch, "c:overlap"),
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -429,6 +421,7 @@ fn parse_line_chart(
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -441,6 +434,7 @@ fn parse_pie_chart(
     ..ChartGroup::default(PieChart),
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -455,6 +449,7 @@ fn parse_donut_chart(
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     hole_size: if hs == 0 { default_donut_hole_size } else { hs },
     series: parse_series_list(ch, theme),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -469,6 +464,7 @@ fn parse_scatter_chart(
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_scatter_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -484,6 +480,7 @@ fn parse_area_chart(
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -497,6 +494,7 @@ fn parse_radar_chart(
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -527,13 +525,56 @@ fn child_attr_int(ch : Array[@xml.XmlNode], tag : String) -> Int {
 fn parse_ax_ids(ch : Array[@xml.XmlNode]) -> Array[Int] {
   let ids : Array[Int] = []
   let nodes = @xml.find_children(ch, "c:axId")
-  let n = nodes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<nodes.length() {
     ids.push(attr_int(nodes[i], "val"))
-    i = i + 1
   }
   ids
+}
+
+// ── Data labels parsing ──────────────────────────────────────────────────────
+
+///|
+/// Parse c:dLbls element.
+fn parse_chart_data_labels(ch : Array[@xml.XmlNode]) -> ChartDataLabels {
+  match @xml.find_child(ch, "c:dLbls") {
+    None => ChartDataLabels::none()
+    Some(n) => {
+      let dc = @xml.get_children(n)
+      {
+        show_val: child_attr_val(dc, "c:showVal") == "1",
+        show_cat_name: child_attr_val(dc, "c:showCatName") == "1",
+        show_ser_name: child_attr_val(dc, "c:showSerName") == "1",
+        show_percent: child_attr_val(dc, "c:showPercent") == "1",
+        show_leader_lines: child_attr_val(dc, "c:showLeaderLines") == "1",
+        separator: match @xml.find_child(dc, "c:separator") {
+          None => ", "
+          Some(sep) => {
+            let t = @xml.get_text_content(sep)
+            if t.is_empty() { ", " } else { t }
+          }
+        },
+      }
+    }
+  }
+}
+
+// ── Data point parsing ──────────────────────────────────────────────────────
+
+///|
+/// Parse c:dPt elements from series children.
+fn parse_data_points(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Array[ChartDataPoint] {
+  let pts : Array[ChartDataPoint] = []
+  let dpt_nodes = @xml.find_children(ch, "c:dPt")
+  for i in 0..<dpt_nodes.length() {
+    let dc = @xml.get_children(dpt_nodes[i])
+    let idx = child_attr_int(dc, "c:idx")
+    let sp_pr = parse_chart_sp_pr(dc, theme)
+    pts.push({ idx, sp_pr })
+  }
+  pts
 }
 
 // ── Series parsing ──────────────────────────────────────────────────────────
@@ -546,11 +587,8 @@ fn parse_series_list(
 ) -> Array[ChartSeries] {
   let series : Array[ChartSeries] = []
   let ser_nodes = @xml.find_children(ch, "c:ser")
-  let n = ser_nodes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<ser_nodes.length() {
     series.push(parse_cat_series(@xml.get_children(ser_nodes[i]), theme))
-    i = i + 1
   }
   series
 }
@@ -575,6 +613,7 @@ fn parse_cat_series(
   }
   let smooth = child_attr_val(ch, "c:smooth") == "1"
   let explosion = child_attr_int(ch, "c:explosion")
+  let data_points = parse_data_points(ch, theme)
   {
     idx,
     order,
@@ -586,6 +625,7 @@ fn parse_cat_series(
     y_val: NoData,
     smooth,
     explosion,
+    data_points,
   }
 }
 
@@ -597,38 +637,29 @@ fn parse_scatter_series_list(
 ) -> Array[ChartSeries] {
   let series : Array[ChartSeries] = []
   let ser_nodes = @xml.find_children(ch, "c:ser")
-  let n = ser_nodes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<ser_nodes.length() {
     let sc = @xml.get_children(ser_nodes[i])
-    let idx = child_attr_int(sc, "c:idx")
-    let order = child_attr_int(sc, "c:order")
-    let title = parse_series_title(sc)
-    let sp_pr = parse_chart_sp_pr(sc, theme)
     let x_val = match @xml.find_child(sc, "c:xVal") {
       None => AxisDataSource::NoData
-      Some(n2) => parse_axis_data_source(@xml.get_children(n2))
+      Some(n) => parse_axis_data_source(@xml.get_children(n))
     }
     let y_val = match @xml.find_child(sc, "c:yVal") {
       None => AxisDataSource::NoData
-      Some(n2) => parse_axis_data_source(@xml.get_children(n2))
+      Some(n) => parse_axis_data_source(@xml.get_children(n))
     }
-    let smooth = child_attr_val(sc, "c:smooth") == "1"
-    series.push(
-      {
-        idx,
-        order,
-        title,
-        sp_pr,
-        cat: NoData,
-        val: NoData,
-        x_val,
-        y_val,
-        smooth,
-        explosion: 0,
-      },
-    )
-    i = i + 1
+    series.push({
+      idx: child_attr_int(sc, "c:idx"),
+      order: child_attr_int(sc, "c:order"),
+      title: parse_series_title(sc),
+      sp_pr: parse_chart_sp_pr(sc, theme),
+      cat: NoData,
+      val: NoData,
+      x_val,
+      y_val,
+      smooth: child_attr_val(sc, "c:smooth") == "1",
+      explosion: 0,
+      data_points: parse_data_points(sc, theme),
+    })
   }
   series
 }
@@ -737,16 +768,13 @@ fn parse_str_data(ch : Array[@xml.XmlNode]) -> StrData {
 fn parse_pt_list(ch : Array[@xml.XmlNode]) -> Array[ChartPoint] {
   let pts : Array[ChartPoint] = []
   let pt_nodes = @xml.find_children(ch, "c:pt")
-  let n = pt_nodes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<pt_nodes.length() {
     let idx = attr_int(pt_nodes[i], "idx")
     let value = match @xml.find_child(@xml.get_children(pt_nodes[i]), "c:v") {
       None => ""
       Some(v) => @xml.get_text_content(v)
     }
     pts.push({ idx, value })
-    i = i + 1
   }
   pts
 }
