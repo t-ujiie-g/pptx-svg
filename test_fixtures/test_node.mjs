@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 69', slideCount === 69, `got ${slideCount}`);
+  assert('slide count = 72', slideCount === 72, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 69; i++) {
+  for (let i = 1; i <= 72; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 69; i++) {
+  for (let i = 1; i <= 72; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1290,6 +1290,40 @@ async function testFeaturesPptx() {
       assert('slide69 has depthPercent', chartXml.includes('depthPercent'));
       assert('slide69 has Revenue series', chartXml.includes('Revenue'));
     }
+  }
+
+  // ── Slide 70: Text outline ──────────────────────────────────────────────────
+  {
+    const slide70 = textFiles.get('ppt/slides/slide70.xml') || '';
+    section('test_features.pptx — Slide 70: Text outline');
+    assert('slide70 has a:ln in rPr', slide70.includes('<a:ln'));
+    assert('slide70 has w="25400"', slide70.includes('w="25400"'));
+    assert('slide70 has FF0000 outline', slide70.includes('FF0000'));
+    assert('slide70 has 0000FF outline', slide70.includes('0000FF'));
+    assert('slide70 has Red Outlined Text', slide70.includes('Red Outlined Text'));
+  }
+
+  // ── Slide 71: Text gradient fill ────────────────────────────────────────────
+  {
+    const slide71 = textFiles.get('ppt/slides/slide71.xml') || '';
+    section('test_features.pptx — Slide 71: Text gradient fill');
+    assert('slide71 has a:gradFill', slide71.includes('a:gradFill'));
+    assert('slide71 has gradient stops', slide71.includes('a:gs'));
+    assert('slide71 has Gradient Text', slide71.includes('Gradient Text'));
+    assert('slide71 has FF0000 stop', slide71.includes('FF0000'));
+    assert('slide71 has FFFF00 stop', slide71.includes('FFFF00'));
+  }
+
+  // ── Slide 72: Text warp ─────────────────────────────────────────────────────
+  {
+    const slide72 = textFiles.get('ppt/slides/slide72.xml') || '';
+    section('test_features.pptx — Slide 72: Text warp');
+    assert('slide72 has a:prstTxWarp', slide72.includes('a:prstTxWarp'));
+    assert('slide72 has textWave1', slide72.includes('textWave1'));
+    assert('slide72 has textArchUp', slide72.includes('textArchUp'));
+    assert('slide72 has textDeflate', slide72.includes('textDeflate'));
+    assert('slide72 has a:avLst', slide72.includes('a:avLst'));
+    assert('slide72 has Wave Text', slide72.includes('Wave Text'));
   }
 }
 

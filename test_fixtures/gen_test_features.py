@@ -72,6 +72,9 @@ Slides:
  67. Surface chart (c:surfaceChart — 2D heatmap approximation + view3D)
  68. Pie of pie chart (c:ofPieChart — rendered as standard pie)
  69. 3D bar chart (c:bar3DChart — 2D rendering + view3D preserved)
+ 70. Text outline (a:rPr/a:ln — stroke on text glyphs)
+ 71. Text gradient fill (a:rPr/a:gradFill — gradient on text)
+ 72. Text warp (a:prstTxWarp — preset text warp with adjust values)
 """
 
 from pptx import Presentation
@@ -4777,6 +4780,144 @@ lbl69 = slide69.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl69.text_frame.paragraphs[0].text = "Slide 69: 3D bar chart (view3D preserved)"
 lbl69.text_frame.paragraphs[0].font.size = Pt(18)
 lbl69.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 70: Text outline (a:rPr/a:ln) ──────────────────────────────────────
+slide70 = prs.slides.add_slide(blank)
+lbl70 = slide70.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl70.text_frame.paragraphs[0].text = "Slide 70: Text outline (a:rPr/a:ln)"
+lbl70.text_frame.paragraphs[0].font.size = Pt(18)
+lbl70.text_frame.paragraphs[0].font.bold = True
+
+ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+
+# Text box with outlined text
+tb70a = slide70.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(8), Inches(1.5))
+tf70a = tb70a.text_frame
+p70a = tf70a.paragraphs[0]
+r70a = p70a.add_run()
+r70a.text = "Red Outlined Text"
+r70a.font.size = Pt(48)
+r70a.font.bold = True
+# Inject a:ln into a:rPr via lxml
+rpr70a = r70a._r.find(f'{{{ns_a}}}rPr')
+ln70a = etree.SubElement(rpr70a, f'{{{ns_a}}}ln', attrib={'w': '25400'})
+sf70a = etree.SubElement(ln70a, f'{{{ns_a}}}solidFill')
+etree.SubElement(sf70a, f'{{{ns_a}}}srgbClr', attrib={'val': 'FF0000'})
+
+# Thinner outline with different color
+tb70b = slide70.shapes.add_textbox(Inches(0.5), Inches(3.5), Inches(8), Inches(1.5))
+tf70b = tb70b.text_frame
+p70b = tf70b.paragraphs[0]
+r70b = p70b.add_run()
+r70b.text = "Blue Outlined (thin)"
+r70b.font.size = Pt(36)
+r70b.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
+rpr70b = r70b._r.find(f'{{{ns_a}}}rPr')
+ln70b = etree.SubElement(rpr70b, f'{{{ns_a}}}ln', attrib={'w': '12700'})
+sf70b = etree.SubElement(ln70b, f'{{{ns_a}}}solidFill')
+etree.SubElement(sf70b, f'{{{ns_a}}}srgbClr', attrib={'val': '0000FF'})
+
+# ── Slide 71: Text gradient fill (a:rPr/a:gradFill) ─────────────────────────
+slide71 = prs.slides.add_slide(blank)
+lbl71 = slide71.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl71.text_frame.paragraphs[0].text = "Slide 71: Text gradient fill (a:rPr/a:gradFill)"
+lbl71.text_frame.paragraphs[0].font.size = Pt(18)
+lbl71.text_frame.paragraphs[0].font.bold = True
+
+# Text with gradient fill
+tb71a = slide71.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(8), Inches(2))
+tf71a = tb71a.text_frame
+p71a = tf71a.paragraphs[0]
+r71a = p71a.add_run()
+r71a.text = "Gradient Text"
+r71a.font.size = Pt(60)
+r71a.font.bold = True
+# Inject a:gradFill into a:rPr
+rpr71a = r71a._r.find(f'{{{ns_a}}}rPr')
+grad_xml71 = f"""<a:gradFill xmlns:a="{ns_a}">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="FF0000"/></a:gs>
+    <a:gs pos="50000"><a:srgbClr val="FFFF00"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="0" scaled="1"/>
+</a:gradFill>"""
+rpr71a.append(etree.fromstring(grad_xml71))
+
+# Second text with solid fill + gradient (gradient takes priority in display)
+tb71b = slide71.shapes.add_textbox(Inches(0.5), Inches(4), Inches(8), Inches(2))
+tf71b = tb71b.text_frame
+p71b = tf71b.paragraphs[0]
+r71b = p71b.add_run()
+r71b.text = "Green-Blue Grad"
+r71b.font.size = Pt(48)
+rpr71b = r71b._r.find(f'{{{ns_a}}}rPr')
+grad_xml71b = f"""<a:gradFill xmlns:a="{ns_a}">
+  <a:gsLst>
+    <a:gs pos="0"><a:srgbClr val="00FF00"/></a:gs>
+    <a:gs pos="100000"><a:srgbClr val="0000FF"/></a:gs>
+  </a:gsLst>
+  <a:lin ang="5400000" scaled="1"/>
+</a:gradFill>"""
+rpr71b.append(etree.fromstring(grad_xml71b))
+
+# ── Slide 72: Text warp (a:prstTxWarp) ──────────────────────────────────────
+slide72 = prs.slides.add_slide(blank)
+lbl72 = slide72.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl72.text_frame.paragraphs[0].text = "Slide 72: Text warp (a:prstTxWarp)"
+lbl72.text_frame.paragraphs[0].font.size = Pt(18)
+lbl72.text_frame.paragraphs[0].font.bold = True
+
+ns_p = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+
+# Text box with wave warp
+tb72a = slide72.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(4), Inches(2))
+tf72a = tb72a.text_frame
+p72a = tf72a.paragraphs[0]
+r72a = p72a.add_run()
+r72a.text = "Wave Text"
+r72a.font.size = Pt(36)
+r72a.font.bold = True
+# Inject prstTxWarp into bodyPr
+sp72a = tb72a._element
+body_pr72a = sp72a.find(f'.//{{{ns_a}}}bodyPr')
+warp72a = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textWave1">
+  <a:avLst>
+    <a:gd name="adj" fmla="val 19773"/>
+  </a:avLst>
+</a:prstTxWarp>"""
+body_pr72a.insert(0, etree.fromstring(warp72a))
+
+# Text box with arch up warp
+tb72b = slide72.shapes.add_textbox(Inches(5), Inches(1.5), Inches(4), Inches(2))
+tf72b = tb72b.text_frame
+p72b = tf72b.paragraphs[0]
+r72b = p72b.add_run()
+r72b.text = "Arch Up"
+r72b.font.size = Pt(36)
+r72b.font.bold = True
+sp72b = tb72b._element
+body_pr72b = sp72b.find(f'.//{{{ns_a}}}bodyPr')
+warp72b = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textArchUp">
+  <a:avLst>
+    <a:gd name="adj" fmla="val 10800000"/>
+  </a:avLst>
+</a:prstTxWarp>"""
+body_pr72b.insert(0, etree.fromstring(warp72b))
+
+# Text box with no adjust values (textDeflate)
+tb72c = slide72.shapes.add_textbox(Inches(0.5), Inches(4), Inches(8), Inches(2))
+tf72c = tb72c.text_frame
+p72c = tf72c.paragraphs[0]
+r72c = p72c.add_run()
+r72c.text = "Deflate Text"
+r72c.font.size = Pt(36)
+sp72c = tb72c._element
+body_pr72c = sp72c.find(f'.//{{{ns_a}}}bodyPr')
+warp72c = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textDeflate">
+  <a:avLst/>
+</a:prstTxWarp>"""
+body_pr72c.insert(0, etree.fromstring(warp72c))
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

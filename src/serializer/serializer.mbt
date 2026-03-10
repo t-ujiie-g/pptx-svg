@@ -259,7 +259,8 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
     not(bp.vert.is_empty()) ||
     bp.num_cols > 1 ||
     bp.col_spacing > 0
-  let has_children = bp.auto_fit || bp.font_scale >= 0
+  let has_warp = not(bp.warp_prst.is_empty())
+  let has_children = bp.auto_fit || bp.font_scale >= 0 || has_warp
   if not(has_attrs) && not(has_children) {
     return "<a:bodyPr/>"
   }
@@ -294,8 +295,35 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   if bp.b_ins >= 0 {
     out = out + " bIns=\"" + int_to_str(bp.b_ins) + "\""
   }
+  if not(has_children) {
+    return out + "/>"
+  }
+  out = out + ">"
+  // a:prstTxWarp must come before a:normAutofit/a:spAutoFit per OOXML schema order
+  if has_warp {
+    let mut warp = "<a:prstTxWarp prst=\"" + bp.warp_prst + "\">"
+    if bp.warp_av1 >= 0 || bp.warp_av2 >= 0 {
+      warp = warp + "<a:avLst>"
+      if bp.warp_av1 >= 0 {
+        warp = warp +
+          "<a:gd name=\"adj\" fmla=\"val " +
+          int_to_str(bp.warp_av1) +
+          "\"/>"
+      }
+      if bp.warp_av2 >= 0 {
+        warp = warp +
+          "<a:gd name=\"adj2\" fmla=\"val " +
+          int_to_str(bp.warp_av2) +
+          "\"/>"
+      }
+      warp = warp + "</a:avLst>"
+    } else {
+      warp = warp + "<a:avLst/>"
+    }
+    out = out + warp + "</a:prstTxWarp>"
+  }
   if bp.auto_fit {
-    out + "><a:spAutoFit/></a:bodyPr>"
+    out = out + "<a:spAutoFit/>"
   } else if bp.font_scale >= 0 {
     let mut naf = "<a:normAutofit"
     if bp.font_scale != @ooxml.pct_100 {
@@ -304,11 +332,9 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
     if bp.ln_spc_reduction > 0 {
       naf = naf + " lnSpcReduction=\"" + int_to_str(bp.ln_spc_reduction) + "\""
     }
-    naf = naf + "/>"
-    out + ">" + naf + "</a:bodyPr>"
-  } else {
-    out + "/>"
+    out = out + naf + "/>"
   }
+  out + "</a:bodyPr>"
 }
 
 ///|
@@ -509,11 +535,29 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     not(run.cs_font.is_empty()) ||
     not(run.sym_font.is_empty()) ||
     not(run.hlink_rid.is_empty()) ||
-    not(run.hlink_mouse_over_rid.is_empty())
+    not(run.hlink_mouse_over_rid.is_empty()) ||
+    not(run.outline_color.is_none()) ||
+    not(run.text_grad_fill.is_none()) ||
+    not(run.text_patt_fill.is_none())
   if has_children {
     rpr = rpr + ">"
+    // Text outline: a:ln
+    if not(run.outline_color.is_none()) {
+      let ow = if run.outline_w > 0 { run.outline_w } else { @ooxml.default_outline_w }
+      rpr = rpr + "<a:ln w=\"" + int_to_str(ow) + "\">"
+      rpr = rpr + serialize_color(run.outline_color)
+      rpr = rpr + "</a:ln>"
+    }
     if not(run.color.is_none()) {
       rpr = rpr + serialize_color(run.color)
+    }
+    // Text gradient fill: a:gradFill on a:rPr
+    if not(run.text_grad_fill.is_none()) {
+      rpr = rpr + serialize_gradient_fill(run.text_grad_fill)
+    }
+    // Text pattern fill: a:pattFill on a:rPr
+    if not(run.text_patt_fill.is_none()) {
+      rpr = rpr + serialize_pattern_fill(run.text_patt_fill)
     }
     if not(run.font_face.is_empty()) {
       rpr = rpr + "<a:latin typeface=\"" + xml_escape(run.font_face) + "\"/>"

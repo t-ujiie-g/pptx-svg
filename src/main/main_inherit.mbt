@@ -250,6 +250,10 @@ fn inject_placeholder_auto_content(
         hlink_rid: "",
         hlink_mouse_over_rid: "",
         effects: @ooxml.EffectList::none(),
+        outline_color: @ooxml.Color::none(),
+        outline_w: 0,
+        text_grad_fill: @ooxml.GradientFill::none(),
+        text_patt_fill: @ooxml.PatternFill::none(),
       }
       let para : @ooxml.TextParagraph = {
         runs: [run],

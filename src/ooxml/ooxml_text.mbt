@@ -97,6 +97,53 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
         Some(v) => @xml.parse_int(v)
         None => 0
       }
+      // Parse <a:prstTxWarp prst="..."> with optional <a:avLst>
+      let (warp_prst, warp_av1, warp_av2) = match
+        @xml.find_child(bpr_ch, "a:prstTxWarp") {
+        None => ("", -1, -1)
+        Some(w) => {
+          let prst = match @xml.get_attr(w, "prst") {
+            Some(v) => v
+            None => ""
+          }
+          let w_ch = @xml.get_children(w)
+          let (av1, av2) = match @xml.find_child(w_ch, "a:avLst") {
+            None => (-1, -1)
+            Some(avl) => {
+              let gds = @xml.find_children(@xml.get_children(avl), "a:gd")
+              let v1 = if gds.length() > 0 {
+                // a:gd name="adj" fmla="val N" — extract N
+                let fmla = match @xml.get_attr(gds[0], "fmla") {
+                  Some(f) => f
+                  None => ""
+                }
+                if @xml.str_starts_with(fmla, "val ") {
+                  @xml.parse_int(@xml.str_suffix(fmla, 4))
+                } else {
+                  -1
+                }
+              } else {
+                -1
+              }
+              let v2 = if gds.length() > 1 {
+                let fmla2 = match @xml.get_attr(gds[1], "fmla") {
+                  Some(f) => f
+                  None => ""
+                }
+                if @xml.str_starts_with(fmla2, "val ") {
+                  @xml.parse_int(@xml.str_suffix(fmla2, 4))
+                } else {
+                  -1
+                }
+              } else {
+                -1
+              }
+              (v1, v2)
+            }
+          }
+          (prst, av1, av2)
+        }
+      }
       {
         anchor,
         l_ins,
@@ -111,6 +158,9 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
         vert,
         num_cols,
         col_spacing,
+        warp_prst,
+        warp_av1,
+        warp_av2,
       }
     }
   }
@@ -386,6 +436,20 @@ fn parse_run_props(
         None => ""
       }
   }
+  // Text outline: a:ln on a:rPr
+  let (outline_color, outline_w) = match @xml.find_child(rpr_ch, "a:ln") {
+    None => (Color::none(), 0)
+    Some(ln) => {
+      let ow = attr_int(ln, "w")
+      let ln_ch = @xml.get_children(ln)
+      let oc = parse_solid_fill(ln_ch, theme)
+      (if oc.is_none() { Color::black() } else { oc }, ow)
+    }
+  }
+  // Text gradient fill: a:gradFill on a:rPr
+  let text_grad_fill = parse_gradient_fill(rpr_ch, theme)
+  // Text pattern fill: a:pattFill on a:rPr
+  let text_patt_fill = parse_pattern_fill(rpr_ch, theme)
   {
     text: "",
     bold,
@@ -405,6 +469,10 @@ fn parse_run_props(
     hlink_rid,
     hlink_mouse_over_rid,
     effects: parse_run_effect_lst(rpr_ch, theme),
+    outline_color,
+    outline_w,
+    text_grad_fill,
+    text_patt_fill,
   }
 }
 
@@ -571,6 +639,10 @@ fn parse_text_body(
             hlink_rid: "",
             hlink_mouse_over_rid: "",
             effects: EffectList::none(),
+            outline_color: Color::none(),
+            outline_w: 0,
+            text_grad_fill: GradientFill::none(),
+            text_patt_fill: PatternFill::none(),
           }
         Some(rpr) => {
           let rp = parse_run_props(

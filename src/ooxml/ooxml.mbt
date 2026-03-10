@@ -836,6 +836,13 @@ pub(all) struct TextRun {
   hlink_rid : String // hyperlink relationship ID from <a:hlinkClick r:id="...">; "" = none
   hlink_mouse_over_rid : String // hover hyperlink from <a:hlinkHover r:id="...">; "" = none
   effects : EffectList // a:effectLst on a:rPr; text-level effects (shadow, glow, etc.)
+  // Text outline: a:rPr/a:ln — stroke on text glyphs
+  outline_color : Color // solid fill color; Color::none() = no outline
+  outline_w : Int // width in EMU (a:ln w="..."); 0 = default (12700)
+  // Text gradient fill: a:rPr/a:gradFill — gradient on text glyphs
+  text_grad_fill : GradientFill // gradient fill; GradientFill::none() = no gradient
+  // Text pattern fill: a:rPr/a:pattFill
+  text_patt_fill : PatternFill // pattern fill; PatternFill::none() = no pattern
 }
 
 ///|
@@ -868,6 +875,10 @@ pub(all) struct TextParagraph {
 // ── Text body properties ────────────────────────────────────────────────────
 
 ///|
+/// Default text outline width: 12700 EMU = 1 pt (OOXML default for a:ln on a:rPr).
+pub let default_outline_w : Int = 12700
+
+///|
 /// 100000 = 100% in OOXML percentage units (fontScale, lnSpcReduction, etc.)
 pub let pct_100 : Int = 100000
 
@@ -897,6 +908,10 @@ pub(all) struct BodyProps {
   vert : String // vertical text: "vert"/"eaVert"/"vert270"/"wordArtVert"; "" = horizontal
   num_cols : Int // number of text columns; 0 = default (1)
   col_spacing : Int // spacing between columns in EMU; 0 = default
+  // Text warp: a:prstTxWarp prst="..." — preset text warp effect
+  warp_prst : String // preset name e.g. "textWave1"; "" = none
+  warp_av1 : Int // adjust value 1 (from a:avLst a:gd fmla="val N"); -1 = default
+  warp_av2 : Int // adjust value 2; -1 = default
 }
 
 ///|
@@ -915,6 +930,9 @@ pub fn BodyProps::default() -> BodyProps {
     vert: "",
     num_cols: 0,
     col_spacing: 0,
+    warp_prst: "",
+    warp_av1: -1,
+    warp_av2: -1,
   }
 }
 

@@ -258,6 +258,58 @@ fn parse_grad_fill_from_g(g_node : @xml.XmlNode) -> @ooxml.GradientFill {
   }
 }
 
+// ── Text run fill helpers ────────────────────────────────────────────────────
+
+///|
+/// Parse text gradient fill from tgrad-* data attributes on a run tspan.
+fn parse_text_grad_fill(node : @xml.XmlNode) -> @ooxml.GradientFill {
+  let stops_str = get_da(node, "tgrad-stops")
+  if stops_str.is_empty() {
+    return @ooxml.GradientFill::none()
+  }
+  let stops = parse_grad_stops(stops_str)
+  if stops.length() == 0 {
+    return @ooxml.GradientFill::none()
+  }
+  let angle = get_dai(node, "tgrad-angle")
+  let path_type = get_da(node, "tgrad-path")
+  let rot_s = get_da(node, "tgrad-rot")
+  let rot_with_shape = rot_s != "0"
+  {
+    stops,
+    angle,
+    path_type,
+    rot_with_shape,
+    fill_to_l: -1,
+    fill_to_t: -1,
+    fill_to_r: -1,
+    fill_to_b: -1,
+    tile_flip: "",
+  }
+}
+
+///|
+/// Parse text pattern fill from tpatt-* data attributes on a run tspan.
+fn parse_text_patt_fill(node : @xml.XmlNode) -> @ooxml.PatternFill {
+  let prst = get_da(node, "tpatt-prst")
+  if prst.is_empty() {
+    return @ooxml.PatternFill::none()
+  }
+  let fg_hex = get_da(node, "tpatt-fg")
+  let bg_hex = get_da(node, "tpatt-bg")
+  let fg = if fg_hex.is_empty() {
+    @ooxml.Color::black()
+  } else {
+    parse_hex_color(fg_hex)
+  }
+  let bg = if bg_hex.is_empty() {
+    @ooxml.Color::white()
+  } else {
+    parse_hex_color(bg_hex)
+  }
+  { prst, fg_color: fg, bg_color: bg }
+}
+
 // ── Text parsing from SVG ────────────────────────────────────────────────────
 
 ///|
@@ -328,6 +380,10 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     hlink_rid,
                     hlink_mouse_over_rid,
                     effects: @ooxml.EffectList::none(),
+                    outline_color: color_or_none(run_node, "outline-color"),
+                    outline_w: get_dai(run_node, "outline-w"),
+                    text_grad_fill: parse_text_grad_fill(run_node),
+                    text_patt_fill: parse_text_patt_fill(run_node),
                   })
                 }
               @xml.XmlNode::Text(text) =>
@@ -352,6 +408,10 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     hlink_rid: "",
                     hlink_mouse_over_rid: "",
                     effects: @ooxml.EffectList::none(),
+                    outline_color: @ooxml.Color::none(),
+                    outline_w: 0,
+                    text_grad_fill: @ooxml.GradientFill::none(),
+                    text_patt_fill: @ooxml.PatternFill::none(),
                   })
                 }
             }
@@ -556,6 +616,15 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     vert: bp_vert,
     num_cols: bp_num_cols,
     col_spacing: bp_col_spacing,
+    warp_prst: get_da(g_node, "warp-prst"),
+    warp_av1: {
+      let v = get_dai(g_node, "warp-av1")
+      if v == 0 { -1 } else { v }
+    },
+    warp_av2: {
+      let v = get_dai(g_node, "warp-av2")
+      if v == 0 { -1 } else { v }
+    },
   }
   let ph_type = get_da(g_node, "ph-type")
   let ph_idx = get_dai(g_node, "ph-idx")

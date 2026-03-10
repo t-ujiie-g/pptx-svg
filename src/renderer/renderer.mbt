@@ -1343,6 +1343,9 @@ fn render_shape(
     da("bp-vert", shape.body_props.vert) +
     dai("bp-num-cols", shape.body_props.num_cols) +
     dai("bp-col-spacing", shape.body_props.col_spacing) +
+    da("warp-prst", shape.body_props.warp_prst) +
+    dai("warp-av1", if shape.body_props.warp_av1 >= 0 { shape.body_props.warp_av1 } else { 0 }) +
+    dai("warp-av2", if shape.body_props.warp_av2 >= 0 { shape.body_props.warp_av2 } else { 0 }) +
     // Gradient fill attributes
     (if not(shape.grad_fill.is_none()) {
       da("grad-stops", grad_stops_attr(shape.grad_fill)) +

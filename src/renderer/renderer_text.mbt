@@ -445,10 +445,29 @@ fn render_run_tspan(
     span = span + a("font-family", ff + ", sans-serif")
   }
   // Color: explicit color, or theme hlink/folHlink color for hyperlinks
-  if not(run.color.is_none()) {
+  // For text gradient fill, use the first stop color as fallback display
+  if not(run.text_grad_fill.is_none()) && run.text_grad_fill.stops.length() > 0 {
+    span = span + a("fill", run.text_grad_fill.stops[0].color.to_css())
+  } else if not(run.color.is_none()) {
     span = span + a("fill", run.color.to_css())
   } else if not(run.hlink_rid.is_empty()) && not(theme.hlink.is_none()) {
     span = span + a("fill", theme.hlink.to_css())
+  }
+  // Text outline: render as SVG stroke on text
+  if not(run.outline_color.is_none()) {
+    span = span + a("stroke", run.outline_color.to_css())
+    let ow_emu = if run.outline_w > 0 {
+      run.outline_w
+    } else {
+      @ooxml.default_outline_w
+    }
+    let ow_px = px(ow_emu, scale)
+    if ow_px > 0 {
+      span = span + ai("stroke-width", ow_px)
+    } else {
+      span = span + a("stroke-width", "0.5")
+    }
+    span = span + a("paint-order", "stroke")
   }
   // Character spacing
   if run.char_spacing != 0 {
@@ -504,6 +523,22 @@ fn render_run_tspan(
     da("cap", run.cap) +
     da("hlink-rid", run.hlink_rid) +
     da("hlink-hover-rid", run.hlink_mouse_over_rid) +
+    // Text outline round-trip
+    da("outline-color", if run.outline_color.is_none() { "" } else { run.outline_color.to_hex() }) +
+    dai("outline-w", run.outline_w) +
+    // Text gradient fill round-trip
+    (if not(run.text_grad_fill.is_none()) {
+      da("tgrad-stops", grad_stops_attr(run.text_grad_fill)) +
+      dai("tgrad-angle", run.text_grad_fill.angle) +
+      da("tgrad-path", run.text_grad_fill.path_type) +
+      da("tgrad-rot", if run.text_grad_fill.rot_with_shape { "1" } else { "0" })
+    } else { "" }) +
+    // Text pattern fill round-trip
+    (if not(run.text_patt_fill.is_none()) {
+      da("tpatt-prst", run.text_patt_fill.prst) +
+      da("tpatt-fg", run.text_patt_fill.fg_color.to_hex()) +
+      da("tpatt-bg", run.text_patt_fill.bg_color.to_hex())
+    } else { "" }) +
     // Text-level effect data attributes (round-trip only)
     (if not(run.effects.is_none()) {
       let eff = run.effects
