@@ -1406,12 +1406,12 @@ fn render_trendlines(
   for si in 0..<group.series.length() {
     let ser = group.series[si]
     if ser.trendlines.is_empty() {
-      continue si + 1
+      continue
     }
     let values = get_num_values(ser.val)
     let nv = values.length()
     if nv < 2 {
-      continue si + 1
+      continue
     }
     for ti in 0..<ser.trendlines.length() {
       let tl = ser.trendlines[ti]
@@ -1495,7 +1495,7 @@ fn render_err_bars(
   for si in 0..<group.series.length() {
     let ser = group.series[si]
     if ser.err_bars.is_none() {
-      continue si + 1
+      continue
     }
     let eb = ser.err_bars
     let values = get_num_values(ser.val)
@@ -1503,7 +1503,7 @@ fn render_err_bars(
     let color = series_color(ser, si, colors)
     for ci in 0..<nc {
       if ci >= nv {
-        continue ci + 1
+        continue
       }
       let val = values[ci]
       // Calculate error magnitude
@@ -1513,7 +1513,7 @@ fn render_err_bars(
         _ => val / 10 // fallback: 10% of value
       }
       if err <= 0 {
-        continue ci + 1
+        continue
       }
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y_center = py + ph - val * ph / max_val
