@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoonBit toolchain
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Wasm
+        run: moon build --target wasm-gc --release
+
+      - name: Build TypeScript
+        run: npx tsc
+
+      - name: Copy Wasm to dist
+        run: cp _build/wasm-gc/release/build/main/main.wasm dist/main.wasm
+
+      - name: Run tests
+        run: node test_fixtures/test_node.mjs

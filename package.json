@@ -1,10 +1,14 @@
 {
   "name": "pptx-svg",
   "version": "0.1.0",
-  "description": "PPTX ↔ SVG conversion library powered by MoonBit + Wasm-GC",
+  "description": "PPTX ↔ SVG round-trip conversion library — browser-native, zero dependencies",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/t-ujiie-g/pptx-svg.git"
+  },
+  "homepage": "https://github.com/t-ujiie-g/pptx-svg",
+  "bugs": {
+    "url": "https://github.com/t-ujiie-g/pptx-svg/issues"
   },
   "type": "module",
   "main": "dist/index.js",
@@ -13,17 +17,39 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./wasm": "./dist/main.wasm"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build:ts": "tsc",
     "build:wasm": "moon build --target wasm-gc --release",
-    "build": "npm run build:wasm && npm run build:ts"
+    "build:ts": "tsc",
+    "build:copy-wasm": "cp _build/wasm-gc/release/build/main/main.wasm dist/main.wasm",
+    "build": "npm run build:wasm && npm run build:ts && npm run build:copy-wasm",
+    "test": "node test_fixtures/test_node.mjs",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": ["pptx", "powerpoint", "renderer", "wasm", "moonbit", "svg"],
-  "license": "MIT"
+  "keywords": [
+    "pptx",
+    "powerpoint",
+    "svg",
+    "ooxml",
+    "converter",
+    "renderer",
+    "wasm",
+    "webassembly",
+    "moonbit",
+    "browser",
+    "client-side"
+  ],
+  "license": "MIT",
+  "author": "t-ujiie-g",
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false
 }

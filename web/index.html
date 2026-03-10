@@ -225,8 +225,6 @@
   <script type="module">
     import { PptxRenderer } from '../dist/index.js';
 
-    const WASM_URL = '../_build/wasm-gc/release/build/main/main.wasm';
-
     const renderer = new PptxRenderer();
     let currentSlide = 0;
     let totalSlides = 0;
@@ -396,7 +394,7 @@
     setStatus('Loading WebAssembly module…');
     statusCard.style.display = '';
 
-    renderer.init(WASM_URL)
+    renderer.init()
       .then(() => {
         setStatus('Wasm module ready. Drop a .pptx file to start.', 'ok');
         dropZone.style.pointerEvents = '';

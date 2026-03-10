@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pptx-svg Vanilla JS Example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; }
+    #drop-zone {
+      border: 2px dashed #ccc; border-radius: 8px; padding: 40px;
+      text-align: center; cursor: pointer; margin-bottom: 16px;
+    }
+    #drop-zone:hover { border-color: #4a90d9; background: #f0f7ff; }
+    #file-input { display: none; }
+    .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    button { padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: white; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #viewer {
+      background: white; border: 1px solid #ddd; border-radius: 8px;
+      padding: 16px; display: flex; justify-content: center; min-height: 300px;
+    }
+    #viewer svg { max-width: 100%; height: auto; }
+    #status { margin-top: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>pptx-svg Vanilla JS Example</h1>
+  <p>Drop a .pptx file to render slides as SVG. Everything runs in the browser.</p>
+
+  <div id="drop-zone">
+    <p><strong>Drop a .pptx file here</strong> or click to browse</p>
+    <input type="file" id="file-input" accept=".pptx">
+  </div>
+
+  <div class="controls" style="display:none" id="controls">
+    <button id="prev-btn" disabled>Prev</button>
+    <span id="slide-num">1 / 1</span>
+    <button id="next-btn" disabled>Next</button>
+    <button id="export-btn">Export PPTX</button>
+  </div>
+
+  <div id="viewer"><span style="color:#999">No slide loaded</span></div>
+  <div id="status"></div>
+
+  <!--
+    This example uses an importmap to simulate the npm install experience.
+    In a real project you would:
+      npm install pptx-svg
+    and then import as:
+      import { PptxRenderer } from 'pptx-svg';
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "pptx-svg": "../../dist/index.js"
+    }
+  }
+  </script>
+  <script type="module">
+    import { PptxRenderer } from 'pptx-svg';
+
+    const renderer = new PptxRenderer();
+    let currentSlide = 0, totalSlides = 0;
+
+    const $ = (id) => document.getElementById(id);
+
+    function showSlide(idx) {
+      currentSlide = idx;
+      $('slide-num').textContent = `${idx + 1} / ${totalSlides}`;
+      $('prev-btn').disabled = idx === 0;
+      $('next-btn').disabled = idx >= totalSlides - 1;
+      const svg = renderer.renderSlideSvg(idx);
+      $('viewer').innerHTML = svg.startsWith('ERROR:')
+        ? `<span style="color:red">${svg}</span>` : svg;
+    }
+
+    $('prev-btn').addEventListener('click', () => showSlide(currentSlide - 1));
+    $('next-btn').addEventListener('click', () => showSlide(currentSlide + 1));
+
+    $('export-btn').addEventListener('click', async () => {
+      $('status').textContent = 'Exporting...';
+      const buffer = await renderer.exportPptx();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'exported.pptx';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      $('status').textContent = 'Exported!';
+    });
+
+    async function loadFile(file) {
+      $('status').textContent = `Loading ${file.name}...`;
+      const { slideCount } = await renderer.loadPptx(await file.arrayBuffer());
+      totalSlides = slideCount;
+      $('controls').style.display = 'flex';
+      $('status').textContent = `Loaded "${file.name}" - ${slideCount} slide(s)`;
+      showSlide(0);
+    }
+
+    const dropZone = $('drop-zone');
+    dropZone.addEventListener('click', () => $('file-input').click());
+    dropZone.addEventListener('dragover', (e) => e.preventDefault());
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+    $('file-input').addEventListener('change', (e) => {
+      if (e.target.files[0]) loadFile(e.target.files[0]);
+    });
+
+    // Initialize - no URL needed, Wasm is resolved automatically
+    $('status').textContent = 'Loading WebAssembly module...';
+    renderer.init()
+      .then(() => { $('status').textContent = 'Ready. Drop a .pptx file.'; })
+      .catch(err => { $('status').textContent = `Init failed: ${err.message}`; });
+  </script>
+</body>
+</html>

@@ -1,177 +1,221 @@
 # pptx-svg
 
-A browser-based PPTX viewer/editor built with MoonBit (wasm-gc).
-ZIP extraction, OOXML processing, SVG rendering, and PPTX export — all client-side, no server required.
+PPTX and SVG round-trip conversion library. Runs entirely in the browser with zero dependencies.
 
 [Japanese / 日本語](README.ja.md)
 
 ## Features
 
-- **Round-trip conversion**: PPTX → SVG → edit → PPTX export
-- **No server required**: ZIP extraction, OOXML parsing, SVG generation, ZIP rebuilding all run in the browser
-- **Lossless round-trip**: `data-ooxml-*` attributes embedded in SVG preserve OOXML metadata
-- **Lightweight**: ~24KB Wasm binary, zero external dependencies
+- **PPTX to SVG**: Convert PowerPoint slides to high-quality SVG
+- **SVG to PPTX**: Edit SVG and export back to a valid .pptx file (lossless round-trip)
+- **Browser-native**: No server required. ZIP, OOXML parsing, SVG generation all run client-side
+- **Zero dependencies**: ~200KB Wasm binary, no npm dependencies
+- **Framework-agnostic**: Works with React, Vue, Svelte, vanilla JS, or any framework
 
-## Tech Stack
+## Install
 
-| Layer | Technology |
-|-------|-----------|
-| Logic | [MoonBit](https://moonbitlang.com/) → WebAssembly GC (wasm-gc) |
-| Rendering | SVG (with `data-ooxml-*` attributes) |
-| ZIP handling | Browser-native `DecompressionStream` / `CompressionStream` API (JS) |
-| String FFI | `use-js-builtin-string: true` (MoonBit String = JS String, zero-cost) |
-| Host layer | Plain JavaScript ES Modules |
+```bash
+npm install pptx-svg
+```
+
+## Quick Start
+
+```ts
+import { PptxRenderer } from 'pptx-svg';
+
+const renderer = new PptxRenderer();
+await renderer.init();                        // Wasm loaded automatically
+
+const file = await fetch('presentation.pptx');
+await renderer.loadPptx(await file.arrayBuffer());
+
+const svgString = renderer.renderSlideSvg(0); // Slide 1 as SVG
+document.getElementById('viewer').innerHTML = svgString;
+```
+
+### React
+
+```tsx
+import { useEffect, useRef, useState } from 'react';
+import { PptxRenderer } from 'pptx-svg';
+
+function SlideViewer({ pptxBuffer }: { pptxBuffer: ArrayBuffer }) {
+  const [svg, setSvg] = useState('');
+  const rendererRef = useRef<PptxRenderer | null>(null);
+
+  useEffect(() => {
+    const renderer = new PptxRenderer();
+    rendererRef.current = renderer;
+    renderer.init()
+      .then(() => renderer.loadPptx(pptxBuffer))
+      .then(() => setSvg(renderer.renderSlideSvg(0)));
+  }, [pptxBuffer]);
+
+  return <div dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+```
+
+### Vanilla JS (no bundler)
+
+```html
+<script type="importmap">
+{ "imports": { "pptx-svg": "https://cdn.jsdelivr.net/npm/pptx-svg/dist/index.js" } }
+</script>
+<script type="module">
+  import { PptxRenderer } from 'pptx-svg';
+  const renderer = new PptxRenderer();
+  await renderer.init();
+  // ...
+</script>
+```
+
+See [`examples/`](examples/) for complete working examples.
+
+## API Reference
+
+### `PptxRenderer`
+
+```ts
+import { PptxRenderer } from 'pptx-svg';
+
+const renderer = new PptxRenderer(options?);
+```
+
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `measureText` | `(text, fontFace, fontSizePt) => number` | Custom text width measurement. Defaults to Canvas 2D. |
+
+**Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `init(wasmSource?)` | `Promise<void>` | Load the Wasm module. No arguments needed (auto-resolved). Pass URL or ArrayBuffer to override. |
+| `loadPptx(buffer)` | `Promise<{ slideCount }>` | Load a PPTX file from ArrayBuffer. |
+| `getSlideCount()` | `number` | Number of slides. |
+| `renderSlideSvg(idx)` | `string` | Render slide as SVG string (0-indexed). |
+| `updateSlideFromSvg(idx, svg)` | `string` | Update slide data from edited SVG. Returns `"OK"` or `"ERROR:..."`. |
+| `getSlideOoxml(idx)` | `string` | Get OOXML XML for a slide. |
+| `exportPptx()` | `Promise<ArrayBuffer>` | Export as .pptx file with modifications applied. |
+| `getSlideXmlRaw(idx)` | `string` | Raw slide XML (for debugging). |
+| `getEntryList()` | `string[]` | All ZIP entry paths (for debugging). |
+
+## Supported Features
+
+### Fully Supported
+
+- **Shapes**: AutoShape (rect, ellipse, roundRect, line, ~154 preset geometries), custom geometry (`a:custGeom`), connectors (straight/elbow/curved)
+- **Text**: Paragraphs, runs, bullets (char/auto/image), fonts (Latin/EA/CS/Symbol), bold/italic/underline/strikethrough, superscript/subscript, character spacing, kerning, capitalization, hyperlinks, tabs, RTL
+- **Text body**: Vertical alignment, margins, auto-fit, font scale, rotation, vertical text, multi-column, text warp (prstTxWarp)
+- **Fill**: Solid color, gradient (linear/radial with stops), pattern (48 presets), image fill (stretch/tile/crop)
+- **Stroke**: 11 dash patterns, 5 arrow types, line cap/join, compound lines, gradient/pattern stroke
+- **Effects**: Outer shadow, inner shadow, glow, soft edge, reflection (all via SVG filters)
+- **Images**: PNG/JPEG/GIF/SVG, crop, alpha, brightness/contrast, duotone, color change
+- **Tables**: Cell merge (grid span, row span), borders (including diagonal), margins, anchoring, table styles, conditional formatting (banded rows/cols, first/last row/col)
+- **Charts**: Bar, Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 types), data labels, data points, trendlines, error bars, composite charts
+- **Group shapes**: Recursive nesting with coordinate transforms
+- **Theme**: 12 theme colors, font scheme, all color modifiers (tint, shade, saturation, luminance, etc.)
+- **Master/Layout inheritance**: Placeholder inheritance, `p:clrMapOvr`
+- **Background**: Solid, gradient, image, pattern backgrounds
+- **3D**: Data preservation for round-trip (bevel, extrusion, contour, material, camera, lighting)
+- **Placeholder auto content**: Slide number, date, footer
+
+### Not Yet Supported
+
+- **SmartArt** (`dgm:*` DiagramML) - planned: fallback image display
+- **OLE / Embedded objects** (`p:oleObj`) - planned: fallback image display
+- **Media** (video/audio) - planned: poster frame display
+- **EMF/WMF images** - cannot be decoded in browser
+- **TIFF images** - not supported by browser `<img>`
+- **Math equations** (OMML `m:oMath`) - planned: plain text fallback
+- **Embedded fonts** - uses system font fallback
+- **Speaker notes** (`p:notes`) - planned
+- **Comments** (`p:cmAuthorLst` / `p:cmLst`) - planned
+
+### Out of Scope
+
+- **Animations** (`p:timing`) - static rendering only
+- **Transitions** (`p:transition`) - static rendering only
+- **Macros / VBA** - not supported for security reasons
+
+## SVG Output Format
+
+The generated SVG embeds `data-ooxml-*` attributes that preserve all OOXML metadata for round-trip conversion. See [`docs/svg-specification.md`](docs/svg-specification.md) for the complete attribute reference.
+
+## Browser Compatibility
+
+| Browser | Minimum Version | Notes |
+|---------|----------------|-------|
+| Chrome | 111+ | Full support (Tier 3 Wasm fallback) |
+| Firefox | 120+ | Full support |
+| Safari | 17+ | Full support |
+| Edge | 111+ | Same as Chrome |
+| Node.js | Not supported | Wasm-GC requires browser runtime |
 
 ## Architecture
 
 ```
 [Browser]
-  ┌─────────────────────────────────────────────────┐
-  │  web/index.html                                 │
-  │  lib/ → dist/  ← PptxRenderer class            │
-  │    │                                            │
-  │    ├─ ZIP extraction (DecompressionStream)       │
-  │    ├─ ZIP building (CompressionStream + CRC-32)  │
-  │    │                                            │
-  │    └─ FFI ──────────────────────────────┐      │
-  │                                          │      │
-  │  [WebAssembly GC]                        │      │
-  │  _build/.../main.wasm                    │      │
-  │    src/ffi/         ← FFI declarations   │      │
-  │    src/xml/         ← Generic XML parser │      │
-  │    src/ooxml/       ← OOXML types+parser │      │
-  │    src/renderer/    ← SlideData → SVG    │      │
-  │    src/svg_parser/  ← SVG → SlideData    │      │
-  │    src/serializer/  ← SlideData → XML    │      │
-  │    src/main/        ← Public API ────────┘      │
-  └─────────────────────────────────────────────────┘
+  PptxRenderer (TypeScript)
+    ├── ZIP extraction (DecompressionStream)
+    ├── ZIP building (CompressionStream + CRC-32)
+    └── FFI ─── WebAssembly GC (MoonBit)
+                  ├── XML parser
+                  ├── OOXML parser (types, theme, text, shapes, charts)
+                  ├── SVG renderer (shapes, text, fill, geometry, charts)
+                  ├── SVG parser (data-ooxml-* → SlideData)
+                  └── OOXML serializer (SlideData → XML)
 ```
 
-**Data flow (Round-trip):**
-1. User drops a .pptx file
-2. JS parses and decompresses the ZIP, storing entries in a Map
-3. `render_slide_svg(idx)` → SVG with `data-ooxml-*` attributes
-4. (Edit SVG in browser)
-5. `update_slide_from_svg(idx, svg)` → update cached SlideData
-6. `exportPptx()` → rebuild ZIP with modified slide XML → download .pptx
-
-## Quick Start
+## Development
 
 ### Prerequisites
 
-- [MoonBit toolchain](https://moonbitlang.com/download/) (`moon` command)
-- Node.js 18+ (for building TypeScript and running tests)
-- Chrome 111+ / Firefox 120+ / Safari 17+
+- [MoonBit toolchain](https://moonbitlang.com/download/)
+- Node.js 18+
 
 ### Build
 
 ```bash
-# Build Wasm
-moon build --target wasm-gc --release
-# → _build/wasm-gc/release/build/main/main.wasm (~24KB)
-
-# Build TypeScript library
-tsc
-# → dist/
-
-# Build everything (Wasm + TypeScript)
-npm run build
+npm run build          # Wasm + TypeScript + copy wasm to dist/
 ```
 
-### Development Server
+### Test
+
+```bash
+npm test               # Node.js test suite (ZIP + XML structure)
+```
+
+### Browser Test
 
 ```bash
 python3 -m http.server 8765 --directory .
-# → http://localhost:8765/web/index.html
+# Open http://localhost:8765/web/index.html
 ```
 
-### Tests
+## Release
+
+Releases are published to npm via GitHub Actions when a version tag is pushed:
 
 ```bash
-node test_fixtures/test_node.mjs
+# Update version in package.json, then:
+git tag v0.1.0
+git push origin v0.1.0
+# GitHub Actions builds, tests, and publishes to npm
 ```
 
-## Project Structure
+Requires `NPM_TOKEN` secret configured in GitHub repository settings.
 
-```
-pptx-svg/
-├── moon.mod.json                  # MoonBit project config (no external deps)
-├── package.json                   # npm package definition
-├── src/                           # MoonBit (Wasm-GC)
-│   ├── ffi/ffi.mbt               # JS host FFI declarations
-│   ├── xml/xml.mbt               # Generic XML parser (DOM tree)
-│   ├── ooxml/
-│   │   ├── ooxml.mbt             # OOXML types + Color/HSL utilities
-│   │   ├── ooxml_theme.mbt       # Theme parser + ColorMap + master/layout
-│   │   ├── ooxml_text.mbt        # Text body/paragraph/run parsing
-│   │   └── ooxml_parse.mbt       # Shape/Slide/Fill parsing + rels
-│   ├── renderer/
-│   │   ├── renderer.mbt          # Shape/Table SVG rendering + public API
-│   │   ├── renderer_text.mbt     # Text SVG rendering (bullets, wrapping, tabs)
-│   │   └── renderer_fill.mbt     # Gradient/pattern fill SVG rendering
-│   ├── svg_parser/svg_parser.mbt # SVG → SlideData (reverse transform)
-│   ├── serializer/serializer.mbt # SlideData → OOXML slide XML
-│   └── main/
-│       ├── main.mbt              # Wasm export API + slide cache
-│       └── main_inherit.mbt      # Placeholder inheritance + text defaults
-├── lib/                           # TypeScript library source
-│   ├── index.ts                   # Public API re-exports
-│   ├── pptx-renderer.ts          # PptxRenderer class (core API)
-│   ├── wasm-compat.ts            # 3-tier Wasm js-string fallback
-│   ├── zip.ts                    # ZIP extraction / building
-│   └── utils.ts                  # bytesToBase64, crc32
-├── dist/                          # Compiled JS + .d.ts (tsc output)
-├── web/
-│   ├── host.js                   # Legacy JS host (reference only)
-│   └── index.html                # Demo UI (imports from dist/)
-└── test_fixtures/
-    ├── minimal.pptx              # 2-slide minimal test PPTX
-    ├── test_features.pptx        # Feature regression test fixture
-    ├── gen_test_features.py      # Python script to regenerate test fixture
-    └── test_node.mjs             # Node.js test suite (JS layer)
-```
+## Contributing
 
-**Module dependencies (no cycles):**
-```
-main → renderer   → ooxml → xml
-     → svg_parser → ooxml → xml
-     → serializer → ooxml
-     → ffi
-```
-
-## API Reference
-
-### Wasm Exports
-
-| Function | Returns | Description |
-|----------|---------|-------------|
-| `initialize_pptx()` | `"OK:<count>"` or `"ERROR:..."` | Initialize PPTX and get slide count |
-| `get_slide_count()` | `Int` | Number of slides |
-| `get_slide_xml_raw(idx)` | `String` | Raw slide XML |
-| `get_entry_list()` | `String` | ZIP entry list (newline-separated) |
-| `render_slide_svg(idx)` | `String` | SVG with `data-ooxml-*` attributes |
-| `update_slide_from_svg(idx, svg)` | `"OK"` or `"ERROR:..."` | Update SlideData from SVG |
-| `get_slide_ooxml(idx)` | `String` | OOXML slide XML (regenerated if modified) |
-| `get_modified_entries()` | `String` | Modified entries (`path\tcontent\n` format) |
-
-### JS API (PptxRenderer class)
-
-```javascript
-await renderer.init(wasmUrl)              // Initialize Wasm module
-await renderer.loadPptx(arrayBuffer)      // Load PPTX → { slideCount }
-renderer.renderSlideSvg(slideIdx)         // Get SVG string
-renderer.updateSlideFromSvg(idx, svg)     // Update internal data from SVG
-renderer.getSlideOoxml(idx)               // Get OOXML XML
-await renderer.exportPptx()               // Export as PPTX ArrayBuffer
-```
-
-## Known Limitations
-
-- SmartArt / Charts render as gray fallback
-- EMF/WMF images not supported
-- Animations and transitions are ignored
-- Does not run in Node.js (wasm-gc is browser-only)
+1. Fork the repository
+2. Create a feature branch
+3. Make changes following the existing code style
+4. Add tests in `test_fixtures/gen_test_features.py` and `test_fixtures/test_node.mjs`
+5. Run `npm run build && npm test` to verify
+6. Submit a pull request
 
 ## License
 
-MIT
+[MIT](LICENSE)

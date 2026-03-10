@@ -31,6 +31,9 @@ export interface PptxRendererOptions {
   measureText?: MeasureTextFn;
 }
 
+/** Default Wasm URL resolved relative to this module. */
+const DEFAULT_WASM_URL = new URL('./main.wasm', import.meta.url).href;
+
 export class PptxRenderer {
   private wasm: WebAssembly.Instance | null = null;
 
@@ -64,21 +67,27 @@ export class PptxRenderer {
 
   /**
    * Initialize the renderer by loading the Wasm module.
-   * @param wasmSource - URL string (for fetch) or ArrayBuffer of .wasm bytes
+   *
+   * When called without arguments, the bundled Wasm binary is loaded
+   * automatically via `import.meta.url` resolution. This works with
+   * Vite, webpack, Rollup, and CDN imports (unpkg, jsdelivr).
+   *
+   * @param wasmSource - Optional URL string or ArrayBuffer of .wasm bytes.
+   *                     If omitted, the bundled Wasm is used.
    */
-  async init(wasmSource: string | ArrayBuffer): Promise<void> {
+  async init(wasmSource?: string | ArrayBuffer): Promise<void> {
     let bytes: ArrayBuffer;
-    if (typeof wasmSource === 'string') {
-      const response = await fetch(wasmSource);
-      if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${wasmSource}`);
-      bytes = await response.arrayBuffer();
-    } else {
+    if (wasmSource instanceof ArrayBuffer) {
       bytes = wasmSource;
+    } else {
+      const url = wasmSource ?? DEFAULT_WASM_URL;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
+      bytes = await response.arrayBuffer();
     }
 
     const result = await instantiateWasmWithFallback(bytes, this.buildImportObject());
     this.wasm = result.instance;
-    console.log('[pptx] Wasm module loaded. Exports:', Object.keys(this.wasm.exports));
   }
 
   /**
