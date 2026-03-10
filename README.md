@@ -55,20 +55,6 @@ ZIP extraction, OOXML processing, SVG rendering, and PPTX export — all client-
 5. `update_slide_from_svg(idx, svg)` → update cached SlideData
 6. `exportPptx()` → rebuild ZIP with modified slide XML → download .pptx
 
-## Browser Compatibility
-
-| Browser | wasm-gc | js-string builtins | Status |
-|---------|---------|-------------------|--------|
-| Chrome 117+ | Yes | Tier-1 (builtins) | Supported |
-| Edge 117+ | Yes | Tier-1 (builtins) | Supported |
-| Chrome 115–116 | Yes | Tier-2 (importedStringConstants) | Supported |
-| Chrome 111–114 | Yes | Tier-3 (full manual) | Supported |
-| Firefox 120+ | Yes | Tier-1 (builtins) | Supported |
-| Safari 17+ | Yes | Tier-1 (builtins) | Supported |
-| Chrome < 111 | No | — | Not supported (no wasm-gc) |
-
-> `lib/wasm-compat.ts` initializes Wasm with a 3-tier fallback strategy.
-
 ## Quick Start
 
 ### Prerequisites
