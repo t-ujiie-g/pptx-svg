@@ -59,6 +59,9 @@ let chart_bubble_max_r : Int = 20 // max bubble radius in px
 ///|
 let chart_err_bar_cap_w : Int = 4 // half-width of error bar cap in px
 
+///|
+let chart_heatmap_min_sentinel : Int = 2147483647 // Int max sentinel for heatmap min detection
+
 // ── Chart style constants ─────────────────────────────────────────────────
 
 ///|
@@ -138,8 +141,9 @@ fn is_pie_or_donut_chart(groups : Array[@ooxml.ChartGroup]) -> Bool {
     return false
   }
   match groups[0].chart_type {
-    @ooxml.ChartKind::PieChart => true
-    @ooxml.ChartKind::DoughnutChart => true
+    @ooxml.ChartKind::PieChart
+    | @ooxml.ChartKind::DoughnutChart
+    | @ooxml.ChartKind::OfPieChart => true
     _ => false
   }
 }
@@ -256,6 +260,10 @@ fn render_chart_group(
       render_bubble_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::StockChart =>
       render_stock_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::SurfaceChart =>
+      render_surface_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::OfPieChart =>
+      render_pie_chart(group, px_, py, pw, ph, colors)
   }
 }
 
@@ -730,6 +738,68 @@ fn render_stock_chart(
   svg
 }
 
+// ── Surface chart (2D heatmap approximation) ────────────────────────────────
+
+///|
+/// Render surface chart as a 2D heatmap grid.
+/// Each series represents one row; data points are columns.
+/// Colors interpolate from cool (blue) to warm (red) based on value.
+fn render_surface_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  _colors : Array[String],
+) -> String {
+  let ns = group.series.length()
+  if ns == 0 {
+    return ""
+  }
+  // Collect all values and find global min/max
+  let all_values : Array[Array[Int]] = []
+  let mut global_max = 0
+  let mut global_min = chart_heatmap_min_sentinel
+  let mut max_cols = 0
+  for si in 0..<ns {
+    let vals = get_num_values(group.series[si].val)
+    if vals.length() > max_cols {
+      max_cols = vals.length()
+    }
+    for vi in 0..<vals.length() {
+      if vals[vi] > global_max { global_max = vals[vi] }
+      if vals[vi] < global_min { global_min = vals[vi] }
+    }
+    all_values.push(vals)
+  }
+  if max_cols == 0 || global_max == global_min {
+    return ""
+  }
+  let cell_w = pw / max_cols
+  let cell_h = ph / ns
+  let range = global_max - global_min
+  let mut svg = ""
+  for si in 0..<ns {
+    let vals = all_values[si]
+    for ci in 0..<vals.length() {
+      // Interpolate: 0=blue(cold), 1=red(hot)
+      let t = (vals[ci] - global_min) * 255 / range
+      let r = t
+      let b = 255 - t
+      let g = if t < 128 { t * 2 } else { (255 - t) * 2 }
+      let color = "rgb(" + int_to_str(r) + "," + int_to_str(g) + "," +
+        int_to_str(b) + ")"
+      let x = px_ + ci * cell_w
+      let y = py + si * cell_h
+      svg = svg + "<rect x=\"" + int_to_str(x) + "\" y=\"" +
+        int_to_str(y) + "\" width=\"" + int_to_str(cell_w) +
+        "\" height=\"" + int_to_str(cell_h) + "\" fill=\"" + color +
+        "\" stroke=\"" + chart_gridline_color + "\" stroke-width=\"0.5\"/>"
+    }
+  }
+  svg
+}
+
 // ── Axes rendering ──────────────────────────────────────────────────────────
 
 ///|
@@ -863,7 +933,9 @@ fn render_legend(
   for gi in 0..<groups.length() {
     let group = groups[gi]
     let is_pie = match group.chart_type {
-      @ooxml.ChartKind::PieChart | @ooxml.ChartKind::DoughnutChart => true
+      @ooxml.ChartKind::PieChart
+      | @ooxml.ChartKind::DoughnutChart
+      | @ooxml.ChartKind::OfPieChart => true
       _ => false
     }
     if is_pie {

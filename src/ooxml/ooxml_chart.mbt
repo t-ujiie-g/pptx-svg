@@ -109,6 +109,23 @@ pub fn ChartErrBars::is_none(self : ChartErrBars) -> Bool {
   self.err_val_type.is_empty()
 }
 
+// ── 3D view ─────────────────────────────────────────────────────────────────
+
+///|
+/// 3D view settings (c:view3D) — preserved for round-trip, not rendered.
+pub(all) struct ChartView3D {
+  rot_x : Int // c:rotX (degrees × 1)
+  rot_y : Int // c:rotY (degrees × 1)
+  depth_percent : Int // c:depthPercent (default 100)
+  r_ang_ax : Bool // c:rAngAx (right-angle axes)
+  perspective : Int // c:perspective (0-240, default 30)
+}
+
+///|
+pub fn ChartView3D::none() -> ChartView3D {
+  { rot_x: 15, rot_y: 20, depth_percent: 100, r_ang_ax: true, perspective: 30 }
+}
+
 // ── Chart data types ────────────────────────────────────────────────────────
 
 ///|
@@ -123,6 +140,8 @@ pub(all) enum ChartKind {
   RadarChart // c:radarChart
   BubbleChart // c:bubbleChart
   StockChart // c:stockChart
+  SurfaceChart // c:surfaceChart / c:surface3DChart — 2D heatmap approximation
+  OfPieChart // c:ofPieChart — pie/bar of pie, rendered as standard pie
 }
 
 ///|
@@ -225,6 +244,9 @@ pub(all) struct ChartGroup {
   scatter_style : String // scatter: "lineMarker" etc.
   ax_ids : Array[Int] // axis ID references
   data_labels : ChartDataLabels // c:dLbls
+  of_pie_type : String // ofPieChart: "pie"|"bar" (c:ofPieType)
+  split_pos : Int // ofPieChart: split position (c:splitPos)
+  wireframe : Bool // surface chart: wireframe mode
 }
 
 ///|
@@ -241,6 +263,9 @@ pub fn ChartGroup::default(ct : ChartKind) -> ChartGroup {
     scatter_style: "",
     ax_ids: [],
     data_labels: ChartDataLabels::none(),
+    of_pie_type: "",
+    split_pos: 0,
+    wireframe: false,
   }
 }
 
@@ -309,6 +334,7 @@ pub(all) struct ChartData {
   legend : ChartLegend
   style : Int // c:style (0 = none)
   chart_xml : String // raw chart XML for round-trip preservation
+  view_3d : ChartView3D // c:view3D — preserved for round-trip
 }
 
 ///|
@@ -320,6 +346,7 @@ pub fn ChartData::empty() -> ChartData {
     legend: ChartLegend::none(),
     style: 0,
     chart_xml: "",
+    view_3d: ChartView3D::none(),
   }
 }
 
@@ -357,7 +384,12 @@ pub fn parse_chart_xml(chart_xml : String, theme : ThemeData) -> ChartData {
     None => ChartLegend::none()
     Some(lg) => parse_chart_legend(@xml.get_children(lg))
   }
-  { groups, axes, title, legend, style, chart_xml }
+  // 3D view (preserved for round-trip)
+  let view_3d = match @xml.find_child(chart_ch, "c:view3D") {
+    None => ChartView3D::none()
+    Some(v) => parse_view_3d(@xml.get_children(v))
+  }
+  { groups, axes, title, legend, style, chart_xml, view_3d }
 }
 
 ///|
@@ -441,7 +473,11 @@ fn parse_plot_area(
           groups.push(parse_bubble_chart(ch, theme))
         } else if tag == "c:stockChart" {
           groups.push(parse_stock_chart(ch, theme))
-        } else if tag == "c:catAx" || tag == "c:dateAx" {
+        } else if tag == "c:surfaceChart" || tag == "c:surface3DChart" {
+          groups.push(parse_surface_chart(ch, theme))
+        } else if tag == "c:ofPieChart" {
+          groups.push(parse_of_pie_chart(ch, theme))
+        } else if tag == "c:catAx" || tag == "c:dateAx" || tag == "c:serAx" {
           axes.push(parse_chart_axis(ch, false, theme))
         } else if tag == "c:valAx" {
           axes.push(parse_chart_axis(ch, true, theme))
@@ -584,6 +620,40 @@ fn parse_stock_chart(
 ) -> ChartGroup {
   {
     ..ChartGroup::default(StockChart),
+    vary_colors: child_attr_val(ch, "c:varyColors") == "1",
+    series: parse_series_list(ch, theme),
+    ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
+  }
+}
+
+///|
+fn parse_surface_chart(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> ChartGroup {
+  {
+    ..ChartGroup::default(SurfaceChart),
+    wireframe: child_attr_val(ch, "c:wireframe") == "1",
+    series: parse_series_list(ch, theme),
+    ax_ids: parse_ax_ids(ch),
+    data_labels: parse_chart_data_labels(ch),
+  }
+}
+
+///|
+fn parse_of_pie_chart(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> ChartGroup {
+  let of_pie_type = child_attr_val(ch, "c:ofPieType")
+  let gw = child_attr_int(ch, "c:gapWidth")
+  let sp = child_attr_int(ch, "c:splitPos")
+  {
+    ..ChartGroup::default(OfPieChart),
+    of_pie_type: if of_pie_type.is_empty() { "pie" } else { of_pie_type },
+    split_pos: sp,
+    gap_width: if gw == 0 { default_bar_gap_width } else { gw },
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
@@ -1072,4 +1142,21 @@ fn parse_chart_legend(ch : Array[@xml.XmlNode]) -> ChartLegend {
   let pos = child_attr_val(ch, "c:legendPos")
   let overlay = child_attr_val(ch, "c:overlay") == "1"
   { position: if pos.is_empty() { "r" } else { pos }, overlay, show: true }
+}
+
+///|
+/// Parse c:view3D element — 3D rotation/perspective for round-trip preservation.
+/// Uses child_attr_val to distinguish missing elements (default) from val="0".
+fn parse_view_3d(ch : Array[@xml.XmlNode]) -> ChartView3D {
+  let rx_s = child_attr_val(ch, "c:rotX")
+  let ry_s = child_attr_val(ch, "c:rotY")
+  let dp_s = child_attr_val(ch, "c:depthPercent")
+  let p_s = child_attr_val(ch, "c:perspective")
+  {
+    rot_x: if rx_s.is_empty() { 15 } else { @xml.parse_int(rx_s) },
+    rot_y: if ry_s.is_empty() { 20 } else { @xml.parse_int(ry_s) },
+    depth_percent: if dp_s.is_empty() { 100 } else { @xml.parse_int(dp_s) },
+    r_ang_ax: child_attr_val(ch, "c:rAngAx") != "0",
+    perspective: if p_s.is_empty() { 30 } else { @xml.parse_int(p_s) },
+  }
 }

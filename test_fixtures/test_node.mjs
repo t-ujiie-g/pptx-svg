@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 66', slideCount === 66, `got ${slideCount}`);
+  assert('slide count = 69', slideCount === 69, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 66; i++) {
+  for (let i = 1; i <= 69; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 66; i++) {
+  for (let i = 1; i <= 69; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1237,6 +1237,58 @@ async function testFeaturesPptx() {
       assert('slide66 has c:barChart', chartXml.includes('c:barChart'));
       assert('slide66 has c:lineChart', chartXml.includes('c:lineChart'));
       assert('slide66 has Profit series', chartXml.includes('Profit'));
+    }
+  }
+
+  // ── Slide 67: Surface chart ──
+  {
+    const slide67 = textFiles.get('ppt/slides/slide67.xml') || '';
+    section('test_features.pptx — Slide 67: surface chart');
+    assert('slide67 has p:graphicFrame', slide67.includes('p:graphicFrame'));
+    const rels67 = textFiles.get('ppt/slides/_rels/slide67.xml.rels') || '';
+    const chartTarget67 = rels67.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget67) {
+      const chartPath = 'ppt/charts/' + chartTarget67[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide67 has c:surfaceChart', chartXml.includes('c:surfaceChart'));
+      assert('slide67 has c:view3D', chartXml.includes('c:view3D'));
+      assert('slide67 has Row 1 series', chartXml.includes('Row 1'));
+      assert('slide67 has c:serAx', chartXml.includes('c:serAx'));
+    }
+  }
+
+  // ── Slide 68: Pie of pie chart ──
+  {
+    const slide68 = textFiles.get('ppt/slides/slide68.xml') || '';
+    section('test_features.pptx — Slide 68: ofPieChart');
+    assert('slide68 has p:graphicFrame', slide68.includes('p:graphicFrame'));
+    const rels68 = textFiles.get('ppt/slides/_rels/slide68.xml.rels') || '';
+    const chartTarget68 = rels68.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget68) {
+      const chartPath = 'ppt/charts/' + chartTarget68[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide68 has c:ofPieChart', chartXml.includes('c:ofPieChart'));
+      assert('slide68 has c:ofPieType pie', chartXml.includes('ofPieType') && chartXml.includes('"pie"'));
+      assert('slide68 has c:splitPos', chartXml.includes('c:splitPos'));
+      assert('slide68 has Product A', chartXml.includes('Product A'));
+    }
+  }
+
+  // ── Slide 69: 3D bar chart with view3D ──
+  {
+    const slide69 = textFiles.get('ppt/slides/slide69.xml') || '';
+    section('test_features.pptx — Slide 69: 3D bar chart');
+    assert('slide69 has p:graphicFrame', slide69.includes('p:graphicFrame'));
+    const rels69 = textFiles.get('ppt/slides/_rels/slide69.xml.rels') || '';
+    const chartTarget69 = rels69.match(/Target="([^"]*chart[^"]*)"/);
+    if (chartTarget69) {
+      const chartPath = 'ppt/charts/' + chartTarget69[1].replace(/^.*\//, '');
+      const chartXml = textFiles.get(chartPath) || '';
+      assert('slide69 has c:bar3DChart', chartXml.includes('c:bar3DChart'));
+      assert('slide69 has c:view3D', chartXml.includes('c:view3D'));
+      assert('slide69 has rotX', chartXml.includes('rotX'));
+      assert('slide69 has depthPercent', chartXml.includes('depthPercent'));
+      assert('slide69 has Revenue series', chartXml.includes('Revenue'));
     }
   }
 }

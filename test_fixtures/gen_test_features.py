@@ -69,6 +69,9 @@ Slides:
  64. Line chart with linear trendline (c:trendline)
  65. Column chart with error bars (c:errBars)
  66. Composite chart (column + line on same plot area)
+ 67. Surface chart (c:surfaceChart — 2D heatmap approximation + view3D)
+ 68. Pie of pie chart (c:ofPieChart — rendered as standard pie)
+ 69. 3D bar chart (c:bar3DChart — 2D rendering + view3D preserved)
 """
 
 from pptx import Presentation
@@ -4603,6 +4606,177 @@ lbl66 = slide66.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl66.text_frame.paragraphs[0].text = "Slide 66: Composite chart (column + line)"
 lbl66.text_frame.paragraphs[0].font.size = Pt(18)
 lbl66.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 67: Surface chart (2D heatmap approximation) ─────────────────────
+slide67 = prs.slides.add_slide(blank)
+
+# Create a bar chart as placeholder, then replace with surface chart XML
+surf_placeholder = CategoryChartData()
+surf_placeholder.categories = ['X1', 'X2', 'X3', 'X4', 'X5']
+surf_placeholder.add_series('Y1', (10, 20, 30, 40, 50))
+
+chart_frame67 = slide67.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), surf_placeholder
+)
+chart67 = chart_frame67.chart
+chart_part67 = chart67.part
+chart_elem67 = chart_part67._element
+ns_c = 'http://schemas.openxmlformats.org/drawingml/2006/chart'
+ns_a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+
+# Find plotArea and remove existing barChart
+plot_area67 = chart_elem67.find(f'.//{{{ns_c}}}plotArea')
+for bar in plot_area67.findall(f'{{{ns_c}}}barChart'):
+    plot_area67.remove(bar)
+
+# Build surface chart with 4 series × 5 data points (grid)
+surface_xml = f"""<c:surfaceChart xmlns:c="{ns_c}" xmlns:a="{ns_a}">
+  <c:wireframe val="0"/>
+  <c:ser>
+    <c:idx val="0"/><c:order val="0"/>
+    <c:tx><c:strRef><c:f>Sheet1!$B$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Row 1</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:cat><c:strRef><c:f>Sheet1!$A$2:$A$6</c:f><c:strCache><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>X1</c:v></c:pt><c:pt idx="1"><c:v>X2</c:v></c:pt><c:pt idx="2"><c:v>X3</c:v></c:pt><c:pt idx="3"><c:v>X4</c:v></c:pt><c:pt idx="4"><c:v>X5</c:v></c:pt>
+    </c:strCache></c:strRef></c:cat>
+    <c:val><c:numRef><c:f>Sheet1!$B$2:$B$6</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>10</c:v></c:pt><c:pt idx="1"><c:v>25</c:v></c:pt><c:pt idx="2"><c:v>40</c:v></c:pt><c:pt idx="3"><c:v>30</c:v></c:pt><c:pt idx="4"><c:v>15</c:v></c:pt>
+    </c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:ser>
+    <c:idx val="1"/><c:order val="1"/>
+    <c:tx><c:strRef><c:f>Sheet1!$C$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Row 2</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:val><c:numRef><c:f>Sheet1!$C$2:$C$6</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>20</c:v></c:pt><c:pt idx="1"><c:v>35</c:v></c:pt><c:pt idx="2"><c:v>50</c:v></c:pt><c:pt idx="3"><c:v>45</c:v></c:pt><c:pt idx="4"><c:v>30</c:v></c:pt>
+    </c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:ser>
+    <c:idx val="2"/><c:order val="2"/>
+    <c:tx><c:strRef><c:f>Sheet1!$D$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Row 3</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:val><c:numRef><c:f>Sheet1!$D$2:$D$6</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>35</c:v></c:pt><c:pt idx="1"><c:v>50</c:v></c:pt><c:pt idx="2"><c:v>60</c:v></c:pt><c:pt idx="3"><c:v>55</c:v></c:pt><c:pt idx="4"><c:v>40</c:v></c:pt>
+    </c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:ser>
+    <c:idx val="3"/><c:order val="3"/>
+    <c:tx><c:strRef><c:f>Sheet1!$E$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Row 4</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:val><c:numRef><c:f>Sheet1!$E$2:$E$6</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>25</c:v></c:pt><c:pt idx="1"><c:v>40</c:v></c:pt><c:pt idx="2"><c:v>45</c:v></c:pt><c:pt idx="3"><c:v>50</c:v></c:pt><c:pt idx="4"><c:v>35</c:v></c:pt>
+    </c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:bandFmts/>
+  <c:axId val="111111"/>
+  <c:axId val="222222"/>
+  <c:axId val="333333"/>
+</c:surfaceChart>"""
+
+# Remove existing axes
+for ax_tag in ['catAx', 'valAx', 'serAx']:
+    for ax in plot_area67.findall(f'{{{ns_c}}}{ax_tag}'):
+        plot_area67.remove(ax)
+
+# Insert surface chart
+plot_area67.append(etree.fromstring(surface_xml))
+
+# Add axes for surface chart
+surf_axes = f"""<c:catAx xmlns:c="{ns_c}"><c:axId val="111111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="222222"/></c:catAx>"""
+plot_area67.append(etree.fromstring(surf_axes))
+surf_val_ax = f"""<c:valAx xmlns:c="{ns_c}"><c:axId val="222222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:crossAx val="111111"/><c:majorGridlines/></c:valAx>"""
+plot_area67.append(etree.fromstring(surf_val_ax))
+# serAx for surface chart
+surf_ser_ax = f"""<c:serAx xmlns:c="{ns_c}"><c:axId val="333333"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:crossAx val="222222"/></c:serAx>"""
+plot_area67.append(etree.fromstring(surf_ser_ax))
+
+# Add view3D to chart element
+chart_node67 = chart_elem67.find(f'{{{ns_c}}}chart')
+view3d_xml = f"""<c:view3D xmlns:c="{ns_c}"><c:rotX val="15"/><c:rotY val="20"/><c:depthPercent val="100"/><c:rAngAx val="1"/><c:perspective val="30"/></c:view3D>"""
+chart_node67.insert(0, etree.fromstring(view3d_xml))
+
+lbl67 = slide67.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl67.text_frame.paragraphs[0].text = "Slide 67: Surface chart (2D heatmap)"
+lbl67.text_frame.paragraphs[0].font.size = Pt(18)
+lbl67.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 68: Pie of pie chart (ofPieChart) ─────────────────────────────────
+slide68 = prs.slides.add_slide(blank)
+
+# Create a pie chart as placeholder, then replace with ofPieChart XML
+ofpie_placeholder = CategoryChartData()
+ofpie_placeholder.categories = ['Product A', 'Product B', 'Product C', 'Product D', 'Product E']
+ofpie_placeholder.add_series('Sales', (40, 25, 15, 12, 8))
+
+chart_frame68 = slide68.shapes.add_chart(
+    XL_CHART_TYPE.PIE, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), ofpie_placeholder
+)
+chart68 = chart_frame68.chart
+chart_part68 = chart68.part
+chart_elem68 = chart_part68._element
+
+# Find plotArea and remove existing pieChart
+plot_area68 = chart_elem68.find(f'.//{{{ns_c}}}plotArea')
+for pie in plot_area68.findall(f'{{{ns_c}}}pieChart'):
+    plot_area68.remove(pie)
+
+# Build ofPieChart element
+ofpie_xml = f"""<c:ofPieChart xmlns:c="{ns_c}" xmlns:a="{ns_a}">
+  <c:ofPieType val="pie"/>
+  <c:varyColors val="1"/>
+  <c:ser>
+    <c:idx val="0"/><c:order val="0"/>
+    <c:tx><c:strRef><c:f>Sheet1!$B$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>Sales</c:v></c:pt></c:strCache></c:strRef></c:tx>
+    <c:cat><c:strRef><c:f>Sheet1!$A$2:$A$6</c:f><c:strCache><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>Product A</c:v></c:pt><c:pt idx="1"><c:v>Product B</c:v></c:pt>
+      <c:pt idx="2"><c:v>Product C</c:v></c:pt><c:pt idx="3"><c:v>Product D</c:v></c:pt>
+      <c:pt idx="4"><c:v>Product E</c:v></c:pt>
+    </c:strCache></c:strRef></c:cat>
+    <c:val><c:numRef><c:f>Sheet1!$B$2:$B$6</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="5"/>
+      <c:pt idx="0"><c:v>40</c:v></c:pt><c:pt idx="1"><c:v>25</c:v></c:pt>
+      <c:pt idx="2"><c:v>15</c:v></c:pt><c:pt idx="3"><c:v>12</c:v></c:pt>
+      <c:pt idx="4"><c:v>8</c:v></c:pt>
+    </c:numCache></c:numRef></c:val>
+  </c:ser>
+  <c:gapWidth val="150"/>
+  <c:splitPos val="2"/>
+</c:ofPieChart>"""
+plot_area68.append(etree.fromstring(ofpie_xml))
+
+lbl68 = slide68.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl68.text_frame.paragraphs[0].text = "Slide 68: Pie of pie chart (ofPieChart)"
+lbl68.text_frame.paragraphs[0].font.size = Pt(18)
+lbl68.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 69: 3D bar chart with view3D ────────────────────────────────────
+slide69 = prs.slides.add_slide(blank)
+
+chart_data69 = CategoryChartData()
+chart_data69.categories = ['East', 'West', 'North', 'South']
+chart_data69.add_series('Revenue', (320, 280, 190, 250))
+chart_data69.add_series('Cost', (200, 180, 140, 160))
+
+chart_frame69 = slide69.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5),
+    Inches(7), Inches(4.5), chart_data69
+)
+
+# Replace barChart with bar3DChart and add view3D via lxml
+chart69 = chart_frame69.chart
+chart_part69 = chart69.part
+chart_elem69 = chart_part69._element
+plot_area69 = chart_elem69.find(f'.//{{{ns_c}}}plotArea')
+for bar in plot_area69.findall(f'{{{ns_c}}}barChart'):
+    # Convert barChart to bar3DChart by changing tag
+    bar.tag = f'{{{ns_c}}}bar3DChart'
+
+# Add view3D element
+chart_node69 = chart_elem69.find(f'{{{ns_c}}}chart')
+view3d_69 = f"""<c:view3D xmlns:c="{ns_c}"><c:rotX val="20"/><c:rotY val="30"/><c:depthPercent val="150"/><c:rAngAx val="1"/><c:perspective val="40"/></c:view3D>"""
+chart_node69.insert(0, etree.fromstring(view3d_69))
+
+lbl69 = slide69.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl69.text_frame.paragraphs[0].text = "Slide 69: 3D bar chart (view3D preserved)"
+lbl69.text_frame.paragraphs[0].font.size = Pt(18)
+lbl69.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'
