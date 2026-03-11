@@ -17,9 +17,9 @@
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     #viewer {
       background: white; border: 1px solid #ddd; border-radius: 8px;
-      padding: 16px; display: flex; justify-content: center; min-height: 300px;
+      padding: 8px; min-height: 500px; overflow: hidden;
     }
-    #viewer svg { max-width: 100%; height: auto; }
+    #viewer svg { display: block; width: 100%; height: auto; }
     #status { margin-top: 12px; color: #666; }
   </style>
 </head>
@@ -42,17 +42,10 @@
   <div id="viewer"><span style="color:#999">No slide loaded</span></div>
   <div id="status"></div>
 
-  <!--
-    This example uses an importmap to simulate the npm install experience.
-    In a real project you would:
-      npm install pptx-svg
-    and then import as:
-      import { PptxRenderer } from 'pptx-svg';
-  -->
   <script type="importmap">
   {
     "imports": {
-      "pptx-svg": "../../dist/index.js"
+      "pptx-svg": "https://cdn.jsdelivr.net/npm/pptx-svg@0.1.0/dist/index.js"
     }
   }
   </script>
@@ -70,8 +63,23 @@
       $('prev-btn').disabled = idx === 0;
       $('next-btn').disabled = idx >= totalSlides - 1;
       const svg = renderer.renderSlideSvg(idx);
-      $('viewer').innerHTML = svg.startsWith('ERROR:')
-        ? `<span style="color:red">${svg}</span>` : svg;
+      const viewer = $('viewer');
+      if (svg.startsWith('ERROR:')) {
+        viewer.innerHTML = `<span style="color:red">${svg}</span>`;
+      } else {
+        viewer.innerHTML = svg;
+        // Let CSS control sizing: add viewBox if missing, remove fixed width/height
+        const svgEl = viewer.querySelector('svg');
+        if (svgEl) {
+          const w = svgEl.getAttribute('width');
+          const h = svgEl.getAttribute('height');
+          if (w && h && !svgEl.getAttribute('viewBox')) {
+            svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+          }
+          svgEl.removeAttribute('width');
+          svgEl.removeAttribute('height');
+        }
+      }
     }
 
     $('prev-btn').addEventListener('click', () => showSlide(currentSlide - 1));
@@ -111,7 +119,6 @@
       if (e.target.files[0]) loadFile(e.target.files[0]);
     });
 
-    // Initialize - no URL needed, Wasm is resolved automatically
     $('status').textContent = 'Loading WebAssembly module...';
     renderer.init()
       .then(() => { $('status').textContent = 'Ready. Drop a .pptx file.'; })
