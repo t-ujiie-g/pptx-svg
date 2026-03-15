@@ -228,6 +228,8 @@ pub(all) struct ChartSeries {
   // Trendlines + error bars
   trendlines : Array[ChartTrendline] // c:trendline list
   err_bars : ChartErrBars // c:errBars
+  // Series-level data labels (override group dLbls)
+  data_labels : ChartDataLabels // c:dLbls on series
 }
 
 ///|
@@ -859,6 +861,7 @@ fn parse_cat_series(
     data_points,
     trendlines,
     err_bars,
+    data_labels: parse_chart_data_labels(ch),
   }
 }
 
@@ -899,6 +902,7 @@ fn parse_scatter_series_list(
       data_points: parse_data_points(sc, theme),
       trendlines: parse_trendlines(sc, theme),
       err_bars: parse_err_bars(sc, theme),
+      data_labels: parse_chart_data_labels(sc),
     })
   }
   series
