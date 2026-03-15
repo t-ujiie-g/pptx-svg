@@ -678,6 +678,11 @@ fn render_text(
       if para.spc_before > 0 && ti > 0 {
         total_text_h = total_text_h + px(para.spc_before, scale)
       }
+      // Extra space for super/subscript (must match rendering loop)
+      let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
+        para, scale, def_sz,
+      )
+      total_text_h = total_text_h + bl_extra_above
       // Count visual lines for wrapped text (uses col_w for multi-col)
       let num_visual_lines = if do_wrap {
         let indent_emu = if para.mar_l > 0 {
@@ -702,6 +707,7 @@ fn render_text(
         1 + br_count
       }
       total_text_h = total_text_h + para_line_h * num_visual_lines
+      total_text_h = total_text_h + bl_extra_below
       // Add spacing after
       if para.spc_after > 0 {
         total_text_h = total_text_h + px(para.spc_after, scale)

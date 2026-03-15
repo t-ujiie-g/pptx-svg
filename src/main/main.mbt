@@ -724,6 +724,9 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   let mut shape_i = 0
   while shape_i < ns {
     let shape = slide_data.shapes[shape_i]
+    // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
+    // This applies to all shapes (both placeholders and free-standing text boxes)
+    apply_inline_lst_style(shape)
     // Layout placeholder defaults first (more specific)
     apply_layout_text_defaults(shape, layout_opt)
     // Master placeholder's lstStyle as second fallback

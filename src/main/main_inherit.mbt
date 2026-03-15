@@ -119,6 +119,24 @@ fn resolve_placeholder_inheritance(
   }
 }
 
+// ── Inline lstStyle application ──────────────────────────────────────────────
+
+///|
+/// Apply the shape's own inline lstStyle (from p:txBody/a:lstStyle) to its
+/// paragraphs. This handles non-placeholder text boxes that define their own
+/// per-level text defaults (font size, line spacing, bullets, etc.).
+fn apply_inline_lst_style(shape : @ooxml.Shape) -> Unit {
+  let style = shape.lst_style
+  // Check if the style has any non-empty levels
+  let nl = style.levels.length()
+  if nl == 0 {
+    return
+  }
+  apply_text_style_to_runs(shape.paragraphs, style)
+  apply_para_alignment_from_style(shape.paragraphs, style)
+  apply_para_spacing_from_style(shape.paragraphs, style)
+}
+
 // ── Text style defaults application ─────────────────────────────────────────
 
 ///|
@@ -201,6 +219,7 @@ fn apply_ph_lst_style_defaults(
       let ph_style = ph.lst_style
       apply_text_style_to_runs(shape.paragraphs, ph_style)
       apply_para_alignment_from_style(shape.paragraphs, ph_style)
+      apply_para_spacing_from_style(shape.paragraphs, ph_style)
     }
   }
 }
@@ -247,6 +266,62 @@ fn apply_para_alignment_from_style(
 }
 
 ///|
+/// Apply paragraph-level spacing and bullet defaults from a TextStyleGroup.
+/// Inherits line_spacing, spc_before, spc_after, mar_l, indent, and bullet
+/// properties when the paragraph has no explicit value.
+fn apply_para_spacing_from_style(
+  paragraphs : Array[@ooxml.TextParagraph],
+  style : @ooxml.TextStyleGroup,
+) -> Unit {
+  let np = paragraphs.length()
+  let mut pi = 0
+  while pi < np {
+    let para = paragraphs[pi]
+    let lvl_idx = if para.level >= 0 && para.level < @ooxml.max_outline_levels {
+      para.level
+    } else {
+      0
+    }
+    let defaults = style.levels[lvl_idx]
+    let mut changed = false
+    let mut new_para = para
+    // line_spacing: 0 = unset
+    if para.line_spacing == 0 && defaults.line_spacing != 0 {
+      new_para = { ..new_para, line_spacing: defaults.line_spacing }
+      changed = true
+    }
+    // spc_before: 0 = unset
+    if para.spc_before == 0 && defaults.spc_before != 0 {
+      new_para = { ..new_para, spc_before: defaults.spc_before }
+      changed = true
+    }
+    // spc_after: 0 = unset
+    if para.spc_after == 0 && defaults.spc_after != 0 {
+      new_para = { ..new_para, spc_after: defaults.spc_after }
+      changed = true
+    }
+    // mar_l: 0 = unset (note: -1 means explicitly unset in LevelTextDefaults)
+    if para.mar_l == 0 && defaults.mar_l > 0 {
+      new_para = { ..new_para, mar_l: defaults.mar_l }
+      changed = true
+    }
+    // indent: 0 = unset
+    if para.indent == 0 && defaults.indent != 0 {
+      new_para = { ..new_para, indent: defaults.indent }
+      changed = true
+    }
+    // Note: bullet properties (bullet, bullet_font, bullet_size, bullet_color)
+    // are NOT inherited here. They are already set explicitly in the slide XML
+    // for paragraphs that need them, and inheriting from style defaults can
+    // incorrectly add bullets to non-bullet paragraphs (e.g. title lines).
+    if changed {
+      paragraphs[pi] = new_para
+    }
+    pi = pi + 1
+  }
+}
+
+///|
 /// Apply master placeholder text styles to a shape's paragraphs.
 fn apply_master_ph_text_defaults(
   shape : @ooxml.Shape,
@@ -279,6 +354,7 @@ fn apply_text_defaults(
     text_styles.other_style
   }
   apply_text_style_to_runs(shape.paragraphs, style)
+  apply_para_spacing_from_style(shape.paragraphs, style)
 }
 
 // ── Placeholder auto-content ─────────────────────────────────────────────
