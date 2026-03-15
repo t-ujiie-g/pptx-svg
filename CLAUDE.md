@@ -159,7 +159,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `lib/wasm-compat.ts` | 3-tier Wasm js-string builtins fallback |
 | `lib/zip.ts` | ZIP extraction and building |
 | `lib/utils.ts` | bytesToBase64, crc32 utilities |
-| `web/host.js` | Legacy JS host (kept for reference; demo uses `dist/`) |
+| `lib/font-fallbacks.ts` | Font fallback mappings (customizable via `PptxRendererOptions`) |
 | `web/index.html` | Browser demo UI |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |
 | `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |

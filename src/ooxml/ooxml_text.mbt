@@ -175,6 +175,10 @@ fn resolve_font_theme(typeface : String, theme : ThemeData) -> String {
     theme.major_font
   } else if typeface == "+mn-lt" {
     theme.minor_font
+  } else if typeface == "+mj-ea" {
+    theme.major_ea_font
+  } else if typeface == "+mn-ea" {
+    theme.minor_ea_font
   } else {
     typeface
   }

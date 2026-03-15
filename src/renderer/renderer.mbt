@@ -694,8 +694,14 @@ fn format_ratio(num : Int, den : Int) -> String {
   if den == 0 || num == den {
     return "1"
   }
-  // Use 4 fractional digits: compute ratio * 10000
-  let scaled = num * 10000 / den
+  // Compute ratio * 10000 without 32-bit overflow.
+  // Split: whole = num/den, then fractional digits via remainder*100 steps.
+  let q1 = num / den
+  let r1 = num - q1 * den
+  let q2 = r1 * 100 / den
+  let r2 = r1 * 100 - q2 * den
+  let q3 = r2 * 100 / den
+  let scaled = q1 * 10000 + q2 * 100 + q3
   let whole = scaled / 10000
   let frac = scaled - whole * 10000
   let abs_frac = if frac < 0 { -frac } else { frac }

@@ -20,9 +20,23 @@ fn build_font_family(
   let mut ff = ""
   if not(sym.is_empty()) { ff = sym }
   if not(cs.is_empty()) { ff = if ff.is_empty() { cs } else { ff + ", " + cs } }
-  if not(ea.is_empty()) { ff = if ff.is_empty() { ea } else { ff + ", " + ea } }
+  if not(ea.is_empty()) {
+    ff = if ff.is_empty() { ea } else { ff + ", " + ea }
+    // Append platform fallbacks for EA font
+    let fb = @ffi.ffi_get_font_fallback(ea)
+    if not(fb.is_empty()) {
+      ff = ff + ", " + fb
+    }
+  }
   if not(latin.is_empty()) {
     ff = if ff.is_empty() { latin } else { ff + ", " + latin }
+    // Append platform fallbacks for Latin font (if different from EA)
+    if latin != ea {
+      let fb = @ffi.ffi_get_font_fallback(latin)
+      if not(fb.is_empty()) {
+        ff = ff + ", " + fb
+      }
+    }
   }
   ff
 }

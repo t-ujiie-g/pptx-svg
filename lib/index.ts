@@ -15,6 +15,8 @@
 
 export { PptxRenderer } from './pptx-renderer.js';
 export type { MeasureTextFn, PptxRendererOptions } from './pptx-renderer.js';
+export { DEFAULT_FONT_FALLBACKS } from './font-fallbacks.js';
+export type { FontFallbackMap } from './font-fallbacks.js';
 export { bytesToBase64, crc32 } from './utils.js';
 export { extractZip, buildZip } from './zip.js';
 export type { ZipContents } from './zip.js';

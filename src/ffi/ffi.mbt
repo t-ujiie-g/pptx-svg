@@ -63,3 +63,8 @@ pub fn ffi_measure_text(
   font_face : String,
   font_size_pt : Double,
 ) -> Double = "pptx_ffi" "measure_text"
+
+///|
+/// Get font fallback list for a given font name.
+/// Returns comma-separated fallback font names, or empty string if none.
+pub fn ffi_get_font_fallback(font : String) -> String = "pptx_ffi" "get_font_fallback"
