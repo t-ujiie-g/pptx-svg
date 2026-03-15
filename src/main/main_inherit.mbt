@@ -1,4 +1,4 @@
-// Main — Placeholder inheritance + text style defaults + utilities
+// Main — Placeholder inheritance + text style defaults
 //
 // Same package as main.mbt — all globals and helpers are shared.
 
@@ -513,91 +513,4 @@ fn extract_text(paragraphs : Array[@ooxml.TextParagraph]) -> String {
     pi = pi + 1
   }
   result
-}
-
-// ── Theme path resolution ────────────────────────────────────────────────────
-
-///|
-/// Find the theme file path from presentation.xml.rels.
-fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
-  let n = rels.length()
-  let mut i = 0
-  while i < n {
-    let rel = rels[i]
-    // Theme relationship type ends with "/theme"
-    if ends_with(rel.type_, "/theme") {
-      // Target is relative to ppt/ directory
-      if starts_with(rel.target, "/") {
-        return suffix(rel.target, 1)
-      } else {
-        return "ppt/" + rel.target
-      }
-    }
-    i = i + 1
-  }
-  // Fallback: try the standard location
-  ""
-}
-
-// ── Package-local string/int helpers (shared by main.mbt) ────────────────────
-
-///|
-fn ends_with(s : String, pat : String) -> Bool {
-  @xml.str_ends_with(s, pat)
-}
-
-///|
-fn starts_with(s : String, pat : String) -> Bool {
-  @xml.str_starts_with(s, pat)
-}
-
-///|
-fn suffix(s : String, from : Int) -> String {
-  @xml.str_suffix(s, from)
-}
-
-///|
-fn int_to_str(n : Int) -> String {
-  @xml.int_to_str(n)
-}
-
-// ── Slide counting ────────────────────────────────────────────────────────────
-
-///|
-fn count_slide_ids(xml : String) -> Int {
-  count_occurrences(xml, "<p:sldId ") +
-  count_occurrences(xml, "<p:sldId\t") +
-  count_occurrences(xml, "<p:sldId\n") +
-  count_occurrences(xml, "<p:sldId/>")
-}
-
-///|
-fn count_occurrences(text : String, pattern : String) -> Int {
-  let plen = pattern.length()
-  let tlen = text.length()
-  if plen == 0 || tlen < plen {
-    return 0
-  }
-  let mut count = 0
-  let mut i = 0
-  while i <= tlen - plen {
-    if match_at(text, pattern, i) {
-      count = count + 1
-      i = i + plen
-    } else {
-      i = i + 1
-    }
-  }
-  count
-}
-
-///|
-fn match_at(text : String, pattern : String, pos : Int) -> Bool {
-  let plen = pattern.length()
-  for j = 0; j < plen; j = j + 1 {
-    if text.get_char(pos + j).unwrap() != pattern.get_char(j).unwrap() {
-      return false
-    }
-  }
-  true
 }

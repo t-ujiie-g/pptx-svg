@@ -62,6 +62,9 @@ let chart_err_bar_cap_w : Int = 4 // half-width of error bar cap in px
 ///|
 let chart_heatmap_min_sentinel : Int = 2147483647 // Int max sentinel for heatmap min detection
 
+///|
+let chart_val_scale : Int = 10000 // fixed-point scale for chart numeric values (4 decimal places)
+
 // ── Chart style constants ─────────────────────────────────────────────────
 
 ///|
@@ -206,8 +209,18 @@ fn render_chart(
   } else {
     chart_pad + chart_axis_label_w
   }
+  // Detect if X-axis labels need rotation (many categories)
+  let has_many_cats = if not(no_axes) && not(h_bar) && not(chart.groups.is_empty()) &&
+    not(chart.groups[0].series.is_empty()) {
+    let nc = get_cat_labels(chart.groups[0].series[0].cat).length()
+    nc > 8
+  } else {
+    false
+  }
   let bottom_pad = if no_axes {
     chart_pad
+  } else if has_many_cats {
+    chart_pad + chart_axis_label_h + 40 // extra space for rotated labels
   } else {
     chart_pad + chart_axis_label_h
   }
@@ -223,7 +236,7 @@ fn render_chart(
   // Render chart groups
   for gi in 0..<chart.groups.length() {
     svg = svg + render_chart_group(
-      chart.groups[gi], plot_x, plot_y, plot_w, plot_h, colors,
+      chart.groups[gi], plot_x, plot_y, plot_w, plot_h, colors, chart.axes,
     )
   }
   // Render axes
@@ -245,17 +258,18 @@ fn render_chart_group(
   pw : Int,
   ph : Int,
   colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
 ) -> String {
   match group.chart_type {
-    @ooxml.ChartKind::BarChart => render_bar_chart(group, px_, py, pw, ph, colors)
-    @ooxml.ChartKind::LineChart => render_line_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::BarChart => render_bar_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::LineChart => render_line_chart(group, px_, py, pw, ph, colors, axes)
     @ooxml.ChartKind::PieChart => render_pie_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::DoughnutChart =>
       render_donut_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::ScatterChart =>
       render_scatter_chart(group, px_, py, pw, ph, colors)
-    @ooxml.ChartKind::AreaChart => render_area_chart(group, px_, py, pw, ph, colors)
-    @ooxml.ChartKind::RadarChart => render_line_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::AreaChart => render_area_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::RadarChart => render_line_chart(group, px_, py, pw, ph, colors, axes)
     @ooxml.ChartKind::BubbleChart =>
       render_bubble_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::StockChart =>
@@ -277,6 +291,7 @@ fn render_bar_chart(
   pw : Int,
   ph : Int,
   colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
 ) -> String {
   let is_horizontal = group.bar_dir == "bar"
   let ns = group.series.length()
@@ -284,7 +299,8 @@ fn render_bar_chart(
     return ""
   }
   // Get data range
-  let (cats, max_val) = get_series_range(group.series)
+  let (cats, raw_max) = get_series_range(group.series)
+  let max_val = compute_axis_max(raw_max, axes)
   let nc = cats.length()
   if nc == 0 || max_val == 0 {
     return ""
@@ -307,7 +323,7 @@ fn render_bar_chart(
       let val = values[ci]
       if val > 0 {
         let pt_color = point_color(ser, ci, color)
-        let bar_len = val * val_size / max_val
+        let bar_len = mul_div(val, val_size, max_val)
         let cat_start = ci * cat_size / nc
         let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
           nc /
@@ -327,8 +343,15 @@ fn render_bar_chart(
       }
     }
   }
-  // Data labels
-  if group.data_labels.is_visible() {
+  // Data labels (check group-level and series-level)
+  let has_data_labels = group.data_labels.is_visible() || {
+    let mut found = false
+    for si2 in 0..<ns {
+      if group.series[si2].data_labels.is_visible() { found = true }
+    }
+    found
+  }
+  if has_data_labels {
     svg = svg + render_bar_data_labels(
       group, px_, py, pw, ph, max_val, is_horizontal, units_per_cat, gap_pct,
     )
@@ -351,12 +374,14 @@ fn render_line_chart(
   pw : Int,
   ph : Int,
   colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
 ) -> String {
   let ns = group.series.length()
   if ns == 0 {
     return ""
   }
-  let (cats, max_val) = get_series_range(group.series)
+  let (cats, raw_max) = get_series_range(group.series)
+  let max_val = compute_axis_max(raw_max, axes)
   let nc = cats.length()
   if nc == 0 || max_val == 0 {
     return ""
@@ -372,7 +397,7 @@ fn render_line_chart(
     let n_pts = if nv < nc { nv } else { nc }
     for ci in 0..<n_pts {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-      let y = py + ph - values[ci] * ph / max_val
+      let y = py + ph - mul_div(values[ci], ph, max_val)
       if not(points.is_empty()) {
         points = points + " "
       }
@@ -385,15 +410,22 @@ fn render_line_chart(
       // Draw markers
       for ci in 0..<n_pts {
         let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-        let y = py + ph - values[ci] * ph / max_val
+        let y = py + ph - mul_div(values[ci], ph, max_val)
         svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
           int_to_str(y) + "\" r=\"" + int_to_str(chart_line_marker_r) +
           "\" fill=\"" + color + "\"/>"
       }
     }
   }
-  // Data labels
-  if group.data_labels.is_visible() {
+  // Data labels (check group-level and series-level)
+  let has_xy_dl = group.data_labels.is_visible() || {
+    let mut found = false
+    for si2 in 0..<ns {
+      if group.series[si2].data_labels.is_visible() { found = true }
+    }
+    found
+  }
+  if has_xy_dl {
     svg = svg + render_xy_data_labels(group, px_, py, pw, ph, max_val, nc)
   }
   // Trendlines + error bars
@@ -429,7 +461,7 @@ fn render_pie_chart(
     return ""
   }
   let mut svg = render_pie_slices(values, nv, cx, cy, r, 0, ser.data_points, colors)
-  if group.data_labels.is_visible() {
+  if group.data_labels.is_visible() || ser.data_labels.is_visible() {
     svg = svg + render_pie_data_labels(
       group, values, nv, cx, cy, r, 0, ser,
     )
@@ -463,7 +495,7 @@ fn render_donut_chart(
     return ""
   }
   let mut svg = render_pie_slices(values, nv, cx, cy, r, inner_r, ser.data_points, colors)
-  if group.data_labels.is_visible() {
+  if group.data_labels.is_visible() || ser.data_labels.is_visible() {
     svg = svg + render_pie_data_labels(
       group, values, nv, cx, cy, r, inner_r, ser,
     )
@@ -496,7 +528,7 @@ fn render_pie_slices(
   let mut svg = ""
   let mut start_angle = -90 * 100 // in hundredths of degrees, start from top
   for i in 0..<nv {
-    let sweep = values[i] * 36000 / total // hundredths of degrees
+    let sweep = mul_div(values[i], 36000, total) // hundredths of degrees
     if sweep > 0 {
       let color = get_dpt_color(data_points, i, colors)
       let end_angle = start_angle + sweep
@@ -556,8 +588,8 @@ fn render_scatter_chart(
     let yv = get_num_values(ser.y_val)
     let n = if xv.length() < yv.length() { xv.length() } else { yv.length() }
     for ci in 0..<n {
-      let x = px_ + xv[ci] * pw / x_max
-      let y = py + ph - yv[ci] * ph / y_max
+      let x = px_ + mul_div(xv[ci], pw, x_max)
+      let y = py + ph - mul_div(yv[ci], ph, y_max)
       svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
         int_to_str(y) + "\" r=\"" + int_to_str(chart_scatter_marker_r) +
         "\" fill=\"" + color + "\"/>"
@@ -576,11 +608,13 @@ fn render_area_chart(
   pw : Int,
   ph : Int,
   colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
 ) -> String {
   if group.series.is_empty() {
     return ""
   }
-  let (_, max_val) = get_series_range(group.series)
+  let (_, raw_max) = get_series_range(group.series)
+  let max_val = compute_axis_max(raw_max, axes)
   let nc = get_max_points(group.series)
   if nc == 0 || max_val == 0 {
     return ""
@@ -596,7 +630,7 @@ fn render_area_chart(
     let mut points = ""
     for ci in 0..<actual {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-      let y = py + ph - values[ci] * ph / max_val
+      let y = py + ph - mul_div(values[ci], ph, max_val)
       if not(points.is_empty()) {
         points = points + " "
       }
@@ -641,8 +675,8 @@ fn render_bubble_chart(
     let bv = get_num_values(ser.bubble_size)
     let n = if xv.length() < yv.length() { xv.length() } else { yv.length() }
     for ci in 0..<n {
-      let x = px_ + xv[ci] * pw / x_max
-      let y = py + ph - yv[ci] * ph / y_max
+      let x = px_ + mul_div(xv[ci], pw, x_max)
+      let y = py + ph - mul_div(yv[ci], ph, y_max)
       // Bubble radius proportional to bubble_size / bub_max (linear approximation)
       let bsize = if ci < bv.length() { bv[ci] } else { bub_max / 2 }
       let r = if bub_max > 0 {
@@ -712,9 +746,9 @@ fn render_stock_chart(
     let h_val = if ci < high_vals.length() { high_vals[ci] } else { 0 }
     let l_val = if ci < low_vals.length() { low_vals[ci] } else { 0 }
     let c_val = if ci < close_vals.length() { close_vals[ci] } else { 0 }
-    let hy = py + ph - h_val * ph / max_val
-    let ly = py + ph - l_val * ph / max_val
-    let cy_ = py + ph - c_val * ph / max_val
+    let hy = py + ph - mul_div(h_val, ph, max_val)
+    let ly = py + ph - mul_div(l_val, ph, max_val)
+    let cy_ = py + ph - mul_div(c_val, ph, max_val)
     // High-low vertical line
     svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" +
       int_to_str(hy) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" +
@@ -728,7 +762,7 @@ fn render_stock_chart(
     // Open tick (left) if 4 series
     if open_idx >= 0 && ci < open_vals.length() {
       let o_val = open_vals[ci]
-      let oy = py + ph - o_val * ph / max_val
+      let oy = py + ph - mul_div(o_val, ph, max_val)
       svg = svg + "<line x1=\"" + int_to_str(cx - bar_w) + "\" y1=\"" +
         int_to_str(oy) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" +
         int_to_str(oy) + "\" stroke=\"" + colors[1 % colors.length()] +
@@ -783,7 +817,7 @@ fn render_surface_chart(
     let vals = all_values[si]
     for ci in 0..<vals.length() {
       // Interpolate: 0=blue(cold), 1=red(hot)
-      let t = (vals[ci] - global_min) * 255 / range
+      let t = mul_div(vals[ci] - global_min, 255, range)
       let r = t
       let b = 255 - t
       let g = if t < 128 { t * 2 } else { (255 - t) * 2 }
@@ -836,12 +870,12 @@ fn render_axes(
     let x_max = get_x_axis_max(groups)
     for ti in 0..=chart_axis_ticks {
       let x = px_ + ti * pw / chart_axis_ticks
-      let label_val = ti * x_max / chart_axis_ticks
+      let label_val = mul_div(ti, x_max, chart_axis_ticks)
       svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
         int_to_str(py + ph + 14) +
         "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
         chart_axis_label_color + "\">" +
-        int_to_str(label_val) + "</text>"
+        format_chart_val(label_val, "General") + "</text>"
     }
   } else {
     let cats = if not(groups.is_empty()) && not(groups[0].series.is_empty()) {
@@ -863,13 +897,25 @@ fn render_axes(
         }
       } else {
         // Vertical: category labels at bottom (X axis)
+        // Rotate labels when there are many categories to avoid overlap
+        let rotate = nc > 8
         for ci in 0..<nc {
           let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-          svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
-            int_to_str(py + ph + 14) +
-            "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
-            chart_axis_label_color + "\">" +
-            svg_escape(cats[ci]) + "</text>"
+          if rotate {
+            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              int_to_str(py + ph + 10) +
+              "\" text-anchor=\"end\" font-size=\"8\" fill=\"" +
+              chart_axis_label_color +
+              "\" transform=\"rotate(-45," + int_to_str(x) + "," +
+              int_to_str(py + ph + 10) + ")\">" +
+              svg_escape(cats[ci]) + "</text>"
+          } else {
+            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              int_to_str(py + ph + 14) +
+              "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
+              chart_axis_label_color + "\">" +
+              svg_escape(cats[ci]) + "</text>"
+          }
         }
       }
     }
@@ -878,40 +924,54 @@ fn render_axes(
   for ai in 0..<axes.length() {
     let ax = axes[ai]
     if ax.is_val && not(ax.delete) {
-      let max_val = get_value_axis_max(groups)
-      for ti in 0..=chart_axis_ticks {
+      let raw_max = get_value_axis_max(groups)
+      let val_fmt = ax.num_fmt
+      let max_val = compute_axis_max(raw_max, axes)
+      // Determine tick count from majorUnit if specified
+      let major_unit = if ax.major_unit.is_empty() {
+        0
+      } else {
+        parse_chart_num(ax.major_unit)
+      }
+      let n_ticks = if major_unit > 0 && max_val > 0 {
+        let n = max_val / major_unit
+        if n > 20 { 20 } else if n < 1 { 1 } else { n }
+      } else {
+        chart_axis_ticks
+      }
+      for ti in 0..=n_ticks {
         if h_bar {
           // Horizontal bar: value labels at bottom (X axis), vertical gridlines
-          let x = px_ + ti * pw / chart_axis_ticks
-          if ax.major_gridlines && ti > 0 && ti < chart_axis_ticks {
+          let x = px_ + ti * pw / n_ticks
+          if ax.major_gridlines && ti > 0 && ti < n_ticks {
             svg = svg + "<line x1=\"" + int_to_str(x) + "\" y1=\"" +
               int_to_str(py) + "\" x2=\"" + int_to_str(x) +
               "\" y2=\"" + int_to_str(py + ph) +
               "\" stroke=\"" + chart_gridline_color +
               "\" stroke-width=\"0.5\"/>"
           }
-          let label_val = ti * max_val / chart_axis_ticks
+          let label_val = mul_div(ti, max_val, n_ticks)
           svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
             int_to_str(py + ph + 14) +
             "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
             chart_axis_label_color + "\">" +
-            int_to_str(label_val) + "</text>"
+            format_chart_val(label_val, val_fmt) + "</text>"
         } else {
           // Vertical: value labels on left (Y axis), horizontal gridlines
-          let y = py + ph - ti * ph / chart_axis_ticks
-          if ax.major_gridlines && ti > 0 && ti < chart_axis_ticks {
+          let y = py + ph - ti * ph / n_ticks
+          if ax.major_gridlines && ti > 0 && ti < n_ticks {
             svg = svg + "<line x1=\"" + int_to_str(px_) + "\" y1=\"" +
               int_to_str(y) + "\" x2=\"" + int_to_str(px_ + pw) +
               "\" y2=\"" + int_to_str(y) +
               "\" stroke=\"" + chart_gridline_color +
               "\" stroke-width=\"0.5\"/>"
           }
-          let label_val = ti * max_val / chart_axis_ticks
+          let label_val = mul_div(ti, max_val, n_ticks)
           svg = svg + "<text x=\"" + int_to_str(px_ - 4) + "\" y=\"" +
             int_to_str(y + 3) +
             "\" text-anchor=\"end\" font-size=\"10\" fill=\"" +
             chart_axis_label_color + "\">" +
-            int_to_str(label_val) + "</text>"
+            format_chart_val(label_val, val_fmt) + "</text>"
         }
       }
     }
@@ -1067,6 +1127,16 @@ fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
 }
 
 ///|
+/// Get the numeric format code from an AxisDataSource (e.g. "0%", "General").
+fn get_num_format(src : @ooxml.AxisDataSource) -> String {
+  match src {
+    @ooxml.AxisDataSource::NumSource(_, data) =>
+      if data.format_code.is_empty() { "General" } else { data.format_code }
+    _ => "General"
+  }
+}
+
+///|
 /// Get max data points across all series.
 fn get_max_points(series : Array[@ooxml.ChartSeries]) -> Int {
   let mut max_n = 0
@@ -1075,6 +1145,43 @@ fn get_max_points(series : Array[@ooxml.ChartSeries]) -> Int {
     if n > max_n { max_n = n }
   }
   max_n
+}
+
+///|
+/// Round up a tick interval to a nice number from {1,2,5}×10^n series.
+/// E.g. 762 → 1000, 350 → 500, 18 → 20.
+fn nice_ceil(val : Int) -> Int {
+  if val <= 0 {
+    return 1
+  }
+  // Find magnitude
+  let mut mag = 1
+  while mag * 10 <= val {
+    mag = mag * 10
+  }
+  // val / mag is 1..9; pick the next nice number
+  let leading = (val + mag - 1) / mag // ceil(val/mag)
+  if leading <= 1 {
+    mag
+  } else if leading <= 2 {
+    mag * 2
+  } else if leading <= 5 {
+    mag * 5
+  } else {
+    mag * 10
+  }
+}
+
+///|
+/// Round up max value to produce clean axis tick labels.
+/// Uses nice_ceil on the tick interval so labels are round numbers.
+fn round_up_nice(val : Int) -> Int {
+  if val <= 0 {
+    return chart_val_scale
+  }
+  let raw_interval = (val + chart_axis_ticks - 1) / chart_axis_ticks
+  let nice_interval = nice_ceil(raw_interval)
+  nice_interval * chart_axis_ticks
 }
 
 ///|
@@ -1125,6 +1232,29 @@ fn get_xy_range(
 }
 
 ///|
+/// Compute effective axis max from raw data max, using majorUnit if available,
+/// otherwise round_up_nice.
+fn compute_axis_max(
+  raw_max : Int,
+  axes : Array[@ooxml.ChartAxis],
+) -> Int {
+  // Find the value axis majorUnit
+  let mut major_unit = 0
+  for ai in 0..<axes.length() {
+    if axes[ai].is_val && not(axes[ai].major_unit.is_empty()) {
+      major_unit = parse_chart_num(axes[ai].major_unit)
+    }
+  }
+  if major_unit > 0 {
+    let n = (raw_max + major_unit - 1) / major_unit
+    let n_capped = if n > 20 { 20 } else if n < 1 { 1 } else { n }
+    n_capped * major_unit
+  } else {
+    round_up_nice(raw_max)
+  }
+}
+
+///|
 /// Get the max value for the value axis, considering chart type.
 fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
   if groups.is_empty() {
@@ -1171,35 +1301,226 @@ fn get_x_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
 }
 
 ///|
-/// Parse a numeric string to integer (truncating decimal part).
+/// Parse a numeric string to fixed-point integer (×chart_val_scale).
+/// Handles: "0.381" → 3810, "38.1" → 381000, "500" → 5000000.
+/// Also handles scientific notation: "1.77E-2" → 177.
 fn parse_chart_num(s : String) -> Int {
   if s.is_empty() {
     return 0
   }
-  // Find decimal point position
   let len = s.length()
-  let mut end = len
-  let mut i = 0
+  // Handle negative
+  let start = if len > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
+  // Detect scientific notation (E or e)
+  let mut e_pos = -1
+  let mut si = start
+  while si < len {
+    let c = s.get_char(si).unwrap()
+    if c == 'E' || c == 'e' {
+      e_pos = si
+      si = len // break
+    }
+    si = si + 1
+  }
+  if e_pos >= 0 {
+    // Scientific notation: parse mantissa and exponent separately
+    // Parse mantissa digits (ignoring dot, max 8 significant digits to avoid overflow)
+    let mut mantissa = 0
+    let mut mant_dec_digits = 0
+    let mut found_dot = false
+    let mut sig_digits = 0
+    si = start
+    while si < e_pos {
+      let c = s.get_char(si).unwrap()
+      if c == '.' {
+        found_dot = true
+      } else if c >= '0' && c <= '9' && sig_digits < 8 {
+        mantissa = mantissa * 10 + (Char::to_int(c) - 48)
+        sig_digits = sig_digits + 1
+        if found_dot { mant_dec_digits = mant_dec_digits + 1 }
+      }
+      si = si + 1
+    }
+    // Parse exponent (may be negative)
+    let mut exp = 0
+    let mut exp_neg = false
+    si = e_pos + 1
+    if si < len {
+      let ec = s.get_char(si).unwrap()
+      if ec == '-' { exp_neg = true; si = si + 1 }
+      else if ec == '+' { si = si + 1 }
+    }
+    while si < len {
+      let c = s.get_char(si).unwrap()
+      if c >= '0' && c <= '9' {
+        exp = exp * 10 + (Char::to_int(c) - 48)
+      }
+      si = si + 1
+    }
+    if exp_neg { exp = -exp }
+    // Net decimal shift: number of decimal places after applying exponent
+    // E.g. 1.7738E-2: mantissa=17738, mant_dec_digits=4, exp=-2
+    // Actual value = 17738 × 10^(-4-2) = 17738 × 10^-6 = 0.017738
+    // We need result × 10^-4 (chart_val_scale = 10^4)
+    // So result = mantissa × 10^(exp - mant_dec_digits + 4)
+    let shift = exp - mant_dec_digits + 4
+    let mut result = mantissa
+    if shift >= 0 {
+      let mut p = 0
+      while p < shift {
+        result = result * 10
+        p = p + 1
+      }
+    } else {
+      let mut p = 0
+      while p < -shift {
+        result = result / 10
+        p = p + 1
+      }
+    }
+    return if start == 1 { -result } else { result }
+  }
+  // Standard decimal parsing
+  // Find decimal point position
+  let mut dot_pos = len
+  let mut i = start
   while i < len {
     let c = s.get_char(i).unwrap()
     if c == '.' {
-      end = i
-      i = len // skip to end (MoonBit has no break)
+      dot_pos = i
+      i = len // break
     }
     i = i + 1
   }
-  // Handle negative
-  let start = if len > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
-  let mut result = 0
+  // Parse integer part
+  let mut int_part = 0
   i = start
-  while i < end {
+  while i < dot_pos {
     let c = s.get_char(i).unwrap()
     if c >= '0' && c <= '9' {
-      result = result * 10 + (Char::to_int(c) - 48)
+      int_part = int_part * 10 + (Char::to_int(c) - 48)
     }
     i = i + 1
   }
+  // Parse decimal part (up to 4 digits for scale=10000)
+  let mut dec_part = 0
+  let mut dec_digits = 0
+  i = dot_pos + 1
+  while i < len && dec_digits < 4 {
+    let c = s.get_char(i).unwrap()
+    if c >= '0' && c <= '9' {
+      dec_part = dec_part * 10 + (Char::to_int(c) - 48)
+      dec_digits = dec_digits + 1
+    }
+    i = i + 1
+  }
+  // Pad remaining decimal places with zeros
+  while dec_digits < 4 {
+    dec_part = dec_part * 10
+    dec_digits = dec_digits + 1
+  }
+  let result = int_part * chart_val_scale + dec_part
   if start == 1 { -result } else { result }
+}
+
+///|
+/// Safe a*b/c avoiding 32-bit overflow.
+/// Uses: a*b/c = (a/c)*b + (a%c)*b/c.
+fn gcd(a : Int, b : Int) -> Int {
+  let mut x = if a < 0 { -a } else { a }
+  let mut y = if b < 0 { -b } else { b }
+  while y != 0 {
+    let t = y
+    y = x % y
+    x = t
+  }
+  x
+}
+
+fn mul_div(a : Int, b : Int, c : Int) -> Int {
+  if c == 0 {
+    return 0
+  }
+  // Reduce a/c and b/c by GCD to avoid overflow in a*b
+  let g1 = gcd(a, c)
+  let a1 = a / g1
+  let c1 = c / g1
+  let g2 = gcd(b, c1)
+  let b1 = b / g2
+  let c2 = c1 / g2
+  // Now a1 * b1 / c2 with minimal overflow risk
+  if c2 == 0 {
+    return 0
+  }
+  a1 * b1 / c2
+}
+
+///|
+/// Format a scaled chart value for axis/data label display.
+/// Handles "0%", "0.0%", "0.00%", "General", etc.
+fn format_chart_val(val : Int, num_fmt : String) -> String {
+  // Check if percentage format
+  let is_pct = num_fmt.length() > 0 && {
+    let last = num_fmt.get_char(num_fmt.length() - 1).unwrap()
+    last == '%'
+  }
+  if is_pct {
+    // Percentage: multiply by 100 then format
+    // val is scaled ×10000, so 0.381 = 3810.
+    // ×100 = 381000 / 10000 = 38.1
+    let pct_scaled = val * 100 // now scaled ×10000 of percentage value
+    // Count decimal places in format (e.g. "0%" = 0, "0.0%" = 1, "0.00%" = 2)
+    let mut dec_places = 0
+    let mut found_dot = false
+    let mut fi = 0
+    while fi < num_fmt.length() {
+      let c = num_fmt.get_char(fi).unwrap()
+      if c == '.' {
+        found_dot = true
+      } else if found_dot && c == '0' {
+        dec_places = dec_places + 1
+      } else if c == '%' {
+        fi = num_fmt.length() // break
+      }
+      fi = fi + 1
+    }
+    if dec_places == 0 {
+      // Round to integer percentage
+      let int_pct = (pct_scaled + chart_val_scale / 2) / chart_val_scale
+      int_to_str(int_pct) + "%"
+    } else {
+      // Show with decimal places, properly rounded
+      // For N decimal places, round to 10^N resolution then split
+      let round_div = if dec_places == 1 {
+        1000 // chart_val_scale / 10
+      } else if dec_places == 2 {
+        100 // chart_val_scale / 100
+      } else {
+        10
+      }
+      let rounded = (pct_scaled + round_div / 2) / round_div
+      let pows = if dec_places == 1 { 10 } else if dec_places == 2 { 100 } else { 1000 }
+      let int_pct = rounded / pows
+      let frac = if rounded >= 0 {
+        rounded - int_pct * pows
+      } else {
+        -(rounded - int_pct * pows)
+      }
+      let frac_str = if dec_places == 1 {
+        int_to_str(frac)
+      } else if dec_places == 2 {
+        (if frac < 10 { "0" } else { "" }) + int_to_str(frac)
+      } else {
+        (if frac < 100 { "0" } else { "" }) + (if frac < 10 { "0" } else { "" }) +
+        int_to_str(frac)
+      }
+      int_to_str(int_pct) + "." + frac_str + "%"
+    }
+  } else {
+    // General format: just show the integer part
+    let int_val = val / chart_val_scale
+    int_to_str(int_val)
+  }
 }
 
 // ── Data label rendering ─────────────────────────────────────────────────────
@@ -1212,6 +1533,7 @@ fn build_label_text(
   total : Int,
   cat_name : String,
   ser_name : String,
+  num_fmt : String,
 ) -> String {
   let parts : Array[String] = []
   if dl.show_ser_name {
@@ -1221,11 +1543,11 @@ fn build_label_text(
     parts.push(cat_name)
   }
   if dl.show_val {
-    parts.push(int_to_str(val))
+    parts.push(format_chart_val(val, num_fmt))
   }
   if dl.show_percent && total > 0 {
-    let pct = val * 100 / total
-    parts.push(int_to_str(pct) + "%")
+    let pct = mul_div(val, 100 * chart_val_scale, total)
+    parts.push(format_chart_val(pct, "0%"))
   }
   let mut result = ""
   for i in 0..<parts.length() {
@@ -1253,22 +1575,30 @@ fn render_bar_data_labels(
   let ns = group.series.length()
   let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
   let nc = cats.length()
-  let dl = group.data_labels
+  let group_dl = group.data_labels
   let cat_size = if is_horizontal { ph } else { pw }
   let val_size = if is_horizontal { pw } else { ph }
   let mut svg = ""
   for si in 0..<ns {
     let ser = group.series[si]
+    // Use series-level dLbls if available, otherwise group-level
+    let dl = if ser.data_labels.is_visible() {
+      ser.data_labels
+    } else {
+      group_dl
+    }
+    if not(dl.is_visible()) { continue }
     let values = get_num_values(ser.val)
+    let val_fmt = get_num_format(ser.val)
     let nv = values.length()
     for ci in 0..<nc {
       if ci < nv && values[ci] > 0 {
         let label = build_label_text(
           dl, values[ci], 0, if ci < cats.length() { cats[ci] } else { "" },
-          ser.title,
+          ser.title, val_fmt,
         )
         if not(label.is_empty()) {
-          let bar_len = values[ci] * val_size / max_val
+          let bar_len = mul_div(values[ci], val_size, max_val)
           let cat_start = ci * cat_size / nc
           let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
             nc / units_per_cat
@@ -1311,21 +1641,24 @@ fn render_xy_data_labels(
 ) -> String {
   let ns = group.series.length()
   let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
-  let dl = group.data_labels
+  let group_dl = group.data_labels
   let mut svg = ""
   for si in 0..<ns {
     let ser = group.series[si]
+    let dl = if ser.data_labels.is_visible() { ser.data_labels } else { group_dl }
+    if not(dl.is_visible()) { continue }
     let values = get_num_values(ser.val)
+    let val_fmt = get_num_format(ser.val)
     let nv = values.length()
     for ci in 0..<nc {
       if ci < nv {
         let label = build_label_text(
           dl, values[ci], 0,
-          if ci < cats.length() { cats[ci] } else { "" }, ser.title,
+          if ci < cats.length() { cats[ci] } else { "" }, ser.title, val_fmt,
         )
         if not(label.is_empty()) {
           let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-          let y = py + ph - values[ci] * ph / max_val - 6
+          let y = py + ph - mul_div(values[ci], ph, max_val) - 6
           svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
             int_to_str(y) +
             "\" text-anchor=\"middle\" font-size=\"" +
@@ -1358,13 +1691,13 @@ fn render_pie_data_labels(
   if total == 0 {
     return ""
   }
-  let dl = group.data_labels
+  let dl = if ser.data_labels.is_visible() { ser.data_labels } else { group.data_labels }
   let cats = get_cat_labels(ser.cat)
   let label_r = if inner_r > 0 { (r + inner_r) / 2 } else { r * 2 / 3 }
   let mut svg = ""
   let mut start_angle = -90 * 100
   for i in 0..<nv {
-    let sweep = values[i] * 36000 / total
+    let sweep = mul_div(values[i], 36000, total)
     if sweep > 0 {
       let mid_angle = start_angle + sweep / 2
       let lx = cx + label_r * cos1000(mid_angle) / 1000
@@ -1372,6 +1705,7 @@ fn render_pie_data_labels(
       let label = build_label_text(
         dl, values[i], total,
         if i < cats.length() { cats[i] } else { "" }, ser.title,
+        get_num_format(ser.val),
       )
       if not(label.is_empty()) {
         svg = svg + "<text x=\"" + int_to_str(lx) + "\" y=\"" +
@@ -1437,17 +1771,19 @@ fn render_trendlines(
           }
           let denom = n * sum_x2 - sum_x * sum_x
           if denom != 0 {
-            // Compute endpoints using integer math (scale by 1000 for precision)
-            let m_1000 = (n * sum_xy - sum_x * sum_y) * 1000 / denom
-            let b_1000 = (sum_y * 1000 - m_1000 * sum_x) / n
+            // Compute slope and intercept directly
+            // Values are already scaled by chart_val_scale, enough precision
+            let numer = n * sum_xy - sum_x * sum_y
+            let m = numer / denom // slope in scaled units per x index
+            let b = (sum_y - m * sum_x) / n // y-intercept in scaled units
             // Start point (x=0)
-            let y0 = b_1000
+            let y0 = b
             let x_start = px_ + pw / (nc * 2)
-            let y_start = py + ph - y0 * ph / (max_val * 1000)
+            let y_start = py + ph - mul_div(y0, ph, max_val)
             // End point (x=n-1)
-            let yn = m_1000 * (n - 1) + b_1000
+            let yn = m * (n - 1) + b
             let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
-            let y_end = py + ph - yn * ph / (max_val * 1000)
+            let y_end = py + ph - mul_div(yn, ph, max_val)
             svg = svg + "<line x1=\"" + int_to_str(x_start) + "\" y1=\"" +
               int_to_str(y_start) + "\" x2=\"" + int_to_str(x_end) +
               "\" y2=\"" + int_to_str(y_end) +
@@ -1461,9 +1797,9 @@ fn render_trendlines(
           let n = if nv < nc { nv } else { nc }
           if n >= 2 {
             let x_start = px_ + pw / (nc * 2)
-            let y_start = py + ph - values[0] * ph / max_val
+            let y_start = py + ph - mul_div(values[0], ph, max_val)
             let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
-            let y_end = py + ph - values[n - 1] * ph / max_val
+            let y_end = py + ph - mul_div(values[n - 1], ph, max_val)
             svg = svg + "<line x1=\"" + int_to_str(x_start) + "\" y1=\"" +
               int_to_str(y_start) + "\" x2=\"" + int_to_str(x_end) +
               "\" y2=\"" + int_to_str(y_end) +
@@ -1508,24 +1844,24 @@ fn render_err_bars(
       let val = values[ci]
       // Calculate error magnitude
       let err = match eb.err_val_type {
-        "fixedVal" => eb.val
-        "percentage" => val * eb.val / 100
+        "fixedVal" => eb.val * chart_val_scale
+        "percentage" => mul_div(val, eb.val, 100)
         _ => val / 10 // fallback: 10% of value
       }
       if err <= 0 {
         continue
       }
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
-      let y_center = py + ph - val * ph / max_val
+      let y_center = py + ph - mul_div(val, ph, max_val)
       let show_plus = eb.err_bar_type == "both" || eb.err_bar_type == "plus"
       let show_minus = eb.err_bar_type == "both" || eb.err_bar_type == "minus"
       let y_top = if show_plus {
-        py + ph - (val + err) * ph / max_val
+        py + ph - mul_div(val + err, ph, max_val)
       } else {
         y_center
       }
       let y_bottom = if show_minus {
-        py + ph - (val - err) * ph / max_val
+        py + ph - mul_div(val - err, ph, max_val)
       } else {
         y_center
       }

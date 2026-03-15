@@ -122,15 +122,22 @@ TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_spa
 Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
 ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }
 
-ChartData { title, chart_xml: String, groups: Array[ChartGroup], axes: Array[ChartAxis], legend: ChartLegend, view_3d: ChartView3D }
+ChartData { groups: Array[ChartGroup], axes: Array[ChartAxis], title: String, legend: ChartLegend, style: Int, chart_xml: String, view_3d: ChartView3D }
 ChartKind = BarChart | LineChart | PieChart | DoughnutChart | ScatterChart | AreaChart | RadarChart | BubbleChart | StockChart | SurfaceChart | OfPieChart
-ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap, hole_size: Int, vary_colors: Bool, data_labels: ChartDataLabels, of_pie_type: String, split_pos: Int, wireframe: Bool }
-ChartSeries { idx, order: Int, title: String, sp_pr: ChartSpPr, cat, val, x_val, y_val, bubble_size: AxisDataSource, data_points: Array[ChartDataPoint], trendlines: Array[ChartTrendline], err_bars: ChartErrBars }
+ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap: Int, vary_colors: Bool, hole_size: Int, scatter_style: String, ax_ids: Array[Int], data_labels: ChartDataLabels, of_pie_type: String, split_pos: Int, wireframe: Bool }
+ChartSeries { idx, order: Int, title: String, sp_pr: ChartSpPr, cat, val, x_val, y_val, bubble_size: AxisDataSource, smooth: Bool, explosion: Int, data_points: Array[ChartDataPoint], trendlines: Array[ChartTrendline], err_bars: ChartErrBars, data_labels: ChartDataLabels }
+ChartSpPr { fill: Color, grad_fill: GradientFill, patt_fill: PatternFill, stroke: Color, stroke_w: Int, no_fill: Bool }
 ChartView3D { rot_x, rot_y, depth_percent: Int, r_ang_ax: Bool, perspective: Int }
 ChartDataLabels { show_val, show_cat_name, show_ser_name, show_percent, show_leader_lines: Bool, separator: String }
 ChartDataPoint { idx: Int, sp_pr: ChartSpPr }
+ChartTrendline { trendline_type, name: String, order, period, forward, backward: Int, sp_pr: ChartSpPr }
+ChartErrBars { err_dir, err_bar_type, err_val_type: String, val: Int, sp_pr: ChartSpPr }
+ChartLegend { position: String, overlay, show: Bool }
 AxisDataSource = NumSource(String, NumData) | StrSource(String, StrData) | NoData
-ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridlines: Bool }
+NumData { format_code: String, points: Array[ChartPoint] }
+StrData { points: Array[ChartPoint] }
+ChartPoint { idx: Int, value: String }
+ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridlines, minor_gridlines: Bool, title, orientation, min_val, max_val, major_unit, num_fmt, tick_lbl_pos, cross_between: String, sp_pr: ChartSpPr }
 ```
 
 ## Key files
@@ -148,11 +155,11 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
 | `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
-| `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area) |
+| `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), global state |
-| `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults |
+| `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
 | `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
 | `lib/pptx-renderer.ts` | `PptxRenderer` class (core API) |
