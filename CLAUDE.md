@@ -25,7 +25,7 @@ python3 -m http.server 8765 --directory .
 ## Architecture
 
 **Separation of concerns:**
-- **TypeScript library** (`lib/` → `dist/`): ZIP parsing/building, DEFLATE, Wasm lifecycle, CRC-32, `PptxRenderer` class
+- **TypeScript library** (`lib/` → `dist/`): ZIP parsing/building, DEFLATE, Wasm lifecycle, CRC-32, EMF→SVG conversion, `PptxRenderer` class
 - **MoonBit** (`src/`): OOXML parsing, SVG generation, SVG→SlideData parsing, OOXML serialization
 - **Demo** (`web/`): Browser demo UI (imports from `dist/`)
 
@@ -160,6 +160,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `lib/zip.ts` | ZIP extraction and building |
 | `lib/utils.ts` | bytesToBase64, crc32 utilities |
 | `lib/font-fallbacks.ts` | Font fallback mappings (customizable via `PptxRendererOptions`) |
+| `lib/emf-converter.ts` | Lightweight EMF→SVG converter (vector paths, text, bitmaps) |
+| `docs/svg-specification.md` | SVG output format specification (`data-ooxml-*` attributes) |
 | `web/index.html` | Browser demo UI |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |
 | `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |

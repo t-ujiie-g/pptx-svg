@@ -510,6 +510,15 @@ fn mime_from_ext(path : String) -> String {
     "image/gif"
   } else if ext == "svg" || ext == "svgz" {
     "image/svg+xml"
+  } else if ext == "bmp" {
+    "image/bmp"
+  } else if ext == "tif" || ext == "tiff" {
+    "image/tiff"
+  } else if ext == "webp" {
+    "image/webp"
+  } else if ext == "emf" || ext == "wmf" {
+    // EMF/WMF are Windows-only vector formats; browsers cannot render them
+    ""
   } else {
     "image/png"
   }
@@ -538,11 +547,16 @@ fn resolve_image_href(
     None => ()
   }
   let img_path = resolve_image_path(target)
+  let mime = mime_from_ext(img_path)
+  if mime.is_empty() {
+    // EMF/WMF: try converting to SVG via FFI
+    let svg_uri = @ffi.ffi_convert_emf(img_path)
+    return svg_uri
+  }
   let b64 = @ffi.ffi_get_file_base64(img_path)
   if b64.is_empty() {
     ""
   } else {
-    let mime = mime_from_ext(img_path)
     "data:" + mime + ";base64," + b64
   }
 }

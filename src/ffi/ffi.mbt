@@ -68,3 +68,9 @@ pub fn ffi_measure_text(
 /// Get font fallback list for a given font name.
 /// Returns comma-separated fallback font names, or empty string if none.
 pub fn ffi_get_font_fallback(font : String) -> String = "pptx_ffi" "get_font_fallback"
+
+///|
+/// Convert an EMF file to an SVG data URI.
+/// path: ZIP entry path (e.g. "ppt/media/image1.emf")
+/// Returns a data:image/svg+xml URI, or empty string if conversion fails.
+pub fn ffi_convert_emf(path : String) -> String = "pptx_ffi" "convert_emf"

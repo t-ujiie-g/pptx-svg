@@ -5,6 +5,7 @@
  */
 
 import { bytesToBase64 } from './utils.js';
+import { emfToSvg } from './emf-converter.js';
 import { instantiateWasmWithFallback } from './wasm-compat.js';
 import { extractZip, buildZip } from './zip.js';
 import { DEFAULT_FONT_FALLBACKS } from './font-fallbacks.js';
@@ -213,6 +214,7 @@ export class PptxRenderer {
         measure_text: (text: string, fontFace: string, fontSizePt: number) =>
           this.measureText(text, fontFace, fontSizePt),
         get_font_fallback: (font: string) => this.fontFallbackCache.get(font) ?? '',
+        convert_emf: (path: string) => this.convertEmf(path),
         math_sin:   (x: number) => Math.sin(x),
         math_cos:   (x: number) => Math.cos(x),
         math_atan2: (y: number, x: number) => Math.atan2(y, x),
@@ -222,6 +224,16 @@ export class PptxRenderer {
         make_closure: (f: Function, ctx: unknown) => f.bind(null, ctx),
       },
     };
+  }
+
+  /** Convert an EMF file to an SVG data URI. Returns "" if conversion fails. */
+  private convertEmf(path: string): string {
+    const bytes = this.rawFiles.get(path);
+    if (!bytes) return '';
+    const svg = emfToSvg(bytes);
+    if (!svg) return '';
+    const encoded = encodeURIComponent(svg);
+    return `data:image/svg+xml,${encoded}`;
   }
 
   /** Measure the rendered pixel width of text. */

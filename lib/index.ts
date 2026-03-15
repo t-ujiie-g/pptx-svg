@@ -21,3 +21,4 @@ export { bytesToBase64, crc32 } from './utils.js';
 export { extractZip, buildZip } from './zip.js';
 export type { ZipContents } from './zip.js';
 export { parseWasmStringConstants, instantiateWasmWithFallback } from './wasm-compat.js';
+export { emfToSvg } from './emf-converter.js';
