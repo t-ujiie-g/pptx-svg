@@ -4,3 +4,5 @@ _build/
 dist/
 node_modules/
 .serena/
+*.pptx
+!test_fixtures/*.pptx

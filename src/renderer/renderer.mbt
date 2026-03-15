@@ -1702,7 +1702,7 @@ fn render_shape(
         let opacity = blip_opacity_attr(bf)
         let filter_id = blip_filter_id(slide_num, shape_idx)
         let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
-        if bf.has_crop() {
+        let img_svg = if bf.has_crop() {
           let clip_id = blip_clip_id("picclip", slide_num, shape_idx)
           filter_defs + render_cropped_image_with_filter(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr)
         } else {
@@ -1716,6 +1716,28 @@ fn render_shape(
           a("href", href) +
           opacity + filter_attr + rot + "/>"
         }
+        // Render border if picture has a stroke (a:ln)
+        let border = if not(shape.stroke.is_none()) && not(shape.stroke_no_fill) {
+          let stroke_emu = if shape.stroke_w > 0 {
+            shape.stroke_w
+          } else {
+            @ooxml.default_stroke_w
+          }
+          let sw_str = px_frac(stroke_emu, scale)
+          "<rect" +
+          ai("x", x_p) +
+          ai("y", y_p) +
+          ai("width", cx_p) +
+          ai("height", cy_p) +
+          " fill=\"none\"" +
+          a("stroke", shape.stroke.to_css()) +
+          a("stroke-width", sw_str) +
+          rot +
+          "/>"
+        } else {
+          ""
+        }
+        img_svg + border
       }
     }
     @ooxml.ShapeKind::TableShape(table) =>

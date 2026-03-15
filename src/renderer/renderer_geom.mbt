@@ -819,7 +819,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "homePlate" {
     Some({
       avlst: "adj=50000",
-      gdlst: "a=pin 0 adj 100000;dx=*/ w a 100000;x1=+- r 0 dx",
+      gdlst: "a=pin 0 adj 100000;dx=*/ ss a 100000;x1=+- r 0 dx",
       paths: "M l t L x1 t L r hd2 L x1 b L l b Z",
     })
   } else if prst == "notchedRightArrow" {

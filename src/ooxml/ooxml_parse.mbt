@@ -956,13 +956,15 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
 }
 
 ///|
-fn parse_pic(pic : @xml.XmlNode) -> Shape {
+fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(pic)
   let sppr = match @xml.find_child(ch, "p:spPr") {
     None => return empty_shape()
     Some(n) => n
   }
-  let transform = parse_xfrm(@xml.get_children(sppr))
+  let sppr_ch = @xml.get_children(sppr)
+  let transform = parse_xfrm(sppr_ch)
+  let sp = parse_stroke(sppr_ch, theme)
   // Parse p:blipFill (same structure as a:blipFill) for rid, crop, alpha
   let bf = match @xml.find_child(ch, "p:blipFill") {
     None => BlipFill::none()
@@ -974,7 +976,17 @@ fn parse_pic(pic : @xml.XmlNode) -> Shape {
     Some(nvpic) => parse_cnvpr_links(@xml.get_children(nvpic))
   }
   let mut s = Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
-  // Immutable struct — reconstruct with links if present
+  // Apply stroke properties
+  s = {
+    ..s,
+    stroke: sp.color,
+    stroke_w: sp.width,
+    stroke_dash: sp.dash,
+    stroke_cap: sp.cap,
+    stroke_join: sp.join,
+    stroke_miter_limit: sp.miter_limit,
+    stroke_no_fill: sp.no_fill,
+  }
   if not(sh_link_rid.is_empty()) || not(sh_link_hover_rid.is_empty()) {
     s = { ..s, sh_link_rid, sh_link_hover_rid }
   }
@@ -1872,7 +1884,7 @@ fn parse_shapes_from_children(
         if tag == "p:sp" {
           shapes.push(parse_sp(children[i], theme))
         } else if tag == "p:pic" {
-          shapes.push(parse_pic(children[i]))
+          shapes.push(parse_pic(children[i], theme))
         } else if tag == "p:graphicFrame" {
           shapes.push(parse_graphic_frame(children[i], theme))
         } else if tag == "p:grpSp" {
