@@ -911,8 +911,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   // Pattern fill
   let patt_fill = parse_pattern_fill(sppr_ch, theme)
   // Text
-  let (paras, body_props) = match @xml.find_child(ch, "p:txBody") {
-    None => ([], BodyProps::default())
+  let (paras, body_props, txt_lst_style) = match @xml.find_child(ch, "p:txBody") {
+    None => ([], BodyProps::default(), TextStyleGroup::empty())
     Some(txb) => parse_text_body(txb, theme)
   }
   {
@@ -951,6 +951,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     effects: parse_effect_lst(sppr_ch, theme),
     scene_3d: parse_scene_3d(sppr_ch),
     sp_3d: parse_sp_3d(sppr_ch),
+    lst_style: txt_lst_style,
   }
 }
 
@@ -1010,8 +1011,8 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     _ => false
   }
   // Parse cell text from <a:txBody>
-  let (paragraphs, _) = match @xml.find_child(ch, "a:txBody") {
-    None => ([], BodyProps::default())
+  let (paragraphs, _, _) = match @xml.find_child(ch, "a:txBody") {
+    None => ([], BodyProps::default(), TextStyleGroup::empty())
     Some(txb) => parse_text_body(txb, theme)
   }
   // Parse cell properties from <a:tcPr>
@@ -1824,17 +1825,33 @@ pub fn parse_slide(
 
 ///|
 /// Parse background color from p:cSld children. Returns Color::none() if no bg.
-fn parse_bg_from_csld(
+///|
+/// Parse all background fills from p:cSld children.
+pub fn parse_bg_fills_from_csld(
   csld_ch : Array[@xml.XmlNode],
   theme : ThemeData,
-) -> Color {
+) -> (Color, GradientFill, BlipFill, PatternFill) {
   match @xml.find_child(csld_ch, "p:bg") {
-    None => Color::none()
+    None =>
+      (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
     Some(bg_node) => {
       let bg_ch = @xml.get_children(bg_node)
       match @xml.find_child(bg_ch, "p:bgPr") {
-        None => Color::none()
-        Some(bgpr) => parse_solid_fill(@xml.get_children(bgpr), theme)
+        None =>
+          (
+            Color::none(),
+            GradientFill::none(),
+            BlipFill::none(),
+            PatternFill::none(),
+          )
+        Some(bgpr) => {
+          let bgpr_ch = @xml.get_children(bgpr)
+          let c = parse_solid_fill(bgpr_ch, theme)
+          let gf = parse_gradient_fill(bgpr_ch, theme)
+          let bf = parse_blip_fill(bgpr_ch)
+          let pf = parse_pattern_fill(bgpr_ch, theme)
+          (c, gf, bf, pf)
+        }
       }
     }
   }

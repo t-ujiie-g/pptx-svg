@@ -103,6 +103,18 @@ fn wrap_paragraph(
     } else {
       run.text
     }
+    // Handle explicit line break runs (from <a:br>)
+    if text == "\n" {
+      if cur_line.length() > 0 {
+        lines.push(cur_line)
+      } else {
+        lines.push([])
+      }
+      cur_line = []
+      cur_width = 0.0
+      ri = ri + 1
+      continue
+    }
     let text_len = text.length()
     // Split text into segments (words for Latin, chars for CJK)
     let mut seg_start = 0
@@ -662,7 +674,16 @@ fn render_text(
         let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
         vlines.length()
       } else {
-        1
+        // Count explicit line breaks (from <a:br>) to get visual line count
+        let mut br_count = 0
+        let mut bri = 0
+        while bri < nr {
+          if para.runs[bri].text == "\n" {
+            br_count = br_count + 1
+          }
+          bri = bri + 1
+        }
+        1 + br_count
       }
       total_text_h = total_text_h + para_line_h * num_visual_lines
       // Add spacing after
@@ -954,7 +975,7 @@ fn render_text(
           vli = vli + 1
         }
       } else {
-        // No wrapping: render runs directly, handling tab stops
+        // No wrapping: render runs directly, handling tab stops and line breaks
         let mut tab_idx = 0
         let mut ri = 0
         while ri < nr {
@@ -963,6 +984,19 @@ fn render_text(
             to_upper_ascii(run.text)
           } else {
             run.text
+          }
+          // Handle line break runs (from <a:br>)
+          if display_text == "\n" {
+            cur_y = cur_y + p_line_h
+            out = out +
+              "</tspan><tspan" +
+              ai("x", anchor_x) +
+              ai("y", cur_y) +
+              anchor_attr +
+              rtl_attr +
+              ">"
+            ri = ri + 1
+            continue
           }
           let (tab_svg, new_ti) = render_run_with_tabs(
             run,

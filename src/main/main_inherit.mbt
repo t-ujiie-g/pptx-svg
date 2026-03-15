@@ -34,24 +34,6 @@ fn find_placeholder(
 }
 
 ///|
-/// Create a new shape with inherited transform and optionally body_props from a placeholder source.
-fn shape_with_inherited_transform(
-  shape : @ooxml.Shape,
-  source_ph : @ooxml.Shape,
-) -> @ooxml.Shape {
-  {
-    ..shape,
-    transform: source_ph.transform,
-    body_props: if shape.body_props.anchor.is_empty() &&
-      not(source_ph.body_props.anchor.is_empty()) {
-      source_ph.body_props
-    } else {
-      shape.body_props
-    },
-  }
-}
-
-///|
 /// Resolve placeholder transforms and fills from layout/master for a slide's shapes.
 ///  Modifies shapes in-place by replacing zero-size transforms with inherited ones.
 fn resolve_placeholder_inheritance(
@@ -63,9 +45,13 @@ fn resolve_placeholder_inheritance(
   let mut i = 0
   while i < ns {
     let shape = shapes[i]
-    if shape.ph_type.is_empty() ||
-      shape.transform.cx != 0 ||
-      shape.transform.cy != 0 {
+    if shape.ph_type.is_empty() {
+      i = i + 1
+      continue
+    }
+    let needs_transform = shape.transform.cx == 0 && shape.transform.cy == 0
+    let needs_body_props = shape.body_props.anchor.is_empty()
+    if not(needs_transform) && not(needs_body_props) {
       i = i + 1
       continue
     }
@@ -74,11 +60,17 @@ fn resolve_placeholder_inheritance(
     match layout_opt {
       Some(layout) =>
         match find_placeholder(layout.shapes, shape.ph_type, shape.ph_idx) {
-          Some(ph) =>
-            if ph.transform.cx > 0 && ph.transform.cy > 0 {
-              shapes[i] = shape_with_inherited_transform(shape, ph)
-              resolved = true
+          Some(ph) => {
+            let mut new_shape = shape
+            if needs_transform && ph.transform.cx > 0 && ph.transform.cy > 0 {
+              new_shape = { ..new_shape, transform: ph.transform }
             }
+            if needs_body_props && not(ph.body_props.anchor.is_empty()) {
+              new_shape = { ..new_shape, body_props: ph.body_props }
+            }
+            shapes[i] = new_shape
+            resolved = true
+          }
           None => ()
         }
       None => ()
@@ -87,10 +79,16 @@ fn resolve_placeholder_inheritance(
       match master_opt {
         Some(master) =>
           match find_placeholder(master.shapes, shape.ph_type, shape.ph_idx) {
-            Some(ph) =>
-              if ph.transform.cx > 0 && ph.transform.cy > 0 {
-                shapes[i] = shape_with_inherited_transform(shape, ph)
+            Some(ph) => {
+              let mut new_shape = shape
+              if needs_transform && ph.transform.cx > 0 && ph.transform.cy > 0 {
+                new_shape = { ..new_shape, transform: ph.transform }
               }
+              if needs_body_props && not(ph.body_props.anchor.is_empty()) {
+                new_shape = { ..new_shape, body_props: ph.body_props }
+              }
+              shapes[i] = new_shape
+            }
             None => ()
           }
         None => ()
@@ -103,26 +101,16 @@ fn resolve_placeholder_inheritance(
 // ── Text style defaults application ─────────────────────────────────────────
 
 ///|
-/// Apply master text style defaults to a shape's paragraphs based on ph_type.
-fn apply_text_defaults(
-  shape : @ooxml.Shape,
-  text_styles : @ooxml.MasterTextStyles,
+/// Apply text style defaults from a source (layout placeholder or master style)
+/// to runs that are missing font_size, color, font_face, or ea_font.
+fn apply_text_style_to_runs(
+  paragraphs : Array[@ooxml.TextParagraph],
+  style : @ooxml.TextStyleGroup,
 ) -> Unit {
-  let ph = shape.ph_type
-  if ph.is_empty() {
-    return
-  }
-  let style = if ph == "title" || ph == "ctrTitle" {
-    text_styles.title_style
-  } else if ph == "body" || ph == "subTitle" || ph == "obj" {
-    text_styles.body_style
-  } else {
-    text_styles.other_style
-  }
-  let np = shape.paragraphs.length()
+  let np = paragraphs.length()
   let mut pi = 0
   while pi < np {
-    let para = shape.paragraphs[pi]
+    let para = paragraphs[pi]
     let lvl = para.level
     let lvl_idx = if lvl >= 0 && lvl < @ooxml.max_outline_levels {
       lvl
@@ -130,19 +118,18 @@ fn apply_text_defaults(
       0
     }
     let defaults = style.levels[lvl_idx]
-    // Apply defaults to each run
     let nr = para.runs.length()
     let mut ri = 0
     while ri < nr {
       let run = para.runs[ri]
-      // Apply defaults if any field is unset
       let need_font_size = run.font_size == 0 && defaults.font_size > 0
       let need_color = run.color.is_none() && not(defaults.color.is_none())
       let need_font_face = run.font_face.is_empty() &&
         not(defaults.font_face.is_empty())
       let need_ea_font = run.ea_font.is_empty() &&
         not(defaults.ea_font.is_empty())
-      if need_font_size || need_color || need_font_face || need_ea_font {
+      let need_bold = not(run.bold_explicit) && not(run.bold) && defaults.bold
+      if need_font_size || need_color || need_font_face || need_ea_font || need_bold {
         let new_run : @ooxml.TextRun = {
           ..run,
           font_size: if need_font_size {
@@ -165,6 +152,11 @@ fn apply_text_defaults(
           } else {
             run.ea_font
           },
+          bold: if need_bold {
+            true
+          } else {
+            run.bold
+          },
         }
         para.runs[ri] = new_run
       }
@@ -172,6 +164,81 @@ fn apply_text_defaults(
     }
     pi = pi + 1
   }
+}
+
+///|
+/// Apply layout placeholder text styles to a shape's paragraphs.
+/// Uses the layout placeholder's lst_style (from a:lstStyle in p:txBody)
+/// to inherit font_size, color, bold, alignment, etc.
+fn apply_layout_text_defaults(
+  shape : @ooxml.Shape,
+  layout_opt : @ooxml.SlideLayoutData?,
+) -> Unit {
+  if shape.ph_type.is_empty() {
+    return
+  }
+  match layout_opt {
+    None => ()
+    Some(layout) =>
+      match find_placeholder(layout.shapes, shape.ph_type, shape.ph_idx) {
+        None => ()
+        Some(ph) => {
+          // Use the layout placeholder's lst_style for text run defaults
+          let ph_style = ph.lst_style
+          apply_text_style_to_runs(shape.paragraphs, ph_style)
+          // Also inherit alignment from layout placeholder's lst_style
+          apply_para_alignment_from_style(shape.paragraphs, ph_style)
+          // Also inherit body_props (insets, anchor) from layout placeholder
+          // This is already done for transforms in resolve_placeholder_inheritance
+        }
+      }
+  }
+}
+
+///|
+/// Apply paragraph alignment from a TextStyleGroup when the paragraph
+/// has no explicit alignment.
+fn apply_para_alignment_from_style(
+  paragraphs : Array[@ooxml.TextParagraph],
+  style : @ooxml.TextStyleGroup,
+) -> Unit {
+  let np = paragraphs.length()
+  let mut pi = 0
+  while pi < np {
+    let para = paragraphs[pi]
+    if para.align.is_empty() {
+      let lvl_idx = if para.level >= 0 && para.level < @ooxml.max_outline_levels {
+        para.level
+      } else {
+        0
+      }
+      let align = style.levels[lvl_idx].align
+      if not(align.is_empty()) {
+        paragraphs[pi] = { ..para, align, }
+      }
+    }
+    pi = pi + 1
+  }
+}
+
+///|
+/// Apply master text style defaults to a shape's paragraphs based on ph_type.
+fn apply_text_defaults(
+  shape : @ooxml.Shape,
+  text_styles : @ooxml.MasterTextStyles,
+) -> Unit {
+  let ph = shape.ph_type
+  if ph.is_empty() {
+    return
+  }
+  let style = if ph == "title" || ph == "ctrTitle" {
+    text_styles.title_style
+  } else if ph == "body" || ph == "subTitle" || ph == "obj" {
+    text_styles.body_style
+  } else {
+    text_styles.other_style
+  }
+  apply_text_style_to_runs(shape.paragraphs, style)
 }
 
 // ── Placeholder auto-content ─────────────────────────────────────────────
@@ -254,6 +321,7 @@ fn inject_placeholder_auto_content(
         outline_w: 0,
         text_grad_fill: @ooxml.GradientFill::none(),
         text_patt_fill: @ooxml.PatternFill::none(),
+        bold_explicit: false,
       }
       let para : @ooxml.TextParagraph = {
         runs: [run],
@@ -355,6 +423,8 @@ fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
   ""
 }
 
+// ── Package-local string/int helpers (shared by main.mbt) ────────────────────
+
 ///|
 fn ends_with(s : String, pat : String) -> Bool {
   @xml.str_ends_with(s, pat)
@@ -369,8 +439,6 @@ fn starts_with(s : String, pat : String) -> Bool {
 fn suffix(s : String, from : Int) -> String {
   @xml.str_suffix(s, from)
 }
-
-// ── Integer → String conversion ───────────────────────────────────────────────
 
 ///|
 fn int_to_str(n : Int) -> String {

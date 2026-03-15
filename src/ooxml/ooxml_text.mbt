@@ -379,7 +379,12 @@ fn parse_run_props(
   def_ea_font : String,
   theme : ThemeData,
 ) -> TextRun {
-  let bold = match @xml.get_attr(rpr, "b") {
+  let bold_attr = @xml.get_attr(rpr, "b")
+  let bold_explicit = match bold_attr {
+    Some(_) => true
+    None => false
+  }
+  let bold = match bold_attr {
     Some(v) => v == "1" || v == "true"
     None => def_bold
   }
@@ -453,6 +458,7 @@ fn parse_run_props(
   {
     text: "",
     bold,
+    bold_explicit,
     italic,
     font_size,
     color,
@@ -513,7 +519,7 @@ fn parse_run_effect_lst(rpr_ch : Array[@xml.XmlNode], theme : ThemeData) -> Effe
 fn parse_text_body(
   txbody : @xml.XmlNode,
   theme : ThemeData,
-) -> (Array[TextParagraph], BodyProps) {
+) -> (Array[TextParagraph], BodyProps, TextStyleGroup) {
   let paras : Array[TextParagraph] = []
   let ch = @xml.get_children(txbody)
   let body_props = parse_body_props(ch)
@@ -607,53 +613,85 @@ fn parse_text_body(
     } else {
       def_ea_font
     }
-    let rnodes = @xml.find_children(p_ch, "a:r")
+    // Iterate over all children to handle both a:r (runs) and a:br (line breaks)
     let runs : Array[TextRun] = []
-    let nr = rnodes.length()
+    let p_ch_len = p_ch.length()
     let mut ri = 0
-    while ri < nr {
-      let r = rnodes[ri]
-      let r_ch = @xml.get_children(r)
-      let text = match @xml.find_child(r_ch, "a:t") {
-        None => ""
-        Some(t_node) => @xml.get_text_content(t_node)
-      }
-      let run = match @xml.find_child(r_ch, "a:rPr") {
-        None =>
-          {
-            text,
-            bold: def_bold,
-            italic: def_italic,
-            font_size: def_font_size,
-            color: def_color,
-            font_face: def_font_face,
-            ea_font: def_ea_font,
-            cs_font: "",
-            sym_font: "",
-            underline: "",
-            strike: "",
-            baseline: 0,
-            char_spacing: 0,
-            kern: 0,
-            cap: "",
-            hlink_rid: "",
-            hlink_mouse_over_rid: "",
-            effects: EffectList::none(),
-            outline_color: Color::none(),
-            outline_w: 0,
-            text_grad_fill: GradientFill::none(),
-            text_patt_fill: PatternFill::none(),
-          }
-        Some(rpr) => {
-          let rp = parse_run_props(
-            rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font,
-            theme,
-          )
-          { ..rp, text, }
+    while ri < p_ch_len {
+      let child = p_ch[ri]
+      let child_tag = @xml.get_tag(child)
+      if child_tag == "a:r" {
+        let r_ch = @xml.get_children(child)
+        let text = match @xml.find_child(r_ch, "a:t") {
+          None => ""
+          Some(t_node) => @xml.get_text_content(t_node)
         }
-      }
-      if not(text.is_empty()) {
-        runs.push(run)
+        let run = match @xml.find_child(r_ch, "a:rPr") {
+          None =>
+            {
+              text,
+              bold: def_bold,
+              italic: def_italic,
+              font_size: def_font_size,
+              color: def_color,
+              font_face: def_font_face,
+              ea_font: def_ea_font,
+              cs_font: "",
+              sym_font: "",
+              underline: "",
+              strike: "",
+              baseline: 0,
+              char_spacing: 0,
+              kern: 0,
+              cap: "",
+              hlink_rid: "",
+              hlink_mouse_over_rid: "",
+              effects: EffectList::none(),
+              outline_color: Color::none(),
+              outline_w: 0,
+              text_grad_fill: GradientFill::none(),
+              text_patt_fill: PatternFill::none(),
+              bold_explicit: false,
+            }
+          Some(rpr) => {
+            let rp = parse_run_props(
+              rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font,
+              theme,
+            )
+            { ..rp, text, }
+          }
+        }
+        if not(text.is_empty()) {
+          runs.push(run)
+        }
+      } else if child_tag == "a:br" {
+        // Line break within a paragraph — insert a newline run
+        let br_run : TextRun = {
+          text: "\n",
+          bold: def_bold,
+          italic: def_italic,
+          font_size: def_font_size,
+          color: def_color,
+          font_face: def_font_face,
+          ea_font: def_ea_font,
+          cs_font: "",
+          sym_font: "",
+          underline: "",
+          strike: "",
+          baseline: 0,
+          char_spacing: 0,
+          kern: 0,
+          cap: "",
+          hlink_rid: "",
+          hlink_mouse_over_rid: "",
+          effects: EffectList::none(),
+          outline_color: Color::none(),
+          outline_w: 0,
+          text_grad_fill: GradientFill::none(),
+          text_patt_fill: PatternFill::none(),
+          bold_explicit: false,
+        }
+        runs.push(br_run)
       }
       ri = ri + 1
     }
@@ -678,5 +716,23 @@ fn parse_text_body(
     })
     pi = pi + 1
   }
-  (paras, body_props)
+  // Apply lstStyle alignment fallback to paragraphs missing explicit alignment
+  let npara = paras.length()
+  let mut pai = 0
+  while pai < npara {
+    let para = paras[pai]
+    if para.align.is_empty() {
+      let lvl_idx = if para.level >= 0 && para.level < max_outline_levels {
+        para.level
+      } else {
+        0
+      }
+      let lst_align = lst_style.levels[lvl_idx].align
+      if not(lst_align.is_empty()) {
+        paras[pai] = { ..para, align: lst_align }
+      }
+    }
+    pai = pai + 1
+  }
+  (paras, body_props, lst_style)
 }

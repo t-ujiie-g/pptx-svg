@@ -454,15 +454,10 @@ fn resolve_image_path(target : String) -> String {
     target.get_char(0).unwrap() == '.' &&
     target.get_char(1).unwrap() == '.' &&
     target.get_char(2).unwrap() == '/' {
-    "ppt/" + suffix(target, 3)
+    "ppt/" + @xml.str_suffix(target, 3)
   } else {
     target
   }
-}
-
-///|
-fn suffix(s : String, from : Int) -> String {
-  @xml.str_suffix(s, from)
 }
 
 ///|
@@ -478,7 +473,7 @@ fn mime_from_ext(path : String) -> String {
   if dot < 0 {
     return "image/png"
   }
-  let ext = suffix(path, dot + 1)
+  let ext = @xml.str_suffix(path, dot + 1)
   if ext == "png" {
     "image/png"
   } else if ext == "jpg" || ext == "jpeg" {
@@ -2176,6 +2171,8 @@ pub fn render_slide_svg(
   theme : @ooxml.ThemeData,
   bg_shapes : Array[@ooxml.Shape],
   table_styles : Array[@ooxml.TableStyleDef],
+  bg_shapes_rels : Array[Array[@ooxml.Relationship]],
+  bg_fill_rels : Array[@ooxml.Relationship],
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
@@ -2311,7 +2308,12 @@ pub fn render_slide_svg(
   // Background blip fill (image)
   let bg_blip_svg = if not(slide.bg_blip_fill.is_none()) {
     let bf = slide.bg_blip_fill
-    let href = resolve_blip_href(rels, bf)
+    let bg_resolve_rels = if bg_fill_rels.length() > 0 {
+      bg_fill_rels
+    } else {
+      rels
+    }
+    let href = resolve_blip_href(bg_resolve_rels, bf)
     if href.is_empty() {
       ""
     } else {
@@ -2345,8 +2347,13 @@ pub fn render_slide_svg(
   let mut bg_shapes_svg = ""
   let mut bi = 0
   while bi < nbg {
+    let bg_shape_rels = if bi < bg_shapes_rels.length() {
+      bg_shapes_rels[bi]
+    } else {
+      rels
+    }
     bg_shapes_svg = bg_shapes_svg +
-      render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme, table_styles)
+      render_shape(bg_shapes[bi], bg_shape_rels, slide_num, scale, -(bi + 1), theme, table_styles)
     bi = bi + 1
   }
   // Render slide shapes

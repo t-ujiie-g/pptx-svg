@@ -410,10 +410,11 @@ pub fn parse_slide_master(
   }
   let effective_theme = apply_color_map(theme, clr_map)
   let csld = @xml.find_path(nodes, ["p:sldMaster", "p:cSld"])
-  let background = match csld {
-    None => Color::none()
+  let (background, bg_grad, bg_blip_fill, bg_patt_fill) = match csld {
+    None =>
+      (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
     Some(csld_node) =>
-      parse_bg_from_csld(@xml.get_children(csld_node), effective_theme)
+      parse_bg_fills_from_csld(@xml.get_children(csld_node), effective_theme)
   }
   let shapes : Array[Shape] = match csld {
     None => []
@@ -436,7 +437,7 @@ pub fn parse_slide_master(
       }
     }
   }
-  { background, shapes, text_styles, clr_map }
+  { background, bg_grad, bg_blip_fill, bg_patt_fill, shapes, text_styles, clr_map }
 }
 
 // ── Slide layout parser ──────────────────────────────────────────────────────
@@ -453,9 +454,11 @@ pub fn parse_slide_layout(
     None => []
   }
   let csld = @xml.find_child(root_ch, "p:cSld")
-  let background = match csld {
-    None => Color::none()
-    Some(csld_node) => parse_bg_from_csld(@xml.get_children(csld_node), theme)
+  let (background, bg_grad, bg_blip_fill, bg_patt_fill) = match csld {
+    None =>
+      (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
+    Some(csld_node) =>
+      parse_bg_fills_from_csld(@xml.get_children(csld_node), theme)
   }
   let shapes : Array[Shape] = match csld {
     None => []
@@ -468,5 +471,5 @@ pub fn parse_slide_layout(
     }
   }
   let clr_map_ovr = extract_clr_map_ovr_from_nodes(root_ch)
-  { background, shapes, clr_map_ovr }
+  { background, bg_grad, bg_blip_fill, bg_patt_fill, shapes, clr_map_ovr }
 }
