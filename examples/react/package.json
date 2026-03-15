@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "pptx-svg": "^0.1.0",
+    "pptx-svg": "latest",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
