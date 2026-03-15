@@ -66,6 +66,12 @@ let g_masters : Ref[Array[(@ooxml.SlideMasterData, String)]] = { val: [] }
 let g_layout_to_master : Ref[Array[(String, String)]] = { val: [] }
 
 ///|
+let g_layout_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [] }
+
+///|
+let g_master_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [] }
+
+///|
 let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [] }
 
 // ── Path resolution helpers ──────────────────────────────────────────────────
@@ -257,6 +263,17 @@ fn get_layout(layout_path : String) -> @ooxml.SlideLayoutData? {
 }
 
 ///|
+/// Look up parsed layout rels by path.
+fn get_layout_rels(layout_path : String) -> Array[@ooxml.Relationship] {
+  let idx = array_index_of(g_layout_paths.val, layout_path)
+  if idx >= 0 && idx < g_layout_rels.val.length() {
+    g_layout_rels.val[idx]
+  } else {
+    []
+  }
+}
+
+///|
 /// Look up parsed master data by path.
 fn get_master(master_path : String) -> @ooxml.SlideMasterData? {
   let idx = array_index_of(g_master_paths.val, master_path)
@@ -265,6 +282,17 @@ fn get_master(master_path : String) -> @ooxml.SlideMasterData? {
     Some(data)
   } else {
     None
+  }
+}
+
+///|
+/// Look up parsed master rels by path.
+fn get_master_rels(master_path : String) -> Array[@ooxml.Relationship] {
+  let idx = array_index_of(g_master_paths.val, master_path)
+  if idx >= 0 && idx < g_master_rels.val.length() {
+    g_master_rels.val[idx]
+  } else {
+    []
   }
 }
 
@@ -392,33 +420,56 @@ pub fn initialize_pptx() -> String {
   }
   // Parse all unique masters
   let masters : Array[(@ooxml.SlideMasterData, String)] = []
+  let master_rels_arr : Array[Array[@ooxml.Relationship]] = []
   let nmas = master_paths.length()
   let mut mi = 0
   while mi < nmas {
     let mp = master_paths[mi]
     let mxml = @ffi.ffi_get_file(mp)
+    // Parse master rels
+    let mrels_path = rels_path_for(mp)
+    let mrels_xml = @ffi.ffi_get_file(mrels_path)
+    let mrels = if mrels_xml.is_empty() {
+      ([] : Array[@ooxml.Relationship])
+    } else {
+      @ooxml.parse_rels(mrels_xml)
+    }
     if not(mxml.is_empty()) {
       let mdata = @ooxml.parse_slide_master(mxml, g_theme.val)
       masters.push((mdata, mp))
+      master_rels_arr.push(mrels)
       @ffi.ffi_log("Parsed master: " + mp)
     } else {
       let empty_master : @ooxml.SlideMasterData = {
         background: @ooxml.Color::none(),
+        bg_grad: @ooxml.GradientFill::none(),
+        bg_blip_fill: @ooxml.BlipFill::none(),
+        bg_patt_fill: @ooxml.PatternFill::none(),
         shapes: [],
         text_styles: @ooxml.MasterTextStyles::empty(),
         clr_map: @ooxml.ColorMap::default(),
       }
       masters.push((empty_master, mp))
+      master_rels_arr.push(mrels)
     }
     mi = mi + 1
   }
   // Parse all unique layouts
   let layouts : Array[(@ooxml.SlideLayoutData, String)] = []
+  let layout_rels_arr : Array[Array[@ooxml.Relationship]] = []
   let nlay2 = layout_paths.length()
   let mut li2 = 0
   while li2 < nlay2 {
     let lp = layout_paths[li2]
     let lxml = @ffi.ffi_get_file(lp)
+    // Parse layout rels (needed for bg_shapes image resolution)
+    let layout_rels_path = rels_path_for(lp)
+    let layout_rels_xml = @ffi.ffi_get_file(layout_rels_path)
+    let cur_layout_rels = if layout_rels_xml.is_empty() {
+      ([] : Array[@ooxml.Relationship])
+    } else {
+      @ooxml.parse_rels(layout_rels_xml)
+    }
     if not(lxml.is_empty()) {
       // Compute effective theme: layout's own clrMapOvr > master's clrMap
       let layout_effective_theme = {
@@ -438,14 +489,19 @@ pub fn initialize_pptx() -> String {
       }
       let ldata = @ooxml.parse_slide_layout(lxml, layout_effective_theme)
       layouts.push((ldata, lp))
+      layout_rels_arr.push(cur_layout_rels)
       @ffi.ffi_log("Parsed layout: " + lp)
     } else {
       let empty_layout : @ooxml.SlideLayoutData = {
         background: @ooxml.Color::none(),
+        bg_grad: @ooxml.GradientFill::none(),
+        bg_blip_fill: @ooxml.BlipFill::none(),
+        bg_patt_fill: @ooxml.PatternFill::none(),
         shapes: [],
         clr_map_ovr: None,
       }
       layouts.push((empty_layout, lp))
+      layout_rels_arr.push(cur_layout_rels)
     }
     li2 = li2 + 1
   }
@@ -453,8 +509,10 @@ pub fn initialize_pptx() -> String {
   g_slide_layout_paths.val = slide_layout_paths
   g_layout_paths.val = layout_paths
   g_layouts.val = layouts
+  g_layout_rels.val = layout_rels_arr
   g_master_paths.val = master_paths
   g_masters.val = masters
+  g_master_rels.val = master_rels_arr
   g_layout_to_master.val = layout_to_master
   // Initialize slide cache
   let slides : Array[@ooxml.SlideData] = []
@@ -601,32 +659,76 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   )
   // ── Background inheritance: slide → layout → master → white ──
   let mut bg = slide_data.background
-  if bg.is_none() {
+  let mut bg_grad = slide_data.bg_grad
+  let mut bg_blip_fill = slide_data.bg_blip_fill
+  let mut bg_patt_fill = slide_data.bg_patt_fill
+  let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
+  // Check if slide has any explicit background
+  let slide_has_bg = not(bg.is_none()) || not(bg_grad.is_none()) ||
+    not(bg_blip_fill.is_none()) ||
+    not(bg_patt_fill.is_none())
+  if not(slide_has_bg) {
+    // Try layout
+    let mut inherited = false
     match layout_opt {
-      Some(layout) =>
-        if not(layout.background.is_none()) {
+      Some(layout) => {
+        let layout_has_bg = not(layout.background.is_none()) ||
+          not(layout.bg_grad.is_none()) ||
+          not(layout.bg_blip_fill.is_none()) ||
+          not(layout.bg_patt_fill.is_none())
+        if layout_has_bg {
           bg = layout.background
+          bg_grad = layout.bg_grad
+          bg_blip_fill = layout.bg_blip_fill
+          bg_patt_fill = layout.bg_patt_fill
+          bg_fill_rels = if not(layout_path.is_empty()) {
+            get_layout_rels(layout_path)
+          } else {
+            rels
+          }
+          inherited = true
         }
+      }
       None => ()
     }
-    if bg.is_none() {
+    // Try master
+    if not(inherited) {
       match master_opt {
-        Some(master) =>
-          if not(master.background.is_none()) {
+        Some(master) => {
+          let master_has_bg = not(master.background.is_none()) ||
+            not(master.bg_grad.is_none()) ||
+            not(master.bg_blip_fill.is_none()) ||
+            not(master.bg_patt_fill.is_none())
+          if master_has_bg {
             bg = master.background
+            bg_grad = master.bg_grad
+            bg_blip_fill = master.bg_blip_fill
+            bg_patt_fill = master.bg_patt_fill
+            bg_fill_rels = if not(master_path.is_empty()) {
+              get_master_rels(master_path)
+            } else {
+              rels
+            }
+            inherited = true
           }
+        }
         None => ()
       }
     }
-    if bg.is_none() {
+    if not(inherited) && bg.is_none() {
       bg = @ooxml.Color::white()
     }
   }
-  // ── Apply text style defaults from master ──
+  // ── Apply text style defaults: layout first (more specific), then master ──
   let ns = slide_data.shapes.length()
   let mut shape_i = 0
   while shape_i < ns {
     let shape = slide_data.shapes[shape_i]
+    // Layout placeholder defaults first (more specific)
+    apply_layout_text_defaults(shape, layout_opt)
+    // Master placeholder's lstStyle as second fallback
+    apply_master_ph_text_defaults(shape, master_opt)
+    // Master text styles (p:txStyles) as final fallback
     match master_opt {
       Some(master) => apply_text_defaults(shape, master.text_styles)
       None => ()
@@ -636,14 +738,20 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   let resolved_slide : @ooxml.SlideData = {
     slide_size: slide_data.slide_size,
     background: bg,
-    bg_grad: slide_data.bg_grad,
-    bg_blip_fill: slide_data.bg_blip_fill,
-    bg_patt_fill: slide_data.bg_patt_fill,
+    bg_grad,
+    bg_blip_fill,
+    bg_patt_fill,
     shapes: slide_data.shapes,
   }
   g_slides.val[slide_idx] = resolved_slide
   // ── Collect master/layout background shapes (non-placeholder) ──
   let bg_shapes : Array[@ooxml.Shape] = []
+  let bg_shapes_rels : Array[Array[@ooxml.Relationship]] = []
+  let m_rels = if not(master_path.is_empty()) {
+    get_master_rels(master_path)
+  } else {
+    ([] : Array[@ooxml.Relationship])
+  }
   match master_opt {
     Some(master) => {
       let ms = master.shapes.length()
@@ -652,11 +760,17 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
         let s = master.shapes[mi]
         if s.ph_type.is_empty() {
           bg_shapes.push(s)
+          bg_shapes_rels.push(m_rels)
         }
         mi = mi + 1
       }
     }
     None => ()
+  }
+  let l_rels = if not(layout_path.is_empty()) {
+    get_layout_rels(layout_path)
+  } else {
+    ([] : Array[@ooxml.Relationship])
   }
   match layout_opt {
     Some(layout) => {
@@ -666,6 +780,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
         let s = layout.shapes[li]
         if s.ph_type.is_empty() {
           bg_shapes.push(s)
+          bg_shapes_rels.push(l_rels)
         }
         li = li + 1
       }
@@ -675,6 +790,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   // Render to SVG
   @renderer.render_slide_svg(
     resolved_slide, rels, slide_num, effective_theme, bg_shapes, g_table_styles.val,
+    bg_shapes_rels, bg_fill_rels,
   )
 }
 

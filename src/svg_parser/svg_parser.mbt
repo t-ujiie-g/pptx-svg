@@ -384,6 +384,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     outline_w: get_dai(run_node, "outline-w"),
                     text_grad_fill: parse_text_grad_fill(run_node),
                     text_patt_fill: parse_text_patt_fill(run_node),
+                    bold_explicit: bold,
                   })
                 }
               @xml.XmlNode::Text(text) =>
@@ -412,6 +413,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     outline_w: 0,
                     text_grad_fill: @ooxml.GradientFill::none(),
                     text_patt_fill: @ooxml.PatternFill::none(),
+                    bold_explicit: false,
                   })
                 }
             }
@@ -723,6 +725,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     effects: parse_effects_from_da(g_node),
     scene_3d: parse_scene_3d_from_da(g_node),
     sp_3d: parse_sp_3d_from_da(g_node),
+    lst_style: @ooxml.TextStyleGroup::empty(),
   }
 }
 

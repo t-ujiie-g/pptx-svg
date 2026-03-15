@@ -5,8 +5,11 @@
  */
 
 import { bytesToBase64 } from './utils.js';
+import { emfToSvg } from './emf-converter.js';
 import { instantiateWasmWithFallback } from './wasm-compat.js';
 import { extractZip, buildZip } from './zip.js';
+import { DEFAULT_FONT_FALLBACKS } from './font-fallbacks.js';
+import type { FontFallbackMap } from './font-fallbacks.js';
 
 /** Wasm exports provided by the MoonBit module. */
 interface PptxWasmExports {
@@ -29,6 +32,11 @@ export interface MeasureTextFn {
 export interface PptxRendererOptions {
   /** Custom text measurement function. If not provided, uses Canvas 2D (browser only). */
   measureText?: MeasureTextFn;
+  /**
+   * Custom font fallback mappings. Merged with built-in defaults (lib/font-fallbacks.ts).
+   * User entries override built-in entries for the same font name.
+   */
+  fontFallbacks?: FontFallbackMap;
 }
 
 /** Default Wasm URL resolved relative to this module. */
@@ -53,9 +61,17 @@ export class PptxRenderer {
   /** Custom text measurement function */
   private measureTextFn: MeasureTextFn | null = null;
 
+  /** Font fallback lookup map (source → comma-separated fallbacks) */
+  private fontFallbackCache = new Map<string, string>();
+
   constructor(options?: PptxRendererOptions) {
     if (options?.measureText) {
       this.measureTextFn = options.measureText;
+    }
+    // Build font fallback cache: merge defaults with user overrides
+    const merged: FontFallbackMap = { ...DEFAULT_FONT_FALLBACKS, ...options?.fontFallbacks };
+    for (const [font, fallbacks] of Object.entries(merged)) {
+      this.fontFallbackCache.set(font, fallbacks.join(', '));
     }
   }
 
@@ -197,6 +213,8 @@ export class PptxRenderer {
         error: (msg: string) => console.error('[pptx]', msg),
         measure_text: (text: string, fontFace: string, fontSizePt: number) =>
           this.measureText(text, fontFace, fontSizePt),
+        get_font_fallback: (font: string) => this.fontFallbackCache.get(font) ?? '',
+        convert_emf: (path: string) => this.convertEmf(path),
         math_sin:   (x: number) => Math.sin(x),
         math_cos:   (x: number) => Math.cos(x),
         math_atan2: (y: number, x: number) => Math.atan2(y, x),
@@ -206,6 +224,16 @@ export class PptxRenderer {
         make_closure: (f: Function, ctx: unknown) => f.bind(null, ctx),
       },
     };
+  }
+
+  /** Convert an EMF file to an SVG data URI. Returns "" if conversion fails. */
+  private convertEmf(path: string): string {
+    const bytes = this.rawFiles.get(path);
+    if (!bytes) return '';
+    const svg = emfToSvg(bytes);
+    if (!svg) return '';
+    const encoded = encodeURIComponent(svg);
+    return `data:image/svg+xml,${encoded}`;
   }
 
   /** Measure the rendered pixel width of text. */

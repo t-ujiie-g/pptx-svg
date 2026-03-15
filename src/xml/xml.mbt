@@ -254,20 +254,6 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
 
 // ── Text helpers ──────────────────────────────────────────────────────────────
 
-///|
-fn is_all_whitespace(s : String) -> Bool {
-  let len = s.length()
-  let mut i = 0
-  while i < len {
-    match s.get_char(i).unwrap() {
-      ' ' | '\t' | '\n' | '\r' => ()
-      _ => return false
-    }
-    i = i + 1
-  }
-  true
-}
-
 // ── Core parsing ──────────────────────────────────────────────────────────────
 
 ///|
@@ -351,7 +337,9 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
         }
       } else {
         let text = self.read_until_char('<')
-        if not(is_all_whitespace(text)) {
+        // Keep all text nodes including whitespace-only ones.
+        // Whitespace is significant inside elements like <a:t xml:space="preserve">.
+        if not(text.is_empty()) {
           children.push(XmlNode::Text(decode_entities(text)))
         }
       }

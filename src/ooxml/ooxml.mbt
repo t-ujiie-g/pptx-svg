@@ -711,6 +711,12 @@ pub(all) struct LevelTextDefaults {
   indent : Int // EMU; 0 = unset
   bullet : String // "" = none
   bullet_none : Bool
+  bullet_font : String // "" = inherit
+  bullet_size : Int // 0 = inherit
+  bullet_color : Color // Color::none() = inherit
+  line_spacing : Int // 0 = unset; positive = pct (e.g. 130000 = 130%)
+  spc_before : Int // 0 = unset
+  spc_after : Int // 0 = unset
 }
 
 ///|
@@ -727,6 +733,12 @@ pub fn LevelTextDefaults::empty() -> LevelTextDefaults {
     indent: 0,
     bullet: "",
     bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: Color::none(),
+    line_spacing: 0,
+    spc_before: 0,
+    spc_after: 0,
   }
 }
 
@@ -802,6 +814,9 @@ pub fn ColorMap::default() -> ColorMap {
 ///|
 pub(all) struct SlideMasterData {
   background : Color
+  bg_grad : GradientFill
+  bg_blip_fill : BlipFill
+  bg_patt_fill : PatternFill
   shapes : Array[Shape]
   text_styles : MasterTextStyles
   clr_map : ColorMap
@@ -810,6 +825,9 @@ pub(all) struct SlideMasterData {
 ///|
 pub(all) struct SlideLayoutData {
   background : Color // Color::none() = inherit from master
+  bg_grad : GradientFill
+  bg_blip_fill : BlipFill
+  bg_patt_fill : PatternFill
   shapes : Array[Shape]
   clr_map_ovr : ColorMap? // None = inherit master's color map
 }
@@ -820,6 +838,7 @@ pub(all) struct SlideLayoutData {
 pub(all) struct TextRun {
   text : String
   bold : Bool
+  bold_explicit : Bool // true if b= attribute was explicitly set on a:rPr (vs inherited/default)
   italic : Bool
   font_size : Int // in hundredths-of-a-point (sz attr); 0 = inherit
   color : Color
@@ -1459,6 +1478,7 @@ pub(all) struct Shape {
   effects : EffectList // a:effectLst; EffectList::none() = no effects
   scene_3d : Scene3d // a:scene3d
   sp_3d : Shape3d // a:sp3d
+  lst_style : TextStyleGroup // a:lstStyle from p:txBody (used for placeholder inheritance)
 }
 
 ///|
@@ -1503,6 +1523,7 @@ pub fn Shape::default_with(
     effects: EffectList::none(),
     scene_3d: Scene3d::none(),
     sp_3d: Shape3d::none(),
+    lst_style: TextStyleGroup::empty(),
   }
 }
 

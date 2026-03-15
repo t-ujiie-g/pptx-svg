@@ -175,6 +175,10 @@ fn resolve_font_theme(typeface : String, theme : ThemeData) -> String {
     theme.major_font
   } else if typeface == "+mn-lt" {
     theme.minor_font
+  } else if typeface == "+mj-ea" {
+    theme.major_ea_font
+  } else if typeface == "+mn-ea" {
+    theme.minor_ea_font
   } else {
     typeface
   }
@@ -368,6 +372,44 @@ fn parse_def_rpr(
 // ── Run properties parsing ───────────────────────────────────────────────────
 
 ///|
+/// Create a TextRun with default properties (no explicit formatting).
+fn default_text_run(
+  text : String,
+  def_bold : Bool,
+  def_italic : Bool,
+  def_font_size : Int,
+  def_color : Color,
+  def_font_face : String,
+  def_ea_font : String,
+) -> TextRun {
+  {
+    text,
+    bold: def_bold,
+    italic: def_italic,
+    font_size: def_font_size,
+    color: def_color,
+    font_face: def_font_face,
+    ea_font: def_ea_font,
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: EffectList::none(),
+    outline_color: Color::none(),
+    outline_w: 0,
+    text_grad_fill: GradientFill::none(),
+    text_patt_fill: PatternFill::none(),
+    bold_explicit: false,
+  }
+}
+
+///|
 /// Parse run properties from <a:rPr> with defRPr fallback. Returns a TextRun (text field set to "").
 fn parse_run_props(
   rpr : @xml.XmlNode,
@@ -379,7 +421,12 @@ fn parse_run_props(
   def_ea_font : String,
   theme : ThemeData,
 ) -> TextRun {
-  let bold = match @xml.get_attr(rpr, "b") {
+  let bold_attr = @xml.get_attr(rpr, "b")
+  let bold_explicit = match bold_attr {
+    Some(_) => true
+    None => false
+  }
+  let bold = match bold_attr {
     Some(v) => v == "1" || v == "true"
     None => def_bold
   }
@@ -453,6 +500,7 @@ fn parse_run_props(
   {
     text: "",
     bold,
+    bold_explicit,
     italic,
     font_size,
     color,
@@ -513,7 +561,7 @@ fn parse_run_effect_lst(rpr_ch : Array[@xml.XmlNode], theme : ThemeData) -> Effe
 fn parse_text_body(
   txbody : @xml.XmlNode,
   theme : ThemeData,
-) -> (Array[TextParagraph], BodyProps) {
+) -> (Array[TextParagraph], BodyProps, TextStyleGroup) {
   let paras : Array[TextParagraph] = []
   let ch = @xml.get_children(txbody)
   let body_props = parse_body_props(ch)
@@ -607,53 +655,45 @@ fn parse_text_body(
     } else {
       def_ea_font
     }
-    let rnodes = @xml.find_children(p_ch, "a:r")
+    // Iterate over all children to handle a:r (runs), a:fld (fields), and a:br (breaks)
     let runs : Array[TextRun] = []
-    let nr = rnodes.length()
+    let p_ch_len = p_ch.length()
     let mut ri = 0
-    while ri < nr {
-      let r = rnodes[ri]
-      let r_ch = @xml.get_children(r)
-      let text = match @xml.find_child(r_ch, "a:t") {
-        None => ""
-        Some(t_node) => @xml.get_text_content(t_node)
-      }
-      let run = match @xml.find_child(r_ch, "a:rPr") {
-        None =>
-          {
-            text,
-            bold: def_bold,
-            italic: def_italic,
-            font_size: def_font_size,
-            color: def_color,
-            font_face: def_font_face,
-            ea_font: def_ea_font,
-            cs_font: "",
-            sym_font: "",
-            underline: "",
-            strike: "",
-            baseline: 0,
-            char_spacing: 0,
-            kern: 0,
-            cap: "",
-            hlink_rid: "",
-            hlink_mouse_over_rid: "",
-            effects: EffectList::none(),
-            outline_color: Color::none(),
-            outline_w: 0,
-            text_grad_fill: GradientFill::none(),
-            text_patt_fill: PatternFill::none(),
-          }
-        Some(rpr) => {
-          let rp = parse_run_props(
-            rpr, def_bold, def_italic, def_font_size, def_color, def_font_face, def_ea_font,
-            theme,
-          )
-          { ..rp, text, }
+    while ri < p_ch_len {
+      let child = p_ch[ri]
+      let child_tag = @xml.get_tag(child)
+      // a:r (run) and a:fld (field, e.g. slide number) share the same structure
+      if child_tag == "a:r" || child_tag == "a:fld" {
+        let r_ch = @xml.get_children(child)
+        let text = match @xml.find_child(r_ch, "a:t") {
+          None => ""
+          Some(t_node) => @xml.get_text_content(t_node)
         }
-      }
-      if not(text.is_empty()) {
-        runs.push(run)
+        if not(text.is_empty()) {
+          let run = match @xml.find_child(r_ch, "a:rPr") {
+            None =>
+              default_text_run(
+                text, def_bold, def_italic, def_font_size, def_color,
+                def_font_face, def_ea_font,
+              )
+            Some(rpr) => {
+              let rp = parse_run_props(
+                rpr, def_bold, def_italic, def_font_size, def_color,
+                def_font_face, def_ea_font, theme,
+              )
+              { ..rp, text }
+            }
+          }
+          runs.push(run)
+        }
+      } else if child_tag == "a:br" {
+        // Line break — insert a newline run
+        runs.push(
+          default_text_run(
+            "\n", def_bold, def_italic, def_font_size, def_color,
+            def_font_face, def_ea_font,
+          ),
+        )
       }
       ri = ri + 1
     }
@@ -678,5 +718,82 @@ fn parse_text_body(
     })
     pi = pi + 1
   }
-  (paras, body_props)
+  // Apply lstStyle fallbacks to paragraphs missing explicit values
+  let npara = paras.length()
+  let mut pai = 0
+  while pai < npara {
+    let para = paras[pai]
+    let lvl_idx = if para.level >= 0 && para.level < max_outline_levels {
+      para.level
+    } else {
+      0
+    }
+    let lst_def = lst_style.levels[lvl_idx]
+    let mut changed = false
+    let mut new_para = para
+    // Alignment fallback
+    if para.align.is_empty() && not(lst_def.align.is_empty()) {
+      new_para = { ..new_para, align: lst_def.align }
+      changed = true
+    }
+    // Bullet fallback: inherit buChar from lstStyle if paragraph has no explicit bullet
+    if para.bullet.is_empty() && para.bullet_auto.is_empty() &&
+      not(para.bullet_none) &&
+      para.bullet_img_rid.is_empty() &&
+      not(lst_def.bullet.is_empty()) {
+      new_para = { ..new_para, bullet: lst_def.bullet }
+      changed = true
+      // Also inherit bullet_font/size/color from lstStyle if not set on paragraph
+      if new_para.bullet_font.is_empty() && not(lst_def.bullet_font.is_empty()) {
+        new_para = { ..new_para, bullet_font: lst_def.bullet_font }
+      }
+      if new_para.bullet_size == 0 && lst_def.bullet_size != 0 {
+        new_para = { ..new_para, bullet_size: lst_def.bullet_size }
+      }
+      if new_para.bullet_color.is_none() && not(lst_def.bullet_color.is_none()) {
+        new_para = { ..new_para, bullet_color: lst_def.bullet_color }
+      }
+    } else if not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) {
+      // Paragraph has explicit bullet, but may still need font/size/color from lstStyle
+      if para.bullet_font.is_empty() && not(lst_def.bullet_font.is_empty()) {
+        new_para = { ..new_para, bullet_font: lst_def.bullet_font }
+        changed = true
+      }
+      if para.bullet_size == 0 && lst_def.bullet_size != 0 {
+        new_para = { ..new_para, bullet_size: lst_def.bullet_size }
+        changed = true
+      }
+      if para.bullet_color.is_none() && not(lst_def.bullet_color.is_none()) {
+        new_para = { ..new_para, bullet_color: lst_def.bullet_color }
+        changed = true
+      }
+    }
+    // buNone fallback
+    if not(para.bullet_none) && lst_def.bullet_none &&
+      para.bullet.is_empty() &&
+      para.bullet_auto.is_empty() &&
+      para.bullet_img_rid.is_empty() {
+      new_para = { ..new_para, bullet_none: true }
+      changed = true
+    }
+    // Line spacing fallback
+    if para.line_spacing == 0 && lst_def.line_spacing != 0 {
+      new_para = { ..new_para, line_spacing: lst_def.line_spacing }
+      changed = true
+    }
+    // Space before/after fallback
+    if para.spc_before == 0 && lst_def.spc_before != 0 {
+      new_para = { ..new_para, spc_before: lst_def.spc_before }
+      changed = true
+    }
+    if para.spc_after == 0 && lst_def.spc_after != 0 {
+      new_para = { ..new_para, spc_after: lst_def.spc_after }
+      changed = true
+    }
+    if changed {
+      paras[pai] = new_para
+    }
+    pai = pai + 1
+  }
+  (paras, body_props, lst_style)
 }

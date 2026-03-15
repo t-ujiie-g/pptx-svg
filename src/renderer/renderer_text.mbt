@@ -20,9 +20,23 @@ fn build_font_family(
   let mut ff = ""
   if not(sym.is_empty()) { ff = sym }
   if not(cs.is_empty()) { ff = if ff.is_empty() { cs } else { ff + ", " + cs } }
-  if not(ea.is_empty()) { ff = if ff.is_empty() { ea } else { ff + ", " + ea } }
+  if not(ea.is_empty()) {
+    ff = if ff.is_empty() { ea } else { ff + ", " + ea }
+    // Append platform fallbacks for EA font
+    let fb = @ffi.ffi_get_font_fallback(ea)
+    if not(fb.is_empty()) {
+      ff = ff + ", " + fb
+    }
+  }
   if not(latin.is_empty()) {
     ff = if ff.is_empty() { latin } else { ff + ", " + latin }
+    // Append platform fallbacks for Latin font (if different from EA)
+    if latin != ea {
+      let fb = @ffi.ffi_get_font_fallback(latin)
+      if not(fb.is_empty()) {
+        ff = ff + ", " + fb
+      }
+    }
   }
   ff
 }
@@ -102,6 +116,18 @@ fn wrap_paragraph(
       to_upper_ascii(run.text)
     } else {
       run.text
+    }
+    // Handle explicit line break runs (from <a:br>)
+    if text == "\n" {
+      if cur_line.length() > 0 {
+        lines.push(cur_line)
+      } else {
+        lines.push([])
+      }
+      cur_line = []
+      cur_width = 0.0
+      ri = ri + 1
+      continue
     }
     let text_len = text.length()
     // Split text into segments (words for Latin, chars for CJK)
@@ -345,11 +371,13 @@ fn para_line_height(
     px(para.line_spacing, scale)
   } else if para.line_spacing < 0 {
     // Negative = percentage (-100000 = 100% = single spacing)
-    // In OOXML, 100% means the default single-line spacing (font_size * 1.2)
-    let pct = -para.line_spacing // e.g. 150000 for 150%
+    // In OOXML, percentage is relative to "normal" line spacing (ascent + descent + gap).
+    // Use pct_line_height_numer/denom (1.5) instead of default (1.2) — more accurate
+    // for CJK fonts whose ascent+descent is typically ~1.45× the em size.
+    let pct = -para.line_spacing // e.g. 130000 for 130%
     let emu = para_max_font_emu(para)
     let base_line_h = if emu > 0 {
-      px(emu, scale) * line_height_numer / line_height_denom
+      px(emu, scale) * pct_line_height_numer / pct_line_height_denom
     } else {
       def_line_h
     }
@@ -662,7 +690,16 @@ fn render_text(
         let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
         vlines.length()
       } else {
-        1
+        // Count explicit line breaks (from <a:br>) to get visual line count
+        let mut br_count = 0
+        let mut bri = 0
+        while bri < nr {
+          if para.runs[bri].text == "\n" {
+            br_count = br_count + 1
+          }
+          bri = bri + 1
+        }
+        1 + br_count
       }
       total_text_h = total_text_h + para_line_h * num_visual_lines
       // Add spacing after
@@ -954,7 +991,7 @@ fn render_text(
           vli = vli + 1
         }
       } else {
-        // No wrapping: render runs directly, handling tab stops
+        // No wrapping: render runs directly, handling tab stops and line breaks
         let mut tab_idx = 0
         let mut ri = 0
         while ri < nr {
@@ -963,6 +1000,19 @@ fn render_text(
             to_upper_ascii(run.text)
           } else {
             run.text
+          }
+          // Handle line break runs (from <a:br>)
+          if display_text == "\n" {
+            cur_y = cur_y + p_line_h
+            out = out +
+              "</tspan><tspan" +
+              ai("x", anchor_x) +
+              ai("y", cur_y) +
+              anchor_attr +
+              rtl_attr +
+              ">"
+            ri = ri + 1
+            continue
           }
           let (tab_svg, new_ti) = render_run_with_tabs(
             run,

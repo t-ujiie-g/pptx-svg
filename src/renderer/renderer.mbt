@@ -33,10 +33,16 @@ let svg_target_width : Int = 960 // output SVG width in px
 let default_emu_per_px : Int = 9525 // EMU per pixel at 96 DPI
 
 ///|
-let line_height_numer : Int = 12 // line-height = font-size * line_height_numer / line_height_denom
+let line_height_numer : Int = 12 // default line-height = font-size * 12/10
 
 ///|
 let line_height_denom : Int = 10
+
+///|
+let pct_line_height_numer : Int = 15 // for %-based spacing: font-size * 15/10 (CJK-friendly)
+
+///|
+let pct_line_height_denom : Int = 10
 
 
 ///|
@@ -394,6 +400,28 @@ fn px(emu : Int, scale : Int) -> Int {
   }
 }
 
+///|
+let min_stroke_width_str : String = "0.3" // minimum visible stroke (sub-pixel)
+
+///|
+/// Convert EMU to fractional pixel string (e.g. "0.3", "1.5", "2").
+/// Used for stroke-width where sub-pixel precision matters.
+fn px_frac(emu : Int, scale : Int) -> String {
+  if scale <= 0 || emu <= 0 {
+    return min_stroke_width_str
+  }
+  let whole = emu / scale
+  let remainder = emu - whole * scale
+  let tenths = remainder * 10 / scale
+  if whole == 0 && tenths == 0 {
+    min_stroke_width_str
+  } else if tenths == 0 {
+    int_to_str(whole)
+  } else {
+    int_to_str(whole) + "." + int_to_str(tenths)
+  }
+}
+
 // ── Font size ─────────────────────────────────────────────────────────────────
 
 ///|
@@ -454,15 +482,10 @@ fn resolve_image_path(target : String) -> String {
     target.get_char(0).unwrap() == '.' &&
     target.get_char(1).unwrap() == '.' &&
     target.get_char(2).unwrap() == '/' {
-    "ppt/" + suffix(target, 3)
+    "ppt/" + @xml.str_suffix(target, 3)
   } else {
     target
   }
-}
-
-///|
-fn suffix(s : String, from : Int) -> String {
-  @xml.str_suffix(s, from)
 }
 
 ///|
@@ -478,7 +501,7 @@ fn mime_from_ext(path : String) -> String {
   if dot < 0 {
     return "image/png"
   }
-  let ext = suffix(path, dot + 1)
+  let ext = @xml.str_suffix(path, dot + 1)
   if ext == "png" {
     "image/png"
   } else if ext == "jpg" || ext == "jpeg" {
@@ -487,6 +510,15 @@ fn mime_from_ext(path : String) -> String {
     "image/gif"
   } else if ext == "svg" || ext == "svgz" {
     "image/svg+xml"
+  } else if ext == "bmp" {
+    "image/bmp"
+  } else if ext == "tif" || ext == "tiff" {
+    "image/tiff"
+  } else if ext == "webp" {
+    "image/webp"
+  } else if ext == "emf" || ext == "wmf" {
+    // EMF/WMF are Windows-only vector formats; browsers cannot render them
+    ""
   } else {
     "image/png"
   }
@@ -515,11 +547,16 @@ fn resolve_image_href(
     None => ()
   }
   let img_path = resolve_image_path(target)
+  let mime = mime_from_ext(img_path)
+  if mime.is_empty() {
+    // EMF/WMF: try converting to SVG via FFI
+    let svg_uri = @ffi.ffi_convert_emf(img_path)
+    return svg_uri
+  }
   let b64 = @ffi.ffi_get_file_base64(img_path)
   if b64.is_empty() {
     ""
   } else {
-    let mime = mime_from_ext(img_path)
     "data:" + mime + ";base64," + b64
   }
 }
@@ -671,8 +708,14 @@ fn format_ratio(num : Int, den : Int) -> String {
   if den == 0 || num == den {
     return "1"
   }
-  // Use 4 fractional digits: compute ratio * 10000
-  let scaled = num * 10000 / den
+  // Compute ratio * 10000 without 32-bit overflow.
+  // Split: whole = num/den, then fractional digits via remainder*100 steps.
+  let q1 = num / den
+  let r1 = num - q1 * den
+  let q2 = r1 * 100 / den
+  let r2 = r1 * 100 - q2 * den
+  let q3 = r2 * 100 / den
+  let scaled = q1 * 10000 + q2 * 100 + q3
   let whole = scaled / 10000
   let frac = scaled - whole * 10000
   let abs_frac = if frac < 0 { -frac } else { frac }
@@ -1466,14 +1509,14 @@ fn render_shape(
       } else if shape.stroke_no_fill {
         " stroke=\"none\""
       } else {
-        let sw = px(
-          if shape.stroke_w > 0 {
-            shape.stroke_w
-          } else {
-            @ooxml.default_stroke_w
-          },
-          scale,
-        )
+        let stroke_emu = if shape.stroke_w > 0 {
+          shape.stroke_w
+        } else {
+          @ooxml.default_stroke_w
+        }
+        let sw_str = px_frac(stroke_emu, scale)
+        let sw = px(stroke_emu, scale)
+        let sw_for_dash = if sw <= 0 { 1 } else { sw }
         let stroke_color = if not(shape.stroke_grad_fill.is_none()) {
           "url(#" + stroke_grad_id(slide_num, shape_idx) + ")"
         } else if not(shape.stroke_patt_fill.is_none()) {
@@ -1481,8 +1524,8 @@ fn render_shape(
         } else {
           shape.stroke.to_css()
         }
-        let base = a("stroke", stroke_color) + ai("stroke-width", sw)
-        let dash_attr = stroke_dasharray(shape.stroke_dash, sw)
+        let base = a("stroke", stroke_color) + a("stroke-width", sw_str)
+        let dash_attr = stroke_dasharray(shape.stroke_dash, sw_for_dash)
         let cap_attr = stroke_linecap(shape.stroke_cap)
         let join_attr = stroke_linejoin(
           shape.stroke_join,
@@ -2176,6 +2219,8 @@ pub fn render_slide_svg(
   theme : @ooxml.ThemeData,
   bg_shapes : Array[@ooxml.Shape],
   table_styles : Array[@ooxml.TableStyleDef],
+  bg_shapes_rels : Array[Array[@ooxml.Relationship]],
+  bg_fill_rels : Array[@ooxml.Relationship],
 ) -> String {
   let sw = slide.slide_size.cx
   let sh = slide.slide_size.cy
@@ -2311,7 +2356,12 @@ pub fn render_slide_svg(
   // Background blip fill (image)
   let bg_blip_svg = if not(slide.bg_blip_fill.is_none()) {
     let bf = slide.bg_blip_fill
-    let href = resolve_blip_href(rels, bf)
+    let bg_resolve_rels = if bg_fill_rels.length() > 0 {
+      bg_fill_rels
+    } else {
+      rels
+    }
+    let href = resolve_blip_href(bg_resolve_rels, bf)
     if href.is_empty() {
       ""
     } else {
@@ -2345,8 +2395,13 @@ pub fn render_slide_svg(
   let mut bg_shapes_svg = ""
   let mut bi = 0
   while bi < nbg {
+    let bg_shape_rels = if bi < bg_shapes_rels.length() {
+      bg_shapes_rels[bi]
+    } else {
+      rels
+    }
     bg_shapes_svg = bg_shapes_svg +
-      render_shape(bg_shapes[bi], rels, slide_num, scale, -(bi + 1), theme, table_styles)
+      render_shape(bg_shapes[bi], bg_shape_rels, slide_num, scale, -(bi + 1), theme, table_styles)
     bi = bi + 1
   }
   // Render slide shapes
