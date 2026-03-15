@@ -1937,13 +1937,16 @@ fn render_table_cell_text(
   if available_h <= 0 {
     return ""
   }
-  // Compute per-paragraph line heights (use run font size when available)
+  let content_w = cell_w - pad_l - pad_r
   let np = paragraphs.length()
-  let line_heights : Array[Int] = []
+  // Pre-compute per-paragraph: line height, wrapped lines count, bullet indent
+  let para_line_hs : Array[Int] = []
+  let para_wrap_counts : Array[Int] = []
+  let para_bul_mars : Array[Int] = []
   let mut pi = 0
   while pi < np {
     let para = paragraphs[pi]
-    // Find max run font size in this paragraph
+    // Line height from max run font size
     let mut max_run_sz = 0
     let nr = para.runs.length()
     let mut ri = 0
@@ -1963,14 +1966,34 @@ fn render_table_cell_text(
     } else {
       font_sz * line_height_numer / line_height_denom
     }
-    line_heights.push(lh)
+    para_line_hs.push(lh)
+    // Bullet indent
+    let bul_mar = if para.mar_l > 0 { px(para.mar_l, scale) } else { 0 }
+    para_bul_mars.push(bul_mar)
+    // Wrapped line count
+    let wrap_w = content_w - bul_mar
+    if nr == 0 {
+      para_wrap_counts.push(1)
+    } else if wrap_w > 0 {
+      let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, -1, theme)
+      para_wrap_counts.push(vlines.length())
+    } else {
+      para_wrap_counts.push(1)
+    }
     pi = pi + 1
   }
-  // Total text height
+  // Total text height (all wrapped lines)
   let mut text_height = 0
   let mut thi = 0
   while thi < np {
-    text_height = text_height + line_heights[thi]
+    text_height = text_height + para_line_hs[thi] * para_wrap_counts[thi]
+    // Space before/after
+    if paragraphs[thi].spc_before > 0 && thi > 0 {
+      text_height = text_height + px(paragraphs[thi].spc_before, scale)
+    }
+    if paragraphs[thi].spc_after > 0 {
+      text_height = text_height + px(paragraphs[thi].spc_after, scale)
+    }
     thi = thi + 1
   }
   // Vertical anchor offset
@@ -1985,8 +2008,6 @@ fn render_table_cell_text(
   let style_fill = if not(style_cell.font_color.is_none()) {
     style_cell.font_color.to_css()
   } else if not(cell_fill.is_none()) {
-    // Auto-contrast: use white text on dark cell backgrounds
-    // Luminance = 0.299*R + 0.587*G + 0.114*B (scaled ×1000)
     let lum = cell_fill.r * 299 + cell_fill.g * 587 + cell_fill.b * 114
     if lum < auto_contrast_lum_threshold { "#FFFFFF" } else { default_text_fill }
   } else {
@@ -2004,61 +2025,94 @@ fn render_table_cell_text(
   let mut p_idx = 0
   while p_idx < np {
     let para = paragraphs[p_idx]
-    let lh = line_heights[p_idx]
+    let lh = para_line_hs[p_idx]
     let nr = para.runs.length()
-    // Advance to baseline
-    cur_y = cur_y + lh
+    let bul_mar = para_bul_mars[p_idx]
+    // Space before
+    if para.spc_before > 0 && p_idx > 0 {
+      cur_y = cur_y + px(para.spc_before, scale)
+    }
     if nr == 0 && para.bullet.is_empty() {
+      cur_y = cur_y + lh
       p_idx = p_idx + 1
       if cur_y > cell_y + cell_h - pad_b {
         break
       }
       continue
     }
-    // Determine paragraph alignment
+    // Paragraph alignment
     let algn = para.align
-    // Bullet indent in pixels
-    let bul_mar = if para.mar_l > 0 { px(para.mar_l, scale) } else { 0 }
-    let bul_indent = if para.indent != 0 {
-      px(para.indent, scale)
-    } else {
-      0
-    }
+    let bul_indent = if para.indent != 0 { px(para.indent, scale) } else { 0 }
     // Text start x after bullet indent
     let text_x = cell_x + pad_l + bul_mar
-    // Compute paragraph x position based on alignment
-    let (para_x, text_anchor) = if algn == "ctr" {
-      (cell_x + cell_w / 2, "middle")
-    } else if algn == "r" {
-      (cell_x + cell_w - pad_r, "end")
+    // Wrap text into visual lines
+    let wrap_w = content_w - bul_mar
+    let wrapped = if wrap_w > 0 {
+      wrap_paragraph(para, wrap_w, scale, def_sz, -1, theme)
     } else {
-      (text_x, "start")
-    }
-    // Render bullet character if present
-    if not(para.bullet.is_empty()) && algn != "ctr" && algn != "r" {
-      let bul_x = cell_x + pad_l + bul_mar + bul_indent
-      out = out + "<tspan" + ai("x", bul_x) + ai("y", cur_y) + ">" +
-        para.bullet + " </tspan>"
-    }
-    // Paragraph-level tspan for positioning
-    out = out + "<tspan" + ai("x", para_x) + ai("y", cur_y)
-    if text_anchor != "start" {
-      out = out + a("text-anchor", text_anchor)
-    }
-    out = out + ">"
-    let mut ri = 0
-    while ri < nr {
-      let run = para.runs[ri]
-      let display_text = if run.cap == "all" {
-        to_upper_ascii(run.text)
-      } else {
-        run.text
+      // Fallback: all segments on one line
+      let segs : Array[(Int, String)] = []
+      let mut ri = 0
+      while ri < nr {
+        segs.push((ri, para.runs[ri].text))
+        ri = ri + 1
       }
-      out = out +
-        render_run_tspan(run, ri, display_text, scale, -1, rels, theme)
-      ri = ri + 1
+      [segs]
     }
-    out = out + "</tspan>"
+    let nlines = wrapped.length()
+    let mut li = 0
+    while li < nlines {
+      cur_y = cur_y + lh
+      if cur_y > cell_y + cell_h - pad_b {
+        break
+      }
+      let line = wrapped[li]
+      // Compute x position based on alignment
+      let (line_x, text_anchor) = if algn == "ctr" {
+        (cell_x + cell_w / 2, "middle")
+      } else if algn == "r" {
+        (cell_x + cell_w - pad_r, "end")
+      } else {
+        (text_x, "start")
+      }
+      // Render bullet on first line only
+      if li == 0 && not(para.bullet.is_empty()) && algn != "ctr" && algn != "r" {
+        let bul_x = cell_x + pad_l + bul_mar + bul_indent
+        out = out + "<tspan" + ai("x", bul_x) + ai("y", cur_y) + ">" +
+          para.bullet + " </tspan>"
+      }
+      // Line tspan
+      out = out + "<tspan" + ai("x", line_x) + ai("y", cur_y)
+      if text_anchor != "start" {
+        out = out + a("text-anchor", text_anchor)
+      }
+      out = out + ">"
+      // Render segments
+      let nseg = line.length()
+      let mut si = 0
+      while si < nseg {
+        let (run_idx, seg_text) = line[si]
+        if run_idx < nr {
+          let run = para.runs[run_idx]
+          let display = if run.cap == "all" {
+            to_upper_ascii(seg_text)
+          } else {
+            seg_text
+          }
+          // Use render_run_tspan with segment text instead of full run text
+          out = out + render_run_tspan(
+            run, run_idx, display, scale, -1, rels, theme,
+          )
+        }
+        si = si + 1
+      }
+      out = out + "</tspan>"
+      li = li + 1
+    }
+    // Space after
+    if para.spc_after > 0 {
+      cur_y = cur_y + px(para.spc_after, scale)
+    }
     p_idx = p_idx + 1
     if cur_y > cell_y + cell_h - pad_b {
       break
@@ -2203,14 +2257,26 @@ fn render_table(
     cx_accum = cx_accum + table.col_widths[ci]
     ci = ci + 1
   }
-  // Precompute row y-offsets in EMU
+  // Precompute row heights in EMU (auto-size rows with h=0)
   let nrows = table.rows.length()
+  let row_heights_emu : Array[Int] = []
+  // Minimum row height: default font size + top/bottom margins
+  let min_row_h_emu = default_font_size_emu() * line_height_numer /
+    line_height_denom +
+    default_cell_mar_tb * 2
+  let mut rhi = 0
+  while rhi < nrows {
+    let h = table.rows[rhi].height
+    row_heights_emu.push(if h > 0 { h } else { min_row_h_emu })
+    rhi = rhi + 1
+  }
+  // Precompute row y-offsets in EMU
   let row_y_emu : Array[Int] = []
   let mut ry_accum = 0
   let mut ri2 = 0
   while ri2 < nrows {
     row_y_emu.push(ry_accum)
-    ry_accum = ry_accum + table.rows[ri2].height
+    ry_accum = ry_accum + row_heights_emu[ri2]
     ri2 = ri2 + 1
   }
   // Look up table style definition
@@ -2249,7 +2315,7 @@ fn render_table(
       let mut merged_h_emu = 0
       let mut sri = 0
       while sri < rspan && (ri + sri) < nrows {
-        merged_h_emu = merged_h_emu + table.rows[ri + sri].height
+        merged_h_emu = merged_h_emu + row_heights_emu[ri + sri]
         sri = sri + 1
       }
       let cx_px = base_x + px(col_x_emu[col_idx], scale)
