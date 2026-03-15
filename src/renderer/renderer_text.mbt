@@ -678,6 +678,11 @@ fn render_text(
       if para.spc_before > 0 && ti > 0 {
         total_text_h = total_text_h + px(para.spc_before, scale)
       }
+      // Extra space for super/subscript (must match rendering loop)
+      let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
+        para, scale, def_sz,
+      )
+      total_text_h = total_text_h + bl_extra_above
       // Count visual lines for wrapped text (uses col_w for multi-col)
       let num_visual_lines = if do_wrap {
         let indent_emu = if para.mar_l > 0 {
@@ -702,6 +707,7 @@ fn render_text(
         1 + br_count
       }
       total_text_h = total_text_h + para_line_h * num_visual_lines
+      total_text_h = total_text_h + bl_extra_below
       // Add spacing after
       if para.spc_after > 0 {
         total_text_h = total_text_h + px(para.spc_after, scale)
@@ -773,6 +779,10 @@ fn render_text(
   let mut cur_y = base_y
   let mut cur_col = 0
 
+  // Auto-number counters per level (reset when a lower level is encountered)
+  let auto_num_counters : Array[Int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let mut prev_para_level = -1
+
   let mut pi = 0
   while pi < np {
     let para = paragraphs[pi]
@@ -807,13 +817,21 @@ fn render_text(
       cur_y = cur_y + (p_line_h - p_font_sz)
       pi = pi + 1
     } else {
-      // Indent: use marL from paragraph if set, otherwise use level-based
-      let indent_emu = if para.mar_l > 0 {
+      // Indent: marL = left margin for continuation lines
+      //         para.indent = first-line offset from marL (negative = hanging indent)
+      let mar_l_emu = if para.mar_l > 0 {
         para.mar_l
       } else {
         para.level * level_indent_emu
       }
-      let indent = px(indent_emu, scale)
+      let indent = px(mar_l_emu, scale)
+      // First-line indent: marL + indent (e.g., marL=171450, indent=-171450 → 0)
+      let first_line_indent_emu = mar_l_emu + para.indent
+      let first_line_indent = if first_line_indent_emu > 0 {
+        px(first_line_indent_emu, scale)
+      } else {
+        0
+      }
       // RTL: default alignment is right
       // In SVG with direction="rtl", text-anchor semantics are swapped:
       //   "start" = right edge (text flows leftward from x)
@@ -823,31 +841,47 @@ fn render_text(
       } else {
         para.align
       }
-      let (anchor_x, anchor_attr) = if effective_align == "ctr" ||
+      // anchor_x: first line uses first_line_indent, continuation uses indent (marL)
+      let (anchor_x, cont_anchor_x_init, anchor_attr) = if effective_align == "ctr" ||
         effective_align == "c" {
-        (text_x + indent + (text_w - indent) / 2, " text-anchor=\"middle\"")
+        (
+          text_x + first_line_indent + (text_w - first_line_indent) / 2,
+          text_x + indent + (text_w - indent) / 2,
+          " text-anchor=\"middle\"",
+        )
       } else if effective_align == "r" || (para.rtl && effective_align != "l") {
         if para.rtl {
-          // RTL right-aligned: use text-anchor="start" so text flows leftward from right edge
-          (text_x + text_w, " text-anchor=\"start\"")
+          (text_x + text_w, text_x + text_w, " text-anchor=\"start\"")
         } else {
-          (text_x + text_w, " text-anchor=\"end\"")
+          (text_x + text_w, text_x + text_w, " text-anchor=\"end\"")
         }
       } else if para.rtl {
-        // RTL left-aligned: use text-anchor="end" so text ends at left edge
-        (text_x + indent, " text-anchor=\"end\"")
+        (text_x + first_line_indent, text_x + indent, " text-anchor=\"end\"")
       } else {
-        (text_x + indent, " text-anchor=\"start\"")
+        (text_x + first_line_indent, text_x + indent, " text-anchor=\"start\"")
       }
+      let mut cont_anchor_x = cont_anchor_x_init
       // RTL direction attribute
       let rtl_attr = if para.rtl { " direction=\"rtl\"" } else { "" }
+      // Reset auto-number counters for levels deeper than current
+      let cur_level = para.level
+      if cur_level < prev_para_level {
+        let mut rl = cur_level + 1
+        while rl < 10 {
+          auto_num_counters[rl] = 0
+          rl = rl + 1
+        }
+      }
+      prev_para_level = cur_level
       // Determine bullet text
       let bullet_text = if para.bullet_none {
         ""
       } else if not(para.bullet.is_empty()) {
         para.bullet
       } else if not(para.bullet_auto.is_empty()) {
-        auto_number_text(para.bullet_auto, pi)
+        let auto_idx = auto_num_counters[cur_level]
+        auto_num_counters[cur_level] = auto_idx + 1
+        auto_number_text(para.bullet_auto, auto_idx)
       } else {
         ""
       }
@@ -923,7 +957,8 @@ fn render_text(
         let nvl = vlines.length()
         let mut vli = 0
         let mut tab_idx = 0
-        let mut anchor_x = anchor_x
+        // Use first-line anchor for first line, continuation anchor for rest
+        let mut cur_anchor_x = anchor_x
         while vli < nvl {
           let vline = vlines[vli]
           // For wrapped lines after the first, emit a new positioning tspan
@@ -938,32 +973,47 @@ fn render_text(
               cur_col = cur_col + 1
               text_x = base_text_x + (col_w + col_spacing_px) * cur_col
               cur_y = base_y + p_font_sz
-              // Recompute anchor_x for new column
-              anchor_x = if effective_align == "ctr" || effective_align == "c" {
+              // Recompute anchor for new column (use continuation indent)
+              cur_anchor_x = if effective_align == "ctr" || effective_align == "c" {
                 text_x + indent + (text_w - indent) / 2
               } else if effective_align == "r" {
                 text_x + text_w
               } else {
                 text_x + indent
               }
+              // Update cont_anchor_x for subsequent lines in new column
+              cont_anchor_x = cur_anchor_x
               // Open new <text> and paragraph tspan
               out = out + make_text_header(text_x)
               out = out +
                 "<tspan" +
-                ai("x", anchor_x) +
+                ai("x", cur_anchor_x) +
                 ai("y", cur_y) +
                 anchor_attr +
                 rtl_attr +
                 ">"
             } else {
+              // Switch to continuation indent (marL) for wrapped lines
+              cur_anchor_x = cont_anchor_x
               out = out +
                 "</tspan><tspan" +
-                ai("x", anchor_x) +
+                ai("x", cur_anchor_x) +
                 ai("y", cur_y) +
                 anchor_attr +
                 rtl_attr +
                 ">"
             }
+          }
+          // On first line with bullet, reposition to cont_anchor_x (= marL)
+          // so text aligns with continuation lines (OOXML text starts at marL)
+          if vli == 0 && not(bullet_text.is_empty()) {
+            out = out +
+              "</tspan><tspan" +
+              ai("x", cont_anchor_x) +
+              ai("y", cur_y) +
+              anchor_attr +
+              rtl_attr +
+              ">"
           }
           // Render fragments in this visual line
           let nf = vline.length()
