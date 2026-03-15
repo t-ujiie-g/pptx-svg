@@ -1202,6 +1202,9 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   if cell.v_merge {
     out = out + " vMerge=\"1\""
   }
+  if cell.h_merge {
+    out = out + " hMerge=\"1\""
+  }
   out = out + ">"
   // Text body
   if cell.paragraphs.length() > 0 {

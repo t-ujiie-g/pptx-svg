@@ -1909,37 +1909,71 @@ let default_cell_mar_lr : Int = 91440 // OOXML default L/R margin: 0.1 inch
 let default_cell_mar_tb : Int = 45720 // OOXML default T/B margin: 0.05 inch
 
 ///|
+let auto_contrast_lum_threshold : Int = 128000 // luminance threshold (×1000) for auto-contrast text color
+
+///|
 fn render_table_cell_text(
   paragraphs : Array[@ooxml.TextParagraph],
   cell_x : Int,
   cell_y : Int,
+  cell_w : Int,
   cell_h : Int,
   pad_l : Int,
+  pad_r : Int,
   pad_t : Int,
   pad_b : Int,
   anchor : String,
   scale : Int,
   theme : @ooxml.ThemeData,
   rels : Array[@ooxml.Relationship],
+  style_cell : @ooxml.TableStyleCell,
+  cell_fill : @ooxml.Color,
 ) -> String {
   if paragraphs.length() == 0 {
     return ""
   }
-  let tx = cell_x + pad_l
   let def_sz = px(default_font_size_emu(), scale)
-  let font_sz = if def_sz > cell_h - pad_t - pad_b {
-    cell_h - pad_t - pad_b
-  } else {
-    def_sz
-  }
-  if font_sz <= 0 {
+  let available_h = cell_h - pad_t - pad_b
+  if available_h <= 0 {
     return ""
   }
-  let line_h = font_sz * line_height_numer / line_height_denom
-  let font_face = theme.minor_font + ", sans-serif"
+  // Compute per-paragraph line heights (use run font size when available)
   let np = paragraphs.length()
-  let text_height = np * line_h
-  let available_h = cell_h - pad_t - pad_b
+  let line_heights : Array[Int] = []
+  let mut pi = 0
+  while pi < np {
+    let para = paragraphs[pi]
+    // Find max run font size in this paragraph
+    let mut max_run_sz = 0
+    let nr = para.runs.length()
+    let mut ri = 0
+    while ri < nr {
+      let rsz = para.runs[ri].font_size
+      if rsz > 0 {
+        let rsp = px(rsz * @ooxml.emu_per_hundredth_pt, scale)
+        if rsp > max_run_sz {
+          max_run_sz = rsp
+        }
+      }
+      ri = ri + 1
+    }
+    let font_sz = if max_run_sz > 0 { max_run_sz } else { def_sz }
+    let lh = if para.line_spacing > 0 {
+      font_sz * para.line_spacing / 100000
+    } else {
+      font_sz * line_height_numer / line_height_denom
+    }
+    line_heights.push(lh)
+    pi = pi + 1
+  }
+  // Total text height
+  let mut text_height = 0
+  let mut thi = 0
+  while thi < np {
+    text_height = text_height + line_heights[thi]
+    thi = thi + 1
+  }
+  // Vertical anchor offset
   let y_offset = if anchor == "ctr" {
     pad_t + (available_h - text_height) / 2
   } else if anchor == "b" {
@@ -1947,40 +1981,85 @@ fn render_table_cell_text(
   } else {
     pad_t
   }
+  // Default text color: style > auto-contrast > black
+  let style_fill = if not(style_cell.font_color.is_none()) {
+    style_cell.font_color.to_css()
+  } else if not(cell_fill.is_none()) {
+    // Auto-contrast: use white text on dark cell backgrounds
+    // Luminance = 0.299*R + 0.587*G + 0.114*B (scaled ×1000)
+    let lum = cell_fill.r * 299 + cell_fill.g * 587 + cell_fill.b * 114
+    if lum < auto_contrast_lum_threshold { "#FFFFFF" } else { default_text_fill }
+  } else {
+    default_text_fill
+  }
+  let font_face = theme.minor_font + ", sans-serif"
   let mut out = "<text" +
-    ai("x", tx) +
     a("xml:space", "preserve") +
     a("font-family", font_face) +
-    ai("font-size", font_sz) +
-    a("fill", default_text_fill) +
+    ai("font-size", def_sz) +
+    a("fill", style_fill) +
+    (if style_cell.bold { " font-weight=\"bold\"" } else { "" }) +
     ">"
-  let mut cur_y = cell_y + y_offset + font_sz
-  let mut pi = 0
-  while pi < np {
-    let para = paragraphs[pi]
+  let mut cur_y = cell_y + y_offset
+  let mut p_idx = 0
+  while p_idx < np {
+    let para = paragraphs[p_idx]
+    let lh = line_heights[p_idx]
     let nr = para.runs.length()
-    if nr == 0 {
-      cur_y = cur_y + line_h
-    } else {
-      // Paragraph-level tspan for positioning
-      out = out + "<tspan" + ai("x", tx) + ai("y", cur_y) + ">"
-      let mut ri = 0
-      while ri < nr {
-        let run = para.runs[ri]
-        let display_text = if run.cap == "all" {
-          to_upper_ascii(run.text)
-        } else {
-          run.text
-        }
-        out = out +
-          render_run_tspan(run, ri, display_text, scale, -1, rels, theme)
-        ri = ri + 1
+    // Advance to baseline
+    cur_y = cur_y + lh
+    if nr == 0 && para.bullet.is_empty() {
+      p_idx = p_idx + 1
+      if cur_y > cell_y + cell_h - pad_b {
+        break
       }
-      out = out + "</tspan>"
-      cur_y = cur_y + line_h
+      continue
     }
-    pi = pi + 1
-    // Stop if we overflow the cell
+    // Determine paragraph alignment
+    let algn = para.align
+    // Bullet indent in pixels
+    let bul_mar = if para.mar_l > 0 { px(para.mar_l, scale) } else { 0 }
+    let bul_indent = if para.indent != 0 {
+      px(para.indent, scale)
+    } else {
+      0
+    }
+    // Text start x after bullet indent
+    let text_x = cell_x + pad_l + bul_mar
+    // Compute paragraph x position based on alignment
+    let (para_x, text_anchor) = if algn == "ctr" {
+      (cell_x + cell_w / 2, "middle")
+    } else if algn == "r" {
+      (cell_x + cell_w - pad_r, "end")
+    } else {
+      (text_x, "start")
+    }
+    // Render bullet character if present
+    if not(para.bullet.is_empty()) && algn != "ctr" && algn != "r" {
+      let bul_x = cell_x + pad_l + bul_mar + bul_indent
+      out = out + "<tspan" + ai("x", bul_x) + ai("y", cur_y) + ">" +
+        para.bullet + " </tspan>"
+    }
+    // Paragraph-level tspan for positioning
+    out = out + "<tspan" + ai("x", para_x) + ai("y", cur_y)
+    if text_anchor != "start" {
+      out = out + a("text-anchor", text_anchor)
+    }
+    out = out + ">"
+    let mut ri = 0
+    while ri < nr {
+      let run = para.runs[ri]
+      let display_text = if run.cap == "all" {
+        to_upper_ascii(run.text)
+      } else {
+        run.text
+      }
+      out = out +
+        render_run_tspan(run, ri, display_text, scale, -1, rels, theme)
+      ri = ri + 1
+    }
+    out = out + "</tspan>"
+    p_idx = p_idx + 1
     if cur_y > cell_y + cell_h - pad_b {
       break
     }
@@ -2146,9 +2225,14 @@ fn render_table(
     let mut col_idx = 0 // actual grid column index
     while cj < ncells && col_idx < ncols {
       let cell = row.cells[cj]
-      // Skip vertically merged continuation cells
+      // Skip merged continuation cells
       if cell.v_merge {
         col_idx = col_idx + cell.grid_span
+        cj = cj + 1
+        continue
+      }
+      if cell.h_merge {
+        // hMerge cells don't advance col_idx — parent's gridSpan already covers them
         cj = cj + 1
         continue
       }
@@ -2208,19 +2292,32 @@ fn render_table(
       let pad_t = px(if cell.mar_t >= 0 { cell.mar_t } else { default_cell_mar_tb }, scale)
       let pad_b = px(if cell.mar_b >= 0 { cell.mar_b } else { default_cell_mar_tb }, scale)
       // Cell text
+      let pad_r = px(if cell.mar_r >= 0 { cell.mar_r } else { default_cell_mar_lr }, scale)
+      // Resolve effective cell fill for auto-contrast text color
+      let eff_fill = if not(cell.fill.is_none()) {
+        cell.fill
+      } else if not(style_cell.fill.is_none()) {
+        style_cell.fill
+      } else {
+        @ooxml.Color::none()
+      }
       out = out +
         render_table_cell_text(
           cell.paragraphs,
           cx_px,
           ry,
+          cw,
           ch,
           pad_l,
+          pad_r,
           pad_t,
           pad_b,
           cell.anchor,
           scale,
           theme,
           rels,
+          style_cell,
+          eff_fill,
         )
       col_idx = col_idx + span
       cj = cj + 1

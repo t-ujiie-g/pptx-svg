@@ -966,6 +966,7 @@ pub(all) struct TableCell {
   grid_span : Int // horizontal merge span (1 = no merge)
   row_span : Int // vertical merge span (1 = no merge)
   v_merge : Bool // true = this cell is merged into the cell above
+  h_merge : Bool // true = this cell is merged into the cell to the left
   // Cell borders (line width in EMU, 0 = default, -1 = none)
   bdr_l_w : Int
   bdr_r_w : Int
