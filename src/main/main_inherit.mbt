@@ -36,6 +36,34 @@ fn find_placeholder(
 ///|
 /// Resolve placeholder transforms and fills from layout/master for a slide's shapes.
 ///  Modifies shapes in-place by replacing zero-size transforms with inherited ones.
+///|
+/// Try to inherit transform and body_props from a source placeholder.
+/// Applies what it can and returns (got_transform, got_body_props).
+fn try_inherit_from_source(
+  shapes : Array[@ooxml.Shape],
+  idx : Int,
+  shape : @ooxml.Shape,
+  source_shapes : Array[@ooxml.Shape],
+  needs_transform : Bool,
+  needs_body_props : Bool,
+) -> (Bool, Bool) {
+  match find_placeholder(source_shapes, shape.ph_type, shape.ph_idx) {
+    None => (false, false)
+    Some(ph) => {
+      let mut new_shape = shape
+      let got_t = needs_transform && ph.transform.cx > 0 && ph.transform.cy > 0
+      if got_t {
+        new_shape = { ..new_shape, transform: ph.transform }
+      }
+      if needs_body_props {
+        new_shape = { ..new_shape, body_props: ph.body_props }
+      }
+      shapes[idx] = new_shape
+      (got_t, needs_body_props)
+    }
+  }
+}
+
 fn resolve_placeholder_inheritance(
   shapes : Array[@ooxml.Shape],
   layout_opt : @ooxml.SlideLayoutData?,
@@ -49,48 +77,41 @@ fn resolve_placeholder_inheritance(
       i = i + 1
       continue
     }
-    let needs_transform = shape.transform.cx == 0 && shape.transform.cy == 0
-    let needs_body_props = shape.body_props.anchor.is_empty()
+    let mut needs_transform = shape.transform.cx == 0 && shape.transform.cy == 0
+    let mut needs_body_props = shape.body_props.l_ins < 0 &&
+      shape.body_props.t_ins < 0 &&
+      shape.body_props.r_ins < 0 &&
+      shape.body_props.b_ins < 0 &&
+      shape.body_props.anchor.is_empty()
     if not(needs_transform) && not(needs_body_props) {
       i = i + 1
       continue
     }
-    // Try layout first, then master
-    let mut resolved = false
+    // Try layout first
     match layout_opt {
-      Some(layout) =>
-        match find_placeholder(layout.shapes, shape.ph_type, shape.ph_idx) {
-          Some(ph) => {
-            let mut new_shape = shape
-            if needs_transform && ph.transform.cx > 0 && ph.transform.cy > 0 {
-              new_shape = { ..new_shape, transform: ph.transform }
-            }
-            if needs_body_props && not(ph.body_props.anchor.is_empty()) {
-              new_shape = { ..new_shape, body_props: ph.body_props }
-            }
-            shapes[i] = new_shape
-            resolved = true
-          }
-          None => ()
+      Some(layout) => {
+        let (got_t, got_bp) = try_inherit_from_source(
+          shapes, i, shapes[i], layout.shapes, needs_transform, needs_body_props,
+        )
+        if got_t {
+          needs_transform = false
         }
+        if got_bp {
+          needs_body_props = false
+        }
+      }
       None => ()
     }
-    if not(resolved) {
+    // Try master for anything still needed
+    if needs_transform || needs_body_props {
       match master_opt {
         Some(master) =>
-          match find_placeholder(master.shapes, shape.ph_type, shape.ph_idx) {
-            Some(ph) => {
-              let mut new_shape = shape
-              if needs_transform && ph.transform.cx > 0 && ph.transform.cy > 0 {
-                new_shape = { ..new_shape, transform: ph.transform }
-              }
-              if needs_body_props && not(ph.body_props.anchor.is_empty()) {
-                new_shape = { ..new_shape, body_props: ph.body_props }
-              }
-              shapes[i] = new_shape
-            }
-            None => ()
-          }
+          ignore(
+            try_inherit_from_source(
+              shapes, i, shapes[i], master.shapes, needs_transform,
+              needs_body_props,
+            ),
+          )
         None => ()
       }
     }
@@ -167,9 +188,25 @@ fn apply_text_style_to_runs(
 }
 
 ///|
+/// Apply a placeholder's lst_style to a shape's paragraphs as fallback.
+/// Searches source_shapes for a matching placeholder, then applies its
+/// lst_style for run defaults (font_size, color, bold) and alignment.
+fn apply_ph_lst_style_defaults(
+  shape : @ooxml.Shape,
+  source_shapes : Array[@ooxml.Shape],
+) -> Unit {
+  match find_placeholder(source_shapes, shape.ph_type, shape.ph_idx) {
+    None => ()
+    Some(ph) => {
+      let ph_style = ph.lst_style
+      apply_text_style_to_runs(shape.paragraphs, ph_style)
+      apply_para_alignment_from_style(shape.paragraphs, ph_style)
+    }
+  }
+}
+
+///|
 /// Apply layout placeholder text styles to a shape's paragraphs.
-/// Uses the layout placeholder's lst_style (from a:lstStyle in p:txBody)
-/// to inherit font_size, color, bold, alignment, etc.
 fn apply_layout_text_defaults(
   shape : @ooxml.Shape,
   layout_opt : @ooxml.SlideLayoutData?,
@@ -179,19 +216,7 @@ fn apply_layout_text_defaults(
   }
   match layout_opt {
     None => ()
-    Some(layout) =>
-      match find_placeholder(layout.shapes, shape.ph_type, shape.ph_idx) {
-        None => ()
-        Some(ph) => {
-          // Use the layout placeholder's lst_style for text run defaults
-          let ph_style = ph.lst_style
-          apply_text_style_to_runs(shape.paragraphs, ph_style)
-          // Also inherit alignment from layout placeholder's lst_style
-          apply_para_alignment_from_style(shape.paragraphs, ph_style)
-          // Also inherit body_props (insets, anchor) from layout placeholder
-          // This is already done for transforms in resolve_placeholder_inheritance
-        }
-      }
+    Some(layout) => apply_ph_lst_style_defaults(shape, layout.shapes)
   }
 }
 
@@ -218,6 +243,21 @@ fn apply_para_alignment_from_style(
       }
     }
     pi = pi + 1
+  }
+}
+
+///|
+/// Apply master placeholder text styles to a shape's paragraphs.
+fn apply_master_ph_text_defaults(
+  shape : @ooxml.Shape,
+  master_opt : @ooxml.SlideMasterData?,
+) -> Unit {
+  if shape.ph_type.is_empty() {
+    return
+  }
+  match master_opt {
+    None => ()
+    Some(master) => apply_ph_lst_style_defaults(shape, master.shapes)
   }
 }
 

@@ -711,6 +711,12 @@ pub(all) struct LevelTextDefaults {
   indent : Int // EMU; 0 = unset
   bullet : String // "" = none
   bullet_none : Bool
+  bullet_font : String // "" = inherit
+  bullet_size : Int // 0 = inherit
+  bullet_color : Color // Color::none() = inherit
+  line_spacing : Int // 0 = unset; positive = pct (e.g. 130000 = 130%)
+  spc_before : Int // 0 = unset
+  spc_after : Int // 0 = unset
 }
 
 ///|
@@ -727,6 +733,12 @@ pub fn LevelTextDefaults::empty() -> LevelTextDefaults {
     indent: 0,
     bullet: "",
     bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: Color::none(),
+    line_spacing: 0,
+    spc_before: 0,
+    spc_after: 0,
   }
 }
 

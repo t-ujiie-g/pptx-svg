@@ -310,6 +310,50 @@ fn parse_level_defaults(
     Some(_) => true
     None => false
   }
+  let bu_font = match @xml.find_child(ppr_ch, "a:buFont") {
+    None => ""
+    Some(bf) =>
+      match @xml.get_attr(bf, "typeface") {
+        Some(v) => v
+        None => ""
+      }
+  }
+  let bu_size = match @xml.find_child(ppr_ch, "a:buSzPct") {
+    Some(bsp) =>
+      match @xml.get_attr(bsp, "val") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+    None =>
+      match @xml.find_child(ppr_ch, "a:buSzPts") {
+        Some(bsp) =>
+          match @xml.get_attr(bsp, "val") {
+            Some(v) => -@xml.parse_int(v)
+            None => 0
+          }
+        None => 0
+      }
+  }
+  let bu_color = match @xml.find_child(ppr_ch, "a:buClr") {
+    None => Color::none()
+    Some(bc) => {
+      let bc_ch = @xml.get_children(bc)
+      parse_solid_fill(bc_ch, theme)
+    }
+  }
+  // Line spacing & spacing before/after
+  let lnspc = match @xml.find_child(ppr_ch, "a:lnSpc") {
+    Some(n) => parse_spacing(n)
+    None => 0
+  }
+  let spc_bef = match @xml.find_child(ppr_ch, "a:spcBef") {
+    Some(n) => parse_spacing(n)
+    None => 0
+  }
+  let spc_aft = match @xml.find_child(ppr_ch, "a:spcAft") {
+    Some(n) => parse_spacing(n)
+    None => 0
+  }
   // Default run properties from a:defRPr
   let (bold, italic, font_size, color, font_face, ea_font) = match
     @xml.find_child(ppr_ch, "a:defRPr") {
@@ -345,6 +389,12 @@ fn parse_level_defaults(
     indent,
     bullet: bu_char,
     bullet_none: bu_none,
+    bullet_font: bu_font,
+    bullet_size: bu_size,
+    bullet_color: bu_color,
+    line_spacing: lnspc,
+    spc_before: spc_bef,
+    spc_after: spc_aft,
   }
 }
 

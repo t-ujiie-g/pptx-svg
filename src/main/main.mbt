@@ -726,7 +726,9 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     let shape = slide_data.shapes[shape_i]
     // Layout placeholder defaults first (more specific)
     apply_layout_text_defaults(shape, layout_opt)
-    // Master text styles as final fallback
+    // Master placeholder's lstStyle as second fallback
+    apply_master_ph_text_defaults(shape, master_opt)
+    // Master text styles (p:txStyles) as final fallback
     match master_opt {
       Some(master) => apply_text_defaults(shape, master.text_styles)
       None => ()

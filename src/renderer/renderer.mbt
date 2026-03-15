@@ -33,10 +33,16 @@ let svg_target_width : Int = 960 // output SVG width in px
 let default_emu_per_px : Int = 9525 // EMU per pixel at 96 DPI
 
 ///|
-let line_height_numer : Int = 12 // line-height = font-size * line_height_numer / line_height_denom
+let line_height_numer : Int = 12 // default line-height = font-size * 12/10
 
 ///|
 let line_height_denom : Int = 10
+
+///|
+let pct_line_height_numer : Int = 15 // for %-based spacing: font-size * 15/10 (CJK-friendly)
+
+///|
+let pct_line_height_denom : Int = 10
 
 
 ///|
@@ -391,6 +397,28 @@ fn px(emu : Int, scale : Int) -> Int {
     0
   } else {
     emu / scale
+  }
+}
+
+///|
+let min_stroke_width_str : String = "0.3" // minimum visible stroke (sub-pixel)
+
+///|
+/// Convert EMU to fractional pixel string (e.g. "0.3", "1.5", "2").
+/// Used for stroke-width where sub-pixel precision matters.
+fn px_frac(emu : Int, scale : Int) -> String {
+  if scale <= 0 || emu <= 0 {
+    return min_stroke_width_str
+  }
+  let whole = emu / scale
+  let remainder = emu - whole * scale
+  let tenths = remainder * 10 / scale
+  if whole == 0 && tenths == 0 {
+    min_stroke_width_str
+  } else if tenths == 0 {
+    int_to_str(whole)
+  } else {
+    int_to_str(whole) + "." + int_to_str(tenths)
   }
 }
 
@@ -1461,14 +1489,14 @@ fn render_shape(
       } else if shape.stroke_no_fill {
         " stroke=\"none\""
       } else {
-        let sw = px(
-          if shape.stroke_w > 0 {
-            shape.stroke_w
-          } else {
-            @ooxml.default_stroke_w
-          },
-          scale,
-        )
+        let stroke_emu = if shape.stroke_w > 0 {
+          shape.stroke_w
+        } else {
+          @ooxml.default_stroke_w
+        }
+        let sw_str = px_frac(stroke_emu, scale)
+        let sw = px(stroke_emu, scale)
+        let sw_for_dash = if sw <= 0 { 1 } else { sw }
         let stroke_color = if not(shape.stroke_grad_fill.is_none()) {
           "url(#" + stroke_grad_id(slide_num, shape_idx) + ")"
         } else if not(shape.stroke_patt_fill.is_none()) {
@@ -1476,8 +1504,8 @@ fn render_shape(
         } else {
           shape.stroke.to_css()
         }
-        let base = a("stroke", stroke_color) + ai("stroke-width", sw)
-        let dash_attr = stroke_dasharray(shape.stroke_dash, sw)
+        let base = a("stroke", stroke_color) + a("stroke-width", sw_str)
+        let dash_attr = stroke_dasharray(shape.stroke_dash, sw_for_dash)
         let cap_attr = stroke_linecap(shape.stroke_cap)
         let join_attr = stroke_linejoin(
           shape.stroke_join,

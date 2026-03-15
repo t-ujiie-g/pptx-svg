@@ -357,11 +357,13 @@ fn para_line_height(
     px(para.line_spacing, scale)
   } else if para.line_spacing < 0 {
     // Negative = percentage (-100000 = 100% = single spacing)
-    // In OOXML, 100% means the default single-line spacing (font_size * 1.2)
-    let pct = -para.line_spacing // e.g. 150000 for 150%
+    // In OOXML, percentage is relative to "normal" line spacing (ascent + descent + gap).
+    // Use pct_line_height_numer/denom (1.5) instead of default (1.2) — more accurate
+    // for CJK fonts whose ascent+descent is typically ~1.45× the em size.
+    let pct = -para.line_spacing // e.g. 130000 for 130%
     let emu = para_max_font_emu(para)
     let base_line_h = if emu > 0 {
-      px(emu, scale) * line_height_numer / line_height_denom
+      px(emu, scale) * pct_line_height_numer / pct_line_height_denom
     } else {
       def_line_h
     }
