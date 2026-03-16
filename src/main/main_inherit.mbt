@@ -310,10 +310,28 @@ fn apply_para_spacing_from_style(
       new_para = { ..new_para, indent: defaults.indent }
       changed = true
     }
-    // Note: bullet properties (bullet, bullet_font, bullet_size, bullet_color)
-    // are NOT inherited here. They are already set explicitly in the slide XML
-    // for paragraphs that need them, and inheriting from style defaults can
-    // incorrectly add bullets to non-bullet paragraphs (e.g. title lines).
+    // Bullet: inherit from style only when the paragraph has no bullet specification at all.
+    // If bullet, bullet_auto, or bullet_none is set, the paragraph controls its own bullets.
+    let has_any_bullet_spec = not(para.bullet.is_empty()) ||
+      not(para.bullet_auto.is_empty()) ||
+      para.bullet_none
+    if not(has_any_bullet_spec) {
+      if defaults.bullet_none {
+        // Style explicitly disables bullets (a:buNone)
+        new_para = { ..new_para, bullet_none: true }
+        changed = true
+      } else if not(defaults.bullet.is_empty()) {
+        // Style provides a default bullet character
+        new_para = {
+          ..new_para,
+          bullet: defaults.bullet,
+          bullet_font: if para.bullet_font.is_empty() { defaults.bullet_font } else { para.bullet_font },
+          bullet_size: if para.bullet_size == 0 { defaults.bullet_size } else { para.bullet_size },
+          bullet_color: if para.bullet_color.is_none() { defaults.bullet_color } else { para.bullet_color },
+        }
+        changed = true
+      }
+    }
     if changed {
       paragraphs[pi] = new_para
     }
