@@ -568,39 +568,40 @@ fn get_preset_def(prst : String) -> PresetDef? {
     })
     // ── Block arrows ──
   } else if prst == "rightArrow" {
+    // ECMA-376: arrowhead dimension uses ss (short side), not w
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 100000;dx=*/ w a2 100000;x1=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0",
+      gdlst: "maxAdj2=*/ 100000 w ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dx=*/ ss a2 100000;x1=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0",
       paths: "M l y1 L x1 y1 L x1 t L r hd2 L x1 b L x1 y2 L l y2 Z",
     })
   } else if prst == "leftArrow" {
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 100000;dx=*/ w a2 100000;x1=+- l dx 0;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0",
+      gdlst: "maxAdj2=*/ 100000 w ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dx=*/ ss a2 100000;x1=+- l dx 0;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0",
       paths: "M r y1 L x1 y1 L x1 t L l hd2 L x1 b L x1 y2 L r y2 Z",
     })
   } else if prst == "upArrow" {
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 100000;dy=*/ h a2 100000;y1=+- t dy 0;dx=*/ w a1 200000;x1=+- wd2 0 dx;x2=+- wd2 dx 0",
+      gdlst: "maxAdj2=*/ 100000 h ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dy=*/ ss a2 100000;y1=+- t dy 0;dx=*/ w a1 200000;x1=+- wd2 0 dx;x2=+- wd2 dx 0",
       paths: "M x1 b L x1 y1 L l y1 L wd2 t L r y1 L x2 y1 L x2 b Z",
     })
   } else if prst == "downArrow" {
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 100000;dy=*/ h a2 100000;y1=+- b 0 dy;dx=*/ w a1 200000;x1=+- wd2 0 dx;x2=+- wd2 dx 0",
+      gdlst: "maxAdj2=*/ 100000 h ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dy=*/ ss a2 100000;y1=+- b 0 dy;dx=*/ w a1 200000;x1=+- wd2 0 dx;x2=+- wd2 dx 0",
       paths: "M x1 t L x1 y1 L l y1 L wd2 b L r y1 L x2 y1 L x2 t Z",
     })
   } else if prst == "leftRightArrow" {
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 50000;dx=*/ w a2 100000;x1=+- l dx 0;x2=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0",
+      gdlst: "maxAdj2=*/ 50000 w ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dx=*/ ss a2 100000;x1=+- l dx 0;x2=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0",
       paths: "M l hd2 L x1 t L x1 y1 L x2 y1 L x2 t L r hd2 L x2 b L x2 y2 L x1 y2 L x1 b Z",
     })
   } else if prst == "upDownArrow" {
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 50000;dy=*/ h a2 100000;y1=+- t dy 0;y2=+- b 0 dy;dx=*/ w a1 200000;x1=+- wd2 0 dx;x2=+- wd2 dx 0",
+      gdlst: "maxAdj2=*/ 50000 h ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dy=*/ ss a2 100000;y1=+- t dy 0;y2=+- b 0 dy;dx=*/ w a1 200000;x1=+- wd2 0 dx;x2=+- wd2 dx 0",
       paths: "M wd2 t L r y1 L x2 y1 L x2 y2 L r y2 L wd2 b L l y2 L x1 y2 L x1 y1 L l y1 Z",
     })
   } else if prst == "quadArrow" {
@@ -825,7 +826,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "notchedRightArrow" {
     Some({
       avlst: "adj1=50000;adj2=50000",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 100000;dx=*/ w a2 100000;x1=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0;dx1=*/ h a2 200000;nx1=+- l dx1 0",
+      gdlst: "maxAdj2=*/ 100000 w ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dx=*/ ss a2 100000;x1=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0;dx1=*/ h a2 200000;nx1=+- l dx1 0",
       paths: "M l y1 L x1 y1 L x1 t L r hd2 L x1 b L x1 y2 L l y2 L nx1 hd2 Z",
     })
   } else if prst == "leftRightArrowCallout" || prst == "stripedRightArrow" {
@@ -1566,45 +1567,51 @@ fn add_text_rect_guides(
   } else if prst == "rightArrow" || prst == "notchedRightArrow" {
     let adj1 = env.resolve("adj1")
     let adj2 = env.resolve("adj2")
+    let ss = if w < h { w } else { h }
     let dy = adj1 * h / 200000.0
     env.set("ady1", h / 2.0 - dy)
-    env.set("arx", w - adj2 * w / 100000.0)
+    env.set("arx", w - adj2 * ss / 100000.0)
   } else if prst == "leftArrow" {
     let adj1 = env.resolve("adj1")
     let adj2 = env.resolve("adj2")
+    let ss = if w < h { w } else { h }
     let dy = adj1 * h / 200000.0
     env.set("ady1", h / 2.0 - dy)
-    env.set("alx", adj2 * w / 100000.0)
+    env.set("alx", adj2 * ss / 100000.0)
   } else if prst == "upArrow" {
     let adj1 = env.resolve("adj1")
     let adj2 = env.resolve("adj2")
+    let ss = if w < h { w } else { h }
     let dx = adj1 * w / 200000.0
     env.set("adx1", w / 2.0 - dx)
     env.set("adx2", w / 2.0 + dx)
-    env.set("aly", adj2 * h / 100000.0)
+    env.set("aly", adj2 * ss / 100000.0)
   } else if prst == "downArrow" {
     let adj1 = env.resolve("adj1")
     let adj2 = env.resolve("adj2")
+    let ss = if w < h { w } else { h }
     let dx = adj1 * w / 200000.0
     env.set("adx1", w / 2.0 - dx)
     env.set("adx2", w / 2.0 + dx)
-    env.set("ary", h - adj2 * h / 100000.0)
+    env.set("ary", h - adj2 * ss / 100000.0)
   } else if prst == "leftRightArrow" {
     let adj1 = env.resolve("adj1")
     let adj2 = env.resolve("adj2")
+    let ss = if w < h { w } else { h }
     let dy = adj1 * h / 200000.0
     env.set("ady1", h / 2.0 - dy)
     env.set("ady2", h / 2.0 + dy)
-    env.set("alx", adj2 * w / 100000.0)
-    env.set("arx", w - adj2 * w / 100000.0)
+    env.set("alx", adj2 * ss / 100000.0)
+    env.set("arx", w - adj2 * ss / 100000.0)
   } else if prst == "upDownArrow" {
     let adj1 = env.resolve("adj1")
     let adj2 = env.resolve("adj2")
+    let ss = if w < h { w } else { h }
     let dx = adj1 * w / 200000.0
     env.set("adx1", w / 2.0 - dx)
     env.set("adx2", w / 2.0 + dx)
-    env.set("aly", adj2 * h / 100000.0)
-    env.set("ary", h - adj2 * h / 100000.0)
+    env.set("aly", adj2 * ss / 100000.0)
+    env.set("ary", h - adj2 * ss / 100000.0)
   } else if prst == "chevron" {
     let adj = env.resolve("adj")
     env.set("chx", w - adj * w / 100000.0)

@@ -72,6 +72,26 @@ fn is_cjk(c : Char) -> Bool {
   (code >= 0x20000 && code <= 0x2FA1F)
 }
 
+///|
+/// Check if a character is a kinsoku line-start-prohibited character
+/// (行頭禁止文字). These must not appear at the beginning of a line.
+fn is_kinsoku_start_prohibited(c : Char) -> Bool {
+  // Japanese punctuation, closing brackets, etc.
+  c == '。' || c == '、' || c == '，' || c == '．' || c == '.' || c == ',' ||
+  c == ';' || c == ':' || c == '!' || c == '?' || c == '！' || c == '？' ||
+  c == '）' || c == '」' || c == '』' || c == '】' || c == '》' || c == '〉' ||
+  c == '｝' || c == ')' || c == '>' || c == ']' || c == '}' ||
+  c == 'ー' || c == '～' || c == '…' || c == '‥' ||
+  c == '・' || c == '：' || c == '；' ||
+  c == '゛' || c == '゜' || c == 'ゝ' || c == 'ゞ' || c == 'ヽ' || c == 'ヾ' ||
+  c == '々' || c == '〃' ||
+  // Small kana
+  c == 'ぁ' || c == 'ぃ' || c == 'ぅ' || c == 'ぇ' || c == 'ぉ' ||
+  c == 'っ' || c == 'ゃ' || c == 'ゅ' || c == 'ょ' || c == 'ゎ' ||
+  c == 'ァ' || c == 'ィ' || c == 'ゥ' || c == 'ェ' || c == 'ォ' ||
+  c == 'ッ' || c == 'ャ' || c == 'ュ' || c == 'ョ' || c == 'ヮ'
+}
+
 // ── Text wrapping ────────────────────────────────────────────────────────────
 
 ///| A visual line fragment: (run_index, text_fragment)
@@ -162,6 +182,16 @@ fn wrap_paragraph(
       let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_px)
       // Check if adding this segment would overflow
       if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
+        // Kinsoku: if this segment starts with a line-start-prohibited char,
+        // keep it on the current line (allow slight overflow)
+        let first_char = seg_text.get_char(0).unwrap()
+        if is_kinsoku_start_prohibited(first_char) && cur_line.length() > 0 {
+          // Keep on current line (burasagari / hanging punctuation)
+          cur_line.push((ri, seg_text))
+          cur_width = cur_width + seg_w
+          seg_start = seg_end
+          continue
+        }
         // Start new line
         if cur_line.length() > 0 {
           lines.push(cur_line)
@@ -486,14 +516,9 @@ fn render_run_tspan(
     span = span + a("fill", theme.hlink.to_css())
   }
   // Text outline: render as SVG stroke on text
-  if not(run.outline_color.is_none()) {
+  if not(run.outline_color.is_none()) && run.outline_w > 0 {
     span = span + a("stroke", run.outline_color.to_css())
-    let ow_emu = if run.outline_w > 0 {
-      run.outline_w
-    } else {
-      @ooxml.default_outline_w
-    }
-    let ow_px = px(ow_emu, scale)
+    let ow_px = px(run.outline_w, scale)
     if ow_px > 0 {
       span = span + ai("stroke-width", ow_px)
     } else {

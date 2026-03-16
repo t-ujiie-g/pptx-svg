@@ -341,16 +341,24 @@ fn parse_para_props(
 
 ///|
 /// Parse <a:defRPr> defaults from a <a:pPr> node.
+/// Returns (bold, bold_explicit, italic, font_size, color, font_face, ea_font).
+/// bold_explicit is true when defRPr has an explicit `b` attribute (either "0" or "1"),
+/// which should prevent inheriting bold from lower-priority style sources.
 fn parse_def_rpr(
   ppr : @xml.XmlNode,
   theme : ThemeData,
-) -> (Bool, Bool, Int, Color, String, String) {
+) -> (Bool, Bool, Bool, Int, Color, String, String) {
   let ppr_ch = @xml.get_children(ppr)
   match @xml.find_child(ppr_ch, "a:defRPr") {
-    None => (false, false, 0, Color::none(), "", "")
+    None => (false, false, false, 0, Color::none(), "", "")
     Some(drpr) => {
-      let db = match @xml.get_attr(drpr, "b") {
+      let bold_attr = @xml.get_attr(drpr, "b")
+      let db = match bold_attr {
         Some(v) => v == "1" || v == "true"
+        None => false
+      }
+      let db_explicit = match bold_attr {
+        Some(_) => true
         None => false
       }
       let di = match @xml.get_attr(drpr, "i") {
@@ -364,7 +372,7 @@ fn parse_def_rpr(
       let dff = resolve_font_theme(dff_raw, theme)
       let dea_raw = child_attr(drpr_ch, "a:ea", "typeface")
       let dea = resolve_ea_font_theme(dea_raw, theme)
-      (db, di, dsz, dclr, dff, dea)
+      (db, db_explicit, di, dsz, dclr, dff, dea)
     }
   }
 }
@@ -376,6 +384,7 @@ fn parse_def_rpr(
 fn default_text_run(
   text : String,
   def_bold : Bool,
+  def_bold_explicit : Bool,
   def_italic : Bool,
   def_font_size : Int,
   def_color : Color,
@@ -405,7 +414,7 @@ fn default_text_run(
     outline_w: 0,
     text_grad_fill: GradientFill::none(),
     text_patt_fill: PatternFill::none(),
-    bold_explicit: false,
+    bold_explicit: def_bold_explicit,
   }
 }
 
@@ -414,6 +423,7 @@ fn default_text_run(
 fn parse_run_props(
   rpr : @xml.XmlNode,
   def_bold : Bool,
+  def_bold_explicit : Bool,
   def_italic : Bool,
   def_font_size : Int,
   def_color : Color,
@@ -422,9 +432,10 @@ fn parse_run_props(
   theme : ThemeData,
 ) -> TextRun {
   let bold_attr = @xml.get_attr(rpr, "b")
+  // bold_explicit: true if either the run or defRPr has an explicit `b` attribute
   let bold_explicit = match bold_attr {
     Some(_) => true
-    None => false
+    None => def_bold_explicit
   }
   let bold = match bold_attr {
     Some(v) => v == "1" || v == "true"
@@ -484,13 +495,16 @@ fn parse_run_props(
       }
   }
   // Text outline: a:ln on a:rPr
+  // Only apply outline when a:ln has an explicit solid fill color.
+  // An empty <a:ln/> or <a:ln> without <a:solidFill> means no visible outline.
   let (outline_color, outline_w) = match @xml.find_child(rpr_ch, "a:ln") {
     None => (Color::none(), 0)
     Some(ln) => {
       let ow = attr_int(ln, "w")
       let ln_ch = @xml.get_children(ln)
       let oc = parse_solid_fill(ln_ch, theme)
-      (if oc.is_none() { Color::black() } else { oc }, ow)
+      // Only set outline if solidFill was explicitly specified
+      (oc, ow)
     }
   }
   // Text gradient fill: a:gradFill on a:rPr
@@ -617,13 +631,14 @@ fn parse_text_body(
     }
     let (
       def_bold,
+      def_bold_explicit,
       def_italic,
       def_font_size,
       def_color,
       def_font_face,
       def_ea_font,
     ) = match @xml.find_child(p_ch, "a:pPr") {
-      None => (false, false, 0, Color::none(), "", "")
+      None => (false, false, false, 0, Color::none(), "", "")
       Some(ppr) => parse_def_rpr(ppr, theme)
     }
     // Apply lstStyle level defaults as fallback
@@ -673,13 +688,13 @@ fn parse_text_body(
           let run = match @xml.find_child(r_ch, "a:rPr") {
             None =>
               default_text_run(
-                text, def_bold, def_italic, def_font_size, def_color,
-                def_font_face, def_ea_font,
+                text, def_bold, def_bold_explicit, def_italic, def_font_size,
+                def_color, def_font_face, def_ea_font,
               )
             Some(rpr) => {
               let rp = parse_run_props(
-                rpr, def_bold, def_italic, def_font_size, def_color,
-                def_font_face, def_ea_font, theme,
+                rpr, def_bold, def_bold_explicit, def_italic, def_font_size,
+                def_color, def_font_face, def_ea_font, theme,
               )
               { ..rp, text }
             }
@@ -690,8 +705,8 @@ fn parse_text_body(
         // Line break — insert a newline run
         runs.push(
           default_text_run(
-            "\n", def_bold, def_italic, def_font_size, def_color,
-            def_font_face, def_ea_font,
+            "\n", def_bold, def_bold_explicit, def_italic, def_font_size,
+            def_color, def_font_face, def_ea_font,
           ),
         )
       }
