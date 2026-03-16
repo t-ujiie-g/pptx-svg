@@ -573,10 +573,11 @@ pub fn apply_color_modifiers(
           g = g * val / pct_100
           b = b * val / pct_100
         } else if tag == "a:tint" {
-          // tint: move each component toward rgb_max
-          r = r + (rgb_max - r) * val / pct_100
-          g = g + (rgb_max - g) * val / pct_100
-          b = b + (rgb_max - b) * val / pct_100
+          // tint: val% of original + (100-val)% of white
+          // ECMA-376: "A 10% tint is 10% of the input color combined with 90% white"
+          r = rgb_max - (rgb_max - r) * val / pct_100
+          g = rgb_max - (rgb_max - g) * val / pct_100
+          b = rgb_max - (rgb_max - b) * val / pct_100
         } else if tag == "a:lumMod" {
           lum_mod = val
         } else if tag == "a:lumOff" {
@@ -966,6 +967,7 @@ pub(all) struct TableCell {
   grid_span : Int // horizontal merge span (1 = no merge)
   row_span : Int // vertical merge span (1 = no merge)
   v_merge : Bool // true = this cell is merged into the cell above
+  h_merge : Bool // true = this cell is merged into the cell to the left
   // Cell borders (line width in EMU, 0 = default, -1 = none)
   bdr_l_w : Int
   bdr_r_w : Int

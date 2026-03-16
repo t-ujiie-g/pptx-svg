@@ -1022,6 +1022,10 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     Some("1") => true
     _ => false
   }
+  let h_merge = match @xml.get_attr(tc, "hMerge") {
+    Some("1") => true
+    _ => false
+  }
   // Parse cell text from <a:txBody>
   let (paragraphs, _, _) = match @xml.find_child(ch, "a:txBody") {
     None => ([], BodyProps::default(), TextStyleGroup::empty())
@@ -1096,7 +1100,7 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   }
   {
     paragraphs, fill, grad_fill,
-    grid_span, row_span, v_merge,
+    grid_span, row_span, v_merge, h_merge,
     bdr_l_w, bdr_r_w, bdr_t_w, bdr_b_w,
     bdr_l_color, bdr_r_color, bdr_t_color, bdr_b_color,
     bdr_tl_br_w, bdr_tl_br_color, bdr_bl_tr_w, bdr_bl_tr_color,

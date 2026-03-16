@@ -72,6 +72,9 @@ let g_layout_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [] }
 let g_master_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [] }
 
 ///|
+let g_master_themes : Ref[Array[@ooxml.ThemeData]] = { val: [] }
+
+///|
 let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [] }
 
 // ── Package-local string/int helpers ─────────────────────────────────────────
@@ -158,6 +161,49 @@ fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
     i = i + 1
   }
   ""
+}
+
+///|
+/// Find and parse the theme for a slide master from its relationships.
+/// Falls back to g_theme if no theme relationship is found.
+fn load_master_theme(
+  master_path : String,
+  mrels : Array[@ooxml.Relationship],
+) -> @ooxml.ThemeData {
+  // Find theme rel in master rels
+  let n = mrels.length()
+  let mut i = 0
+  while i < n {
+    let rel = mrels[i]
+    if ends_with(rel.type_, "/theme") {
+      // Resolve target relative to master's directory
+      let slash = last_index_of(master_path, '/')
+      let base_dir = if slash >= 0 {
+        substring(master_path, 0, slash)
+      } else {
+        ""
+      }
+      let theme_path = resolve_rel_path(base_dir, rel.target)
+      let theme_xml = @ffi.ffi_get_file(theme_path)
+      if not(theme_xml.is_empty()) {
+        @ffi.ffi_log("Loaded per-master theme: " + theme_path)
+        return @ooxml.parse_theme(theme_xml)
+      }
+    }
+    i = i + 1
+  }
+  g_theme.val
+}
+
+///|
+/// Get the theme for a given master path from g_master_themes.
+fn get_master_theme(master_path : String) -> @ooxml.ThemeData {
+  let idx = array_index_of(g_master_paths.val, master_path)
+  if idx >= 0 && idx < g_master_themes.val.length() {
+    g_master_themes.val[idx]
+  } else {
+    g_theme.val
+  }
 }
 
 // ── Path resolution helpers ──────────────────────────────────────────────────
@@ -383,23 +429,30 @@ fn get_master_rels(master_path : String) -> Array[@ooxml.Relationship] {
 }
 
 ///|
+/// Find the owning master path for a given layout path.
+fn find_master_path_for_layout(
+  layout_to_master : Array[(String, String)],
+  layout_path : String,
+) -> String {
+  let n = layout_to_master.length()
+  let mut i = 0
+  while i < n {
+    if layout_to_master[i].0 == layout_path {
+      return layout_to_master[i].1
+    }
+    i = i + 1
+  }
+  ""
+}
+
+///|
 /// Find the owning master's ColorMap for a given layout path.
 fn find_master_clr_map(
   layout_to_master : Array[(String, String)],
   masters : Array[(@ooxml.SlideMasterData, String)],
   layout_path : String,
 ) -> @ooxml.ColorMap {
-  // Find master path for this layout
-  let mut master_path = ""
-  let lt_len = layout_to_master.length()
-  let mut i = 0
-  while i < lt_len {
-    if layout_to_master[i].0 == layout_path {
-      master_path = layout_to_master[i].1
-    }
-    i = i + 1
-  }
-  // Find master's clr_map
+  let master_path = find_master_path_for_layout(layout_to_master, layout_path)
   let mlen = masters.length()
   let mut mi = 0
   while mi < mlen {
@@ -409,6 +462,26 @@ fn find_master_clr_map(
     mi = mi + 1
   }
   @ooxml.ColorMap::default()
+}
+
+///|
+/// Find the owning master's theme for a given layout path.
+fn find_master_theme_for_layout(
+  layout_to_master : Array[(String, String)],
+  master_themes : Array[@ooxml.ThemeData],
+  master_paths : Array[String],
+  layout_path : String,
+) -> @ooxml.ThemeData {
+  let master_path = find_master_path_for_layout(layout_to_master, layout_path)
+  let n = master_paths.length()
+  let mut i = 0
+  while i < n {
+    if master_paths[i] == master_path {
+      return master_themes[i]
+    }
+    i = i + 1
+  }
+  g_theme.val
 }
 
 ///|
@@ -507,6 +580,7 @@ pub fn initialize_pptx() -> String {
   // Parse all unique masters
   let masters : Array[(@ooxml.SlideMasterData, String)] = []
   let master_rels_arr : Array[Array[@ooxml.Relationship]] = []
+  let master_themes : Array[@ooxml.ThemeData] = []
   let nmas = master_paths.length()
   let mut mi = 0
   while mi < nmas {
@@ -520,8 +594,11 @@ pub fn initialize_pptx() -> String {
     } else {
       @ooxml.parse_rels(mrels_xml)
     }
+    // Load per-master theme (falls back to g_theme)
+    let m_theme = load_master_theme(mp, mrels)
+    master_themes.push(m_theme)
     if not(mxml.is_empty()) {
-      let mdata = @ooxml.parse_slide_master(mxml, g_theme.val)
+      let mdata = @ooxml.parse_slide_master(mxml, m_theme)
       masters.push((mdata, mp))
       master_rels_arr.push(mrels)
       @ffi.ffi_log("Parsed master: " + mp)
@@ -559,18 +636,19 @@ pub fn initialize_pptx() -> String {
     if not(lxml.is_empty()) {
       // Compute effective theme: layout's own clrMapOvr > master's clrMap
       let layout_effective_theme = {
-        // First, find owning master's clr_map
+        // Use the master's own theme (not g_theme) for color map application
+        let base_theme = find_master_theme_for_layout(
+          layout_to_master, master_themes, master_paths, lp,
+        )
         let master_clr_map = find_master_clr_map(layout_to_master, masters, lp)
-        // Pre-parse to check for layout's clrMapOvr (parse_slide_layout will also extract it,
-        // but we need the effective theme before calling it)
         let lxml_nodes = @xml.parse_xml(lxml)
         let layout_root_ch = match @xml.find_child(lxml_nodes, "p:sldLayout") {
           Some(n) => @xml.get_children(n)
           None => []
         }
         match @ooxml.extract_clr_map_ovr_from_nodes(layout_root_ch) {
-          Some(ovr) => @ooxml.apply_color_map(g_theme.val, ovr)
-          None => @ooxml.apply_color_map(g_theme.val, master_clr_map)
+          Some(ovr) => @ooxml.apply_color_map(base_theme, ovr)
+          None => @ooxml.apply_color_map(base_theme, master_clr_map)
         }
       }
       let ldata = @ooxml.parse_slide_layout(lxml, layout_effective_theme)
@@ -599,6 +677,7 @@ pub fn initialize_pptx() -> String {
   g_master_paths.val = master_paths
   g_masters.val = masters
   g_master_rels.val = master_rels_arr
+  g_master_themes.val = master_themes
   g_layout_to_master.val = layout_to_master
   // Initialize slide cache
   let slides : Array[@ooxml.SlideData] = []
@@ -699,17 +778,23 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     None
   }
   // ── Compute effective theme with color map overrides ──
+  // Use the master's own theme (not g_theme) for correct per-master colors
+  let base_theme = if not(master_path.is_empty()) {
+    get_master_theme(master_path)
+  } else {
+    g_theme.val
+  }
   let effective_theme = {
-    // Start with master's clr_map
+    // Start with master's clr_map applied to master's theme
     let mut eff = match master_opt {
-      Some(master) => @ooxml.apply_color_map(g_theme.val, master.clr_map)
-      None => g_theme.val
+      Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
+      None => base_theme
     }
     // Apply layout clrMapOvr if present
     match layout_opt {
       Some(layout) =>
         match layout.clr_map_ovr {
-          Some(ovr) => eff = @ooxml.apply_color_map(g_theme.val, ovr)
+          Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
           None => ()
         }
       None => ()
@@ -721,7 +806,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       None => []
     }
     match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
-      Some(ovr) => eff = @ooxml.apply_color_map(g_theme.val, ovr)
+      Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
       None => ()
     }
     eff

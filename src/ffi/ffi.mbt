@@ -61,7 +61,7 @@ pub fn ffi_sqrt(x : Double) -> Double = "pptx_ffi" "math_sqrt"
 pub fn ffi_measure_text(
   text : String,
   font_face : String,
-  font_size_pt : Double,
+  font_size_px : Double,
 ) -> Double = "pptx_ffi" "measure_text"
 
 ///|

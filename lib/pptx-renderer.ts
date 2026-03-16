@@ -23,9 +23,9 @@ interface PptxWasmExports {
   get_modified_entries(): string;
 }
 
-/** Options for text measurement callback. */
+/** Options for text measurement callback. Font size is in CSS pixels (px). */
 export interface MeasureTextFn {
-  (text: string, fontFace: string, fontSizePt: number): number;
+  (text: string, fontFace: string, fontSizePx: number): number;
 }
 
 /** Options for initializing PptxRenderer. */
@@ -237,20 +237,20 @@ export class PptxRenderer {
   }
 
   /** Measure the rendered pixel width of text. */
-  private measureText(text: string, fontFace: string, fontSizePt: number): number {
+  private measureText(text: string, fontFace: string, fontSizePx: number): number {
     if (this.measureTextFn) {
-      return this.measureTextFn(text, fontFace, fontSizePt);
+      return this.measureTextFn(text, fontFace, fontSizePx);
     }
     // Default: Canvas 2D (browser only)
     if (!this.ctx) {
       if (typeof document === 'undefined') {
         // Non-browser environment — return approximate width
-        return text.length * fontSizePt * 0.6;
+        return text.length * fontSizePx * 0.6;
       }
       this.canvas = document.createElement('canvas');
       this.ctx = this.canvas.getContext('2d')!;
     }
-    this.ctx.font = `${fontSizePt}pt ${fontFace}`;
+    this.ctx.font = `${fontSizePx}px ${fontFace}`;
     return this.ctx.measureText(text).width;
   }
 }
