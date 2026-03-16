@@ -714,7 +714,7 @@ fn render_text(
       total_text_h = total_text_h + bl_extra_above
       // Count visual lines for wrapped text (uses col_w for multi-col)
       let num_visual_lines = if do_wrap {
-        let indent_emu = if para.mar_l > 0 {
+        let indent_emu = if para.mar_l >= 0 {
           para.mar_l
         } else {
           para.level * level_indent_emu
@@ -848,7 +848,7 @@ fn render_text(
     } else {
       // Indent: marL = left margin for continuation lines
       //         para.indent = first-line offset from marL (negative = hanging indent)
-      let mar_l_emu = if para.mar_l > 0 {
+      let mar_l_emu = if para.mar_l >= 0 {
         para.mar_l
       } else {
         para.level * level_indent_emu

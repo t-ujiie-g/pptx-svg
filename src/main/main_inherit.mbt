@@ -300,8 +300,8 @@ fn apply_para_spacing_from_style(
       new_para = { ..new_para, spc_after: defaults.spc_after }
       changed = true
     }
-    // mar_l: 0 = unset (note: -1 means explicitly unset in LevelTextDefaults)
-    if para.mar_l == 0 && defaults.mar_l > 0 {
+    // mar_l: -1 = unset
+    if para.mar_l < 0 && defaults.mar_l >= 0 {
       new_para = { ..new_para, mar_l: defaults.mar_l }
       changed = true
     }

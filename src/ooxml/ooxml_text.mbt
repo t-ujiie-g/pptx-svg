@@ -226,7 +226,10 @@ fn parse_para_props(
     None => ""
   }
   let l = attr_int(ppr, "lvl")
-  let ml = attr_int(ppr, "marL")
+  let ml = match @xml.get_attr(ppr, "marL") {
+    Some(v) => @xml.parse_int(v)
+    None => -1 // -1 = unset (distinct from explicit marL="0")
+  }
   let ind = attr_int(ppr, "indent")
   let rtl = match @xml.get_attr(ppr, "rtl") {
     Some(v) => v == "1" || v == "true"
@@ -587,10 +590,8 @@ fn parse_text_body(
   let pnodes = @xml.find_children(ch, "a:p")
   let np = pnodes.length()
   let mut pi = 0
-  // Carry endParaRPr properties across paragraphs (PowerPoint inherits these)
-  let mut prev_epr_bold = false
-  let mut prev_epr_bold_explicit = false
-  let mut prev_epr_italic = false
+  // Carry endParaRPr color/font properties across paragraphs (PowerPoint inherits these).
+  // Bold/italic are NOT carried over — they reset per paragraph.
   let mut prev_epr_font_size = 0
   let mut prev_epr_color = Color::none()
   let mut prev_epr_font_face = ""
@@ -623,7 +624,7 @@ fn parse_text_body(
           0,
           0,
           0,
-          0,
+          -1,
           0,
           "",
           "",
@@ -679,25 +680,12 @@ fn parse_text_body(
       def_ea_font
     }
     // Apply endParaRPr from current paragraph, updating carry-over state.
-    // PowerPoint inherits endParaRPr properties across paragraphs within the same text body.
+    // PowerPoint inherits color/font across paragraphs but NOT bold/italic.
     match @xml.find_child(p_ch, "a:endParaRPr") {
       Some(epr) => {
         let epr_ch = @xml.get_children(epr)
         let epr_clr = parse_solid_fill(epr_ch, theme)
         let epr_sz = attr_int(epr, "sz")
-        let epr_bold_attr = @xml.get_attr(epr, "b")
-        prev_epr_bold = match epr_bold_attr {
-          Some(v) => v == "1" || v == "true"
-          None => prev_epr_bold
-        }
-        prev_epr_bold_explicit = match epr_bold_attr {
-          Some(_) => true
-          None => prev_epr_bold_explicit
-        }
-        prev_epr_italic = match @xml.get_attr(epr, "i") {
-          Some(v) => v == "1" || v == "true"
-          None => prev_epr_italic
-        }
         let epr_ff = resolve_font_theme(child_attr(epr_ch, "a:latin", "typeface"), theme)
         let epr_ea = resolve_ea_font_theme(child_attr(epr_ch, "a:ea", "typeface"), theme)
         if epr_sz > 0 { prev_epr_font_size = epr_sz }
@@ -707,10 +695,7 @@ fn parse_text_body(
       }
       None => ()
     }
-    // Merge: defRPr/lstStyle take priority, then endParaRPr carry-over
-    let def_bold = if def_bold_explicit { def_bold } else { prev_epr_bold }
-    let def_bold_explicit = if def_bold_explicit { def_bold_explicit } else { prev_epr_bold_explicit }
-    let def_italic = def_italic || prev_epr_italic
+    // Merge: defRPr/lstStyle take priority, then endParaRPr carry-over (color/font only)
     let def_font_size = if def_font_size > 0 { def_font_size } else { prev_epr_font_size }
     let def_color = if not(def_color.is_none()) { def_color } else { prev_epr_color }
     let def_font_face = if not(def_font_face.is_empty()) { def_font_face } else { prev_epr_font_face }

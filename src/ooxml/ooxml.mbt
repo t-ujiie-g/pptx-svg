@@ -879,7 +879,7 @@ pub(all) struct TextParagraph {
   spc_before : Int // spacing before in EMU (from a:spcBef); 0 = default
   spc_after : Int // spacing after in EMU (from a:spcAft); 0 = default
   line_spacing : Int // line spacing: >0 = EMU, <0 = percentage (-100000=100%), 0 = default
-  mar_l : Int // left margin in EMU (from marL attr in a:pPr); 0 = default
+  mar_l : Int // left margin in EMU (from marL attr in a:pPr); -1 = unset
   indent : Int // first-line indent in EMU (from indent attr in a:pPr); 0 = default
   bullet : String // bullet char (from a:buChar); "" = none/inherit
   bullet_auto : String // auto-number type (from a:buAutoNum); "" = none

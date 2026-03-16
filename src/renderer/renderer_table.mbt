@@ -78,7 +78,7 @@ fn render_table_cell_text(
     }
     para_line_hs.push(lh)
     // Bullet indent
-    let bul_mar = if para.mar_l > 0 { px(para.mar_l, scale) } else { 0 }
+    let bul_mar = if para.mar_l >= 0 { px(para.mar_l, scale) } else { 0 }
     para_bul_mars.push(bul_mar)
     // Wrapped line count
     let wrap_w = content_w - bul_mar
