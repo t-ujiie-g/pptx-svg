@@ -573,10 +573,11 @@ pub fn apply_color_modifiers(
           g = g * val / pct_100
           b = b * val / pct_100
         } else if tag == "a:tint" {
-          // tint: move each component toward rgb_max
-          r = r + (rgb_max - r) * val / pct_100
-          g = g + (rgb_max - g) * val / pct_100
-          b = b + (rgb_max - b) * val / pct_100
+          // tint: val% of original + (100-val)% of white
+          // ECMA-376: "A 10% tint is 10% of the input color combined with 90% white"
+          r = rgb_max - (rgb_max - r) * val / pct_100
+          g = rgb_max - (rgb_max - g) * val / pct_100
+          b = rgb_max - (rgb_max - b) * val / pct_100
         } else if tag == "a:lumMod" {
           lum_mod = val
         } else if tag == "a:lumOff" {

@@ -18,6 +18,9 @@
 let default_font_size_emu_ : Int = 228600 // 18 pt
 
 ///|
+let default_table_font_size_emu : Int = 127000 // 10 pt — built-in table styles typically default to 10pt
+
+///|
 let default_l_inset : Int = 91440 // 0.1 in (left / right)
 
 ///|
@@ -1932,7 +1935,8 @@ fn render_table_cell_text(
   if paragraphs.length() == 0 {
     return ""
   }
-  let def_sz = px(default_font_size_emu(), scale)
+  // Use smaller default font size for table cells (10pt vs 18pt for shapes)
+  let def_sz = px(default_table_font_size_emu, scale)
   let available_h = cell_h - pad_t - pad_b
   if available_h <= 0 {
     return ""
@@ -2258,7 +2262,7 @@ fn render_table(
   let nrows = table.rows.length()
   let row_heights_emu : Array[Int] = []
   // Minimum row height: default font size + top/bottom margins
-  let min_row_h_emu = default_font_size_emu() * line_height_numer /
+  let min_row_h_emu = default_table_font_size_emu * line_height_numer /
     line_height_denom +
     default_cell_mar_tb * 2
   let mut rhi = 0
