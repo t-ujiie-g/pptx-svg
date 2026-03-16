@@ -373,7 +373,7 @@ fn serialize_text_body_inner(
     // Paragraph properties
     let has_align = not(para.align.is_empty())
     let has_level = para.level > 0
-    let has_mar_l = para.mar_l > 0
+    let has_mar_l = para.mar_l >= 0
     let has_indent = para.indent != 0
     let has_spc = para.spc_before != 0 || para.spc_after != 0
     let has_lnspc = para.line_spacing != 0

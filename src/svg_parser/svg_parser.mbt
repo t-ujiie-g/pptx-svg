@@ -435,7 +435,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             spc_before: 0,
             spc_after: 0,
             line_spacing: 0,
-            mar_l: 0,
+            mar_l: -1,
             indent: 0,
             bullet: "",
             bullet_auto: "",

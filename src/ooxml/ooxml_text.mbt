@@ -226,7 +226,10 @@ fn parse_para_props(
     None => ""
   }
   let l = attr_int(ppr, "lvl")
-  let ml = attr_int(ppr, "marL")
+  let ml = match @xml.get_attr(ppr, "marL") {
+    Some(v) => @xml.parse_int(v)
+    None => -1 // -1 = unset (distinct from explicit marL="0")
+  }
   let ind = attr_int(ppr, "indent")
   let rtl = match @xml.get_attr(ppr, "rtl") {
     Some(v) => v == "1" || v == "true"
@@ -341,16 +344,24 @@ fn parse_para_props(
 
 ///|
 /// Parse <a:defRPr> defaults from a <a:pPr> node.
+/// Returns (bold, bold_explicit, italic, font_size, color, font_face, ea_font).
+/// bold_explicit is true when defRPr has an explicit `b` attribute (either "0" or "1"),
+/// which should prevent inheriting bold from lower-priority style sources.
 fn parse_def_rpr(
   ppr : @xml.XmlNode,
   theme : ThemeData,
-) -> (Bool, Bool, Int, Color, String, String) {
+) -> (Bool, Bool, Bool, Int, Color, String, String) {
   let ppr_ch = @xml.get_children(ppr)
   match @xml.find_child(ppr_ch, "a:defRPr") {
-    None => (false, false, 0, Color::none(), "", "")
+    None => (false, false, false, 0, Color::none(), "", "")
     Some(drpr) => {
-      let db = match @xml.get_attr(drpr, "b") {
+      let bold_attr = @xml.get_attr(drpr, "b")
+      let db = match bold_attr {
         Some(v) => v == "1" || v == "true"
+        None => false
+      }
+      let db_explicit = match bold_attr {
+        Some(_) => true
         None => false
       }
       let di = match @xml.get_attr(drpr, "i") {
@@ -364,7 +375,7 @@ fn parse_def_rpr(
       let dff = resolve_font_theme(dff_raw, theme)
       let dea_raw = child_attr(drpr_ch, "a:ea", "typeface")
       let dea = resolve_ea_font_theme(dea_raw, theme)
-      (db, di, dsz, dclr, dff, dea)
+      (db, db_explicit, di, dsz, dclr, dff, dea)
     }
   }
 }
@@ -376,6 +387,7 @@ fn parse_def_rpr(
 fn default_text_run(
   text : String,
   def_bold : Bool,
+  def_bold_explicit : Bool,
   def_italic : Bool,
   def_font_size : Int,
   def_color : Color,
@@ -405,7 +417,7 @@ fn default_text_run(
     outline_w: 0,
     text_grad_fill: GradientFill::none(),
     text_patt_fill: PatternFill::none(),
-    bold_explicit: false,
+    bold_explicit: def_bold_explicit,
   }
 }
 
@@ -414,6 +426,7 @@ fn default_text_run(
 fn parse_run_props(
   rpr : @xml.XmlNode,
   def_bold : Bool,
+  def_bold_explicit : Bool,
   def_italic : Bool,
   def_font_size : Int,
   def_color : Color,
@@ -422,9 +435,10 @@ fn parse_run_props(
   theme : ThemeData,
 ) -> TextRun {
   let bold_attr = @xml.get_attr(rpr, "b")
+  // bold_explicit: true if either the run or defRPr has an explicit `b` attribute
   let bold_explicit = match bold_attr {
     Some(_) => true
-    None => false
+    None => def_bold_explicit
   }
   let bold = match bold_attr {
     Some(v) => v == "1" || v == "true"
@@ -484,13 +498,16 @@ fn parse_run_props(
       }
   }
   // Text outline: a:ln on a:rPr
+  // Only apply outline when a:ln has an explicit solid fill color.
+  // An empty <a:ln/> or <a:ln> without <a:solidFill> means no visible outline.
   let (outline_color, outline_w) = match @xml.find_child(rpr_ch, "a:ln") {
     None => (Color::none(), 0)
     Some(ln) => {
       let ow = attr_int(ln, "w")
       let ln_ch = @xml.get_children(ln)
       let oc = parse_solid_fill(ln_ch, theme)
-      (if oc.is_none() { Color::black() } else { oc }, ow)
+      // Only set outline if solidFill was explicitly specified
+      (oc, ow)
     }
   }
   // Text gradient fill: a:gradFill on a:rPr
@@ -573,6 +590,12 @@ fn parse_text_body(
   let pnodes = @xml.find_children(ch, "a:p")
   let np = pnodes.length()
   let mut pi = 0
+  // Carry endParaRPr color/font properties across paragraphs (PowerPoint inherits these).
+  // Bold/italic are NOT carried over — they reset per paragraph.
+  let mut prev_epr_font_size = 0
+  let mut prev_epr_color = Color::none()
+  let mut prev_epr_font_face = ""
+  let mut prev_epr_ea_font = ""
   while pi < np {
     let p = pnodes[pi]
     let p_ch = @xml.get_children(p)
@@ -601,7 +624,7 @@ fn parse_text_body(
           0,
           0,
           0,
-          0,
+          -1,
           0,
           "",
           "",
@@ -617,13 +640,14 @@ fn parse_text_body(
     }
     let (
       def_bold,
+      def_bold_explicit,
       def_italic,
       def_font_size,
       def_color,
       def_font_face,
       def_ea_font,
     ) = match @xml.find_child(p_ch, "a:pPr") {
-      None => (false, false, 0, Color::none(), "", "")
+      None => (false, false, false, 0, Color::none(), "", "")
       Some(ppr) => parse_def_rpr(ppr, theme)
     }
     // Apply lstStyle level defaults as fallback
@@ -655,6 +679,27 @@ fn parse_text_body(
     } else {
       def_ea_font
     }
+    // Apply endParaRPr from current paragraph, updating carry-over state.
+    // PowerPoint inherits color/font across paragraphs but NOT bold/italic.
+    match @xml.find_child(p_ch, "a:endParaRPr") {
+      Some(epr) => {
+        let epr_ch = @xml.get_children(epr)
+        let epr_clr = parse_solid_fill(epr_ch, theme)
+        let epr_sz = attr_int(epr, "sz")
+        let epr_ff = resolve_font_theme(child_attr(epr_ch, "a:latin", "typeface"), theme)
+        let epr_ea = resolve_ea_font_theme(child_attr(epr_ch, "a:ea", "typeface"), theme)
+        if epr_sz > 0 { prev_epr_font_size = epr_sz }
+        if not(epr_clr.is_none()) { prev_epr_color = epr_clr }
+        if not(epr_ff.is_empty()) { prev_epr_font_face = epr_ff }
+        if not(epr_ea.is_empty()) { prev_epr_ea_font = epr_ea }
+      }
+      None => ()
+    }
+    // Merge: defRPr/lstStyle take priority, then endParaRPr carry-over (color/font only)
+    let def_font_size = if def_font_size > 0 { def_font_size } else { prev_epr_font_size }
+    let def_color = if not(def_color.is_none()) { def_color } else { prev_epr_color }
+    let def_font_face = if not(def_font_face.is_empty()) { def_font_face } else { prev_epr_font_face }
+    let def_ea_font = if not(def_ea_font.is_empty()) { def_ea_font } else { prev_epr_ea_font }
     // Iterate over all children to handle a:r (runs), a:fld (fields), and a:br (breaks)
     let runs : Array[TextRun] = []
     let p_ch_len = p_ch.length()
@@ -673,13 +718,13 @@ fn parse_text_body(
           let run = match @xml.find_child(r_ch, "a:rPr") {
             None =>
               default_text_run(
-                text, def_bold, def_italic, def_font_size, def_color,
-                def_font_face, def_ea_font,
+                text, def_bold, def_bold_explicit, def_italic, def_font_size,
+                def_color, def_font_face, def_ea_font,
               )
             Some(rpr) => {
               let rp = parse_run_props(
-                rpr, def_bold, def_italic, def_font_size, def_color,
-                def_font_face, def_ea_font, theme,
+                rpr, def_bold, def_bold_explicit, def_italic, def_font_size,
+                def_color, def_font_face, def_ea_font, theme,
               )
               { ..rp, text }
             }
@@ -690,8 +735,8 @@ fn parse_text_body(
         // Line break — insert a newline run
         runs.push(
           default_text_run(
-            "\n", def_bold, def_italic, def_font_size, def_color,
-            def_font_face, def_ea_font,
+            "\n", def_bold, def_bold_explicit, def_italic, def_font_size,
+            def_color, def_font_face, def_ea_font,
           ),
         )
       }
