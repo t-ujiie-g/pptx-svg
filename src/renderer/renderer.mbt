@@ -1258,7 +1258,7 @@ fn render_shape(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, _)) => true
     _ => false
   }
-  if cx_p <= 0 {
+  if cx_p <= 0 && not(is_line) {
     return ""
   }
   if cy_p <= 0 && not(is_line) {
