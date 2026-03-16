@@ -104,7 +104,11 @@ fn wrap_paragraph(
     } else {
       1800
     }
-    let fs_pt = apply_font_scale(fs_raw, font_scale).to_double() / 100.0
+    // Compute font size in px (matching SVG rendering) to avoid pt→px rounding mismatch
+    let fs_px = px(
+      apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
+      scale,
+    ).to_double()
     let ff = if not(run.ea_font.is_empty()) {
       run.ea_font
     } else if not(run.font_face.is_empty()) {
@@ -155,7 +159,7 @@ fn wrap_paragraph(
       }
       // Extract segment text
       let seg_text = @xml.str_substring(text, seg_start, seg_end)
-      let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_pt)
+      let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_px)
       // Check if adding this segment would overflow
       if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
         // Start new line

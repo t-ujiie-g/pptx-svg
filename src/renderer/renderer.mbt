@@ -1962,7 +1962,12 @@ fn render_table_cell_text(
     }
     let font_sz = if max_run_sz > 0 { max_run_sz } else { def_sz }
     let lh = if para.line_spacing > 0 {
-      font_sz * para.line_spacing / 100000
+      // Absolute spacing in EMU
+      px(para.line_spacing, scale)
+    } else if para.line_spacing < 0 {
+      // Percentage spacing (-100000 = 100% = single spacing)
+      let pct = -para.line_spacing
+      font_sz * pct / @ooxml.pct_100
     } else {
       font_sz * line_height_numer / line_height_denom
     }
@@ -1996,14 +2001,15 @@ fn render_table_cell_text(
     }
     thi = thi + 1
   }
-  // Vertical anchor offset
-  let y_offset = if anchor == "ctr" {
+  // Vertical anchor offset (clamp to pad_t so text doesn't overflow above the cell)
+  let y_raw = if anchor == "ctr" {
     pad_t + (available_h - text_height) / 2
   } else if anchor == "b" {
     pad_t + available_h - text_height
   } else {
     pad_t
   }
+  let y_offset = if y_raw < pad_t { pad_t } else { y_raw }
   // Default text color: style > auto-contrast > black
   let style_fill = if not(style_cell.font_color.is_none()) {
     style_cell.font_color.to_css()
@@ -2035,9 +2041,6 @@ fn render_table_cell_text(
     if nr == 0 && para.bullet.is_empty() {
       cur_y = cur_y + lh
       p_idx = p_idx + 1
-      if cur_y > cell_y + cell_h - pad_b {
-        break
-      }
       continue
     }
     // Paragraph alignment
@@ -2063,9 +2066,6 @@ fn render_table_cell_text(
     let mut li = 0
     while li < nlines {
       cur_y = cur_y + lh
-      if cur_y > cell_y + cell_h - pad_b {
-        break
-      }
       let line = wrapped[li]
       // Compute x position based on alignment
       let (line_x, text_anchor) = if algn == "ctr" {
@@ -2114,9 +2114,6 @@ fn render_table_cell_text(
       cur_y = cur_y + px(para.spc_after, scale)
     }
     p_idx = p_idx + 1
-    if cur_y > cell_y + cell_h - pad_b {
-      break
-    }
   }
   out + "</text>"
 }
