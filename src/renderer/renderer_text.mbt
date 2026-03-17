@@ -691,6 +691,10 @@ fn render_text(
   // Calculate total text height for vertical alignment
   let np = paragraphs.length()
   let mut total_text_h = 0
+  // Track last paragraph's trailing space for vertical centering correction
+  let mut last_para_line_h = 0
+  let mut last_para_font_sz = 0
+  let mut last_para_spc_after = 0
   let mut ti = 0
   while ti < np {
     let para = paragraphs[ti]
@@ -700,8 +704,12 @@ fn render_text(
       fs,
       lr,
     )
+    let p_fsz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
     if nr == 0 {
       total_text_h = total_text_h + para_line_h
+      last_para_line_h = para_line_h
+      last_para_font_sz = p_fsz
+      last_para_spc_after = 0
     } else {
       // Add spacing before
       if para.spc_before > 0 && ti > 0 {
@@ -737,13 +745,29 @@ fn render_text(
       }
       total_text_h = total_text_h + para_line_h * num_visual_lines
       total_text_h = total_text_h + bl_extra_below
+      last_para_line_h = para_line_h
+      last_para_font_sz = p_fsz
       // Add spacing after
-      if para.spc_after > 0 {
-        total_text_h = total_text_h + px(para.spc_after, scale)
+      last_para_spc_after = if para.spc_after > 0 {
+        let sa = px(para.spc_after, scale)
+        total_text_h = total_text_h + sa
+        sa
+      } else {
+        0
       }
     }
     ti = ti + 1
   }
+  // For vertical centering/bottom alignment, the trailing space of the last line
+  // (line_height - font_size) and spc_after should not count toward the text extent.
+  // The rendering places text at the baseline (font_size from line top), so the visual
+  // bottom of text is at the last baseline, not at the last baseline + trailing space.
+  let trailing_space = if last_para_line_h > last_para_font_sz {
+    last_para_line_h - last_para_font_sz + last_para_spc_after
+  } else {
+    last_para_spc_after
+  }
+  let text_h_for_anchor = total_text_h - trailing_space
 
   // Vertical anchor offset
   let shape_h = px(t.cy, scale)
@@ -755,9 +779,9 @@ fn render_text(
   let pad_b = px(b_ins, scale)
   let avail_h = shape_h - pad_t - pad_b
   let anchor_offset = if body_props.anchor == "ctr" {
-    (avail_h - total_text_h) / 2
+    (avail_h - text_h_for_anchor) / 2
   } else if body_props.anchor == "b" {
-    avail_h - total_text_h
+    avail_h - text_h_for_anchor
   } else {
     0
   }
