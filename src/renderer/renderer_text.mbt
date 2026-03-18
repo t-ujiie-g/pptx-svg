@@ -406,8 +406,8 @@ fn para_line_height(
   } else if para.line_spacing < 0 {
     // Negative = percentage (-100000 = 100% = single spacing)
     // In OOXML, percentage is relative to "normal" line spacing (ascent + descent + gap).
-    // Use pct_line_height_numer/denom (1.5) instead of default (1.2) — more accurate
-    // for CJK fonts whose ascent+descent is typically ~1.45× the em size.
+    // Use pct_line_height_numer/denom (1.2) as the base "single spacing" factor.
+    // OOXML single spacing ≈ font (ascent+descent)/em ≈ 1.2× for common CJK fonts.
     let pct = -para.line_spacing // e.g. 130000 for 130%
     let emu = para_max_font_emu(para)
     let base_line_h = if emu > 0 {
@@ -667,8 +667,8 @@ fn render_text(
   let mut text_w = full_text_w
   let def_sz = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
   let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
-  let fs = body_props.font_scale
-  let lr = body_props.ln_spc_reduction
+  let mut fs = body_props.font_scale
+  let mut lr = body_props.ln_spc_reduction
 
   let do_wrap = body_props.wrap != "none"
 
@@ -688,6 +688,21 @@ fn render_text(
     text_w = col_w
   }
 
+  // Compute available height (needed for normAutofit and anchor offset)
+  let shape_h = px(t.cy, scale)
+  let b_ins = if body_props.b_ins >= 0 {
+    body_props.b_ins
+  } else {
+    default_t_inset
+  }
+  let pad_b = px(b_ins, scale)
+  let avail_h = shape_h - pad_t - pad_b
+
+  // normAutofit: dynamically adjust font_scale / ln_spc_reduction to fit text.
+  // PowerPoint stores hints in the PPTX, but our font metrics may differ, so
+  // we recompute if needed.  font_scale >= 0 means <a:normAutofit> was present.
+  let is_norm_autofit = body_props.font_scale >= 0
+
   // Calculate total text height for vertical alignment
   let np = paragraphs.length()
   let mut total_text_h = 0
@@ -695,68 +710,93 @@ fn render_text(
   let mut last_para_line_h = 0
   let mut last_para_font_sz = 0
   let mut last_para_spc_after = 0
-  let mut ti = 0
-  while ti < np {
-    let para = paragraphs[ti]
-    let nr = para.runs.length()
-    let para_line_h = apply_autofit_scale(
-      para_line_height(para, scale, def_line_h),
-      fs,
-      lr,
-    )
-    let p_fsz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
-    if nr == 0 {
-      total_text_h = total_text_h + para_line_h
-      last_para_line_h = para_line_h
-      last_para_font_sz = p_fsz
-      last_para_spc_after = 0
-    } else {
-      // Add spacing before
-      if para.spc_before > 0 && ti > 0 {
-        total_text_h = total_text_h + px(para.spc_before, scale)
-      }
-      // Extra space for super/subscript (must match rendering loop)
-      let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
-        para, scale, def_sz,
+  let mut autofit_pass = 0
+  while autofit_pass < 6 {
+    total_text_h = 0
+    last_para_line_h = 0
+    last_para_font_sz = 0
+    last_para_spc_after = 0
+    let mut ti = 0
+    while ti < np {
+      let para = paragraphs[ti]
+      let nr = para.runs.length()
+      let para_line_h = apply_autofit_scale(
+        para_line_height(para, scale, def_line_h),
+        fs,
+        lr,
       )
-      total_text_h = total_text_h + bl_extra_above
-      // Count visual lines for wrapped text (uses col_w for multi-col)
-      let num_visual_lines = if do_wrap {
-        let indent_emu = if para.mar_l >= 0 {
-          para.mar_l
-        } else {
-          para.level * level_indent_emu
-        }
-        let indent_px = px(indent_emu, scale)
-        let wrap_w = col_w - indent_px
-        let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
-        vlines.length()
+      let p_fsz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
+      if nr == 0 {
+        total_text_h = total_text_h + para_line_h
+        last_para_line_h = para_line_h
+        last_para_font_sz = p_fsz
+        last_para_spc_after = 0
       } else {
-        // Count explicit line breaks (from <a:br>) to get visual line count
-        let mut br_count = 0
-        let mut bri = 0
-        while bri < nr {
-          if para.runs[bri].text == "\n" {
-            br_count = br_count + 1
+        // Add spacing before
+        if para.spc_before > 0 && ti > 0 {
+          total_text_h = total_text_h + px(para.spc_before, scale)
+        }
+        // Extra space for super/subscript (must match rendering loop)
+        let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
+          para, scale, def_sz,
+        )
+        total_text_h = total_text_h + bl_extra_above
+        // Count visual lines for wrapped text (uses col_w for multi-col)
+        let num_visual_lines = if do_wrap {
+          let indent_emu = if para.mar_l >= 0 {
+            para.mar_l
+          } else {
+            para.level * level_indent_emu
           }
-          bri = bri + 1
+          let indent_px = px(indent_emu, scale)
+          let wrap_w = col_w - indent_px
+          let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
+          vlines.length()
+        } else {
+          // Count explicit line breaks (from <a:br>) to get visual line count
+          let mut br_count = 0
+          let mut bri = 0
+          while bri < nr {
+            if para.runs[bri].text == "\n" {
+              br_count = br_count + 1
+            }
+            bri = bri + 1
+          }
+          1 + br_count
         }
-        1 + br_count
+        total_text_h = total_text_h + para_line_h * num_visual_lines
+        total_text_h = total_text_h + bl_extra_below
+        last_para_line_h = para_line_h
+        last_para_font_sz = p_fsz
+        // Add spacing after
+        last_para_spc_after = if para.spc_after > 0 {
+          let sa = px(para.spc_after, scale)
+          total_text_h = total_text_h + sa
+          sa
+        } else {
+          0
+        }
       }
-      total_text_h = total_text_h + para_line_h * num_visual_lines
-      total_text_h = total_text_h + bl_extra_below
-      last_para_line_h = para_line_h
-      last_para_font_sz = p_fsz
-      // Add spacing after
-      last_para_spc_after = if para.spc_after > 0 {
-        let sa = px(para.spc_after, scale)
-        total_text_h = total_text_h + sa
-        sa
-      } else {
-        0
+      ti = ti + 1
+    }
+    // normAutofit: if text overflows, adjust parameters and retry
+    if is_norm_autofit && total_text_h > avail_h && avail_h > 0 {
+      // First try increasing line spacing reduction (up to 20%)
+      if lr < 20000 {
+        lr = lr + 5000
+        if lr > 20000 { lr = 20000 }
+        autofit_pass = autofit_pass + 1
+        continue
+      }
+      // Then reduce font scale proportionally
+      let needed_fs = fs * avail_h / total_text_h
+      if needed_fs < fs && needed_fs > 25000 {
+        fs = needed_fs
+        autofit_pass = autofit_pass + 1
+        continue
       }
     }
-    ti = ti + 1
+    break
   }
   // For vertical centering/bottom alignment, the trailing space of the last line
   // (line_height - font_size) and spc_after should not count toward the text extent.
@@ -770,14 +810,6 @@ fn render_text(
   let text_h_for_anchor = total_text_h - trailing_space
 
   // Vertical anchor offset
-  let shape_h = px(t.cy, scale)
-  let b_ins = if body_props.b_ins >= 0 {
-    body_props.b_ins
-  } else {
-    default_t_inset
-  }
-  let pad_b = px(b_ins, scale)
-  let avail_h = shape_h - pad_t - pad_b
   let anchor_offset = if body_props.anchor == "ctr" {
     (avail_h - text_h_for_anchor) / 2
   } else if body_props.anchor == "b" {
@@ -785,7 +817,17 @@ fn render_text(
   } else {
     0
   }
-  let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
+  // For anchor="ctr", allow negative offset so text centers even when it
+  // overflows the padding area (PowerPoint behavior: center in full shape).
+  // But clamp to -pad_t so text never starts above the shape's top edge.
+  // For "t"/"b", clamp to 0 so text stays within the padding boundary.
+  let anchor_offset_clamped = if body_props.anchor == "ctr" {
+    if anchor_offset >= 0 - pad_t { anchor_offset } else { 0 - pad_t }
+  } else if anchor_offset > 0 {
+    anchor_offset
+  } else {
+    0
+  }
 
   // Vertical text mode
   let is_vert = body_props.vert == "vert" ||
