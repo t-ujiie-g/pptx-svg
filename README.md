@@ -87,7 +87,8 @@ const renderer = new PptxRenderer(options?);
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `measureText` | `(text, fontFace, fontSizePt) => number` | Custom text width measurement. Defaults to Canvas 2D. |
+| `measureText` | `(text, fontFace, fontSizePx) => number` | Custom text width measurement. Defaults to Canvas 2D. |
+| `fontFallbacks` | `Record<string, string[]>` | Custom font fallback mappings. Merged with built-in defaults. |
 
 **Methods:**
 
@@ -115,7 +116,7 @@ const renderer = new PptxRenderer(options?);
 - **Effects**: Outer shadow, inner shadow, glow, soft edge, reflection (all via SVG filters)
 - **Images**: PNG/JPEG/GIF/SVG, crop, alpha, brightness/contrast, duotone, color change
 - **Tables**: Cell merge (grid span, row span), borders (including diagonal), margins, anchoring, table styles, conditional formatting (banded rows/cols, first/last row/col)
-- **Charts**: Bar, Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 types), data labels, data points, trendlines, error bars, composite charts
+- **Charts**: Bar (clustered/stacked/percentStacked), Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 types), data labels, data points, trendlines, error bars, composite charts
 - **Group shapes**: Recursive nesting with coordinate transforms
 - **Theme**: 12 theme colors, font scheme, all color modifiers (tint, shade, saturation, luminance, etc.)
 - **Master/Layout inheritance**: Placeholder inheritance, `p:clrMapOvr`
@@ -128,7 +129,7 @@ const renderer = new PptxRenderer(options?);
 - **SmartArt** (`dgm:*` DiagramML) - planned: fallback image display
 - **OLE / Embedded objects** (`p:oleObj`) - planned: fallback image display
 - **Media** (video/audio) - planned: poster frame display
-- **EMF/WMF images** - cannot be decoded in browser
+- **WMF images** - cannot be decoded in browser (EMF is supported via built-in converter)
 - **TIFF images** - not supported by browser `<img>`
 - **Math equations** (OMML `m:oMath`) - planned: plain text fallback
 - **Embedded fonts** - uses system font fallback

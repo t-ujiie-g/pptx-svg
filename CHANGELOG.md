@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.3.4
+
+### Features
+
+- Stacked / percentStacked bar chart support (horizontal & vertical)
+
+### Bug Fixes
+
+- Fix text overflowing to the right due to fallback fonts affecting Canvas 2D text measurement
+- Fix CJK text wrap accuracy with cumulative string measurement (reduces side-bearing over-count)
+- Add normAutofit dynamic scaling (`<a:normAutofit>`) — auto-shrink font size and line spacing to fit text in shape
+- Fix vertical centering — exclude trailing line space from text height calculation
+- Fix percentage-based line spacing base factor (1.4 → 1.2, matching OOXML single spacing spec)
+
+### Documentation
+
+- Add `renderer_table.mbt` to key files in CLAUDE.md
+- Document `data-ooxml-font-face` and `reff-*` text run effect attributes in svg-specification.md
+
+## 0.3.3
+
+### Bug Fixes
+
+- Fix bullet property inheritance from master/layout lstStyle
+- Fix marL sentinel (-1 = unset) to distinguish explicit `marL="0"` from unset
+- Limit endParaRPr carry-over to color/font only
+- Fix endParaRPr color inheritance across paragraphs
+- Fix vertical line rendering
+- Fix arrow geometry, kinsoku line-break, text outline stroke
+- Fix table split rendering
+
 ## 0.3.2
 
 ### Bug Fixes
