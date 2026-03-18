@@ -75,6 +75,7 @@ Slides:
  70. Text outline (a:rPr/a:ln — stroke on text glyphs)
  71. Text gradient fill (a:rPr/a:gradFill — gradient on text)
  72. Text warp (a:prstTxWarp — preset text warp with adjust values)
+ 73. Stacked / Percent-stacked bar charts (BAR_STACKED_100, COLUMN_STACKED, COLUMN_STACKED_100)
 """
 
 from pptx import Presentation
@@ -4918,6 +4919,49 @@ warp72c = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textDeflate">
   <a:avLst/>
 </a:prstTxWarp>"""
 body_pr72c.insert(0, etree.fromstring(warp72c))
+
+# ── Slide 73: Stacked / Percent-stacked bar charts ──────────────────────────
+
+slide73 = prs.slides.add_slide(blank)
+
+# Percent-stacked horizontal bar (like gender breakdown: 58.1% / 41.9%)
+chart_data73a = CategoryChartData()
+chart_data73a.categories = ['Gender']
+chart_data73a.add_series('Male', (58.1,))
+chart_data73a.add_series('Female', (41.9,))
+
+chart_frame73a = slide73.shapes.add_chart(
+    XL_CHART_TYPE.BAR_STACKED_100, Inches(0.5), Inches(1.5),
+    Inches(4), Inches(3), chart_data73a
+)
+
+# Stacked vertical column chart (multiple categories)
+chart_data73b = CategoryChartData()
+chart_data73b.categories = ['Q1', 'Q2', 'Q3', 'Q4']
+chart_data73b.add_series('Product A', (100, 120, 90, 150))
+chart_data73b.add_series('Product B', (80, 70, 110, 60))
+chart_data73b.add_series('Product C', (50, 40, 30, 80))
+
+chart_frame73b = slide73.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_STACKED, Inches(5), Inches(1.5),
+    Inches(4), Inches(3), chart_data73b
+)
+
+# Percent-stacked vertical column chart
+chart_data73c = CategoryChartData()
+chart_data73c.categories = ['East', 'West', 'North']
+chart_data73c.add_series('2024', (300, 200, 150))
+chart_data73c.add_series('2025', (250, 350, 200))
+
+chart_frame73c = slide73.shapes.add_chart(
+    XL_CHART_TYPE.COLUMN_STACKED_100, Inches(2.5), Inches(5),
+    Inches(4), Inches(2), chart_data73c
+)
+
+lbl73 = slide73.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl73.text_frame.paragraphs[0].text = "Slide 73: Stacked / Percent-stacked bar charts"
+lbl73.text_frame.paragraphs[0].font.size = Pt(18)
+lbl73.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

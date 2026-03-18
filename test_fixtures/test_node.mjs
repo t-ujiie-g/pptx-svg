@@ -200,17 +200,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 72', slideCount === 72, `got ${slideCount}`);
+  assert('slide count = 73', slideCount === 73, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 72; i++) {
+  for (let i = 1; i <= 73; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 72; i++) {
+  for (let i = 1; i <= 73; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1324,6 +1324,27 @@ async function testFeaturesPptx() {
     assert('slide72 has textDeflate', slide72.includes('textDeflate'));
     assert('slide72 has a:avLst', slide72.includes('a:avLst'));
     assert('slide72 has Wave Text', slide72.includes('Wave Text'));
+  }
+
+  // ── Slide 73: Stacked / Percent-stacked bar charts ─────────────────────────
+  {
+    const slide73 = textFiles.get('ppt/slides/slide73.xml') || '';
+    section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
+    // Should have chart references
+    const rels73 = textFiles.get('ppt/slides/_rels/slide73.xml.rels') || '';
+    const chartRefs73 = findRelTarget(rels73, 'chart');
+    assert('slide73 has chart references', chartRefs73.length >= 2, `got ${chartRefs73.length}`);
+    // Check the chart XMLs for grouping types
+    let foundPercentStacked = false;
+    let foundStacked = false;
+    for (const [path, content] of textFiles) {
+      if (path.startsWith('ppt/charts/') && path.endsWith('.xml')) {
+        if (content.includes('percentStacked')) foundPercentStacked = true;
+        if (content.includes('<c:grouping val="stacked"')) foundStacked = true;
+      }
+    }
+    assert('has percentStacked grouping', foundPercentStacked);
+    assert('has stacked grouping', foundStacked);
   }
 }
 
