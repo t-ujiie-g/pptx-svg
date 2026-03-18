@@ -42,7 +42,7 @@ let line_height_numer : Int = 12 // default line-height = font-size * 12/10
 let line_height_denom : Int = 10
 
 ///|
-let pct_line_height_numer : Int = 14 // for %-based spacing: font-size * 14/10 ≈ 1.4 (CJK font metrics)
+let pct_line_height_numer : Int = 12 // for %-based spacing: font-size * 12/10 ≈ 1.2 (OOXML single spacing base)
 
 ///|
 let pct_line_height_denom : Int = 10

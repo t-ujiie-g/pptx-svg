@@ -298,47 +298,108 @@ fn render_bar_chart(
   if ns == 0 {
     return ""
   }
+  let is_stacked = group.grouping == "stacked" ||
+    group.grouping == "percentStacked"
+  let is_pct_stacked = group.grouping == "percentStacked"
   // Get data range
-  let (cats, raw_max) = get_series_range(group.series)
-  let max_val = compute_axis_max(raw_max, axes)
+  let (cats, raw_max) = if is_stacked {
+    get_stacked_series_range(group.series)
+  } else {
+    get_series_range(group.series)
+  }
+  let max_val = if is_pct_stacked {
+    // percentStacked: max is always 100% = 1.0 × chart_val_scale
+    chart_val_scale
+  } else {
+    compute_axis_max(raw_max, axes)
+  }
   let nc = cats.length()
   if nc == 0 || max_val == 0 {
     return ""
   }
   let gap_pct = group.gap_width // percentage, e.g. 150 = 150% gap
-  // Calculate bar layout
   let mut svg = ""
-  // For clustered: each category has ns bars + gap
-  // total units per category = ns * 100 + gap_pct
-  let units_per_cat = ns * 100 + gap_pct
   let cat_size = if is_horizontal { ph } else { pw }
   let val_size = if is_horizontal { pw } else { ph }
-  for si in 0..<ns {
-    let ser = group.series[si]
-    let color = series_color(ser, si, colors)
-    let values = get_num_values(ser.val)
-    let nv = values.length()
-    let n_pts = if nv < nc { nv } else { nc }
-    for ci in 0..<n_pts {
-      let val = values[ci]
-      if val > 0 {
-        let pt_color = point_color(ser, ci, color)
-        let bar_len = mul_div(val, val_size, max_val)
-        let cat_start = ci * cat_size / nc
-        let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
-          nc /
-          units_per_cat
-        let bar_w = 100 * cat_size / nc / units_per_cat
-        if is_horizontal {
-          svg = svg + "<rect x=\"" + int_to_str(px_) + "\" y=\"" +
-            int_to_str(py + bar_off) + "\" width=\"" + int_to_str(bar_len) +
-            "\" height=\"" + int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
-            "\" fill=\"" + pt_color + "\"/>"
-        } else {
-          svg = svg + "<rect x=\"" + int_to_str(px_ + bar_off) + "\" y=\"" +
-            int_to_str(py + ph - bar_len) + "\" width=\"" +
-            int_to_str(if bar_w > 1 { bar_w } else { 1 }) + "\" height=\"" +
-            int_to_str(bar_len) + "\" fill=\"" + pt_color + "\"/>"
+  if is_stacked {
+    // Stacked / percentStacked: one bar per category, series stacked
+    let units_per_cat = 100 + gap_pct
+    let cat_totals = compute_cat_totals(group, nc)
+    // Accumulate stacked offsets per category
+    let stack_offset : Array[Int] = Array::make(nc, 0)
+    for si in 0..<ns {
+      let ser = group.series[si]
+      let color = series_color(ser, si, colors)
+      let values = get_num_values(ser.val)
+      let nv = values.length()
+      let n_pts = if nv < nc { nv } else { nc }
+      for ci in 0..<n_pts {
+        let val = values[ci]
+        if val > 0 {
+          let pt_color = point_color(ser, ci, color)
+          let draw_val = pct_stacked_val(val, cat_totals[ci], is_pct_stacked)
+          let bar_len = mul_div(draw_val, val_size, max_val)
+          let base_offset = stack_offset[ci]
+          let cat_start = ci * cat_size / nc
+          let bar_off = cat_start + gap_pct / 2 * cat_size / nc / units_per_cat
+          let bar_w = 100 * cat_size / nc / units_per_cat
+          if is_horizontal {
+            svg = svg + "<rect x=\"" +
+              int_to_str(px_ + mul_div(base_offset, val_size, max_val)) +
+              "\" y=\"" + int_to_str(py + bar_off) + "\" width=\"" +
+              int_to_str(bar_len) + "\" height=\"" +
+              int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
+              "\" fill=\"" + pt_color + "\"/>"
+          } else {
+            svg = svg + "<rect x=\"" + int_to_str(px_ + bar_off) +
+              "\" y=\"" +
+              int_to_str(
+                py + ph - mul_div(base_offset, val_size, max_val) - bar_len,
+              ) +
+              "\" width=\"" +
+              int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
+              "\" height=\"" + int_to_str(bar_len) +
+              "\" fill=\"" + pt_color + "\"/>"
+          }
+          stack_offset[ci] = base_offset +
+            pct_stacked_val(val, cat_totals[ci], is_pct_stacked)
+        }
+      }
+    }
+  } else {
+    // Clustered: each category has ns bars side by side + gap
+    let units_per_cat = ns * 100 + gap_pct
+    for si in 0..<ns {
+      let ser = group.series[si]
+      let color = series_color(ser, si, colors)
+      let values = get_num_values(ser.val)
+      let nv = values.length()
+      let n_pts = if nv < nc { nv } else { nc }
+      for ci in 0..<n_pts {
+        let val = values[ci]
+        if val > 0 {
+          let pt_color = point_color(ser, ci, color)
+          let bar_len = mul_div(val, val_size, max_val)
+          let cat_start = ci * cat_size / nc
+          let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
+            nc /
+            units_per_cat
+          let bar_w = 100 * cat_size / nc / units_per_cat
+          if is_horizontal {
+            svg = svg + "<rect x=\"" + int_to_str(px_) + "\" y=\"" +
+              int_to_str(py + bar_off) + "\" width=\"" +
+              int_to_str(bar_len) +
+              "\" height=\"" +
+              int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
+              "\" fill=\"" + pt_color + "\"/>"
+          } else {
+            svg = svg + "<rect x=\"" + int_to_str(px_ + bar_off) +
+              "\" y=\"" +
+              int_to_str(py + ph - bar_len) + "\" width=\"" +
+              int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
+              "\" height=\"" + int_to_str(bar_len) +
+              "\" fill=\"" + pt_color + "\"/>"
+          }
         }
       }
     }
@@ -353,7 +414,7 @@ fn render_bar_chart(
   }
   if has_data_labels {
     svg = svg + render_bar_data_labels(
-      group, px_, py, pw, ph, max_val, is_horizontal, units_per_cat, gap_pct,
+      group, px_, py, pw, ph, max_val, is_horizontal,
     )
   }
   // Trendlines + error bars (vertical column charts only)
@@ -1127,6 +1188,68 @@ fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
 }
 
 ///|
+/// Get per-category stacked totals and max across categories.
+fn get_stacked_series_range(
+  series : Array[@ooxml.ChartSeries],
+) -> (Array[String], Int) {
+  let cats = if not(series.is_empty()) {
+    get_cat_labels(series[0].cat)
+  } else {
+    []
+  }
+  let nc = cats.length()
+  let totals : Array[Int] = Array::make(nc, 0)
+  for si in 0..<series.length() {
+    let vals = get_num_values(series[si].val)
+    for ci in 0..<nc {
+      if ci < vals.length() {
+        totals[ci] = totals[ci] + vals[ci]
+      }
+    }
+  }
+  let mut max_val = 0
+  for ci in 0..<nc {
+    if totals[ci] > max_val { max_val = totals[ci] }
+  }
+  if max_val == 0 { max_val = 1 }
+  (cats, max_val)
+}
+
+///|
+/// Compute per-category totals for percentStacked normalization.
+fn compute_cat_totals(
+  group : @ooxml.ChartGroup,
+  nc : Int,
+) -> Array[Int] {
+  let totals : Array[Int] = Array::make(nc, 0)
+  let ns = group.series.length()
+  for si in 0..<ns {
+    let vals = get_num_values(group.series[si].val)
+    for ci in 0..<nc {
+      if ci < vals.length() {
+        totals[ci] = totals[ci] + vals[ci]
+      }
+    }
+  }
+  totals
+}
+
+///|
+/// Normalize a value for percentStacked: val * chart_val_scale / total.
+/// Returns the raw val if not percentStacked or total is 0.
+fn pct_stacked_val(
+  val : Int,
+  cat_total : Int,
+  is_pct_stacked : Bool,
+) -> Int {
+  if is_pct_stacked && cat_total > 0 {
+    mul_div(val, chart_val_scale, cat_total)
+  } else {
+    val
+  }
+}
+
+///|
 /// Get the numeric format code from an AxisDataSource (e.g. "0%", "General").
 fn get_num_format(src : @ooxml.AxisDataSource) -> String {
   match src {
@@ -1282,8 +1405,17 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
       // Consider all groups for composite charts
       let mut max_val = 0
       for gi in 0..<groups.length() {
-        let (_, gmax) = get_series_range(groups[gi].series)
-        if gmax > max_val { max_val = gmax }
+        let g = groups[gi]
+        if g.grouping == "percentStacked" {
+          // percentStacked: max is always 100%
+          max_val = chart_val_scale
+        } else if g.grouping == "stacked" {
+          let (_, gmax) = get_stacked_series_range(g.series)
+          if gmax > max_val { max_val = gmax }
+        } else {
+          let (_, gmax) = get_series_range(g.series)
+          if gmax > max_val { max_val = gmax }
+        }
       }
       if max_val == 0 { 1 } else { max_val }
     }
@@ -1569,8 +1701,6 @@ fn render_bar_data_labels(
   ph : Int,
   max_val : Int,
   is_horizontal : Bool,
-  units_per_cat : Int,
-  gap_pct : Int,
 ) -> String {
   let ns = group.series.length()
   let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
@@ -1578,10 +1708,17 @@ fn render_bar_data_labels(
   let group_dl = group.data_labels
   let cat_size = if is_horizontal { ph } else { pw }
   let val_size = if is_horizontal { pw } else { ph }
+  let is_stacked = group.grouping == "stacked" ||
+    group.grouping == "percentStacked"
+  let is_pct_stacked = group.grouping == "percentStacked"
+  let gap_pct = group.gap_width
+  let units_per_cat = if is_stacked { 100 + gap_pct } else { ns * 100 + gap_pct }
+  let cat_totals = compute_cat_totals(group, nc)
+  // Track stacked offset for label positioning
+  let stack_offset : Array[Int] = Array::make(nc, 0)
   let mut svg = ""
   for si in 0..<ns {
     let ser = group.series[si]
-    // Use series-level dLbls if available, otherwise group-level
     let dl = if ser.data_labels.is_visible() {
       ser.data_labels
     } else {
@@ -1598,29 +1735,63 @@ fn render_bar_data_labels(
           ser.title, val_fmt,
         )
         if not(label.is_empty()) {
-          let bar_len = mul_div(values[ci], val_size, max_val)
+          let draw_val = pct_stacked_val(
+            values[ci], cat_totals[ci], is_pct_stacked,
+          )
+          let bar_len = mul_div(draw_val, val_size, max_val)
           let cat_start = ci * cat_size / nc
-          let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
-            nc / units_per_cat
-          let bar_w = 100 * cat_size / nc / units_per_cat
-          if is_horizontal {
-            let x = px_ + bar_len + 3
-            let y = py + bar_off + bar_w / 2 + 3
-            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
-              int_to_str(y) + "\" font-size=\"" +
-              int_to_str(chart_data_label_font_size) +
-              "\" fill=\"" + chart_title_color + "\">" +
-              svg_escape(label) + "</text>"
+          if is_stacked {
+            let base_px = mul_div(stack_offset[ci], val_size, max_val)
+            let bar_off = cat_start + gap_pct / 2 * cat_size / nc /
+              units_per_cat
+            let bar_w = 100 * cat_size / nc / units_per_cat
+            if is_horizontal {
+              let x = px_ + base_px + bar_len / 2
+              let y = py + bar_off + bar_w / 2 + 3
+              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+                int_to_str(y) +
+                "\" text-anchor=\"middle\" font-size=\"" +
+                int_to_str(chart_data_label_font_size) +
+                "\" fill=\"" + chart_title_color + "\">" +
+                svg_escape(label) + "</text>"
+            } else {
+              let x = px_ + bar_off + bar_w / 2
+              let y = py + ph - base_px - bar_len / 2 + 3
+              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+                int_to_str(y) +
+                "\" text-anchor=\"middle\" font-size=\"" +
+                int_to_str(chart_data_label_font_size) +
+                "\" fill=\"" + chart_title_color + "\">" +
+                svg_escape(label) + "</text>"
+            }
           } else {
-            let x = px_ + bar_off + bar_w / 2
-            let y = py + ph - bar_len - 3
-            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
-              int_to_str(y) +
-              "\" text-anchor=\"middle\" font-size=\"" +
-              int_to_str(chart_data_label_font_size) +
-              "\" fill=\"" + chart_title_color + "\">" +
-              svg_escape(label) + "</text>"
+            let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
+              nc / units_per_cat
+            let bar_w = 100 * cat_size / nc / units_per_cat
+            if is_horizontal {
+              let x = px_ + bar_len + 3
+              let y = py + bar_off + bar_w / 2 + 3
+              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+                int_to_str(y) + "\" font-size=\"" +
+                int_to_str(chart_data_label_font_size) +
+                "\" fill=\"" + chart_title_color + "\">" +
+                svg_escape(label) + "</text>"
+            } else {
+              let x = px_ + bar_off + bar_w / 2
+              let y = py + ph - bar_len - 3
+              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+                int_to_str(y) +
+                "\" text-anchor=\"middle\" font-size=\"" +
+                int_to_str(chart_data_label_font_size) +
+                "\" fill=\"" + chart_title_color + "\">" +
+                svg_escape(label) + "</text>"
+            }
           }
+        }
+        // Update stacked offset (must be outside label visibility check)
+        if is_stacked {
+          stack_offset[ci] = stack_offset[ci] +
+            pct_stacked_val(values[ci], cat_totals[ci], is_pct_stacked)
         }
       }
     }

@@ -113,6 +113,12 @@ fn wrap_paragraph(
   let mut cur_line : Array[(Int, String)] = []
   let mut cur_width : Double = 0.0
   let max_w : Double = max_width.to_double()
+  // Track accumulated same-font text on the current line for accurate measurement.
+  // Measuring CJK characters individually over-counts width due to per-glyph
+  // side-bearings; measuring the concatenated string gives the true rendered width.
+  let mut run_accum : String = "" // accumulated text for current font
+  let mut run_ff : String = "" // font face for accumulated text
+  let mut run_fs : Double = 0.0 // font size for accumulated text
   let nr = para.runs.length()
   let mut ri = 0
   while ri < nr {
@@ -124,7 +130,6 @@ fn wrap_paragraph(
     } else {
       1800
     }
-    // Compute font size in px (matching SVG rendering) to avoid pt→px rounding mismatch
     let fs_px = px(
       apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
       scale,
@@ -150,20 +155,27 @@ fn wrap_paragraph(
       }
       cur_line = []
       cur_width = 0.0
+      run_accum = ""
       ri = ri + 1
       continue
     }
+    // When font changes, lock in the accumulated width and reset
+    if ff != run_ff || fs_px != run_fs {
+      if not(run_accum.is_empty()) {
+        cur_width = cur_width + @ffi.ffi_measure_text(run_accum, run_ff, run_fs)
+        run_accum = ""
+      }
+      run_ff = ff
+      run_fs = fs_px
+    }
     let text_len = text.length()
-    // Split text into segments (words for Latin, chars for CJK)
     let mut seg_start = 0
     while seg_start < text_len {
       let c = text.get_char(seg_start).unwrap()
       let mut seg_end = seg_start
       if is_cjk(c) {
-        // Single CJK character as one segment
         seg_end = seg_start + 1
       } else {
-        // Collect word (non-CJK chars until space/CJK)
         seg_end = seg_start
         while seg_end < text_len {
           let sc = text.get_char(seg_end).unwrap()
@@ -171,45 +183,44 @@ fn wrap_paragraph(
             break
           }
           seg_end = seg_end + 1
-          // Break after whitespace
           if sc == ' ' || sc == '\t' {
             break
           }
         }
       }
-      // Extract segment text
       let seg_text = @xml.str_substring(text, seg_start, seg_end)
-      let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_px)
-      // Check if adding this segment would overflow
-      if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
-        // Kinsoku: if this segment starts with a line-start-prohibited char,
-        // keep it on the current line (allow slight overflow)
+      // Measure candidate: accumulated same-font text + new segment
+      let candidate = run_accum + seg_text
+      let candidate_w = @ffi.ffi_measure_text(candidate, ff, fs_px)
+      let total_w = cur_width + candidate_w
+      if cur_line.length() > 0 && total_w > max_w && max_w > 0.0 {
+        // Kinsoku: line-start-prohibited chars stay on current line
         let first_char = seg_text.get_char(0).unwrap()
-        if is_kinsoku_start_prohibited(first_char) && cur_line.length() > 0 {
-          // Keep on current line (burasagari / hanging punctuation)
+        if is_kinsoku_start_prohibited(first_char) {
           cur_line.push((ri, seg_text))
-          cur_width = cur_width + seg_w
+          run_accum = candidate
           seg_start = seg_end
           continue
         }
-        // Start new line
+        // Start new line — lock in accumulated width first
         if cur_line.length() > 0 {
           lines.push(cur_line)
         }
         cur_line = []
         cur_width = 0.0
+        run_accum = ""
       }
       cur_line.push((ri, seg_text))
-      cur_width = cur_width + seg_w
+      run_accum = run_accum + seg_text
       seg_start = seg_end
     }
     ri = ri + 1
   }
+  // Lock in any remaining accumulated text
   if cur_line.length() > 0 {
     lines.push(cur_line)
   }
   if lines.length() == 0 {
-    // Empty paragraph - one empty line
     lines.push([])
   }
   lines
@@ -406,8 +417,8 @@ fn para_line_height(
   } else if para.line_spacing < 0 {
     // Negative = percentage (-100000 = 100% = single spacing)
     // In OOXML, percentage is relative to "normal" line spacing (ascent + descent + gap).
-    // Use pct_line_height_numer/denom (1.5) instead of default (1.2) — more accurate
-    // for CJK fonts whose ascent+descent is typically ~1.45× the em size.
+    // Use pct_line_height_numer/denom (1.2) as the base "single spacing" factor.
+    // OOXML single spacing ≈ font (ascent+descent)/em ≈ 1.2× for common CJK fonts.
     let pct = -para.line_spacing // e.g. 130000 for 130%
     let emu = para_max_font_emu(para)
     let base_line_h = if emu > 0 {
@@ -667,8 +678,8 @@ fn render_text(
   let mut text_w = full_text_w
   let def_sz = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
   let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
-  let fs = body_props.font_scale
-  let lr = body_props.ln_spc_reduction
+  let mut fs = body_props.font_scale
+  let mut lr = body_props.ln_spc_reduction
 
   let do_wrap = body_props.wrap != "none"
 
@@ -688,64 +699,7 @@ fn render_text(
     text_w = col_w
   }
 
-  // Calculate total text height for vertical alignment
-  let np = paragraphs.length()
-  let mut total_text_h = 0
-  let mut ti = 0
-  while ti < np {
-    let para = paragraphs[ti]
-    let nr = para.runs.length()
-    let para_line_h = apply_autofit_scale(
-      para_line_height(para, scale, def_line_h),
-      fs,
-      lr,
-    )
-    if nr == 0 {
-      total_text_h = total_text_h + para_line_h
-    } else {
-      // Add spacing before
-      if para.spc_before > 0 && ti > 0 {
-        total_text_h = total_text_h + px(para.spc_before, scale)
-      }
-      // Extra space for super/subscript (must match rendering loop)
-      let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
-        para, scale, def_sz,
-      )
-      total_text_h = total_text_h + bl_extra_above
-      // Count visual lines for wrapped text (uses col_w for multi-col)
-      let num_visual_lines = if do_wrap {
-        let indent_emu = if para.mar_l >= 0 {
-          para.mar_l
-        } else {
-          para.level * level_indent_emu
-        }
-        let indent_px = px(indent_emu, scale)
-        let wrap_w = col_w - indent_px
-        let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
-        vlines.length()
-      } else {
-        // Count explicit line breaks (from <a:br>) to get visual line count
-        let mut br_count = 0
-        let mut bri = 0
-        while bri < nr {
-          if para.runs[bri].text == "\n" {
-            br_count = br_count + 1
-          }
-          bri = bri + 1
-        }
-        1 + br_count
-      }
-      total_text_h = total_text_h + para_line_h * num_visual_lines
-      total_text_h = total_text_h + bl_extra_below
-      // Add spacing after
-      if para.spc_after > 0 {
-        total_text_h = total_text_h + px(para.spc_after, scale)
-      }
-    }
-    ti = ti + 1
-  }
-
-  // Vertical anchor offset
+  // Compute available height (needed for normAutofit and anchor offset)
   let shape_h = px(t.cy, scale)
   let b_ins = if body_props.b_ins >= 0 {
     body_props.b_ins
@@ -754,14 +708,137 @@ fn render_text(
   }
   let pad_b = px(b_ins, scale)
   let avail_h = shape_h - pad_t - pad_b
+
+  // normAutofit: dynamically adjust font_scale / ln_spc_reduction to fit text.
+  // PowerPoint stores hints in the PPTX, but our font metrics may differ, so
+  // we recompute if needed.  font_scale >= 0 means <a:normAutofit> was present.
+  let is_norm_autofit = body_props.font_scale >= 0
+
+  // Calculate total text height for vertical alignment
+  let np = paragraphs.length()
+  let mut total_text_h = 0
+  // Track last paragraph's trailing space for vertical centering correction
+  let mut last_para_line_h = 0
+  let mut last_para_font_sz = 0
+  let mut last_para_spc_after = 0
+  let mut autofit_pass = 0
+  while autofit_pass < 6 {
+    total_text_h = 0
+    last_para_line_h = 0
+    last_para_font_sz = 0
+    last_para_spc_after = 0
+    let mut ti = 0
+    while ti < np {
+      let para = paragraphs[ti]
+      let nr = para.runs.length()
+      let para_line_h = apply_autofit_scale(
+        para_line_height(para, scale, def_line_h),
+        fs,
+        lr,
+      )
+      let p_fsz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
+      if nr == 0 {
+        total_text_h = total_text_h + para_line_h
+        last_para_line_h = para_line_h
+        last_para_font_sz = p_fsz
+        last_para_spc_after = 0
+      } else {
+        // Add spacing before
+        if para.spc_before > 0 && ti > 0 {
+          total_text_h = total_text_h + px(para.spc_before, scale)
+        }
+        // Extra space for super/subscript (must match rendering loop)
+        let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
+          para, scale, def_sz,
+        )
+        total_text_h = total_text_h + bl_extra_above
+        // Count visual lines for wrapped text (uses col_w for multi-col)
+        let num_visual_lines = if do_wrap {
+          let indent_emu = if para.mar_l >= 0 {
+            para.mar_l
+          } else {
+            para.level * level_indent_emu
+          }
+          let indent_px = px(indent_emu, scale)
+          let wrap_w = col_w - indent_px
+          let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
+          vlines.length()
+        } else {
+          // Count explicit line breaks (from <a:br>) to get visual line count
+          let mut br_count = 0
+          let mut bri = 0
+          while bri < nr {
+            if para.runs[bri].text == "\n" {
+              br_count = br_count + 1
+            }
+            bri = bri + 1
+          }
+          1 + br_count
+        }
+        total_text_h = total_text_h + para_line_h * num_visual_lines
+        total_text_h = total_text_h + bl_extra_below
+        last_para_line_h = para_line_h
+        last_para_font_sz = p_fsz
+        // Add spacing after
+        last_para_spc_after = if para.spc_after > 0 {
+          let sa = px(para.spc_after, scale)
+          total_text_h = total_text_h + sa
+          sa
+        } else {
+          0
+        }
+      }
+      ti = ti + 1
+    }
+    // normAutofit: if text overflows, adjust parameters and retry
+    if is_norm_autofit && total_text_h > avail_h && avail_h > 0 {
+      // First try increasing line spacing reduction (up to 20%)
+      if lr < 20000 {
+        lr = lr + 5000
+        if lr > 20000 { lr = 20000 }
+        autofit_pass = autofit_pass + 1
+        continue
+      }
+      // Then reduce font scale proportionally
+      let needed_fs = fs * avail_h / total_text_h
+      if needed_fs < fs && needed_fs > 25000 {
+        fs = needed_fs
+        autofit_pass = autofit_pass + 1
+        continue
+      }
+    }
+    break
+  }
+  // For vertical centering/bottom alignment, the trailing space of the last line
+  // (line_height - font_size) and spc_after should not count toward the text extent.
+  // The rendering places text at the baseline (font_size from line top), so the visual
+  // bottom of text is at the last baseline, not at the last baseline + trailing space.
+  let trailing_space = if last_para_line_h > last_para_font_sz {
+    last_para_line_h - last_para_font_sz + last_para_spc_after
+  } else {
+    last_para_spc_after
+  }
+  let text_h_for_anchor = total_text_h - trailing_space
+
+  // Vertical anchor offset
   let anchor_offset = if body_props.anchor == "ctr" {
-    (avail_h - total_text_h) / 2
+    (avail_h - text_h_for_anchor) / 2
   } else if body_props.anchor == "b" {
-    avail_h - total_text_h
+    avail_h - text_h_for_anchor
   } else {
     0
   }
-  let anchor_offset_clamped = if anchor_offset > 0 { anchor_offset } else { 0 }
+  // For anchor="ctr", allow negative offset so text centers even when it
+  // overflows the padding area (PowerPoint behavior: center in full shape).
+  // But clamp to -pad_t so text never starts above the shape's top edge.
+  // For "t"/"b", clamp to 0 so text stays within the padding boundary.
+  let anchor_offset_clamped = if body_props.anchor == "ctr" {
+    if anchor_offset >= 0 - pad_t { anchor_offset } else { 0 - pad_t }
+  } else if anchor_offset > 0 {
+    anchor_offset
+  } else {
+    0
+  }
 
   // Vertical text mode
   let is_vert = body_props.vert == "vert" ||

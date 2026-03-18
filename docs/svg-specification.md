@@ -158,6 +158,14 @@ When `data-ooxml-geom="custGeom"`:
 |-----------|------|-------------|
 | `data-ooxml-cxn-adj` | string | Adjustment values (comma-separated integers) |
 
+## Text Element Attributes
+
+Set on the `<text>` element within a shape.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-font-face` | string | Theme default font (minor font) applied as fallback |
+
 ## Text Body Properties
 
 Set on the shape `<g>` element.
@@ -220,6 +228,19 @@ Set on run-level `<tspan>` elements.
 | `data-ooxml-hlink-hover-rid` | string | Hover hyperlink relationship ID |
 | `data-ooxml-outline-color` | string | Text outline color (`RRGGBB`) |
 | `data-ooxml-outline-w` | string | Text outline width (EMU) |
+
+### Text Run Effects (on `<tspan>`)
+
+These attributes preserve text-run-level effects for round-trip. Prefixed `reff-` (run effects) to distinguish from shape-level effects.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-reff-os-blur` | int | Outer shadow blur radius (EMU) |
+| `data-ooxml-reff-os-dist` | int | Outer shadow distance (EMU) |
+| `data-ooxml-reff-os-dir` | int | Outer shadow direction (60,000ths of degree) |
+| `data-ooxml-reff-os-clr` | string | Outer shadow color (`RRGGBB`) |
+| `data-ooxml-reff-gl-rad` | int | Glow radius (EMU) |
+| `data-ooxml-reff-gl-clr` | string | Glow color (`RRGGBB`) |
 
 ### Text Gradient/Pattern Fill (on `<tspan>`)
 
