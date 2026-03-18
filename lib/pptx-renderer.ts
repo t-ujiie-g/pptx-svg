@@ -236,6 +236,31 @@ export class PptxRenderer {
     return `data:image/svg+xml,${encoded}`;
   }
 
+  /** Quote a font name for use in CSS font shorthand (names with spaces need quotes). */
+  private static quoteFontName(name: string): string {
+    const n = name.trim();
+    if (!n || n === 'sans-serif' || n === 'serif' || n === 'monospace') return n;
+    if (n.includes(' ') && !n.startsWith("'") && !n.startsWith('"')) return `'${n}'`;
+    return n;
+  }
+
+  /** Build a CSS font shorthand-safe font-family string with fallbacks. */
+  private buildCssFontFamily(fontFace: string): string {
+    const names: string[] = [];
+    // Add the primary font
+    if (fontFace) names.push(PptxRenderer.quoteFontName(fontFace));
+    // Add fallbacks from cache (comma-separated string)
+    const fb = this.fontFallbackCache.get(fontFace);
+    if (fb) {
+      for (const f of fb.split(',')) {
+        const q = PptxRenderer.quoteFontName(f);
+        if (q) names.push(q);
+      }
+    }
+    names.push('sans-serif');
+    return names.join(', ');
+  }
+
   /** Measure the rendered pixel width of text. */
   private measureText(text: string, fontFace: string, fontSizePx: number): number {
     if (this.measureTextFn) {
@@ -250,7 +275,8 @@ export class PptxRenderer {
       this.canvas = document.createElement('canvas');
       this.ctx = this.canvas.getContext('2d')!;
     }
-    this.ctx.font = `${fontSizePx}px ${fontFace}`;
+    const family = this.buildCssFontFamily(fontFace);
+    this.ctx.font = `${fontSizePx}px ${family}`;
     return this.ctx.measureText(text).width;
   }
 }

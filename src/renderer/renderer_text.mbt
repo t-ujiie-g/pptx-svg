@@ -113,6 +113,12 @@ fn wrap_paragraph(
   let mut cur_line : Array[(Int, String)] = []
   let mut cur_width : Double = 0.0
   let max_w : Double = max_width.to_double()
+  // Track accumulated same-font text on the current line for accurate measurement.
+  // Measuring CJK characters individually over-counts width due to per-glyph
+  // side-bearings; measuring the concatenated string gives the true rendered width.
+  let mut run_accum : String = "" // accumulated text for current font
+  let mut run_ff : String = "" // font face for accumulated text
+  let mut run_fs : Double = 0.0 // font size for accumulated text
   let nr = para.runs.length()
   let mut ri = 0
   while ri < nr {
@@ -124,7 +130,6 @@ fn wrap_paragraph(
     } else {
       1800
     }
-    // Compute font size in px (matching SVG rendering) to avoid pt→px rounding mismatch
     let fs_px = px(
       apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
       scale,
@@ -150,20 +155,27 @@ fn wrap_paragraph(
       }
       cur_line = []
       cur_width = 0.0
+      run_accum = ""
       ri = ri + 1
       continue
     }
+    // When font changes, lock in the accumulated width and reset
+    if ff != run_ff || fs_px != run_fs {
+      if not(run_accum.is_empty()) {
+        cur_width = cur_width + @ffi.ffi_measure_text(run_accum, run_ff, run_fs)
+        run_accum = ""
+      }
+      run_ff = ff
+      run_fs = fs_px
+    }
     let text_len = text.length()
-    // Split text into segments (words for Latin, chars for CJK)
     let mut seg_start = 0
     while seg_start < text_len {
       let c = text.get_char(seg_start).unwrap()
       let mut seg_end = seg_start
       if is_cjk(c) {
-        // Single CJK character as one segment
         seg_end = seg_start + 1
       } else {
-        // Collect word (non-CJK chars until space/CJK)
         seg_end = seg_start
         while seg_end < text_len {
           let sc = text.get_char(seg_end).unwrap()
@@ -171,45 +183,44 @@ fn wrap_paragraph(
             break
           }
           seg_end = seg_end + 1
-          // Break after whitespace
           if sc == ' ' || sc == '\t' {
             break
           }
         }
       }
-      // Extract segment text
       let seg_text = @xml.str_substring(text, seg_start, seg_end)
-      let seg_w = @ffi.ffi_measure_text(seg_text, ff, fs_px)
-      // Check if adding this segment would overflow
-      if cur_width > 0.0 && cur_width + seg_w > max_w && max_w > 0.0 {
-        // Kinsoku: if this segment starts with a line-start-prohibited char,
-        // keep it on the current line (allow slight overflow)
+      // Measure candidate: accumulated same-font text + new segment
+      let candidate = run_accum + seg_text
+      let candidate_w = @ffi.ffi_measure_text(candidate, ff, fs_px)
+      let total_w = cur_width + candidate_w
+      if cur_line.length() > 0 && total_w > max_w && max_w > 0.0 {
+        // Kinsoku: line-start-prohibited chars stay on current line
         let first_char = seg_text.get_char(0).unwrap()
-        if is_kinsoku_start_prohibited(first_char) && cur_line.length() > 0 {
-          // Keep on current line (burasagari / hanging punctuation)
+        if is_kinsoku_start_prohibited(first_char) {
           cur_line.push((ri, seg_text))
-          cur_width = cur_width + seg_w
+          run_accum = candidate
           seg_start = seg_end
           continue
         }
-        // Start new line
+        // Start new line — lock in accumulated width first
         if cur_line.length() > 0 {
           lines.push(cur_line)
         }
         cur_line = []
         cur_width = 0.0
+        run_accum = ""
       }
       cur_line.push((ri, seg_text))
-      cur_width = cur_width + seg_w
+      run_accum = run_accum + seg_text
       seg_start = seg_end
     }
     ri = ri + 1
   }
+  // Lock in any remaining accumulated text
   if cur_line.length() > 0 {
     lines.push(cur_line)
   }
   if lines.length() == 0 {
-    // Empty paragraph - one empty line
     lines.push([])
   }
   lines
