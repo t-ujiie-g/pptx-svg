@@ -275,8 +275,10 @@ export class PptxRenderer {
       this.canvas = document.createElement('canvas');
       this.ctx = this.canvas.getContext('2d')!;
     }
-    const family = this.buildCssFontFamily(fontFace);
-    this.ctx.font = `${fontSizePx}px ${family}`;
+    // Use only the primary font (quoted if needed) for measurement.
+    // Adding fallback fonts changes Canvas 2D metrics and breaks wrap accuracy.
+    const quoted = PptxRenderer.quoteFontName(fontFace) || 'sans-serif';
+    this.ctx.font = `${fontSizePx}px ${quoted}`;
     return this.ctx.measureText(text).width;
   }
 }
