@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0
+
+### Features
+
+- Shape-level editing API: `renderShapeSvg()`, `updateShapeTransform()`, `updateShapeText()`, `updateShapeFill()` — modify cached SlideData in-place without full slide re-parse
+- Group shape child support for editing API (composite shape index resolution)
+- Unit conversion helpers: `pxToEmu()`, `emuToPx()`, `ptToHundredths()`, `hundredthsToPt()`, `degreesToOoxml()`, `ooxmlToDegrees()`
+- SVG DOM helpers: `findShapeElement()`, `getShapeTransform()`, `getAllShapes()`, `getSlideScale()`
+- Interactive editing demo page (`web/editing.html`) with drag move, resize handles, text editing panel, and fill color picker
+- Cache-aware `renderSlideSvg()` — modified slides skip XML re-parse, preserving edits
+
+### Improvements
+
+- Extract shared CSS to `web/styles.css` and common JS utilities to `web/common.js`, reducing ~200 lines of duplication across demo pages
+
+### Documentation
+
+- Add shape-level editing API and helpers to README.md / README.ja.md
+- Add `docs/editing-guide.md` with recommended preview+commit pattern for interactive editing
+
 ## 0.3.4
 
 ### Features

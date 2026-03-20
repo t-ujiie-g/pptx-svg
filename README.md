@@ -10,7 +10,7 @@ PPTX and SVG round-trip conversion library. Runs entirely in the browser with ze
 - **PPTX to SVG**: Convert PowerPoint slides to high-quality SVG
 - **SVG to PPTX**: Edit SVG and export back to a valid .pptx file (lossless round-trip)
 - **Browser-native**: No server required. ZIP, OOXML parsing, SVG generation all run client-side
-- **Zero dependencies**: ~200KB Wasm binary, no npm dependencies
+- **Zero dependencies**: About 230KB Wasm binary, no npm dependencies
 - **Framework-agnostic**: Works with React, Vue, Svelte, vanilla JS, or any framework
 
 ## Install
