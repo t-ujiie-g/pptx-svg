@@ -4,53 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>pptx-svg — Round-trip Demo</title>
+  <link rel="stylesheet" href="styles.css">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      min-height: 100vh;
-      padding: 24px;
-    }
-    h1 { color: #7c7cff; margin-bottom: 8px; }
-    .subtitle { color: #888; margin-bottom: 24px; font-size: 0.9em; }
-
-    .card {
-      background: #16213e;
-      border: 1px solid #2a2a5a;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
-    }
-    .card h2 { color: #a0a0ff; margin-bottom: 12px; font-size: 1em; text-transform: uppercase; letter-spacing: 0.05em; }
-
-    #drop-zone {
-      border: 2px dashed #4a4a8a;
-      border-radius: 8px;
-      padding: 40px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-    }
-    #drop-zone:hover, #drop-zone.drag-over {
-      border-color: #7c7cff;
-      background: #1e1e4a;
-    }
-    #drop-zone p { color: #888; }
-    #drop-zone strong { color: #7c7cff; }
-    #file-input { display: none; }
-
-    #status {
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 0.9em;
-    }
-    #status.ok    { background: #0d3322; color: #4caf50; border: 1px solid #2d6e4e; }
-    #status.error { background: #330d0d; color: #f44336; border: 1px solid #6e2d2d; }
-    #status.info  { background: #1a1a3a; color: #9c9cff; border: 1px solid #3a3a7a; }
-
     #info-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -60,110 +15,29 @@
     .info-item { text-align: center; }
     .info-value { font-size: 2em; font-weight: bold; color: #7c7cff; }
     .info-label { font-size: 0.8em; color: #888; text-transform: uppercase; }
-
-    /* ── Slide viewer ── */
-    #slide-viewer-card { display: none; }
-
-    .slide-nav {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .slide-nav button {
-      background: #7c7cff;
-      color: white;
-      border: none;
-      padding: 8px 18px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.95em;
-      transition: background 0.15s;
-    }
-    .slide-nav button:hover:not(:disabled) { background: #6a6aee; }
-    .slide-nav button:disabled { background: #3a3a6a; cursor: not-allowed; }
-    #slide-num { color: #aaa; font-family: monospace; min-width: 100px; text-align: center; }
-
-    #svg-container {
-      background: #0d1117;
-      border: 1px solid #2a2a4a;
-      border-radius: 6px;
-      padding: 16px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 200px;
-      overflow: auto;
-    }
-    #svg-container svg {
-      max-width: 100%;
-      height: auto;
-      border-radius: 2px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    }
-    #svg-error {
-      color: #f44336;
-      font-family: monospace;
-      font-size: 0.85em;
-    }
-
-    /* ── Export ── */
-    #export-card { display: none; }
-    .export-btn {
-      background: #4caf50;
-      color: white;
-      border: none;
-      padding: 10px 24px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1em;
-      transition: background 0.15s;
-    }
-    .export-btn:hover:not(:disabled) { background: #43a047; }
-    .export-btn:disabled { background: #2d4a2e; cursor: not-allowed; }
+    #svg-error { color: #f44336; font-family: monospace; font-size: 0.85em; }
 
     /* ── Debug (raw XML) ── */
     #xml-card { display: none; }
     #xml-output {
-      font-family: monospace;
-      font-size: 0.78em;
-      background: #0d1117;
-      border: 1px solid #2a2a4a;
-      border-radius: 4px;
-      padding: 12px;
-      overflow: auto;
-      max-height: 260px;
-      white-space: pre;
-      color: #c9d1d9;
+      font-family: monospace; font-size: 0.78em;
+      background: #0d1117; border: 1px solid #2a2a4a; border-radius: 4px;
+      padding: 12px; overflow: auto; max-height: 260px;
+      white-space: pre; color: #c9d1d9;
     }
     .toggle-btn {
-      background: none;
-      border: 1px solid #4a4a8a;
-      color: #888;
-      padding: 4px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.82em;
-      margin-bottom: 10px;
+      background: none; border: 1px solid #4a4a8a; color: #888;
+      padding: 4px 10px; border-radius: 4px; cursor: pointer;
+      font-size: 0.82em; margin-bottom: 10px;
     }
     .toggle-btn:hover { border-color: #7c7cff; color: #aaaaff; }
-
-    button {
-      background: #7c7cff;
-      color: white;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.9em;
-    }
-    button:hover { background: #6a6aee; }
-    button:disabled { background: #3a3a6a; cursor: not-allowed; }
   </style>
 </head>
 <body>
   <h1>pptx-svg</h1>
-  <p class="subtitle">MoonBit + Wasm-GC — Round-trip PPTX / SVG Engine</p>
+  <p class="subtitle">MoonBit + Wasm-GC — Round-trip PPTX / SVG Engine
+    <br><a href="editing.html" style="color:#7c7cff">Editing Demo (shape-level API)</a>
+  </p>
 
   <div class="card">
     <h2>Load PPTX File</h2>
@@ -224,186 +98,91 @@
 
   <script type="module">
     import { PptxRenderer } from '../dist/index.js';
+    import { $, setStatus, setupDropZone, initRenderer, setupExportButton } from './common.js';
 
     const renderer = new PptxRenderer();
     let currentSlide = 0;
     let totalSlides = 0;
-
-    const dropZone    = document.getElementById('drop-zone');
-    const fileInput   = document.getElementById('file-input');
-    const statusEl    = document.getElementById('status');
-    const statusCard  = document.getElementById('status-card');
-    const infoCard    = document.getElementById('info-card');
-    const slideCountVal = document.getElementById('slide-count-val');
-    const slideViewerCard = document.getElementById('slide-viewer-card');
-    const svgContainer = document.getElementById('svg-container');
-    const prevBtn     = document.getElementById('prev-btn');
-    const nextBtn     = document.getElementById('next-btn');
-    const slideNum    = document.getElementById('slide-num');
-    const exportCard  = document.getElementById('export-card');
-    const exportBtn   = document.getElementById('export-btn');
-    const exportStatus = document.getElementById('export-status');
-    const xmlCard     = document.getElementById('xml-card');
-    const xmlOutput   = document.getElementById('xml-output');
-    const xmlToggle   = document.getElementById('xml-toggle');
-    const ooxmlToggle = document.getElementById('ooxml-toggle');
-
-    let xmlMode = 'none'; // 'none', 'raw', 'ooxml'
-
-    function setStatus(msg, type = 'info') {
-      statusCard.style.display = '';
-      statusEl.className = type;
-      statusEl.textContent = msg;
-    }
+    let xmlMode = 'none';
 
     function showSlide(idx) {
       currentSlide = idx;
-      slideNum.textContent = `Slide ${idx + 1} / ${totalSlides}`;
-      prevBtn.disabled = idx === 0;
-      nextBtn.disabled = idx >= totalSlides - 1;
+      $('slide-num').textContent = `Slide ${idx + 1} / ${totalSlides}`;
+      $('prev-btn').disabled = idx === 0;
+      $('next-btn').disabled = idx >= totalSlides - 1;
 
-      // Render SVG via Wasm
       const svg = renderer.renderSlideSvg(idx);
-      console.log('[pptx] SVG output (first 500 chars):', svg.slice(0, 500));
       if (svg.startsWith('ERROR:')) {
-        svgContainer.innerHTML = `<span id="svg-error">${svg}</span>`;
+        $('svg-container').innerHTML = `<span id="svg-error">${svg}</span>`;
       } else {
-        svgContainer.innerHTML = svg;
+        $('svg-container').innerHTML = svg;
       }
-
-      // Update XML if visible
       updateXmlDisplay();
     }
 
     function updateXmlDisplay() {
       if (xmlMode === 'none') return;
-      let xml;
-      if (xmlMode === 'raw') {
-        xml = renderer.getSlideXmlRaw(currentSlide);
-      } else {
-        xml = renderer.getSlideOoxml(currentSlide);
-      }
-      xmlOutput.textContent = xml.length > 12000
-        ? xml.slice(0, 12000) + '\n… (truncated)'
-        : xml;
+      const xml = xmlMode === 'raw'
+        ? renderer.getSlideXmlRaw(currentSlide)
+        : renderer.getSlideOoxml(currentSlide);
+      $('xml-output').textContent = xml.length > 12000
+        ? xml.slice(0, 12000) + '\n… (truncated)' : xml;
     }
 
-    prevBtn.addEventListener('click', () => showSlide(currentSlide - 1));
-    nextBtn.addEventListener('click', () => showSlide(currentSlide + 1));
+    $('prev-btn').addEventListener('click', () => showSlide(currentSlide - 1));
+    $('next-btn').addEventListener('click', () => showSlide(currentSlide + 1));
 
     // XML debug toggles
-    xmlToggle.addEventListener('click', () => {
+    $('xml-toggle').addEventListener('click', () => {
       if (xmlMode === 'raw') {
         xmlMode = 'none';
-        xmlOutput.style.display = 'none';
-        xmlToggle.textContent = 'Show Raw XML';
+        $('xml-output').style.display = 'none';
+        $('xml-toggle').textContent = 'Show Raw XML';
       } else {
         xmlMode = 'raw';
-        xmlOutput.style.display = '';
-        xmlToggle.textContent = 'Hide Raw XML';
-        ooxmlToggle.textContent = 'Show OOXML Output';
+        $('xml-output').style.display = '';
+        $('xml-toggle').textContent = 'Hide Raw XML';
+        $('ooxml-toggle').textContent = 'Show OOXML Output';
         updateXmlDisplay();
       }
     });
-
-    ooxmlToggle.addEventListener('click', () => {
+    $('ooxml-toggle').addEventListener('click', () => {
       if (xmlMode === 'ooxml') {
         xmlMode = 'none';
-        xmlOutput.style.display = 'none';
-        ooxmlToggle.textContent = 'Show OOXML Output';
+        $('xml-output').style.display = 'none';
+        $('ooxml-toggle').textContent = 'Show OOXML Output';
       } else {
         xmlMode = 'ooxml';
-        xmlOutput.style.display = '';
-        ooxmlToggle.textContent = 'Hide OOXML Output';
-        xmlToggle.textContent = 'Show Raw XML';
+        $('xml-output').style.display = '';
+        $('ooxml-toggle').textContent = 'Hide OOXML Output';
+        $('xml-toggle').textContent = 'Show Raw XML';
         updateXmlDisplay();
       }
     });
 
-    // Export button
-    exportBtn.addEventListener('click', async () => {
-      exportBtn.disabled = true;
-      exportStatus.textContent = 'Exporting...';
-      try {
-        const buffer = await renderer.exportPptx();
-        const blob = new Blob([buffer], {
-          type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'exported.pptx';
-        link.click();
-        URL.revokeObjectURL(url);
-        exportStatus.textContent = 'Exported successfully!';
-        exportStatus.style.color = '#4caf50';
-      } catch (err) {
-        exportStatus.textContent = `Error: ${err.message}`;
-        exportStatus.style.color = '#f44336';
-        console.error('[pptx] Export error:', err);
-      } finally {
-        exportBtn.disabled = false;
-      }
-    });
+    setupExportButton(renderer);
 
-    async function loadPptx(file) {
-      setStatus(`Loading ${file.name}…`);
+    setupDropZone(async (file) => {
+      setStatus(`Loading ${file.name}...`);
       try {
-        const buffer = await file.arrayBuffer();
-        const { slideCount } = await renderer.loadPptx(buffer);
+        const { slideCount } = await renderer.loadPptx(await file.arrayBuffer());
         totalSlides = slideCount;
-
         setStatus(`Loaded "${file.name}" — ${slideCount} slide(s)`, 'ok');
-
-        infoCard.style.display = '';
-        slideCountVal.textContent = slideCount;
-
+        $('info-card').style.display = '';
+        $('slide-count-val').textContent = slideCount;
         if (slideCount > 0) {
-          slideViewerCard.style.display = 'block';
-          exportCard.style.display = 'block';
-          xmlCard.style.display = 'block';
+          $('slide-viewer-card').style.display = 'block';
+          $('export-card').style.display = 'block';
+          $('xml-card').style.display = 'block';
           showSlide(0);
         }
       } catch (err) {
         setStatus(`Error: ${err.message}`, 'error');
         console.error(err);
       }
-    }
-
-    // File drop / click
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('drag-over');
-    });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('drag-over');
-      const file = e.dataTransfer.files[0];
-      if (file) loadPptx(file);
-    });
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) loadPptx(file);
     });
 
-    // Init Wasm
-    dropZone.style.pointerEvents = 'none';
-    dropZone.style.opacity = '0.5';
-    setStatus('Loading WebAssembly module…');
-    statusCard.style.display = '';
-
-    renderer.init()
-      .then(() => {
-        setStatus('Wasm module ready. Drop a .pptx file to start.', 'ok');
-        dropZone.style.pointerEvents = '';
-        dropZone.style.opacity = '';
-      })
-      .catch(err => {
-        setStatus(`Wasm init failed: ${err.message}`, 'error');
-        console.error('[pptx] Init error:', err);
-      });
+    initRenderer(renderer);
   </script>
 </body>
 </html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pptx-svg — Editing Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* ── Selection overlay (resize handles) ── */
+    .selection-overlay {
+      position: absolute;
+      pointer-events: none;
+      border: 2px solid #4a90d9;
+      z-index: 100;
+    }
+    .resize-handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background: #4a90d9;
+      border: 1px solid #fff;
+      border-radius: 2px;
+      pointer-events: all;
+      z-index: 101;
+    }
+    .resize-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+    .resize-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+    .resize-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+    .resize-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+    .resize-handle.n  { top: -5px; left: calc(50% - 5px); cursor: n-resize; }
+    .resize-handle.s  { bottom: -5px; left: calc(50% - 5px); cursor: s-resize; }
+    .resize-handle.w  { top: calc(50% - 5px); left: -5px; cursor: w-resize; }
+    .resize-handle.e  { top: calc(50% - 5px); right: -5px; cursor: e-resize; }
+
+    /* ── Editing toolbar ── */
+    #edit-toolbar {
+      display: none;
+      gap: 8px;
+      align-items: center;
+      padding: 12px;
+      background: #0f1a33;
+      border: 1px solid #3a3a7a;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    #edit-toolbar.visible { display: flex; }
+    #edit-toolbar label { color: #aaa; font-size: 0.85em; white-space: nowrap; }
+    #edit-toolbar input[type="color"] {
+      width: 36px; height: 28px; border: 1px solid #4a4a8a; border-radius: 4px;
+      background: transparent; cursor: pointer; padding: 0;
+    }
+    #edit-toolbar .sep {
+      width: 1px; height: 24px; background: #3a3a7a; margin: 0 4px;
+    }
+
+    /* ── Text runs panel ── */
+    #text-runs-panel {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px;
+      background: #0a1628;
+      border: 1px solid #4a90d9;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #text-runs-panel.visible { display: flex; }
+    #text-runs-panel .text-run-row { display: flex; gap: 8px; align-items: center; }
+    #text-runs-panel .text-run-label {
+      color: #6a8abf; font-size: 0.75em; font-family: monospace;
+      min-width: 50px; white-space: nowrap;
+    }
+    #text-runs-panel input {
+      flex: 1; padding: 4px 8px; border: 1px solid #3a3a7a; border-radius: 4px;
+      font-size: 13px; background: #16213e; color: #e0e0e0;
+    }
+    #text-runs-panel input:focus { outline: 1px solid #4a90d9; border-color: #4a90d9; }
+    #text-runs-panel button { padding: 4px 10px; font-size: 0.8em; }
+
+    /* ── Shape info ── */
+    #shape-info {
+      display: none;
+      padding: 8px 12px;
+      font-family: monospace; font-size: 0.8em; color: #888;
+      background: #0d1117; border: 1px solid #2a2a4a; border-radius: 4px;
+      margin-top: 8px;
+    }
+    #shape-info.visible { display: block; }
+  </style>
+</head>
+<body>
+  <h1>pptx-svg Editing Demo</h1>
+  <p class="subtitle">
+    Shape-level editing API demo. Click to select, drag to move, resize with handles, edit text and fill from toolbar.
+    <br><a href="index.html" style="color:#7c7cff">Back to viewer demo</a>
+  </p>
+
+  <div class="card">
+    <h2>Load PPTX File</h2>
+    <div id="drop-zone">
+      <p><strong>Drop a .pptx file here</strong> or click to browse</p>
+      <p style="margin-top:8px; font-size:0.8em">Processed entirely in-browser — no server upload</p>
+      <input type="file" id="file-input" accept=".pptx">
+    </div>
+  </div>
+
+  <div class="card" id="status-card" style="display:none">
+    <h2>Status</h2>
+    <div id="status" class="info">Initializing...</div>
+  </div>
+
+  <!-- SVG slide viewer -->
+  <div class="card" id="slide-viewer-card">
+    <h2>Interactive Editor</h2>
+    <div class="slide-nav">
+      <button id="prev-btn" disabled>◀ Prev</button>
+      <span id="slide-num">Slide 1 / 1</span>
+      <button id="next-btn" disabled>Next ▶</button>
+    </div>
+
+    <!-- Editing toolbar (visible when shape selected) -->
+    <div id="edit-toolbar">
+      <label>Fill:</label>
+      <input type="color" id="fill-color" value="#4a90d9">
+      <button id="apply-fill-btn">Apply Fill</button>
+      <div class="sep"></div>
+      <label id="shape-label">No shape selected</label>
+    </div>
+
+    <!-- Text runs panel (visible when shape with text is selected) -->
+    <div id="text-runs-panel"></div>
+
+    <div id="svg-container">
+      <span style="color:#555">No slide loaded</span>
+    </div>
+
+    <div id="shape-info"></div>
+  </div>
+
+  <!-- Export -->
+  <div class="card" id="export-card">
+    <h2>Export</h2>
+    <p style="color:#888; margin-bottom:12px; font-size:0.85em">
+      Export the presentation as a .pptx file. All shape edits (move, text, fill) are included.
+    </p>
+    <button class="export-btn" id="export-btn">Export PPTX</button>
+    <span id="export-status" style="margin-left:12px; font-size:0.85em; color:#888"></span>
+  </div>
+
+  <script type="module">
+    import { PptxRenderer } from '../dist/index.js';
+    import { findShapeElement, getShapeTransform, emuToPx } from '../dist/editing-helpers.js';
+    import { $, setStatus, setupDropZone, initRenderer, setupExportButton } from './common.js';
+
+    // ── Constants ──
+    const MIN_SHAPE_EMU = 50000;   // minimum shape dimension in EMU (~5.2px)
+    const MIN_OVERLAY_PX = 10;     // minimum overlay dimension in CSS pixels
+    const HANDLE_POSITIONS = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'];
+
+    const renderer = new PptxRenderer();
+    let currentSlide = 0;
+    let totalSlides = 0;
+    let selectedShapeIdx = -1;
+    let dragState = null;
+
+    function getSvgEl() { return $('svg-container').querySelector('svg'); }
+
+    // ── SVG insertion ──
+    function insertSvg(svgString) {
+      removeSelectionOverlay();
+      const container = $('svg-container');
+      if (svgString.startsWith('ERROR:')) {
+        container.innerHTML = `<span style="color:#f44336;font-family:monospace">${svgString}</span>`;
+        return;
+      }
+      container.innerHTML = svgString;
+      const svgEl = container.querySelector('svg');
+      if (svgEl) {
+        const w = svgEl.getAttribute('width');
+        const h = svgEl.getAttribute('height');
+        if (w && h && !svgEl.getAttribute('viewBox')) {
+          svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        }
+        svgEl.removeAttribute('width');
+        svgEl.removeAttribute('height');
+      }
+    }
+
+    function renderAndRefresh() {
+      insertSvg(renderer.renderSlideSvg(currentSlide));
+      reSelectCurrentShape();
+    }
+
+    // ── EMU-per-CSS-pixel ──
+    function getEmuPerCssPx() {
+      const svgEl = getSvgEl();
+      if (!svgEl) return 9525;
+      const rect = svgEl.getBoundingClientRect();
+      const slideCx = parseInt(svgEl.getAttribute('data-ooxml-slide-cx') || '9144000', 10);
+      return slideCx / rect.width;
+    }
+
+    // ── Selection overlay ──
+    function removeSelectionOverlay() {
+      const old = $('svg-container').querySelector('.selection-overlay');
+      if (old) old.remove();
+    }
+
+    function showSelectionOverlay(shapeG) {
+      removeSelectionOverlay();
+      if (!shapeG) return;
+      const shapeRect = shapeG.getBoundingClientRect();
+      const container = $('svg-container');
+      const cr = container.getBoundingClientRect();
+      const ox = shapeRect.left - cr.left - container.clientLeft + container.scrollLeft;
+      const oy = shapeRect.top - cr.top - container.clientTop + container.scrollTop;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'selection-overlay';
+      overlay.style.left = `${ox}px`;
+      overlay.style.top = `${oy}px`;
+      overlay.style.width = `${shapeRect.width}px`;
+      overlay.style.height = `${shapeRect.height}px`;
+      for (const pos of HANDLE_POSITIONS) {
+        const h = document.createElement('div');
+        h.className = `resize-handle ${pos}`;
+        h.dataset.handle = pos;
+        overlay.appendChild(h);
+      }
+      container.appendChild(overlay);
+    }
+
+    // ── Navigation ──
+    function showSlide(idx) {
+      currentSlide = idx;
+      deselect();
+      $('slide-num').textContent = `Slide ${idx + 1} / ${totalSlides}`;
+      $('prev-btn').disabled = idx === 0;
+      $('next-btn').disabled = idx >= totalSlides - 1;
+      insertSvg(renderer.renderSlideSvg(idx));
+    }
+    $('prev-btn').addEventListener('click', () => showSlide(currentSlide - 1));
+    $('next-btn').addEventListener('click', () => showSlide(currentSlide + 1));
+
+    // ── Selection ──
+    function deselect() {
+      selectedShapeIdx = -1;
+      removeSelectionOverlay();
+      $('edit-toolbar').classList.remove('visible');
+      $('shape-info').classList.remove('visible');
+      hideTextRuns();
+    }
+
+    function selectShape(shapeG) {
+      if (!shapeG) { deselect(); return; }
+      selectedShapeIdx = parseInt(shapeG.getAttribute('data-ooxml-shape-idx') ?? '-1', 10);
+      const fillHex = shapeG.getAttribute('data-ooxml-fill') || '';
+      if (fillHex && fillHex.length === 6) $('fill-color').value = '#' + fillHex;
+      showSelectionOverlay(shapeG);
+      updateToolbar();
+      showTextRuns(shapeG);
+    }
+
+    function reSelectCurrentShape() {
+      if (selectedShapeIdx < 0) return;
+      const svgEl = getSvgEl();
+      if (!svgEl) return;
+      const g = findShapeElement(svgEl, selectedShapeIdx);
+      if (g) selectShape(g); else deselect();
+    }
+
+    function updateToolbar() {
+      if (selectedShapeIdx < 0) { $('edit-toolbar').classList.remove('visible'); return; }
+      $('edit-toolbar').classList.add('visible');
+      const svgEl = getSvgEl();
+      const g = svgEl ? findShapeElement(svgEl, selectedShapeIdx) : null;
+      if (!g) { $('shape-label').textContent = `Shape #${selectedShapeIdx}`; return; }
+      const t = getShapeTransform(g);
+      const shapeType = g.getAttribute('data-ooxml-shape-type') || '?';
+      const geom = g.getAttribute('data-ooxml-geom') || '';
+      $('shape-label').textContent = `Shape #${selectedShapeIdx} (${shapeType}${geom ? '/' + geom : ''})`;
+      const info = $('shape-info');
+      info.classList.add('visible');
+      info.textContent = `x=${emuToPx(t.x)}px y=${emuToPx(t.y)}px w=${emuToPx(t.cx)}px h=${emuToPx(t.cy)}px rot=${t.rot}`;
+    }
+
+    // ── Text runs panel ──
+    function hideTextRuns() {
+      $('text-runs-panel').classList.remove('visible');
+      $('text-runs-panel').innerHTML = '';
+    }
+
+    function showTextRuns(shapeG) {
+      hideTextRuns();
+      if (!shapeG) return;
+      const runTspans = shapeG.querySelectorAll('tspan[data-ooxml-run-idx]');
+      if (runTspans.length === 0) return;
+
+      const panel = $('text-runs-panel');
+      // Deduplicate: text wrapping splits runs into multiple tspan fragments
+      const seen = new Map();
+      const runs = [];
+      for (const ts of runTspans) {
+        const ri = ts.getAttribute('data-ooxml-run-idx');
+        const paraTspan = ts.closest('tspan[data-ooxml-para-idx]');
+        const pi = paraTspan ? paraTspan.getAttribute('data-ooxml-para-idx') : null;
+        if (pi === null || ri === null) continue;
+        const key = `${pi}:${ri}`;
+        if (seen.has(key)) {
+          runs[seen.get(key)].text += ts.textContent || '';
+        } else {
+          seen.set(key, runs.length);
+          runs.push({ pi: parseInt(pi), ri: parseInt(ri), text: ts.textContent || '' });
+        }
+      }
+      if (runs.length === 0) return;
+
+      panel.classList.add('visible');
+      for (const run of runs) {
+        const row = document.createElement('div');
+        row.className = 'text-run-row';
+        const label = document.createElement('span');
+        label.className = 'text-run-label';
+        label.textContent = `P${run.pi}R${run.ri}`;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = run.text;
+        const btn = document.createElement('button');
+        btn.textContent = 'Apply';
+        btn.addEventListener('click', () => {
+          const result = renderer.updateShapeText(currentSlide, selectedShapeIdx, run.pi, run.ri, input.value);
+          if (result.startsWith('ERROR:')) { setStatus(result, 'error'); }
+          else { setStatus(`Text updated: P${run.pi}R${run.ri}`, 'ok'); renderAndRefresh(); }
+        });
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
+        row.appendChild(label);
+        row.appendChild(input);
+        row.appendChild(btn);
+        panel.appendChild(row);
+      }
+    }
+
+    // ── Click: select ──
+    $('svg-container').addEventListener('click', (e) => {
+      if (e.target.classList.contains('resize-handle')) return;
+      selectShape(e.target.closest('g[data-ooxml-shape-idx]'));
+    });
+
+    // ── Fill color ──
+    $('apply-fill-btn').addEventListener('click', () => {
+      if (selectedShapeIdx < 0) return;
+      const hex = $('fill-color').value;
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      const result = renderer.updateShapeFill(currentSlide, selectedShapeIdx, r, g, b);
+      if (result.startsWith('ERROR:')) { setStatus(result, 'error'); return; }
+      setStatus(`Fill → ${hex}`, 'ok');
+      renderAndRefresh();
+    });
+
+    // ── Drag (move) and Resize ──
+    $('svg-container').addEventListener('mousedown', (e) => {
+      // Resize handle
+      if (e.target.classList.contains('resize-handle')) {
+        if (selectedShapeIdx < 0) return;
+        const svgEl = getSvgEl();
+        if (!svgEl) return;
+        const g = findShapeElement(svgEl, selectedShapeIdx);
+        if (!g) return;
+        const t = getShapeTransform(g);
+        e.preventDefault(); e.stopPropagation();
+        const overlay = $('svg-container').querySelector('.selection-overlay');
+        dragState = {
+          mode: 'resize', handle: e.target.dataset.handle,
+          shapeIdx: selectedShapeIdx,
+          startX: e.clientX, startY: e.clientY,
+          origEmuX: t.x, origEmuY: t.y, origEmuCx: t.cx, origEmuCy: t.cy, origRot: t.rot,
+          emuPerCssPx: getEmuPerCssPx(),
+          origOverlayLeft: overlay ? parseFloat(overlay.style.left) : 0,
+          origOverlayTop: overlay ? parseFloat(overlay.style.top) : 0,
+          origOverlayWidth: overlay ? parseFloat(overlay.style.width) : 0,
+          origOverlayHeight: overlay ? parseFloat(overlay.style.height) : 0,
+        };
+        return;
+      }
+      // Move
+      if (selectedShapeIdx < 0) return;
+      const clicked = e.target.closest('g[data-ooxml-shape-idx]');
+      if (!clicked) return;
+      const idx = parseInt(clicked.getAttribute('data-ooxml-shape-idx') ?? '-1', 10);
+      if (idx !== selectedShapeIdx) return;
+      const svgEl = getSvgEl();
+      if (!svgEl) return;
+      const t = getShapeTransform(clicked);
+      e.preventDefault();
+      dragState = {
+        mode: 'move', shape: clicked, shapeIdx: idx,
+        startX: e.clientX, startY: e.clientY,
+        origTransform: clicked.getAttribute('transform') || '',
+        origEmuX: t.x, origEmuY: t.y, origEmuCx: t.cx, origEmuCy: t.cy, origRot: t.rot,
+        emuPerCssPx: getEmuPerCssPx(), svgEl,
+      };
+      $('svg-container').style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!dragState) return;
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+
+      if (dragState.mode === 'move') {
+        const rect = dragState.svgEl.getBoundingClientRect();
+        const vb = dragState.svgEl.viewBox.baseVal;
+        const r = vb.width / rect.width;
+        dragState.shape.setAttribute('transform', `translate(${dx * r},${dy * r}) ${dragState.origTransform}`);
+        const overlay = $('svg-container').querySelector('.selection-overlay');
+        if (overlay) overlay.style.transform = `translate(${dx}px, ${dy}px)`;
+      } else if (dragState.mode === 'resize') {
+        const epp = dragState.emuPerCssPx;
+        const h = dragState.handle;
+        let { origEmuX: nx, origEmuY: ny, origEmuCx: ncx, origEmuCy: ncy } = dragState;
+        const de = Math.round(dx * epp), df = Math.round(dy * epp);
+        if (h.includes('e')) ncx += de;
+        if (h.includes('w')) { nx += de; ncx -= de; }
+        if (h.includes('s')) ncy += df;
+        if (h.includes('n')) { ny += df; ncy -= df; }
+        if (ncx < MIN_SHAPE_EMU) ncx = MIN_SHAPE_EMU;
+        if (ncy < MIN_SHAPE_EMU) ncy = MIN_SHAPE_EMU;
+        dragState.newEmuX = nx; dragState.newEmuY = ny;
+        dragState.newEmuCx = ncx; dragState.newEmuCy = ncy;
+
+        const overlay = $('svg-container').querySelector('.selection-overlay');
+        if (overlay) {
+          let oleft = dragState.origOverlayLeft;
+          let otop = dragState.origOverlayTop;
+          let owidth = dragState.origOverlayWidth;
+          let oheight = dragState.origOverlayHeight;
+          if (h.includes('e')) owidth += dx;
+          if (h.includes('w')) { oleft += dx; owidth -= dx; }
+          if (h.includes('s')) oheight += dy;
+          if (h.includes('n')) { otop += dy; oheight -= dy; }
+          if (owidth < MIN_OVERLAY_PX) owidth = MIN_OVERLAY_PX;
+          if (oheight < MIN_OVERLAY_PX) oheight = MIN_OVERLAY_PX;
+          overlay.style.left = `${oleft}px`;
+          overlay.style.top = `${otop}px`;
+          overlay.style.width = `${owidth}px`;
+          overlay.style.height = `${oheight}px`;
+          overlay.style.transform = '';
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!dragState) return;
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+
+      if (dragState.mode === 'move') {
+        const epp = dragState.emuPerCssPx;
+        const nx = dragState.origEmuX + Math.round(dx * epp);
+        const ny = dragState.origEmuY + Math.round(dy * epp);
+        const result = renderer.updateShapeTransform(
+          currentSlide, dragState.shapeIdx,
+          nx, ny, dragState.origEmuCx, dragState.origEmuCy, dragState.origRot,
+        );
+        if (result.startsWith('ERROR:')) {
+          setStatus(result, 'error');
+          dragState.shape.setAttribute('transform', dragState.origTransform);
+        } else {
+          setStatus(`Moved #${dragState.shapeIdx}`, 'ok');
+          renderAndRefresh();
+        }
+      } else if (dragState.mode === 'resize') {
+        const nx = dragState.newEmuX ?? dragState.origEmuX;
+        const ny = dragState.newEmuY ?? dragState.origEmuY;
+        const ncx = dragState.newEmuCx ?? dragState.origEmuCx;
+        const ncy = dragState.newEmuCy ?? dragState.origEmuCy;
+        const result = renderer.updateShapeTransform(
+          currentSlide, dragState.shapeIdx, nx, ny, ncx, ncy, dragState.origRot,
+        );
+        if (result.startsWith('ERROR:')) { setStatus(result, 'error'); }
+        else {
+          setStatus(`Resized #${dragState.shapeIdx}: ${emuToPx(ncx)}x${emuToPx(ncy)}px`, 'ok');
+          renderAndRefresh();
+        }
+      }
+      dragState = null;
+      $('svg-container').style.cursor = '';
+    });
+
+    // ── Setup ──
+    setupExportButton(renderer);
+
+    setupDropZone(async (file) => {
+      setStatus(`Loading ${file.name}...`);
+      try {
+        const { slideCount } = await renderer.loadPptx(await file.arrayBuffer());
+        totalSlides = slideCount;
+        setStatus(`Loaded "${file.name}" — ${slideCount} slide(s)`, 'ok');
+        if (slideCount > 0) {
+          $('slide-viewer-card').style.display = 'block';
+          $('export-card').style.display = 'block';
+          showSlide(0);
+        }
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    });
+
+    initRenderer(renderer);
+  </script>
+</body>
+</html>
