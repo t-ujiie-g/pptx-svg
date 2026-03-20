@@ -1232,7 +1232,7 @@ fn roman_convert(n : Int, lower : Bool) -> String {
 // ── Shape rendering ───────────────────────────────────────────────────────────
 
 ///|
-fn render_shape(
+pub fn render_shape(
   shape : @ooxml.Shape,
   rels : Array[@ooxml.Relationship],
   slide_num : Int,
@@ -1901,6 +1901,70 @@ fn render_group(
   defs_section +
   children_svg +
   "</g>"
+}
+
+// ── Single-shape defs generation ─────────────────────────────────────────────
+
+///|
+/// Generate `<defs>` content for a single shape (gradient, pattern, arrows, effects).
+/// Returns the raw defs content (without wrapping `<defs>` tags).
+pub fn render_shape_defs(
+  shape : @ooxml.Shape,
+  slide_num : Int,
+  shape_idx : Int,
+  scale : Int,
+) -> String {
+  let mut defs = ""
+  if not(shape.grad_fill.is_none()) {
+    defs = defs + render_gradient_def(shape.grad_fill, grad_id(slide_num, shape_idx))
+  }
+  if not(shape.patt_fill.is_none()) {
+    defs = defs + render_pattern_def(shape.patt_fill, patt_id(slide_num, shape_idx))
+  }
+  if not(shape.stroke_grad_fill.is_none()) {
+    defs = defs +
+      render_gradient_def(shape.stroke_grad_fill, stroke_grad_id(slide_num, shape_idx))
+  }
+  if not(shape.stroke_patt_fill.is_none()) {
+    defs = defs +
+      render_pattern_def(shape.stroke_patt_fill, stroke_patt_id(slide_num, shape_idx))
+  }
+  if has_arrow(shape.stroke_head_type) {
+    defs = defs +
+      render_arrow_marker(
+        arrow_marker_id(slide_num, shape_idx, true),
+        shape.stroke_head_type,
+        shape.stroke_head_w,
+        shape.stroke_head_len,
+        shape.stroke,
+      )
+  }
+  if has_arrow(shape.stroke_tail_type) {
+    defs = defs +
+      render_arrow_marker(
+        arrow_marker_id(slide_num, shape_idx, false),
+        shape.stroke_tail_type,
+        shape.stroke_tail_w,
+        shape.stroke_tail_len,
+        shape.stroke,
+      )
+  }
+  if not(shape.effects.is_none()) {
+    let (eff_def, _) = render_effect_filter(
+      shape.effects,
+      effect_filter_id(slide_num, shape_idx),
+      scale,
+    )
+    defs = defs + eff_def
+    if not(shape.effects.reflection.is_none()) {
+      defs = defs +
+        render_reflection_mask_def(
+          shape.effects.reflection,
+          refl_mask_id(slide_num, shape_idx),
+        )
+    }
+  }
+  defs
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

@@ -104,6 +104,39 @@ const renderer = new PptxRenderer(options?);
 | `getSlideXmlRaw(idx)` | `string` | 生のスライド XML（デバッグ用）。 |
 | `getEntryList()` | `string[]` | 全 ZIP エントリパス（デバッグ用）。 |
 
+**シェイプ単位の編集メソッド:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `renderShapeSvg(slideIdx, shapeIdx)` | `string` | 単一シェイプを SVG フラグメントとして描画。 |
+| `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | 位置/サイズ/回転を更新（EMU単位）。再描画SVGを返す。 |
+| `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | テキスト内容を更新。再描画SVGを返す。 |
+| `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | 塗りつぶし色を更新（0-255）。再描画SVGを返す。 |
+
+`update*` メソッドはキャッシュされた SlideData を直接更新し、エクスポート用にスライドを変更済みとしてマークし、再描画されたシェイプSVGを返します。使用パターンは [`docs/editing-guide.md`](docs/editing-guide.md) を参照。
+
+**単位変換ヘルパー:**
+
+```ts
+import { pxToEmu, emuToPx, ptToHundredths, degreesToOoxml } from 'pptx-svg';
+
+pxToEmu(100)        // 952500 EMU
+emuToPx(914400)     // 96 px
+ptToHundredths(18)  // 1800
+degreesToOoxml(90)  // 5400000
+```
+
+**SVG DOM ヘルパー:**
+
+```ts
+import { findShapeElement, getShapeTransform, getAllShapes, getSlideScale } from 'pptx-svg';
+
+const shapes = getAllShapes(svgElement);           // 全シェイプ <g> 要素
+const g = findShapeElement(svgElement, 0);         // インデックスでシェイプ取得
+const transform = getShapeTransform(g);            // { x, y, cx, cy, rot } EMU単位
+const scale = getSlideScale(svgElement);           // SVGピクセルあたりのEMU
+```
+
 ## 対応機能
 
 ### 完全対応

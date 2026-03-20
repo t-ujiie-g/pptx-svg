@@ -104,6 +104,39 @@ const renderer = new PptxRenderer(options?);
 | `getSlideXmlRaw(idx)` | `string` | Raw slide XML (for debugging). |
 | `getEntryList()` | `string[]` | All ZIP entry paths (for debugging). |
 
+**Shape-level Editing Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `renderShapeSvg(slideIdx, shapeIdx)` | `string` | Render a single shape as SVG fragment. |
+| `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | Update position/size/rotation (EMU). Returns re-rendered SVG. |
+| `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | Update text content. Returns re-rendered SVG. |
+| `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | Update solid fill color (0-255). Returns re-rendered SVG. |
+
+All `update*` methods modify the cached SlideData in-place, mark the slide as modified for export, and return the re-rendered shape SVG. See [`docs/editing-guide.md`](docs/editing-guide.md) for usage patterns.
+
+**Unit Conversion Helpers:**
+
+```ts
+import { pxToEmu, emuToPx, ptToHundredths, degreesToOoxml } from 'pptx-svg';
+
+pxToEmu(100)        // 952500 EMU
+emuToPx(914400)     // 96 px
+ptToHundredths(18)  // 1800
+degreesToOoxml(90)  // 5400000
+```
+
+**SVG DOM Helpers:**
+
+```ts
+import { findShapeElement, getShapeTransform, getAllShapes, getSlideScale } from 'pptx-svg';
+
+const shapes = getAllShapes(svgElement);           // All shape <g> elements
+const g = findShapeElement(svgElement, 0);         // Shape by index
+const transform = getShapeTransform(g);            // { x, y, cx, cy, rot } in EMU
+const scale = getSlideScale(svgElement);           // EMU per SVG pixel
+```
+
 ## Supported Features
 
 ### Fully Supported
