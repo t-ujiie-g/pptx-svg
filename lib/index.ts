@@ -22,3 +22,10 @@ export { extractZip, buildZip } from './zip.js';
 export type { ZipContents } from './zip.js';
 export { parseWasmStringConstants, instantiateWasmWithFallback } from './wasm-compat.js';
 export { emfToSvg } from './emf-converter.js';
+export {
+  EMU_PER_PT, EMU_PER_PX_96DPI,
+  pxToEmu, emuToPx, ptToHundredths, hundredthsToPt,
+  degreesToOoxml, ooxmlToDegrees,
+  findShapeElement, getShapeTransform, getAllShapes, getSlideScale,
+} from './editing-helpers.js';
+export type { ShapeTransform } from './editing-helpers.js';

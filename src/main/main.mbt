@@ -746,13 +746,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     return "ERROR:slide index out of range"
   }
   let slide_num = slide_idx + 1
-  // Load slide XML
-  let slide_path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
-  let slide_xml = @ffi.ffi_get_file(slide_path)
-  if slide_xml.is_empty() {
-    return "ERROR:slide XML not found: " + slide_path
-  }
-  // Load slide relationships (.rels)
+  // Load slide relationships (.rels) — needed for both fresh and cached paths
   let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
   let rels_xml = @ffi.ffi_get_file(rels_path)
   let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
@@ -784,99 +778,86 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   } else {
     g_theme.val
   }
-  let effective_theme = {
-    // Start with master's clr_map applied to master's theme
-    let mut eff = match master_opt {
-      Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
-      None => base_theme
+  // ── If slide is modified, skip XML re-parse and use cached SlideData ──
+  let resolved_slide = if g_modified.val[slide_idx] {
+    g_slides.val[slide_idx]
+  } else {
+    // Load slide XML
+    let slide_path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
+    let slide_xml = @ffi.ffi_get_file(slide_path)
+    if slide_xml.is_empty() {
+      return "ERROR:slide XML not found: " + slide_path
     }
-    // Apply layout clrMapOvr if present
-    match layout_opt {
-      Some(layout) =>
-        match layout.clr_map_ovr {
-          Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-          None => ()
-        }
-      None => ()
-    }
-    // Apply slide's own clrMapOvr if present
-    let slide_nodes = @xml.parse_xml(slide_xml)
-    let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
-      Some(n) => @xml.get_children(n)
-      None => []
-    }
-    match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
-      Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-      None => ()
-    }
-    eff
-  }
-  // Parse slide and cache it
-  let slide_data = @ooxml.parse_slide(
-    slide_xml,
-    g_slide_size.val,
-    effective_theme,
-  )
-  // ── Resolve chart shapes: load chart XML and parse ChartML ──
-  resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
-  // ── Placeholder inheritance: resolve transforms from layout/master ──
-  resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
-  // ── Placeholder auto-content: inject slide number/date/footer text ──
-  inject_placeholder_auto_content(
-    slide_data.shapes,
-    slide_num,
-    layout_opt,
-    master_opt,
-  )
-  // ── Background inheritance: slide → layout → master → white ──
-  let mut bg = slide_data.background
-  let mut bg_grad = slide_data.bg_grad
-  let mut bg_blip_fill = slide_data.bg_blip_fill
-  let mut bg_patt_fill = slide_data.bg_patt_fill
-  let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
-  // Check if slide has any explicit background
-  let slide_has_bg = not(bg.is_none()) || not(bg_grad.is_none()) ||
-    not(bg_blip_fill.is_none()) ||
-    not(bg_patt_fill.is_none())
-  if not(slide_has_bg) {
-    // Try layout
-    let mut inherited = false
-    match layout_opt {
-      Some(layout) => {
-        let layout_has_bg = not(layout.background.is_none()) ||
-          not(layout.bg_grad.is_none()) ||
-          not(layout.bg_blip_fill.is_none()) ||
-          not(layout.bg_patt_fill.is_none())
-        if layout_has_bg {
-          bg = layout.background
-          bg_grad = layout.bg_grad
-          bg_blip_fill = layout.bg_blip_fill
-          bg_patt_fill = layout.bg_patt_fill
-          bg_fill_rels = if not(layout_path.is_empty()) {
-            get_layout_rels(layout_path)
-          } else {
-            rels
-          }
-          inherited = true
-        }
+    let effective_theme = {
+      // Start with master's clr_map applied to master's theme
+      let mut eff = match master_opt {
+        Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
+        None => base_theme
       }
-      None => ()
+      // Apply layout clrMapOvr if present
+      match layout_opt {
+        Some(layout) =>
+          match layout.clr_map_ovr {
+            Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
+            None => ()
+          }
+        None => ()
+      }
+      // Apply slide's own clrMapOvr if present
+      let slide_nodes = @xml.parse_xml(slide_xml)
+      let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
+        Some(n) => @xml.get_children(n)
+        None => []
+      }
+      match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
+        Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
+        None => ()
+      }
+      eff
     }
-    // Try master
-    if not(inherited) {
-      match master_opt {
-        Some(master) => {
-          let master_has_bg = not(master.background.is_none()) ||
-            not(master.bg_grad.is_none()) ||
-            not(master.bg_blip_fill.is_none()) ||
-            not(master.bg_patt_fill.is_none())
-          if master_has_bg {
-            bg = master.background
-            bg_grad = master.bg_grad
-            bg_blip_fill = master.bg_blip_fill
-            bg_patt_fill = master.bg_patt_fill
-            bg_fill_rels = if not(master_path.is_empty()) {
-              get_master_rels(master_path)
+    // Parse slide and cache it
+    let slide_data = @ooxml.parse_slide(
+      slide_xml,
+      g_slide_size.val,
+      effective_theme,
+    )
+    // ── Resolve chart shapes: load chart XML and parse ChartML ──
+    resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
+    // ── Placeholder inheritance: resolve transforms from layout/master ──
+    resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
+    // ── Placeholder auto-content: inject slide number/date/footer text ──
+    inject_placeholder_auto_content(
+      slide_data.shapes,
+      slide_num,
+      layout_opt,
+      master_opt,
+    )
+    // ── Background inheritance: slide → layout → master → white ──
+    let mut bg = slide_data.background
+    let mut bg_grad = slide_data.bg_grad
+    let mut bg_blip_fill = slide_data.bg_blip_fill
+    let mut bg_patt_fill = slide_data.bg_patt_fill
+    let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
+    // Check if slide has any explicit background
+    let slide_has_bg = not(bg.is_none()) || not(bg_grad.is_none()) ||
+      not(bg_blip_fill.is_none()) ||
+      not(bg_patt_fill.is_none())
+    if not(slide_has_bg) {
+      // Try layout
+      let mut inherited = false
+      match layout_opt {
+        Some(layout) => {
+          let layout_has_bg = not(layout.background.is_none()) ||
+            not(layout.bg_grad.is_none()) ||
+            not(layout.bg_blip_fill.is_none()) ||
+            not(layout.bg_patt_fill.is_none())
+          if layout_has_bg {
+            bg = layout.background
+            bg_grad = layout.bg_grad
+            bg_blip_fill = layout.bg_blip_fill
+            bg_patt_fill = layout.bg_patt_fill
+            bg_fill_rels = if not(layout_path.is_empty()) {
+              get_layout_rels(layout_path)
             } else {
               rels
             }
@@ -885,39 +866,117 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
         }
         None => ()
       }
+      // Try master
+      if not(inherited) {
+        match master_opt {
+          Some(master) => {
+            let master_has_bg = not(master.background.is_none()) ||
+              not(master.bg_grad.is_none()) ||
+              not(master.bg_blip_fill.is_none()) ||
+              not(master.bg_patt_fill.is_none())
+            if master_has_bg {
+              bg = master.background
+              bg_grad = master.bg_grad
+              bg_blip_fill = master.bg_blip_fill
+              bg_patt_fill = master.bg_patt_fill
+              bg_fill_rels = if not(master_path.is_empty()) {
+                get_master_rels(master_path)
+              } else {
+                rels
+              }
+              inherited = true
+            }
+          }
+          None => ()
+        }
+      }
+      if not(inherited) && bg.is_none() {
+        bg = @ooxml.Color::white()
+      }
     }
-    if not(inherited) && bg.is_none() {
-      bg = @ooxml.Color::white()
+    // ── Apply text style defaults: layout first (more specific), then master ──
+    let ns = slide_data.shapes.length()
+    let mut shape_i = 0
+    while shape_i < ns {
+      let shape = slide_data.shapes[shape_i]
+      // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
+      // This applies to all shapes (both placeholders and free-standing text boxes)
+      apply_inline_lst_style(shape)
+      // Layout placeholder defaults first (more specific)
+      apply_layout_text_defaults(shape, layout_opt)
+      // Master placeholder's lstStyle as second fallback
+      apply_master_ph_text_defaults(shape, master_opt)
+      // Master text styles (p:txStyles) as final fallback
+      match master_opt {
+        Some(master) => apply_text_defaults(shape, master.text_styles)
+        None => ()
+      }
+      shape_i = shape_i + 1
     }
+    let s : @ooxml.SlideData = {
+      slide_size: slide_data.slide_size,
+      background: bg,
+      bg_grad,
+      bg_blip_fill,
+      bg_patt_fill,
+      shapes: slide_data.shapes,
+    }
+    g_slides.val[slide_idx] = s
+    ignore(bg_fill_rels)
+    s
   }
-  // ── Apply text style defaults: layout first (more specific), then master ──
-  let ns = slide_data.shapes.length()
-  let mut shape_i = 0
-  while shape_i < ns {
-    let shape = slide_data.shapes[shape_i]
-    // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
-    // This applies to all shapes (both placeholders and free-standing text boxes)
-    apply_inline_lst_style(shape)
-    // Layout placeholder defaults first (more specific)
-    apply_layout_text_defaults(shape, layout_opt)
-    // Master placeholder's lstStyle as second fallback
-    apply_master_ph_text_defaults(shape, master_opt)
-    // Master text styles (p:txStyles) as final fallback
-    match master_opt {
-      Some(master) => apply_text_defaults(shape, master.text_styles)
+  // ── Resolve effective theme for rendering (needed for both paths) ──
+  let effective_theme = {
+    let mut eff = match master_opt {
+      Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
+      None => base_theme
+    }
+    match layout_opt {
+      Some(layout) =>
+        match layout.clr_map_ovr {
+          Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
+          None => ()
+        }
       None => ()
     }
-    shape_i = shape_i + 1
+    eff
   }
-  let resolved_slide : @ooxml.SlideData = {
-    slide_size: slide_data.slide_size,
-    background: bg,
-    bg_grad,
-    bg_blip_fill,
-    bg_patt_fill,
-    shapes: slide_data.shapes,
+  // ── Resolve background fill rels for rendering ──
+  let bg_fill_rels : Array[@ooxml.Relationship] = {
+    let slide_has_bg = not(resolved_slide.background.is_none()) ||
+      not(resolved_slide.bg_grad.is_none()) ||
+      not(resolved_slide.bg_blip_fill.is_none()) ||
+      not(resolved_slide.bg_patt_fill.is_none())
+    if slide_has_bg {
+      rels
+    } else {
+      // Check layout then master for bg fill rels
+      let mut r = rels
+      let mut found = false
+      match layout_opt {
+        Some(layout) => {
+          if not(layout.background.is_none()) || not(layout.bg_grad.is_none()) ||
+            not(layout.bg_blip_fill.is_none()) || not(layout.bg_patt_fill.is_none()) {
+            r = if not(layout_path.is_empty()) { get_layout_rels(layout_path) } else { rels }
+            found = true
+          }
+        }
+        None => ()
+      }
+      if not(found) {
+        match master_opt {
+          Some(master) => {
+            if not(master.background.is_none()) || not(master.bg_grad.is_none()) ||
+              not(master.bg_blip_fill.is_none()) || not(master.bg_patt_fill.is_none()) {
+              r = if not(master_path.is_empty()) { get_master_rels(master_path) } else { rels }
+            }
+          }
+          None => ()
+        }
+      }
+      r
+    }
   }
-  g_slides.val[slide_idx] = resolved_slide
   // ── Collect master/layout background shapes (non-placeholder) ──
   let bg_shapes : Array[@ooxml.Shape] = []
   let bg_shapes_rels : Array[Array[@ooxml.Relationship]] = []
@@ -1034,4 +1093,199 @@ pub fn get_modified_entries() -> String {
     i = i + 1
   }
   result
+}
+
+// ── Shape-level editing API ──────────────────────────────────────────────────
+
+///|
+/// Compute the EMU-to-pixel scale factor for the current presentation.
+fn get_scale() -> Int {
+  let sw = g_slide_size.val.cx
+  let w = 960 // svg_target_width
+  if sw > 0 { sw / w } else { 9525 }
+}
+
+///|
+/// Resolve a composite shape index (used by group children: parent*1000+child)
+/// to the containing array and the local index within it.
+/// Returns (shapes_array, local_index) or None if out of range.
+fn resolve_shape_location(
+  slide : @ooxml.SlideData,
+  composite_idx : Int,
+) -> (Array[@ooxml.Shape], Int)? {
+  if composite_idx < 1000 {
+    // Direct top-level shape
+    if composite_idx >= 0 && composite_idx < slide.shapes.length() {
+      Some((slide.shapes, composite_idx))
+    } else {
+      None
+    }
+  } else {
+    // Group child: parent = composite_idx / 1000, child = composite_idx % 1000
+    let parent_composite = composite_idx / 1000
+    let child_local = composite_idx % 1000
+    // Recursively resolve the parent
+    match resolve_shape_location(slide, parent_composite) {
+      Some((parent_arr, parent_local)) => {
+        let parent_shape = parent_arr[parent_local]
+        match parent_shape.kind {
+          GroupShape(grp) =>
+            if child_local >= 0 && child_local < grp.children.length() {
+              Some((grp.children, child_local))
+            } else {
+              None
+            }
+          _ => None
+        }
+      }
+      None => None
+    }
+  }
+}
+
+///|
+/// Render a single shape as SVG (0-indexed slide and shape).
+///
+/// Returns the shape SVG (`<g>...</g>`) with its own `<defs>` prepended.
+/// Returns "ERROR:<message>" on failure.
+pub fn render_shape_svg(slide_idx : Int, shape_idx : Int) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let shape = arr[local_idx]
+      let scale = get_scale()
+      let slide_num = slide_idx + 1
+      // Load slide rels for image resolution
+      let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+      let rels_xml = @ffi.ffi_get_file(rels_path)
+      let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
+      // Generate defs for this shape
+      let defs = @renderer.render_shape_defs(shape, slide_num, shape_idx, scale)
+      let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
+      // Render the shape
+      let shape_svg = @renderer.render_shape(
+        shape, rels, slide_num, scale, shape_idx, g_theme.val, g_table_styles.val,
+      )
+      defs_section + shape_svg
+    }
+  }
+}
+
+///|
+/// Update a shape's transform (position, size, rotation) and return its re-rendered SVG.
+///
+/// All values are in EMU. Updates the cached SlideData in-place and marks the slide
+/// as modified. Returns the shape SVG with defs, or "ERROR:<message>" on failure.
+pub fn update_shape_transform(
+  slide_idx : Int,
+  shape_idx : Int,
+  x : Int,
+  y : Int,
+  cx : Int,
+  cy : Int,
+  rot : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let shape = arr[local_idx]
+      let new_transform : @ooxml.ShapeTransform = {
+        x,
+        y,
+        cx,
+        cy,
+        rot,
+        flip_h: shape.transform.flip_h,
+        flip_v: shape.transform.flip_v,
+      }
+      arr[local_idx] = { ..shape, transform: new_transform }
+      g_modified.val[slide_idx] = true
+      render_shape_svg(slide_idx, shape_idx)
+    }
+  }
+}
+
+///|
+/// Update a text run's content and return the shape's re-rendered SVG.
+///
+/// Updates the text of the specified paragraph/run in-place. Returns the shape SVG
+/// with defs, or "ERROR:<message>" on failure.
+pub fn update_shape_text(
+  slide_idx : Int,
+  shape_idx : Int,
+  para_idx : Int,
+  run_idx : Int,
+  text : String,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let shape = arr[local_idx]
+      if para_idx < 0 || para_idx >= shape.paragraphs.length() {
+        return "ERROR:paragraph index out of range"
+      }
+      let para = shape.paragraphs[para_idx]
+      if run_idx < 0 || run_idx >= para.runs.length() {
+        return "ERROR:run index out of range"
+      }
+      para.runs[run_idx] = { ..para.runs[run_idx], text, }
+      g_modified.val[slide_idx] = true
+      render_shape_svg(slide_idx, shape_idx)
+    }
+  }
+}
+
+///|
+/// Update a shape's solid fill color and return its re-rendered SVG.
+///
+/// Sets the shape fill to the given RGB color (0-255 each). Returns the shape SVG
+/// with defs, or "ERROR:<message>" on failure.
+pub fn update_shape_fill(
+  slide_idx : Int,
+  shape_idx : Int,
+  r : Int,
+  g : Int,
+  b : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let new_color : @ooxml.Color = { r, g: g, b, alpha: 255 }
+      arr[local_idx] = { ..arr[local_idx], fill: new_color }
+      g_modified.val[slide_idx] = true
+      render_shape_svg(slide_idx, shape_idx)
+    }
+  }
 }

@@ -21,6 +21,13 @@ interface PptxWasmExports {
   update_slide_from_svg(idx: number, svg: string): string;
   get_slide_ooxml(idx: number): string;
   get_modified_entries(): string;
+  render_shape_svg(slideIdx: number, shapeIdx: number): string;
+  update_shape_transform(slideIdx: number, shapeIdx: number,
+    x: number, y: number, cx: number, cy: number, rot: number): string;
+  update_shape_text(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, text: string): string;
+  update_shape_fill(slideIdx: number, shapeIdx: number,
+    r: number, g: number, b: number): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -196,6 +203,43 @@ export class PptxRenderer {
 
     console.log(`[pptx] Exporting PPTX with ${modifications.size} modified entries`);
     return buildZip(this.originalBuffer, modifications);
+  }
+
+  // ── Shape-level editing API ────────────────────────────────────────────────
+
+  /**
+   * Render a single shape as SVG (0-indexed slide and shape).
+   * Returns SVG fragment (`<defs>...` + `<g>...</g>`), or "ERROR:..." on failure.
+   */
+  renderShapeSvg(slideIdx: number, shapeIdx: number): string {
+    return this.exports.render_shape_svg(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Update a shape's transform (position, size, rotation) and return re-rendered SVG.
+   * All values are in EMU. Marks the slide as modified.
+   */
+  updateShapeTransform(slideIdx: number, shapeIdx: number,
+    x: number, y: number, cx: number, cy: number, rot: number): string {
+    return this.exports.update_shape_transform(slideIdx, shapeIdx, x, y, cx, cy, rot);
+  }
+
+  /**
+   * Update a text run's content and return the shape's re-rendered SVG.
+   * Marks the slide as modified.
+   */
+  updateShapeText(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, text: string): string {
+    return this.exports.update_shape_text(slideIdx, shapeIdx, paraIdx, runIdx, text);
+  }
+
+  /**
+   * Update a shape's solid fill color (RGB 0-255) and return re-rendered SVG.
+   * Marks the slide as modified.
+   */
+  updateShapeFill(slideIdx: number, shapeIdx: number,
+    r: number, g: number, b: number): string {
+    return this.exports.update_shape_fill(slideIdx, shapeIdx, r, g, b);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
