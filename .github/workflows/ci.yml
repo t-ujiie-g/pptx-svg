@@ -34,3 +34,6 @@ jobs:
 
       - name: Run tests
         run: node test_fixtures/test_node.mjs
+
+      - name: Run tests
+        run: node test_fixtures/test_editing_helpers.mjs
