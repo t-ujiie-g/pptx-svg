@@ -173,11 +173,11 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **OLE / Embedded objects**: Fallback image from `p:oleObj` rendered; original XML preserved for round-trip
 - **Media** (video/audio): Poster frame image rendered; original XML preserved for round-trip
 
-### Not Yet Supported
-- **WMF images** - cannot be decoded in browser (EMF is supported via built-in converter)
-- **TIFF images** - not supported by browser `<img>`
-- **Math equations** (OMML `m:oMath`) - planned: plain text fallback
-- **Embedded fonts** - uses system font fallback
+### Supported with Limitations
+- **WMF images** - binary preserved for round-trip; cannot be rendered in browser (EMF is supported via built-in converter)
+- **TIFF images** - binary preserved for round-trip; not supported by browser `<img>` in all browsers
+- **Math equations** (OMML `m:oMath`) - plain text fallback display; original XML preserved for round-trip
+- **Embedded fonts** - binary preserved for round-trip; uses system font fallback for rendering
 
 ### Out of Scope
 

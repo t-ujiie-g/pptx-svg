@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 77', slideCount === 77, `got ${slideCount}`);
+  assert('slide count = 78', slideCount === 78, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 77; i++) {
+  for (let i = 1; i <= 78; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 77; i++) {
+  for (let i = 1; i <= 78; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1445,6 +1445,21 @@ async function testFeaturesPptx() {
     const rels77 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
     assert('slide77 has image relationship', rels77.includes('image'));
     assert('slide77 has video relationship', rels77.includes('video'));
+  }
+
+  // ── Slide 78: Math equation (OMML) ──────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 78: Math equation (OMML)');
+    const slide78 = textFiles.get('ppt/slides/slide78.xml') || '';
+    assert('slide78 exists', slide78.length > 0);
+    assert('slide78 has m:oMathPara', slide78.includes('m:oMathPara'));
+    assert('slide78 has m:oMath', slide78.includes('m:oMath'));
+    assert('slide78 has m:r (math run)', slide78.includes('<m:r>'));
+    assert('slide78 has m:t (math text)', slide78.includes('<m:t>'));
+    assert('slide78 has m:f (fraction)', slide78.includes('<m:f>'));
+    assert('slide78 has m:rad (radical)', slide78.includes('<m:rad>'));
+    assert('slide78 has m:sSup (superscript)', slide78.includes('<m:sSup>'));
+    assert('slide78 has xmlns:m namespace', slide78.includes('xmlns:m='));
   }
 }
 

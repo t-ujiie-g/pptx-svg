@@ -863,6 +863,8 @@ pub(all) struct TextRun {
   text_grad_fill : GradientFill // gradient fill; GradientFill::none() = no gradient
   // Text pattern fill: a:rPr/a:pattFill
   text_patt_fill : PatternFill // pattern fill; PatternFill::none() = no pattern
+  // OMML math equation: raw XML for round-trip; "" = normal text run
+  math_xml : String // raw m:oMath or m:oMathPara XML; "" = not a math run
 }
 
 ///|

@@ -80,7 +80,17 @@ Slides:
  75. SmartArt fallback (mc:AlternateContent with mc:Choice + mc:Fallback group shapes)
  76. OLE embedded object (p:oleObj with fallback image in p:graphicFrame)
  77. Media (video with poster frame — a:videoFile in p:nvPr)
+ 78. Math equation (OMML m:oMathPara / m:oMath in text body)
 """
+
+import base64
+import io
+import os
+import re
+import struct
+import tempfile
+import zipfile
+import zlib
 
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -1584,7 +1594,6 @@ slide21 = prs.slides.add_slide(blank)
 
 # For image bullets, we need a small embedded image
 # We'll create a tiny 1x1 red PNG in memory
-import struct, zlib, io
 def make_tiny_png(r, g, b):
     """Create a minimal 1x1 PNG."""
     # IHDR
@@ -1893,13 +1902,11 @@ s27a = slide27.shapes.add_shape(1, Inches(1), Inches(1), Inches(4), Inches(3))
 s27a.text = ""
 
 # Add image relationship (use slide's existing rels) — use a small 1px PNG
-import base64
 # Minimal 1x1 red PNG
 mini_png = base64.b64decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
 )
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
-import os, tempfile
 
 # Write temp image
 tmp_img = os.path.join(tempfile.gettempdir(), '_test_blip.png')
@@ -3157,7 +3164,6 @@ lbl42.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 slide43 = prs.slides.add_slide(blank)
 
 # Create a test image: 2x2 pixel PNG with 4 colored quadrants (red/green/blue/yellow)
-import struct, zlib
 def make_test_png_4color():
     """Create a 4x4 PNG with colored quadrants: TL=red, TR=green, BL=blue, BR=yellow."""
     width, height = 4, 4
@@ -5204,7 +5210,6 @@ title75.text_frame.paragraphs[0].font.bold = True
 slide76 = prs.slides.add_slide(blank)
 
 # Create a small 2x2 red PNG as the OLE fallback image
-import struct, zlib, base64
 def make_tiny_png(r, g, b, w=2, h=2):
     """Create a minimal RGBA PNG."""
     raw = b''
@@ -5368,7 +5373,75 @@ title77.text_frame.paragraphs[0].text = "Slide 77: Media (Video with Poster Fram
 title77.text_frame.paragraphs[0].font.size = Pt(24)
 title77.text_frame.paragraphs[0].font.bold = True
 
-# Save
+# ── Slide 78: Math equation (OMML) ────────────────────────────────────────────
+
+slide78 = prs.slides.add_slide(blank)
+
+# Title
+title78 = slide78.shapes.add_textbox(Inches(1), Inches(0.3), Inches(8), Inches(0.8))
+title78.text_frame.paragraphs[0].text = "Slide 78: Math Equation (OMML)"
+title78.text_frame.paragraphs[0].font.size = Pt(28)
+title78.text_frame.paragraphs[0].font.bold = True
+
+# Add a textbox, then inject OMML XML directly into the slide XML
+math_tb = slide78.shapes.add_textbox(Inches(2), Inches(2), Inches(6), Inches(2))
+math_tb.text_frame.paragraphs[0].text = "MATH_PLACEHOLDER"
+math_tb.text_frame.paragraphs[0].font.size = Pt(24)
+
+# Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
-print(f"Saved {output_path} with {len(prs.slides)} slides")
+
+# Patch slide78 XML to inject actual OMML
+OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
+etree.register_namespace('m', OMML_NS)
+
+slide78_num = len(prs.slides)
+slide78_path = f'ppt/slides/slide{slide78_num}.xml'
+
+# Read entire ZIP into memory, then close it before writing
+zin = zipfile.ZipFile(output_path, 'r')
+slide78_xml = zin.read(slide78_path).decode('utf-8')
+all_entries = {}
+for item in zin.infolist():
+    all_entries[item.filename] = (item, zin.read(item.filename))
+zin.close()
+
+# Replace the placeholder paragraph with OMML
+omml_xml = (
+    '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    '<m:oMath>'
+    '<m:r><m:t>x</m:t></m:r>'
+    '<m:r><m:t>=</m:t></m:r>'
+    '<m:f>'  # fraction
+    '<m:num><m:r><m:t>-b±</m:t></m:r>'
+    '<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr>'
+    '<m:deg/><m:e><m:sSup><m:e><m:r><m:t>b</m:t></m:r></m:e>'
+    '<m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup>'
+    '<m:r><m:t>-4ac</m:t></m:r></m:e></m:rad></m:num>'
+    '<m:den><m:r><m:t>2a</m:t></m:r></m:den>'
+    '</m:f>'
+    '</m:oMath>'
+    '</m:oMathPara>'
+)
+slide78_xml = re.sub(
+    r'<a:r>(?:<a:rPr[^/]*/>)?<a:t>MATH_PLACEHOLDER</a:t></a:r>',
+    omml_xml,
+    slide78_xml
+)
+# Add m: namespace to root if not present
+if 'xmlns:m=' not in slide78_xml:
+    slide78_xml = slide78_xml.replace(
+        'xmlns:a=',
+        f'xmlns:m="{OMML_NS}" xmlns:a='
+    )
+
+# Rewrite ZIP with patched slide
+with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+    for fname, (item, data) in all_entries.items():
+        if fname == slide78_path:
+            zout.writestr(item, slide78_xml.encode('utf-8'))
+        else:
+            zout.writestr(item, data)
+
+print(f"Saved {output_path} with {slide78_num} slides")

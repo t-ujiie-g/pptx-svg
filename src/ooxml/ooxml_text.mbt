@@ -6,6 +6,36 @@
 //
 // Same package as ooxml.mbt — all types and helpers are shared.
 
+// ── OMML math text extraction ────────────────────────────────────────────────
+
+///|
+/// Recursively extract plain text from OMML math elements (m:t nodes).
+fn extract_math_text(node : @xml.XmlNode) -> String {
+  match node {
+    @xml.XmlNode::Text(s) => s
+    @xml.XmlNode::Element(tag, _, children) =>
+      if tag == "m:t" {
+        // m:t contains the actual math text
+        let mut t = ""
+        let mut i = 0
+        while i < children.length() {
+          t = t + extract_math_text(children[i])
+          i = i + 1
+        }
+        t
+      } else {
+        // Recurse into children
+        let mut result = ""
+        let mut i = 0
+        while i < children.length() {
+          result = result + extract_math_text(children[i])
+          i = i + 1
+        }
+        result
+      }
+  }
+}
+
 // ── Spacing parsing ──────────────────────────────────────────────────────────
 
 ///|
@@ -418,6 +448,7 @@ fn default_text_run(
     text_grad_fill: GradientFill::none(),
     text_patt_fill: PatternFill::none(),
     bold_explicit: def_bold_explicit,
+    math_xml: "",
   }
 }
 
@@ -538,6 +569,7 @@ fn parse_run_props(
     outline_w,
     text_grad_fill,
     text_patt_fill,
+    math_xml: "",
   }
 }
 
@@ -731,6 +763,17 @@ fn parse_text_body(
           }
           runs.push(run)
         }
+      } else if child_tag == "m:oMath" || child_tag == "m:oMathPara" {
+        // OMML math equation — preserve raw XML, extract plain text from m:t elements
+        let math_raw = @xml.serialize_node(child)
+        let math_text = extract_math_text(child)
+        let display = if math_text.is_empty() { "[math]" } else { math_text }
+        let mut run = default_text_run(
+          display, def_bold, def_bold_explicit, def_italic, def_font_size,
+          def_color, def_font_face, def_ea_font,
+        )
+        run = { ..run, math_xml: math_raw }
+        runs.push(run)
       } else if child_tag == "a:br" {
         // Line break — insert a newline run
         runs.push(

@@ -385,6 +385,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     text_grad_fill: parse_text_grad_fill(run_node),
                     text_patt_fill: parse_text_patt_fill(run_node),
                     bold_explicit: bold,
+                    math_xml: @xml.xml_unescape(get_da(run_node, "math-xml")),
                   })
                 }
               @xml.XmlNode::Text(text) =>
@@ -414,6 +415,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     text_grad_fill: @ooxml.GradientFill::none(),
                     text_patt_fill: @ooxml.PatternFill::none(),
                     bold_explicit: false,
+                    math_xml: "",
                   })
                 }
             }

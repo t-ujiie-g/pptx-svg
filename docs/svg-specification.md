@@ -152,6 +152,14 @@ Each shape is rendered as a `<g>` element with these attributes.
 |-----------|------|-------------|
 | `data-ooxml-ole` | string (XML-escaped) | Raw `p:graphicFrame` XML for OLE round-trip. The shape renders the fallback image from `p:oleObj/p:pic`. |
 
+### Math Equations (OMML)
+
+Present on `<tspan>` elements that represent math equations:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-math-xml` | string (XML-escaped) | Raw `m:oMath` or `m:oMathPara` XML. The tspan text content shows a plain-text fallback extracted from `m:t` elements. |
+
 ### Custom Geometry
 
 When `data-ooxml-geom="custGeom"`:

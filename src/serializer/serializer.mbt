@@ -482,10 +482,15 @@ fn serialize_text_body_inner(
     let mut ri = 0
     while ri < nr {
       let run = para.runs[ri]
-      out = out + "<a:r>"
-      out = out + serialize_run_props(run)
-      out = out + "<a:t>" + xml_escape(run.text) + "</a:t>"
-      out = out + "</a:r>"
+      if run.math_xml.length() > 0 {
+        // OMML math equation — emit preserved raw XML directly
+        out = out + run.math_xml
+      } else {
+        out = out + "<a:r>"
+        out = out + serialize_run_props(run)
+        out = out + "<a:t>" + xml_escape(run.text) + "</a:t>"
+        out = out + "</a:r>"
+      }
       ri = ri + 1
     }
     // If no runs, emit an empty run to keep the paragraph
@@ -1444,7 +1449,8 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
     " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\""
   out = out +
     " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"" +
-    " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">"
+    " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"" +
+    " xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\">"
   out = out + "<p:cSld>"
   // Background
   if not(slide.bg_blip_fill.is_none()) {

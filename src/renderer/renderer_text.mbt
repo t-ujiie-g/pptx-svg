@@ -628,6 +628,10 @@ fn render_run_tspan(
       }
       ea
     } else { "" }) +
+    // OMML math equation raw XML for round-trip
+    (if run.math_xml.length() > 0 {
+      da("math-xml", @xml.xml_escape(run.math_xml))
+    } else { "" }) +
     // CSS filter for text-level effects (shadow/glow visual rendering)
     render_text_effect_style(run.effects, scale)
   // Wrap in hyperlink if present
