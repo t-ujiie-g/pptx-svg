@@ -76,7 +76,21 @@ Slides:
  71. Text gradient fill (a:rPr/a:gradFill — gradient on text)
  72. Text warp (a:prstTxWarp — preset text warp with adjust values)
  73. Stacked / Percent-stacked bar charts (BAR_STACKED_100, COLUMN_STACKED, COLUMN_STACKED_100)
+ 74. Speaker notes (p:notes) + comments (p:cmAuthorLst / p:cmLst)
+ 75. SmartArt fallback (mc:AlternateContent with mc:Choice + mc:Fallback group shapes)
+ 76. OLE embedded object (p:oleObj with fallback image in p:graphicFrame)
+ 77. Media (video with poster frame — a:videoFile in p:nvPr)
+ 78. Math equation (OMML m:oMathPara / m:oMath in text body)
 """
+
+import base64
+import io
+import os
+import re
+import struct
+import tempfile
+import zipfile
+import zlib
 
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -1580,7 +1594,6 @@ slide21 = prs.slides.add_slide(blank)
 
 # For image bullets, we need a small embedded image
 # We'll create a tiny 1x1 red PNG in memory
-import struct, zlib, io
 def make_tiny_png(r, g, b):
     """Create a minimal 1x1 PNG."""
     # IHDR
@@ -1889,13 +1902,11 @@ s27a = slide27.shapes.add_shape(1, Inches(1), Inches(1), Inches(4), Inches(3))
 s27a.text = ""
 
 # Add image relationship (use slide's existing rels) — use a small 1px PNG
-import base64
 # Minimal 1x1 red PNG
 mini_png = base64.b64decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=='
 )
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
-import os, tempfile
 
 # Write temp image
 tmp_img = os.path.join(tempfile.gettempdir(), '_test_blip.png')
@@ -3153,7 +3164,6 @@ lbl42.text_frame.paragraphs[0].font.color.rgb = RGBColor(100, 100, 100)
 slide43 = prs.slides.add_slide(blank)
 
 # Create a test image: 2x2 pixel PNG with 4 colored quadrants (red/green/blue/yellow)
-import struct, zlib
 def make_test_png_4color():
     """Create a 4x4 PNG with colored quadrants: TL=red, TR=green, BL=blue, BR=yellow."""
     width, height = 4, 4
@@ -4963,7 +4973,475 @@ lbl73.text_frame.paragraphs[0].text = "Slide 73: Stacked / Percent-stacked bar c
 lbl73.text_frame.paragraphs[0].font.size = Pt(18)
 lbl73.text_frame.paragraphs[0].font.bold = True
 
-# Save
+# ── Slide 74: Speaker notes + comments ──────────────────────────────────────
+
+slide74 = prs.slides.add_slide(blank)
+
+lbl74 = slide74.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl74.text_frame.paragraphs[0].text = "Slide 74: Speaker notes + comments"
+lbl74.text_frame.paragraphs[0].font.size = Pt(18)
+lbl74.text_frame.paragraphs[0].font.bold = True
+
+body74 = slide74.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(8), Inches(3))
+body74.text_frame.paragraphs[0].text = (
+    "This slide has speaker notes and comments attached.\n"
+    "Notes and comments are metadata not rendered on slide, "
+    "but preserved in round-trip export."
+)
+body74.text_frame.paragraphs[0].font.size = Pt(14)
+body74.text_frame.word_wrap = True
+
+# Add speaker notes
+notes_slide74 = slide74.notes_slide
+notes_tf = notes_slide74.notes_text_frame
+notes_tf.text = ""
+p1 = notes_tf.paragraphs[0]
+p1.text = "These are the speaker notes for slide 74."
+p2 = notes_tf.add_paragraph()
+p2.text = "Second paragraph of notes with key points."
+p3 = notes_tf.add_paragraph()
+p3.text = "Remember to mention the round-trip preservation."
+
+# Add comments via raw XML (python-pptx has no public comment API)
+from pptx.opc.package import Part as OpcPart
+from pptx.opc.packuri import PackURI
+
+authors_xml = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+    '<p:cmAuthor id="1" name="Test User" initials="TU" lastIdx="2" clrIdx="0"/>'
+    '</p:cmAuthorLst>'
+)
+
+# Add commentAuthors part
+authors_part = OpcPart(
+    PackURI('/ppt/commentAuthors.xml'),
+    'application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml',
+    prs.part.package,
+    authors_xml.encode('utf-8'),
+)
+prs.part.relate_to(authors_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors')
+
+# Add comments part for slide 74
+comment_xml = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+    '<p:cm authorId="1" dt="2025-01-15T10:30:00.000" idx="1">'
+    '<p:pos x="100" y="200"/>'
+    '<p:text>This is a test comment on slide 74.</p:text>'
+    '</p:cm>'
+    '<p:cm authorId="1" dt="2025-01-15T11:00:00.000" idx="2">'
+    '<p:pos x="300" y="400"/>'
+    '<p:text>Second comment with review feedback.</p:text>'
+    '</p:cm>'
+    '</p:cmLst>'
+)
+
+slide74_idx = len(prs.slides)
+comment_part = OpcPart(
+    PackURI(f'/ppt/comments/comment{slide74_idx}.xml'),
+    'application/vnd.openxmlformats-officedocument.presentationml.comments+xml',
+    prs.part.package,
+    comment_xml.encode('utf-8'),
+)
+slide74.part.relate_to(comment_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments')
+
+# ── Slide 75: SmartArt fallback (mc:AlternateContent) ────────────────────────
+
+slide75 = prs.slides.add_slide(blank)
+
+# We inject raw XML with mc:AlternateContent containing:
+#   mc:Choice  → dummy p:graphicFrame referencing diagram (preserved for round-trip)
+#   mc:Fallback → p:grpSp with 3 rectangles representing a simple process flow
+slide75_sp_tree = slide75.shapes._spTree
+# Register mc: namespace prefix on the root <p:sld> element so lxml uses mc: prefix
+sld_root = slide75_sp_tree.getparent()  # p:cSld -> p:sld
+if sld_root is not None and sld_root.getparent() is not None:
+    sld_root = sld_root.getparent()
+MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006'
+DGM_NS = 'http://schemas.openxmlformats.org/drawingml/2006/diagram'
+etree.register_namespace('mc', MC_NS)
+etree.register_namespace('dgm', DGM_NS)
+
+mc_ac = etree.SubElement(slide75_sp_tree, f'{{{MC_NS}}}AlternateContent')
+
+# mc:Choice — dummy SmartArt reference (for round-trip preservation)
+mc_choice = etree.SubElement(mc_ac, f'{{{MC_NS}}}Choice', attrib={'Requires': 'dgm'})
+choice_gf = etree.SubElement(mc_choice,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}graphicFrame')
+choice_nvgf = etree.SubElement(choice_gf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvGraphicFramePr')
+choice_cnvpr = etree.SubElement(choice_nvgf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvPr',
+    attrib={'id': '100', 'name': 'SmartArt Diagram'})
+choice_cnvgf = etree.SubElement(choice_nvgf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvGraphicFramePr')
+choice_nvpr = etree.SubElement(choice_nvgf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvPr')
+choice_xfrm = etree.SubElement(choice_gf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}xfrm')
+etree.SubElement(choice_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}off',
+    attrib={'x': '457200', 'y': '1371600'})
+etree.SubElement(choice_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}ext',
+    attrib={'cx': '8229600', 'y': '4572000'})
+# Dummy graphic with dgm:relIds
+choice_graphic = etree.SubElement(choice_gf,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}graphic')
+choice_gd = etree.SubElement(choice_graphic,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}graphicData',
+    attrib={'uri': 'http://schemas.openxmlformats.org/drawingml/2006/diagram'})
+etree.SubElement(choice_gd,
+    f'{{{DGM_NS}}}relIds',
+    attrib={
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}dm': 'rId10',
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}lo': 'rId11',
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}qs': 'rId12',
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}cs': 'rId13',
+    })
+
+# mc:Fallback — pre-rendered shapes (3 rectangles as a simple process flow)
+mc_fallback = etree.SubElement(mc_ac,
+    f'{{{MC_NS}}}Fallback')
+
+# Create a group shape containing 3 process boxes
+grp_sp = etree.SubElement(mc_fallback,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}grpSp')
+grp_nv = etree.SubElement(grp_sp,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvGrpSpPr')
+etree.SubElement(grp_nv,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvPr',
+    attrib={'id': '101', 'name': 'SmartArt Fallback Group'})
+etree.SubElement(grp_nv,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvGrpSpPr')
+etree.SubElement(grp_nv,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvPr')
+
+grp_sp_pr = etree.SubElement(grp_sp,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}grpSpPr')
+grp_xfrm = etree.SubElement(grp_sp_pr,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}off',
+    attrib={'x': '457200', 'y': '1371600'})
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}ext',
+    attrib={'cx': '8229600', 'cy': '2743200'})
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}chOff',
+    attrib={'x': '0', 'y': '0'})
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}chExt',
+    attrib={'cx': '8229600', 'cy': '2743200'})
+
+# Helper to add a rectangle shape inside the group
+def add_smartart_box(parent, sp_id, name, x, y, cx, cy, text, fill_hex):
+    sp = etree.SubElement(parent,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}sp')
+    nv = etree.SubElement(sp,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}nvSpPr')
+    etree.SubElement(nv,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvPr',
+        attrib={'id': str(sp_id), 'name': name})
+    etree.SubElement(nv,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvSpPr')
+    etree.SubElement(nv,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}nvPr')
+    spPr = etree.SubElement(sp,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}spPr')
+    xfrm = etree.SubElement(spPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
+    etree.SubElement(xfrm,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}off',
+        attrib={'x': str(x), 'y': str(y)})
+    etree.SubElement(xfrm,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}ext',
+        attrib={'cx': str(cx), 'cy': str(cy)})
+    etree.SubElement(spPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}prstGeom',
+        attrib={'prst': 'roundRect'}).append(
+        etree.Element('{http://schemas.openxmlformats.org/drawingml/2006/main}avLst'))
+    solid = etree.SubElement(spPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+    etree.SubElement(solid,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr',
+        attrib={'val': fill_hex})
+    # Text body
+    txBody = etree.SubElement(sp,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}txBody')
+    bodyPr = etree.SubElement(txBody,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}bodyPr',
+        attrib={'anchor': 'ctr', 'wrap': 'square'})
+    etree.SubElement(txBody,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}lstStyle')
+    p = etree.SubElement(txBody,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}p')
+    pPr = etree.SubElement(p,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr',
+        attrib={'algn': 'ctr'})
+    r = etree.SubElement(p,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}r')
+    rPr = etree.SubElement(r,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr',
+        attrib={'lang': 'en-US', 'sz': '1800', 'b': '1'})
+    solid_font = etree.SubElement(rPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+    etree.SubElement(solid_font,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr',
+        attrib={'val': 'FFFFFF'})
+    t = etree.SubElement(r,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+    t.text = text
+
+# Three process boxes: Plan → Build → Ship
+add_smartart_box(grp_sp, 102, 'Step 1', 0, 457200, 2286000, 1828800, 'Plan', '4472C4')
+add_smartart_box(grp_sp, 103, 'Step 2', 2971800, 457200, 2286000, 1828800, 'Build', 'ED7D31')
+add_smartart_box(grp_sp, 104, 'Step 3', 5943600, 457200, 2286000, 1828800, 'Ship', '70AD47')
+
+# Also add a title textbox
+title75 = slide75.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title75.text_frame.paragraphs[0].text = "Slide 75: SmartArt Fallback (mc:AlternateContent)"
+title75.text_frame.paragraphs[0].font.size = Pt(24)
+title75.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 76: OLE embedded object (p:oleObj with fallback image) ──────────────
+
+slide76 = prs.slides.add_slide(blank)
+
+# Create a small 2x2 red PNG as the OLE fallback image
+def make_tiny_png(r, g, b, w=2, h=2):
+    """Create a minimal RGBA PNG."""
+    raw = b''
+    for _ in range(h):
+        raw += b'\x00'  # filter: none
+        for _ in range(w):
+            raw += struct.pack('BBBB', r, g, b, 255)
+    compressed = zlib.compress(raw)
+    def chunk(ctype, data):
+        c = ctype + data
+        return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+    ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', compressed) + chunk(b'IEND', b'')
+
+ole_fallback_png = make_tiny_png(200, 50, 50)
+
+# Add the PNG as an image part via the slide's relationships
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+from pptx.opc.package import Part as OpcPart
+from pptx.opc.packuri import PackURI
+
+slide76_idx = len(prs.slides)
+ole_img_partname = PackURI(f'/ppt/media/oleImage{slide76_idx}.png')
+ole_img_part = OpcPart(
+    ole_img_partname,
+    'image/png',
+    prs.part.package,
+    ole_fallback_png,
+)
+ole_img_rel = slide76.part.relate_to(ole_img_part, RT.IMAGE)
+
+# Also create a dummy OLE binary part (empty, just for structure)
+ole_bin_partname = PackURI(f'/ppt/embeddings/oleObject{slide76_idx}.bin')
+ole_bin_part = OpcPart(
+    ole_bin_partname,
+    'application/vnd.openxmlformats-officedocument.oleObject',
+    prs.part.package,
+    b'\x00' * 16,  # Minimal dummy data
+)
+ole_bin_rel = slide76.part.relate_to(
+    ole_bin_part,
+    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject',
+)
+
+# Inject p:graphicFrame with p:oleObj into spTree
+A_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+P_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main'
+R_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+
+slide76_sp_tree = slide76.shapes._spTree
+gf = etree.SubElement(slide76_sp_tree, f'{{{P_NS}}}graphicFrame')
+
+# nvGraphicFramePr
+nv = etree.SubElement(gf, f'{{{P_NS}}}nvGraphicFramePr')
+etree.SubElement(nv, f'{{{P_NS}}}cNvPr', attrib={'id': '200', 'name': 'OLE Object'})
+etree.SubElement(nv, f'{{{P_NS}}}cNvGraphicFramePr')
+etree.SubElement(nv, f'{{{P_NS}}}nvPr')
+
+# xfrm
+xfrm = etree.SubElement(gf, f'{{{P_NS}}}xfrm')
+etree.SubElement(xfrm, f'{{{A_NS}}}off', attrib={'x': '914400', 'y': '1828800'})
+etree.SubElement(xfrm, f'{{{A_NS}}}ext', attrib={'cx': '4572000', 'cy': '3429000'})
+
+# a:graphic > a:graphicData (OLE URI)
+graphic = etree.SubElement(gf, f'{{{A_NS}}}graphic')
+gdata = etree.SubElement(graphic, f'{{{A_NS}}}graphicData',
+    attrib={'uri': 'http://schemas.openxmlformats.org/presentationml/2006/ole'})
+
+# p:oleObj with r:id and fallback p:pic
+ole_obj = etree.SubElement(gdata, f'{{{P_NS}}}oleObj', attrib={
+    f'{{{R_NS}}}id': ole_bin_rel,
+    'imgW': '4572000',
+    'imgH': '3429000',
+    'progId': 'Excel.Sheet.12',
+    'name': 'Embedded Spreadsheet',
+})
+etree.SubElement(ole_obj, f'{{{P_NS}}}embed')
+
+# p:pic inside oleObj (fallback image)
+ole_pic = etree.SubElement(ole_obj, f'{{{P_NS}}}pic')
+ole_pic_nv = etree.SubElement(ole_pic, f'{{{P_NS}}}nvPicPr')
+etree.SubElement(ole_pic_nv, f'{{{P_NS}}}cNvPr', attrib={'id': '201', 'name': 'OLE Fallback'})
+etree.SubElement(ole_pic_nv, f'{{{P_NS}}}cNvPicPr')
+etree.SubElement(ole_pic_nv, f'{{{P_NS}}}nvPr')
+ole_pic_bf = etree.SubElement(ole_pic, f'{{{P_NS}}}blipFill')
+etree.SubElement(ole_pic_bf, f'{{{A_NS}}}blip', attrib={f'{{{R_NS}}}embed': ole_img_rel})
+etree.SubElement(ole_pic_bf, f'{{{A_NS}}}stretch').append(
+    etree.Element(f'{{{A_NS}}}fillRect'))
+ole_pic_sp = etree.SubElement(ole_pic, f'{{{P_NS}}}spPr')
+ole_pic_xfrm = etree.SubElement(ole_pic_sp, f'{{{A_NS}}}xfrm')
+etree.SubElement(ole_pic_xfrm, f'{{{A_NS}}}off', attrib={'x': '0', 'y': '0'})
+etree.SubElement(ole_pic_xfrm, f'{{{A_NS}}}ext', attrib={'cx': '4572000', 'cy': '3429000'})
+etree.SubElement(ole_pic_sp, f'{{{A_NS}}}prstGeom', attrib={'prst': 'rect'}).append(
+    etree.Element(f'{{{A_NS}}}avLst'))
+
+# Title
+title76 = slide76.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title76.text_frame.paragraphs[0].text = "Slide 76: OLE Embedded Object (p:oleObj)"
+title76.text_frame.paragraphs[0].font.size = Pt(24)
+title76.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 77: Media (video with poster frame) ────────────────────────────────
+
+slide77 = prs.slides.add_slide(blank)
+
+# Create a poster frame image (blue rectangle) for the video
+poster_png = make_tiny_png(30, 100, 200, w=4, h=3)
+
+slide77_idx = len(prs.slides)
+poster_partname = PackURI(f'/ppt/media/posterFrame{slide77_idx}.png')
+poster_part = OpcPart(
+    poster_partname,
+    'image/png',
+    prs.part.package,
+    poster_png,
+)
+poster_rel = slide77.part.relate_to(poster_part, RT.IMAGE)
+
+# Create a dummy video part
+video_partname = PackURI(f'/ppt/media/video{slide77_idx}.mp4')
+video_part = OpcPart(
+    video_partname,
+    'video/mp4',
+    prs.part.package,
+    b'\x00' * 32,  # Minimal dummy data
+)
+video_rel = slide77.part.relate_to(
+    video_part,
+    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/video',
+)
+
+# Inject p:pic with a:videoFile into spTree
+slide77_sp_tree = slide77.shapes._spTree
+
+vid_pic = etree.SubElement(slide77_sp_tree, f'{{{P_NS}}}pic')
+
+# nvPicPr
+vid_nv = etree.SubElement(vid_pic, f'{{{P_NS}}}nvPicPr')
+etree.SubElement(vid_nv, f'{{{P_NS}}}cNvPr', attrib={'id': '300', 'name': 'Video Placeholder'})
+etree.SubElement(vid_nv, f'{{{P_NS}}}cNvPicPr')
+vid_nvpr = etree.SubElement(vid_nv, f'{{{P_NS}}}nvPr')
+etree.SubElement(vid_nvpr, f'{{{A_NS}}}videoFile', attrib={f'{{{R_NS}}}link': video_rel})
+
+# blipFill (poster frame)
+vid_bf = etree.SubElement(vid_pic, f'{{{P_NS}}}blipFill')
+etree.SubElement(vid_bf, f'{{{A_NS}}}blip', attrib={f'{{{R_NS}}}embed': poster_rel})
+etree.SubElement(vid_bf, f'{{{A_NS}}}stretch').append(
+    etree.Element(f'{{{A_NS}}}fillRect'))
+
+# spPr
+vid_sp = etree.SubElement(vid_pic, f'{{{P_NS}}}spPr')
+vid_xfrm = etree.SubElement(vid_sp, f'{{{A_NS}}}xfrm')
+etree.SubElement(vid_xfrm, f'{{{A_NS}}}off', attrib={'x': '1371600', 'y': '1828800'})
+etree.SubElement(vid_xfrm, f'{{{A_NS}}}ext', attrib={'cx': '6858000', 'cy': '3886200'})
+etree.SubElement(vid_sp, f'{{{A_NS}}}prstGeom', attrib={'prst': 'rect'}).append(
+    etree.Element(f'{{{A_NS}}}avLst'))
+
+# Title
+title77 = slide77.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title77.text_frame.paragraphs[0].text = "Slide 77: Media (Video with Poster Frame)"
+title77.text_frame.paragraphs[0].font.size = Pt(24)
+title77.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 78: Math equation (OMML) ────────────────────────────────────────────
+
+slide78 = prs.slides.add_slide(blank)
+
+# Title
+title78 = slide78.shapes.add_textbox(Inches(1), Inches(0.3), Inches(8), Inches(0.8))
+title78.text_frame.paragraphs[0].text = "Slide 78: Math Equation (OMML)"
+title78.text_frame.paragraphs[0].font.size = Pt(28)
+title78.text_frame.paragraphs[0].font.bold = True
+
+# Add a textbox, then inject OMML XML directly into the slide XML
+math_tb = slide78.shapes.add_textbox(Inches(2), Inches(2), Inches(6), Inches(2))
+math_tb.text_frame.paragraphs[0].text = "MATH_PLACEHOLDER"
+math_tb.text_frame.paragraphs[0].font.size = Pt(24)
+
+# Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
-print(f"Saved {output_path} with {len(prs.slides)} slides")
+
+# Patch slide78 XML to inject actual OMML
+OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
+etree.register_namespace('m', OMML_NS)
+
+slide78_num = len(prs.slides)
+slide78_path = f'ppt/slides/slide{slide78_num}.xml'
+
+# Read entire ZIP into memory, then close it before writing
+zin = zipfile.ZipFile(output_path, 'r')
+slide78_xml = zin.read(slide78_path).decode('utf-8')
+all_entries = {}
+for item in zin.infolist():
+    all_entries[item.filename] = (item, zin.read(item.filename))
+zin.close()
+
+# Replace the placeholder paragraph with OMML
+omml_xml = (
+    '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    '<m:oMath>'
+    '<m:r><m:t>x</m:t></m:r>'
+    '<m:r><m:t>=</m:t></m:r>'
+    '<m:f>'  # fraction
+    '<m:num><m:r><m:t>-b±</m:t></m:r>'
+    '<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr>'
+    '<m:deg/><m:e><m:sSup><m:e><m:r><m:t>b</m:t></m:r></m:e>'
+    '<m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup>'
+    '<m:r><m:t>-4ac</m:t></m:r></m:e></m:rad></m:num>'
+    '<m:den><m:r><m:t>2a</m:t></m:r></m:den>'
+    '</m:f>'
+    '</m:oMath>'
+    '</m:oMathPara>'
+)
+slide78_xml = re.sub(
+    r'<a:r>(?:<a:rPr[^/]*/>)?<a:t>MATH_PLACEHOLDER</a:t></a:r>',
+    omml_xml,
+    slide78_xml
+)
+# Add m: namespace to root if not present
+if 'xmlns:m=' not in slide78_xml:
+    slide78_xml = slide78_xml.replace(
+        'xmlns:a=',
+        f'xmlns:m="{OMML_NS}" xmlns:a='
+    )
+
+# Rewrite ZIP with patched slide
+with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
+    for fname, (item, data) in all_entries.items():
+        if fname == slide78_path:
+            zout.writestr(item, slide78_xml.encode('utf-8'))
+        else:
+            zout.writestr(item, data)
+
+print(f"Saved {output_path} with {slide78_num} slides")

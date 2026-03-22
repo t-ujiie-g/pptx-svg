@@ -616,6 +616,12 @@ pub fn str_substring(s : String, from : Int, to : Int) -> String {
 }
 
 ///|
+/// Unescape XML entities (&lt; &gt; &amp; &quot; &apos;) back to raw characters.
+pub fn xml_unescape(s : String) -> String {
+  decode_entities(s)
+}
+
+///|
 /// Escape XML special characters: < > & " '
 pub fn xml_escape(s : String) -> String {
   let len = s.length()
@@ -676,4 +682,32 @@ pub fn split_by_space(s : String) -> Array[String] {
     tokens.push(str_substring(s, start, len))
   }
   tokens
+}
+
+///|
+/// Serialize an XmlNode back to raw XML string.
+pub fn serialize_node(node : XmlNode) -> String {
+  match node {
+    XmlNode::Text(s) => xml_escape(s)
+    XmlNode::Element(tag, attrs, children) => {
+      let mut out = "<" + tag
+      let mut i = 0
+      while i < attrs.length() {
+        let kv = attrs[i]
+        out = out + " " + kv.name + "=\"" + xml_escape(kv.value) + "\""
+        i = i + 1
+      }
+      if children.length() == 0 {
+        out + "/>"
+      } else {
+        out = out + ">"
+        let mut j = 0
+        while j < children.length() {
+          out = out + serialize_node(children[j])
+          j = j + 1
+        }
+        out + "</" + tag + ">"
+      }
+    }
+  }
 }

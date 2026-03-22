@@ -84,6 +84,7 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int,
   st_cxn_id: Int, st_cxn_idx: Int, end_cxn_id: Int, end_cxn_idx: Int,
   sh_link_rid: String, sh_link_hover_rid: String,
+  mc_choice_xml: String, ole_xml: String,
   effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | ChartShape(ChartData) | Other
@@ -110,7 +111,7 @@ Shape3d { bevel_t, bevel_b: Bevel, extrusion_h, contour_w: Int, extrusion_clr, c
 Scene3d { camera_prst, light_rig, light_dir: String }
 
 TextParagraph { runs, align, level, spc_before, spc_after, mar_l, indent, line_spacing, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, bullet_img_rid, tab_stops, rtl }
-TextRun { text, bold, bold_explicit, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid, effects: EffectList, outline_color: Color, outline_w: Int, text_grad_fill: GradientFill, text_patt_fill: PatternFill }
+TextRun { text, bold, bold_explicit, italic, font_size, color, font_face, ea_font, cs_font, sym_font, underline, strike, baseline, char_spacing, kern, cap, hlink_rid, hlink_mouse_over_rid, effects: EffectList, outline_color: Color, outline_w: Int, text_grad_fill: GradientFill, text_patt_fill: PatternFill, math_xml: String }
 BodyProps { anchor, l_ins, t_ins, r_ins, b_ins, auto_fit, font_scale, ln_spc_reduction, wrap, rot, vert, num_cols, col_spacing, warp_prst: String, warp_av1, warp_av2: Int }
 
 TableData { col_widths: Array[Int], rows: Array[TableRow], style_id: String, first_row/last_row/first_col/last_col/band_row/band_col: Bool }

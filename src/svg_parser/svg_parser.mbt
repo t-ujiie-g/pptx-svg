@@ -385,6 +385,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     text_grad_fill: parse_text_grad_fill(run_node),
                     text_patt_fill: parse_text_patt_fill(run_node),
                     bold_explicit: bold,
+                    math_xml: @xml.xml_unescape(get_da(run_node, "math-xml")),
                   })
                 }
               @xml.XmlNode::Text(text) =>
@@ -414,6 +415,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     text_grad_fill: @ooxml.GradientFill::none(),
                     text_patt_fill: @ooxml.PatternFill::none(),
                     bold_explicit: false,
+                    math_xml: "",
                   })
                 }
             }
@@ -722,6 +724,8 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     end_cxn_idx: get_dai(g_node, "end-cxn-idx"),
     sh_link_rid: get_da(g_node, "sh-link-rid"),
     sh_link_hover_rid: get_da(g_node, "sh-link-hover-rid"),
+    mc_choice_xml: @xml.xml_unescape(get_da(g_node, "mc-choice")),
+    ole_xml: @xml.xml_unescape(get_da(g_node, "ole")),
     effects: parse_effects_from_da(g_node),
     scene_3d: parse_scene_3d_from_da(g_node),
     sp_3d: parse_sp_3d_from_da(g_node),

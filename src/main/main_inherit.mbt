@@ -456,6 +456,7 @@ fn inject_placeholder_auto_content(
         text_grad_fill: @ooxml.GradientFill::none(),
         text_patt_fill: @ooxml.PatternFill::none(),
         bold_explicit: false,
+        math_xml: "",
       }
       let para : @ooxml.TextParagraph = {
         runs: [run],

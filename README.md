@@ -116,6 +116,16 @@ const renderer = new PptxRenderer(options?);
 
 All `update*` methods modify the cached SlideData in-place, mark the slide as modified for export, and return the re-rendered shape SVG. See [`docs/editing-guide.md`](docs/editing-guide.md) for usage patterns.
 
+**Notes & Comments:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getSlideNotes(idx)` | `string[]` | Speaker notes as array of paragraph strings. |
+| `getSlideComments(idx)` | `SlideComment[]` | Comments with text, author ID, date, and position. |
+| `getCommentAuthors()` | `CommentAuthor[]` | All comment authors (id, name, initials). |
+
+Notes and comments are automatically preserved in round-trip export.
+
 **Unit Conversion Helpers:**
 
 ```ts
@@ -157,18 +167,17 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Background**: Solid, gradient, image, pattern backgrounds
 - **3D**: Data preservation for round-trip (bevel, extrusion, contour, material, camera, lighting)
 - **Placeholder auto content**: Slide number, date, footer
+- **Speaker notes**: Read via `getSlideNotes()`, preserved in round-trip export
+- **Comments**: Read via `getSlideComments()` / `getCommentAuthors()`, preserved in round-trip export
+- **SmartArt**: Fallback shapes from `mc:AlternateContent` rendered; `mc:Choice` (DiagramML) preserved for round-trip
+- **OLE / Embedded objects**: Fallback image from `p:oleObj` rendered; original XML preserved for round-trip
+- **Media** (video/audio): Poster frame image rendered; original XML preserved for round-trip
 
-### Not Yet Supported
-
-- **SmartArt** (`dgm:*` DiagramML) - planned: fallback image display
-- **OLE / Embedded objects** (`p:oleObj`) - planned: fallback image display
-- **Media** (video/audio) - planned: poster frame display
-- **WMF images** - cannot be decoded in browser (EMF is supported via built-in converter)
-- **TIFF images** - not supported by browser `<img>`
-- **Math equations** (OMML `m:oMath`) - planned: plain text fallback
-- **Embedded fonts** - uses system font fallback
-- **Speaker notes** (`p:notes`) - planned
-- **Comments** (`p:cmAuthorLst` / `p:cmLst`) - planned
+### Supported with Limitations
+- **WMF images** - binary preserved for round-trip; cannot be rendered in browser (EMF is supported via built-in converter)
+- **TIFF images** - binary preserved for round-trip; not supported by browser `<img>` in all browsers
+- **Math equations** (OMML `m:oMath`) - plain text fallback display; original XML preserved for round-trip
+- **Embedded fonts** - binary preserved for round-trip; uses system font fallback for rendering
 
 ### Out of Scope
 

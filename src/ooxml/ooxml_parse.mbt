@@ -948,6 +948,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     end_cxn_idx: -1,
     sh_link_rid,
     sh_link_hover_rid,
+    mc_choice_xml: "",
+    ole_xml: "",
     effects: parse_effect_lst(sppr_ch, theme),
     scene_3d: parse_scene_3d(sppr_ch),
     sp_3d: parse_sp_3d(sppr_ch),
@@ -970,10 +972,35 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     None => BlipFill::none()
     Some(bf_node) => parse_blip_fill_node(bf_node)
   }
-  // Parse shape hyperlinks from p:nvPicPr/p:cNvPr
-  let (sh_link_rid, sh_link_hover_rid) = match @xml.find_child(ch, "p:nvPicPr") {
-    None => ("", "")
-    Some(nvpic) => parse_cnvpr_links(@xml.get_children(nvpic))
+  // Parse shape hyperlinks from p:nvPicPr/p:cNvPr + detect media (video/audio)
+  let mut sh_link_rid = ""
+  let mut sh_link_hover_rid = ""
+  let mut has_media = false
+  match @xml.find_child(ch, "p:nvPicPr") {
+    None => ()
+    Some(nvpic) => {
+      let nvpic_ch = @xml.get_children(nvpic)
+      let links = parse_cnvpr_links(nvpic_ch)
+      sh_link_rid = links.0
+      sh_link_hover_rid = links.1
+      // Check p:nvPr for a:videoFile or a:audioFile
+      match @xml.find_child(nvpic_ch, "p:nvPr") {
+        None => ()
+        Some(nvpr) => {
+          let nvpr_ch = @xml.get_children(nvpr)
+          match @xml.find_child(nvpr_ch, "a:videoFile") {
+            Some(_) => has_media = true
+            None => ()
+          }
+          if not(has_media) {
+            match @xml.find_child(nvpr_ch, "a:audioFile") {
+              Some(_) => has_media = true
+              None => ()
+            }
+          }
+        }
+      }
+    }
   }
   let mut s = Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
   // Apply stroke properties
@@ -989,6 +1016,10 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   if not(sh_link_rid.is_empty()) || not(sh_link_hover_rid.is_empty()) {
     s = { ..s, sh_link_rid, sh_link_hover_rid }
+  }
+  // For media shapes, preserve original XML for round-trip
+  if has_media {
+    s = { ..s, ole_xml: @xml.serialize_node(pic) }
   }
   s
 }
@@ -1152,6 +1183,46 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
           ShapeKind::ChartShape(chart_data),
           transform,
         )
+      }
+    }
+    None => ()
+  }
+  // Check for OLE object (p:oleObj)
+  match @xml.find_child(gdata_ch, "p:oleObj") {
+    Some(ole_obj) => {
+      // Extract fallback image r:id from p:pic inside oleObj
+      let mut img_rid = ""
+      match @xml.find_child(@xml.get_children(ole_obj), "p:pic") {
+        Some(pic) => {
+          let pic_ch = @xml.get_children(pic)
+          match @xml.find_child(pic_ch, "p:blipFill") {
+            Some(bf) => {
+              let bf_ch = @xml.get_children(bf)
+              match @xml.find_child(bf_ch, "a:blip") {
+                Some(blip) =>
+                  img_rid = match @xml.get_attr(blip, "r:embed") {
+                    Some(v) => v
+                    None => ""
+                  }
+                None => ()
+              }
+            }
+            None => ()
+          }
+        }
+        None => ()
+      }
+      // Serialize entire graphicFrame as ole_xml for round-trip
+      let ole_raw = @xml.serialize_node(gf)
+      if not(img_rid.is_empty()) {
+        // Render as Picture with the fallback image
+        return {
+          ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
+          ole_xml: ole_raw,
+        }
+      } else {
+        // No fallback image available; preserve OLE data as empty shape
+        return { ..Shape::default_with(ShapeKind::Other, transform), ole_xml: ole_raw }
       }
     }
     None => ()
@@ -1895,6 +1966,39 @@ fn parse_shapes_from_children(
           shapes.push(parse_grp_sp(children[i], theme))
         } else if tag == "p:cxnSp" {
           shapes.push(parse_cxn_sp(children[i], theme))
+        } else if tag == "mc:AlternateContent" {
+          let ac_ch = @xml.get_children(children[i])
+          let mut choice_xml = ""
+          let mut fallback_node : @xml.XmlNode? = None
+          let mut j = 0
+          while j < ac_ch.length() {
+            match ac_ch[j] {
+              @xml.XmlNode::Element(ac_tag, _, _) =>
+                if ac_tag == "mc:Choice" {
+                  choice_xml = @xml.serialize_node(ac_ch[j])
+                } else if ac_tag == "mc:Fallback" {
+                  fallback_node = Some(ac_ch[j])
+                }
+              _ => ()
+            }
+            j = j + 1
+          }
+          match fallback_node {
+            Some(fb) => {
+              let fb_shapes = parse_shapes_from_children(
+                @xml.get_children(fb),
+                theme,
+              )
+              let mut k = 0
+              while k < fb_shapes.length() {
+                shapes.push(
+                  { ..fb_shapes[k], mc_choice_xml: choice_xml },
+                )
+                k = k + 1
+              }
+            }
+            None => ()
+          }
         }
       _ => ()
     }

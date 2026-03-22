@@ -482,10 +482,15 @@ fn serialize_text_body_inner(
     let mut ri = 0
     while ri < nr {
       let run = para.runs[ri]
-      out = out + "<a:r>"
-      out = out + serialize_run_props(run)
-      out = out + "<a:t>" + xml_escape(run.text) + "</a:t>"
-      out = out + "</a:r>"
+      if run.math_xml.length() > 0 {
+        // OMML math equation — emit preserved raw XML directly
+        out = out + run.math_xml
+      } else {
+        out = out + "<a:r>"
+        out = out + serialize_run_props(run)
+        out = out + "<a:t>" + xml_escape(run.text) + "</a:t>"
+        out = out + "</a:r>"
+      }
       ri = ri + 1
     }
     // If no runs, emit an empty run to keep the paragraph
@@ -1345,7 +1350,7 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
 }
 
 ///|
-fn serialize_shape(shape : @ooxml.Shape) -> String {
+fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
   match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
       // Connectors with connection refs serialize as p:cxnSp
@@ -1365,6 +1370,24 @@ fn serialize_shape(shape : @ooxml.Shape) -> String {
     @ooxml.ShapeKind::GroupShape(grp) => serialize_group(shape, grp)
     @ooxml.ShapeKind::ChartShape(_) => "" // Charts preserved via chart_xml round-trip
     _ => ""
+  }
+}
+
+///|
+fn serialize_shape(shape : @ooxml.Shape) -> String {
+  // OLE objects: output the preserved graphicFrame XML directly
+  if shape.ole_xml.length() > 0 {
+    return shape.ole_xml
+  }
+  let inner = serialize_shape_inner(shape)
+  if shape.mc_choice_xml.length() == 0 {
+    inner
+  } else {
+    "<mc:AlternateContent>" +
+    shape.mc_choice_xml +
+    "<mc:Fallback>" +
+    inner +
+    "</mc:Fallback></mc:AlternateContent>"
   }
 }
 
@@ -1425,7 +1448,9 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out +
     " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\""
   out = out +
-    " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
+    " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"" +
+    " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"" +
+    " xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\">"
   out = out + "<p:cSld>"
   // Background
   if not(slide.bg_blip_fill.is_none()) {

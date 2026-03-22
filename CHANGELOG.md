@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.1
+
+### Features
+
+- **SmartArt** fallback rendering: parse `mc:AlternateContent` → render `mc:Fallback` shapes, preserve `mc:Choice` (DiagramML) for round-trip
+- **OLE / Embedded objects**: render fallback image from `p:oleObj/p:pic`, preserve original XML for round-trip
+- **Media** (video/audio): render poster frame image, preserve `a:videoFile`/`a:audioFile` XML for round-trip
+- **Math equations** (OMML `m:oMath`): plain text fallback display from `m:t` elements, preserve original XML for round-trip
+- **Speaker notes** API: `getSlideNotes()` returns paragraph text, preserved in round-trip export
+- **Comments** API: `getSlideComments()` / `getCommentAuthors()` for reading comments, preserved in round-trip export
+- Log level control via `logLevel` option (`'silent'` | `'error'` | `'warn'` | `'info'` | `'debug'`)
+
+### Bug Fixes
+
+- Fix ZIP extraction for PPTX files with data descriptor flag (bit 3) — use Central Directory for reliable entry sizes instead of local headers, fixing read errors with Google Slides exports
+- Fix emoji rendering in text runs
+
+### Improvements
+
+- WMF / TIFF / embedded font binaries preserved in round-trip export (no rendering, system font fallback)
+
+### Documentation
+
+- Add SmartArt, OLE, Media, Math attributes to `docs/svg-specification.md`
+- Update README feature lists and supported features sections
+- Consolidate Python test generator imports
+
 ## 0.4.0
 
 ### Features

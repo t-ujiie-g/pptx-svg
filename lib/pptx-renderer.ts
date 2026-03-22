@@ -35,6 +35,23 @@ export interface MeasureTextFn {
   (text: string, fontFace: string, fontSizePx: number): number;
 }
 
+/** A comment on a slide. */
+export interface SlideComment {
+  authorId: number;
+  date: string;
+  index: number;
+  text: string;
+  x: number;
+  y: number;
+}
+
+/** A comment author in the presentation. */
+export interface CommentAuthor {
+  id: number;
+  name: string;
+  initials: string;
+}
+
 /** Log level for controlling console output. */
 export type LogLevel = 'silent' | 'error' | 'warn' | 'info' | 'debug';
 
@@ -243,6 +260,42 @@ export class PptxRenderer {
     return buildZip(this.originalBuffer, modifications);
   }
 
+  // ── Notes & Comments API ──────────────────────────────────────────────────
+
+  /**
+   * Get speaker notes text for a slide (0-indexed).
+   * @returns Array of paragraph strings, or empty array if no notes exist.
+   */
+  getSlideNotes(slideIdx: number): string[] {
+    const notesPath = this.resolveRelTarget(slideIdx, 'notesSlide');
+    if (!notesPath) return [];
+    const xml = this.files.get(notesPath);
+    if (!xml) return [];
+    return this.extractNotesText(xml);
+  }
+
+  /**
+   * Get comments for a slide (0-indexed).
+   * @returns Array of comment objects, or empty array if no comments exist.
+   */
+  getSlideComments(slideIdx: number): SlideComment[] {
+    const commentsPath = this.resolveRelTarget(slideIdx, 'comments');
+    if (!commentsPath) return [];
+    const xml = this.files.get(commentsPath);
+    if (!xml) return [];
+    return this.parseComments(xml);
+  }
+
+  /**
+   * Get comment authors defined in the presentation.
+   * @returns Array of author objects, or empty array if none exist.
+   */
+  getCommentAuthors(): CommentAuthor[] {
+    const xml = this.files.get('ppt/commentAuthors.xml');
+    if (!xml) return [];
+    return this.parseCommentAuthors(xml);
+  }
+
   // ── Shape-level editing API ────────────────────────────────────────────────
 
   /**
@@ -326,23 +379,6 @@ export class PptxRenderer {
     return n;
   }
 
-  /** Build a CSS font shorthand-safe font-family string with fallbacks. */
-  private buildCssFontFamily(fontFace: string): string {
-    const names: string[] = [];
-    // Add the primary font
-    if (fontFace) names.push(PptxRenderer.quoteFontName(fontFace));
-    // Add fallbacks from cache (comma-separated string)
-    const fb = this.fontFallbackCache.get(fontFace);
-    if (fb) {
-      for (const f of fb.split(',')) {
-        const q = PptxRenderer.quoteFontName(f);
-        if (q) names.push(q);
-      }
-    }
-    names.push('sans-serif');
-    return names.join(', ');
-  }
-
   /** Measure the rendered pixel width of text. */
   private measureText(text: string, fontFace: string, fontSizePx: number): number {
     if (this.measureTextFn) {
@@ -362,5 +398,112 @@ export class PptxRenderer {
     const quoted = PptxRenderer.quoteFontName(fontFace) || 'sans-serif';
     this.ctx.font = `${fontSizePx}px ${quoted}`;
     return this.ctx.measureText(text).width;
+  }
+
+  // ── Notes & Comments helpers ─────────────────────────────────────────────
+
+  /**
+   * Resolve a relationship target path for a slide.
+   * @param slideIdx - 0-indexed slide index
+   * @param relType - last segment of the relationship type (e.g. 'notesSlide', 'comments')
+   */
+  private resolveRelTarget(slideIdx: number, relType: string): string | null {
+    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+    const relsXml = this.files.get(relsPath);
+    if (!relsXml) return null;
+
+    // Find Relationship with matching Type
+    const re = new RegExp(
+      `<Relationship[^>]+Type="[^"]*/${relType}"[^>]+Target="([^"]+)"`,
+    );
+    const m = relsXml.match(re);
+    if (!m) {
+      // Try reversed attribute order (Target before Type)
+      const re2 = new RegExp(
+        `<Relationship[^>]+Target="([^"]+)"[^>]+Type="[^"]*/${relType}"`,
+      );
+      const m2 = relsXml.match(re2);
+      if (!m2) return null;
+      return this.resolveRelPath('ppt/slides/', m2[1]);
+    }
+    return this.resolveRelPath('ppt/slides/', m[1]);
+  }
+
+  /** Resolve a relative path like "../notesSlides/notesSlide1.xml" from a base dir. */
+  private resolveRelPath(baseDir: string, target: string): string {
+    if (target.startsWith('/')) return target.slice(1); // absolute
+    const parts = (baseDir + target).split('/');
+    const resolved: string[] = [];
+    for (const p of parts) {
+      if (p === '..') resolved.pop();
+      else if (p && p !== '.') resolved.push(p);
+    }
+    return resolved.join('/');
+  }
+
+  /** Extract text paragraphs from a notesSlide XML (body placeholder). */
+  private extractNotesText(xml: string): string[] {
+    const paragraphs: string[] = [];
+    const bodyMatch = xml.match(
+      /<p:sp\b[^]*?<p:ph[^>]+type="body"[^]*?<\/p:sp>/,
+    );
+    if (!bodyMatch) return paragraphs;
+    const bodyXml = bodyMatch[0];
+
+    const paraRegex = /<a:p\b[^>]*>([\s\S]*?)<\/a:p>/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = paraRegex.exec(bodyXml)) !== null) {
+      const paraContent = pm[1];
+      const texts: string[] = [];
+      const tRegex = /<a:t>([\s\S]*?)<\/a:t>/g;
+      let tm: RegExpExecArray | null;
+      while ((tm = tRegex.exec(paraContent)) !== null) {
+        texts.push(tm[1]);
+      }
+      if (texts.length > 0) {
+        paragraphs.push(texts.join(''));
+      }
+    }
+    return paragraphs;
+  }
+
+  /** Parse comments XML into SlideComment array. */
+  private parseComments(xml: string): SlideComment[] {
+    const comments: SlideComment[] = [];
+    const cmRegex = /<p:cm\b([^>]*)>([\s\S]*?)<\/p:cm>/g;
+    let cm: RegExpExecArray | null;
+    while ((cm = cmRegex.exec(xml)) !== null) {
+      const attrs = cm[1];
+      const body = cm[2];
+
+      const authorId = parseInt(attrs.match(/authorId="(\d+)"/)?.[1] ?? '0');
+      const dt = attrs.match(/dt="([^"]+)"/)?.[1] ?? '';
+      const idx = parseInt(attrs.match(/idx="(\d+)"/)?.[1] ?? '0');
+
+      const posMatch = body.match(/<p:pos\s+x="(\d+)"\s+y="(\d+)"/);
+      const x = parseInt(posMatch?.[1] ?? '0');
+      const y = parseInt(posMatch?.[2] ?? '0');
+
+      const textMatch = body.match(/<p:text>([\s\S]*?)<\/p:text>/);
+      const text = textMatch?.[1] ?? '';
+
+      comments.push({ authorId, date: dt, index: idx, text, x, y });
+    }
+    return comments;
+  }
+
+  /** Parse commentAuthors XML into CommentAuthor array. */
+  private parseCommentAuthors(xml: string): CommentAuthor[] {
+    const authors: CommentAuthor[] = [];
+    const authorRegex = /<p:cmAuthor\b([^>]*)\/?>/g;
+    let am: RegExpExecArray | null;
+    while ((am = authorRegex.exec(xml)) !== null) {
+      const attrs = am[1];
+      const id = parseInt(attrs.match(/id="(\d+)"/)?.[1] ?? '0');
+      const name = attrs.match(/name="([^"]+)"/)?.[1] ?? '';
+      const initials = attrs.match(/initials="([^"]+)"/)?.[1] ?? '';
+      authors.push({ id, name, initials });
+    }
+    return authors;
   }
 }

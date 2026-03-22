@@ -99,13 +99,6 @@ function countSlideIds(xml) {
 
 // ── XML helpers ──────────────────────────────────────────────────────────────
 
-/** Simple attribute extraction (no full XML parsing needed) */
-function getAttrValue(xml, tag, attr) {
-  const re = new RegExp(`<${tag}[^>]*\\s${attr}="([^"]*)"`, 's');
-  const m = xml.match(re);
-  return m ? m[1] : null;
-}
-
 /** Check if a tag exists in XML */
 function hasTag(xml, tag) {
   return xml.includes(`<${tag}`) || xml.includes(`<${tag}/`);
@@ -200,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 73', slideCount === 73, `got ${slideCount}`);
+  assert('slide count = 78', slideCount === 78, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 73; i++) {
+  for (let i = 1; i <= 78; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 73; i++) {
+  for (let i = 1; i <= 78; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1328,7 +1321,6 @@ async function testFeaturesPptx() {
 
   // ── Slide 73: Stacked / Percent-stacked bar charts ─────────────────────────
   {
-    const slide73 = textFiles.get('ppt/slides/slide73.xml') || '';
     section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
     // Should have chart references
     const rels73 = textFiles.get('ppt/slides/_rels/slide73.xml.rels') || '';
@@ -1345,6 +1337,129 @@ async function testFeaturesPptx() {
     }
     assert('has percentStacked grouping', foundPercentStacked);
     assert('has stacked grouping', foundStacked);
+  }
+
+  // ── Slide 74: Speaker notes + comments ──────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 74: Speaker notes + comments');
+    const slide74 = textFiles.get('ppt/slides/slide74.xml') || '';
+    assert('slide74 has text content', slide74.includes('speaker notes'));
+
+    // Notes
+    const rels74 = textFiles.get('ppt/slides/_rels/slide74.xml.rels') || '';
+    const notesRefs = findRelTarget(rels74, 'notesSlide');
+    assert('slide74 has notesSlide relationship', notesRefs.length > 0);
+
+    // Find and check notes content
+    let notesPath = '';
+    for (const ref of notesRefs) {
+      const resolved = 'ppt/notesSlides/' + ref.replace('../notesSlides/', '');
+      if (textFiles.has(resolved)) { notesPath = resolved; break; }
+    }
+    assert('notesSlide XML exists', notesPath !== '');
+    if (notesPath) {
+      const notesXml = textFiles.get(notesPath) || '';
+      assert('notes contain speaker notes text', notesXml.includes('speaker notes for slide 74'));
+      assert('notes have multiple paragraphs', notesXml.includes('round-trip preservation'));
+    }
+
+    // Comments
+    const commentRefs = findRelTarget(rels74, 'comments');
+    assert('slide74 has comments relationship', commentRefs.length > 0);
+
+    // Check commentAuthors
+    const authorsXml = textFiles.get('ppt/commentAuthors.xml') || '';
+    assert('commentAuthors.xml exists', authorsXml.length > 0);
+    assert('commentAuthors has Test User', authorsXml.includes('name="Test User"'));
+    assert('commentAuthors has initials', authorsXml.includes('initials="TU"'));
+
+    // Check comments content
+    let commentsPath = '';
+    for (const ref of commentRefs) {
+      const resolved = 'ppt/comments/' + ref.replace('../comments/', '');
+      if (textFiles.has(resolved)) { commentsPath = resolved; break; }
+    }
+    assert('comments XML exists', commentsPath !== '');
+    if (commentsPath) {
+      const commentsXml = textFiles.get(commentsPath) || '';
+      assert('comments contain test comment', commentsXml.includes('test comment on slide 74'));
+      assert('comments contain review feedback', commentsXml.includes('review feedback'));
+      assert('comments have position data', commentsXml.includes('<p:pos'));
+      assert('comments have 2 entries', (commentsXml.match(/<p:cm\b/g) || []).length === 2);
+    }
+  }
+
+  // ── Slide 75: SmartArt fallback (mc:AlternateContent) ─────────────────────
+  {
+    section('test_features.pptx — Slide 75: SmartArt fallback');
+    const slide75 = textFiles.get('ppt/slides/slide75.xml') || '';
+    assert('slide75 exists', slide75.length > 0);
+    assert('slide75 has mc:AlternateContent', slide75.includes('mc:AlternateContent'));
+    assert('slide75 has mc:Choice', slide75.includes('mc:Choice'));
+    assert('slide75 has mc:Fallback', slide75.includes('mc:Fallback'));
+    assert('slide75 has grpSp in fallback', slide75.includes('p:grpSp'));
+    // Check that the fallback contains our 3 process boxes
+    assert('slide75 has roundRect shapes', slide75.includes('roundRect'));
+    const spCount = (slide75.match(/<p:sp\b/g) || []).length;
+    assert('slide75 has at least 4 p:sp elements (3 boxes + title)', spCount >= 4);
+    // Check text content of SmartArt boxes
+    assert('slide75 has "Plan" text', slide75.includes('Plan'));
+    assert('slide75 has "Build" text', slide75.includes('Build'));
+    assert('slide75 has "Ship" text', slide75.includes('Ship'));
+    // Check fill colors
+    assert('slide75 has blue fill (4472C4)', slide75.includes('4472C4'));
+    assert('slide75 has orange fill (ED7D31)', slide75.includes('ED7D31'));
+    assert('slide75 has green fill (70AD47)', slide75.includes('70AD47'));
+  }
+
+  // ── Slide 76: OLE embedded object ──────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 76: OLE embedded object');
+    const slide76 = textFiles.get('ppt/slides/slide76.xml') || '';
+    assert('slide76 exists', slide76.length > 0);
+    assert('slide76 has p:graphicFrame', slide76.includes('p:graphicFrame'));
+    assert('slide76 has p:oleObj', slide76.includes('p:oleObj'));
+    assert('slide76 has OLE URI', slide76.includes('presentationml/2006/ole'));
+    assert('slide76 has progId Excel.Sheet.12', slide76.includes('Excel.Sheet.12'));
+    assert('slide76 has p:embed', slide76.includes('p:embed'));
+    assert('slide76 has fallback p:pic', slide76.includes('p:pic'));
+    assert('slide76 has blip r:embed', slide76.includes('r:embed'));
+    assert('slide76 has OLE name', slide76.includes('Embedded Spreadsheet'));
+    // Check rels for image and OLE binary
+    const rels76 = textFiles.get('ppt/slides/_rels/slide76.xml.rels') || '';
+    assert('slide76 has image relationship', rels76.includes('image'));
+    assert('slide76 has oleObject relationship', rels76.includes('oleObject'));
+  }
+
+  // ── Slide 77: Media (video with poster frame) ─────────────────────────────
+  {
+    section('test_features.pptx — Slide 77: Media (video with poster frame)');
+    const slide77 = textFiles.get('ppt/slides/slide77.xml') || '';
+    assert('slide77 exists', slide77.length > 0);
+    assert('slide77 has p:pic', slide77.includes('p:pic'));
+    assert('slide77 has a:videoFile', slide77.includes('a:videoFile'));
+    assert('slide77 has r:link for video', slide77.includes('r:link'));
+    assert('slide77 has p:blipFill for poster', slide77.includes('p:blipFill'));
+    assert('slide77 has a:blip r:embed', slide77.includes('r:embed'));
+    // Check rels for video and image
+    const rels77 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
+    assert('slide77 has image relationship', rels77.includes('image'));
+    assert('slide77 has video relationship', rels77.includes('video'));
+  }
+
+  // ── Slide 78: Math equation (OMML) ──────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 78: Math equation (OMML)');
+    const slide78 = textFiles.get('ppt/slides/slide78.xml') || '';
+    assert('slide78 exists', slide78.length > 0);
+    assert('slide78 has m:oMathPara', slide78.includes('m:oMathPara'));
+    assert('slide78 has m:oMath', slide78.includes('m:oMath'));
+    assert('slide78 has m:r (math run)', slide78.includes('<m:r>'));
+    assert('slide78 has m:t (math text)', slide78.includes('<m:t>'));
+    assert('slide78 has m:f (fraction)', slide78.includes('<m:f>'));
+    assert('slide78 has m:rad (radical)', slide78.includes('<m:rad>'));
+    assert('slide78 has m:sSup (superscript)', slide78.includes('<m:sSup>'));
+    assert('slide78 has xmlns:m namespace', slide78.includes('xmlns:m='));
   }
 }
 
