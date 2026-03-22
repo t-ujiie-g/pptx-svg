@@ -1370,6 +1370,10 @@ fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
 
 ///|
 fn serialize_shape(shape : @ooxml.Shape) -> String {
+  // OLE objects: output the preserved graphicFrame XML directly
+  if shape.ole_xml.length() > 0 {
+    return shape.ole_xml
+  }
   let inner = serialize_shape_inner(shape)
   if shape.mc_choice_xml.length() == 0 {
     inner

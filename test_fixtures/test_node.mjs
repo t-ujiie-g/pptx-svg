@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 75', slideCount === 75, `got ${slideCount}`);
+  assert('slide count = 76', slideCount === 76, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 75; i++) {
+  for (let i = 1; i <= 76; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 75; i++) {
+  for (let i = 1; i <= 76; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1410,6 +1410,25 @@ async function testFeaturesPptx() {
     assert('slide75 has blue fill (4472C4)', slide75.includes('4472C4'));
     assert('slide75 has orange fill (ED7D31)', slide75.includes('ED7D31'));
     assert('slide75 has green fill (70AD47)', slide75.includes('70AD47'));
+  }
+
+  // ── Slide 76: OLE embedded object ──────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 76: OLE embedded object');
+    const slide76 = textFiles.get('ppt/slides/slide76.xml') || '';
+    assert('slide76 exists', slide76.length > 0);
+    assert('slide76 has p:graphicFrame', slide76.includes('p:graphicFrame'));
+    assert('slide76 has p:oleObj', slide76.includes('p:oleObj'));
+    assert('slide76 has OLE URI', slide76.includes('presentationml/2006/ole'));
+    assert('slide76 has progId Excel.Sheet.12', slide76.includes('Excel.Sheet.12'));
+    assert('slide76 has p:embed', slide76.includes('p:embed'));
+    assert('slide76 has fallback p:pic', slide76.includes('p:pic'));
+    assert('slide76 has blip r:embed', slide76.includes('r:embed'));
+    assert('slide76 has OLE name', slide76.includes('Embedded Spreadsheet'));
+    // Check rels for image and OLE binary
+    const rels76 = textFiles.get('ppt/slides/_rels/slide76.xml.rels') || '';
+    assert('slide76 has image relationship', rels76.includes('image'));
+    assert('slide76 has oleObject relationship', rels76.includes('oleObject'));
   }
 }
 

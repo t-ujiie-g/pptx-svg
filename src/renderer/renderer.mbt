@@ -1305,6 +1305,11 @@ pub fn render_shape(
     } else {
       ""
     }) +
+    (if shape.ole_xml.length() > 0 {
+      " data-ooxml-ole=\"" + @xml.xml_escape(shape.ole_xml) + "\""
+    } else {
+      ""
+    }) +
     // Effect data attributes for round-trip
     (if not(shape.effects.is_none()) {
       let eff = shape.effects

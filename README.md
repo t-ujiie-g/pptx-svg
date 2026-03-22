@@ -170,9 +170,10 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Speaker notes**: Read via `getSlideNotes()`, preserved in round-trip export
 - **Comments**: Read via `getSlideComments()` / `getCommentAuthors()`, preserved in round-trip export
 - **SmartArt**: Fallback shapes from `mc:AlternateContent` rendered; `mc:Choice` (DiagramML) preserved for round-trip
+- **OLE / Embedded objects**: Fallback image from `p:oleObj` rendered; original XML preserved for round-trip
 
 ### Not Yet Supported
-- **OLE / Embedded objects** (`p:oleObj`) - planned: fallback image display
+
 - **Media** (video/audio) - planned: poster frame display
 - **WMF images** - cannot be decoded in browser (EMF is supported via built-in converter)
 - **TIFF images** - not supported by browser `<img>`

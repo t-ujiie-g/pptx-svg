@@ -723,6 +723,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     sh_link_rid: get_da(g_node, "sh-link-rid"),
     sh_link_hover_rid: get_da(g_node, "sh-link-hover-rid"),
     mc_choice_xml: @xml.xml_unescape(get_da(g_node, "mc-choice")),
+    ole_xml: @xml.xml_unescape(get_da(g_node, "ole")),
     effects: parse_effects_from_da(g_node),
     scene_3d: parse_scene_3d_from_da(g_node),
     sp_3d: parse_sp_3d_from_da(g_node),

@@ -140,6 +140,18 @@ Each shape is rendered as a `<g>` element with these attributes.
 | `data-ooxml-end-cxn-id` | int | End connection shape ID |
 | `data-ooxml-end-cxn-idx` | int | End connection point index |
 
+### SmartArt / AlternateContent
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-mc-choice` | string (XML-escaped) | Raw `mc:Choice` XML for SmartArt round-trip. Present only on shapes parsed from `mc:Fallback`. |
+
+### OLE / Embedded Objects
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-ole` | string (XML-escaped) | Raw `p:graphicFrame` XML for OLE round-trip. The shape renders the fallback image from `p:oleObj/p:pic`. |
+
 ### Custom Geometry
 
 When `data-ooxml-geom="custGeom"`:

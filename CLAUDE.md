@@ -84,6 +84,7 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   paragraphs: Array[TextParagraph], body_props: BodyProps, ph_type: String, ph_idx: Int,
   st_cxn_id: Int, st_cxn_idx: Int, end_cxn_id: Int, end_cxn_idx: Int,
   sh_link_rid: String, sh_link_hover_rid: String,
+  mc_choice_xml: String, ole_xml: String,
   effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | ChartShape(ChartData) | Other

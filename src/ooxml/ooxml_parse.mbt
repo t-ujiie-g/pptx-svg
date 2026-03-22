@@ -949,6 +949,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     sh_link_rid,
     sh_link_hover_rid,
     mc_choice_xml: "",
+    ole_xml: "",
     effects: parse_effect_lst(sppr_ch, theme),
     scene_3d: parse_scene_3d(sppr_ch),
     sp_3d: parse_sp_3d(sppr_ch),
@@ -1153,6 +1154,46 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
           ShapeKind::ChartShape(chart_data),
           transform,
         )
+      }
+    }
+    None => ()
+  }
+  // Check for OLE object (p:oleObj)
+  match @xml.find_child(gdata_ch, "p:oleObj") {
+    Some(ole_obj) => {
+      // Extract fallback image r:id from p:pic inside oleObj
+      let mut img_rid = ""
+      match @xml.find_child(@xml.get_children(ole_obj), "p:pic") {
+        Some(pic) => {
+          let pic_ch = @xml.get_children(pic)
+          match @xml.find_child(pic_ch, "p:blipFill") {
+            Some(bf) => {
+              let bf_ch = @xml.get_children(bf)
+              match @xml.find_child(bf_ch, "a:blip") {
+                Some(blip) =>
+                  img_rid = match @xml.get_attr(blip, "r:embed") {
+                    Some(v) => v
+                    None => ""
+                  }
+                None => ()
+              }
+            }
+            None => ()
+          }
+        }
+        None => ()
+      }
+      // Serialize entire graphicFrame as ole_xml for round-trip
+      let ole_raw = @xml.serialize_node(gf)
+      if not(img_rid.is_empty()) {
+        // Render as Picture with the fallback image
+        return {
+          ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
+          ole_xml: ole_raw,
+        }
+      } else {
+        // No fallback image available; preserve OLE data as empty shape
+        return { ..Shape::default_with(ShapeKind::Other, transform), ole_xml: ole_raw }
       }
     }
     None => ()
