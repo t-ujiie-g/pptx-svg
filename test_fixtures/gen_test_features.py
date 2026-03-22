@@ -79,6 +79,7 @@ Slides:
  74. Speaker notes (p:notes) + comments (p:cmAuthorLst / p:cmLst)
  75. SmartArt fallback (mc:AlternateContent with mc:Choice + mc:Fallback group shapes)
  76. OLE embedded object (p:oleObj with fallback image in p:graphicFrame)
+ 77. Media (video with poster frame — a:videoFile in p:nvPr)
 """
 
 from pptx import Presentation
@@ -5304,6 +5305,68 @@ title76 = slide76.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches
 title76.text_frame.paragraphs[0].text = "Slide 76: OLE Embedded Object (p:oleObj)"
 title76.text_frame.paragraphs[0].font.size = Pt(24)
 title76.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 77: Media (video with poster frame) ────────────────────────────────
+
+slide77 = prs.slides.add_slide(blank)
+
+# Create a poster frame image (blue rectangle) for the video
+poster_png = make_tiny_png(30, 100, 200, w=4, h=3)
+
+slide77_idx = len(prs.slides)
+poster_partname = PackURI(f'/ppt/media/posterFrame{slide77_idx}.png')
+poster_part = OpcPart(
+    poster_partname,
+    'image/png',
+    prs.part.package,
+    poster_png,
+)
+poster_rel = slide77.part.relate_to(poster_part, RT.IMAGE)
+
+# Create a dummy video part
+video_partname = PackURI(f'/ppt/media/video{slide77_idx}.mp4')
+video_part = OpcPart(
+    video_partname,
+    'video/mp4',
+    prs.part.package,
+    b'\x00' * 32,  # Minimal dummy data
+)
+video_rel = slide77.part.relate_to(
+    video_part,
+    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/video',
+)
+
+# Inject p:pic with a:videoFile into spTree
+slide77_sp_tree = slide77.shapes._spTree
+
+vid_pic = etree.SubElement(slide77_sp_tree, f'{{{P_NS}}}pic')
+
+# nvPicPr
+vid_nv = etree.SubElement(vid_pic, f'{{{P_NS}}}nvPicPr')
+etree.SubElement(vid_nv, f'{{{P_NS}}}cNvPr', attrib={'id': '300', 'name': 'Video Placeholder'})
+etree.SubElement(vid_nv, f'{{{P_NS}}}cNvPicPr')
+vid_nvpr = etree.SubElement(vid_nv, f'{{{P_NS}}}nvPr')
+etree.SubElement(vid_nvpr, f'{{{A_NS}}}videoFile', attrib={f'{{{R_NS}}}link': video_rel})
+
+# blipFill (poster frame)
+vid_bf = etree.SubElement(vid_pic, f'{{{P_NS}}}blipFill')
+etree.SubElement(vid_bf, f'{{{A_NS}}}blip', attrib={f'{{{R_NS}}}embed': poster_rel})
+etree.SubElement(vid_bf, f'{{{A_NS}}}stretch').append(
+    etree.Element(f'{{{A_NS}}}fillRect'))
+
+# spPr
+vid_sp = etree.SubElement(vid_pic, f'{{{P_NS}}}spPr')
+vid_xfrm = etree.SubElement(vid_sp, f'{{{A_NS}}}xfrm')
+etree.SubElement(vid_xfrm, f'{{{A_NS}}}off', attrib={'x': '1371600', 'y': '1828800'})
+etree.SubElement(vid_xfrm, f'{{{A_NS}}}ext', attrib={'cx': '6858000', 'cy': '3886200'})
+etree.SubElement(vid_sp, f'{{{A_NS}}}prstGeom', attrib={'prst': 'rect'}).append(
+    etree.Element(f'{{{A_NS}}}avLst'))
+
+# Title
+title77 = slide77.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title77.text_frame.paragraphs[0].text = "Slide 77: Media (Video with Poster Frame)"
+title77.text_frame.paragraphs[0].font.size = Pt(24)
+title77.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

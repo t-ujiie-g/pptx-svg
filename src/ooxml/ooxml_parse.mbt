@@ -972,10 +972,35 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     None => BlipFill::none()
     Some(bf_node) => parse_blip_fill_node(bf_node)
   }
-  // Parse shape hyperlinks from p:nvPicPr/p:cNvPr
-  let (sh_link_rid, sh_link_hover_rid) = match @xml.find_child(ch, "p:nvPicPr") {
-    None => ("", "")
-    Some(nvpic) => parse_cnvpr_links(@xml.get_children(nvpic))
+  // Parse shape hyperlinks from p:nvPicPr/p:cNvPr + detect media (video/audio)
+  let mut sh_link_rid = ""
+  let mut sh_link_hover_rid = ""
+  let mut has_media = false
+  match @xml.find_child(ch, "p:nvPicPr") {
+    None => ()
+    Some(nvpic) => {
+      let nvpic_ch = @xml.get_children(nvpic)
+      let links = parse_cnvpr_links(nvpic_ch)
+      sh_link_rid = links.0
+      sh_link_hover_rid = links.1
+      // Check p:nvPr for a:videoFile or a:audioFile
+      match @xml.find_child(nvpic_ch, "p:nvPr") {
+        None => ()
+        Some(nvpr) => {
+          let nvpr_ch = @xml.get_children(nvpr)
+          match @xml.find_child(nvpr_ch, "a:videoFile") {
+            Some(_) => has_media = true
+            None => ()
+          }
+          if not(has_media) {
+            match @xml.find_child(nvpr_ch, "a:audioFile") {
+              Some(_) => has_media = true
+              None => ()
+            }
+          }
+        }
+      }
+    }
   }
   let mut s = Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
   // Apply stroke properties
@@ -991,6 +1016,10 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   if not(sh_link_rid.is_empty()) || not(sh_link_hover_rid.is_empty()) {
     s = { ..s, sh_link_rid, sh_link_hover_rid }
+  }
+  // For media shapes, preserve original XML for round-trip
+  if has_media {
+    s = { ..s, ole_xml: @xml.serialize_node(pic) }
   }
   s
 }

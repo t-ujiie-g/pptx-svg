@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 76', slideCount === 76, `got ${slideCount}`);
+  assert('slide count = 77', slideCount === 77, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 76; i++) {
+  for (let i = 1; i <= 77; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 76; i++) {
+  for (let i = 1; i <= 77; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1429,6 +1429,22 @@ async function testFeaturesPptx() {
     const rels76 = textFiles.get('ppt/slides/_rels/slide76.xml.rels') || '';
     assert('slide76 has image relationship', rels76.includes('image'));
     assert('slide76 has oleObject relationship', rels76.includes('oleObject'));
+  }
+
+  // ── Slide 77: Media (video with poster frame) ─────────────────────────────
+  {
+    section('test_features.pptx — Slide 77: Media (video with poster frame)');
+    const slide77 = textFiles.get('ppt/slides/slide77.xml') || '';
+    assert('slide77 exists', slide77.length > 0);
+    assert('slide77 has p:pic', slide77.includes('p:pic'));
+    assert('slide77 has a:videoFile', slide77.includes('a:videoFile'));
+    assert('slide77 has r:link for video', slide77.includes('r:link'));
+    assert('slide77 has p:blipFill for poster', slide77.includes('p:blipFill'));
+    assert('slide77 has a:blip r:embed', slide77.includes('r:embed'));
+    // Check rels for video and image
+    const rels77 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
+    assert('slide77 has image relationship', rels77.includes('image'));
+    assert('slide77 has video relationship', rels77.includes('video'));
   }
 }
 

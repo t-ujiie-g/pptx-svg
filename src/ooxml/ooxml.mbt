@@ -1478,7 +1478,7 @@ pub(all) struct Shape {
   sh_link_rid : String // shape hyperlink r:id (a:hlinkClick on p:cNvPr)
   sh_link_hover_rid : String // shape hover link r:id (a:hlinkHover on p:cNvPr)
   mc_choice_xml : String // raw mc:Choice XML for SmartArt round-trip; "" = normal shape
-  ole_xml : String // raw OLE graphicFrame XML for round-trip; "" = normal shape
+  ole_xml : String // raw XML for OLE/media round-trip (graphicFrame or p:pic); "" = normal shape
   effects : EffectList // a:effectLst; EffectList::none() = no effects
   scene_3d : Scene3d // a:scene3d
   sp_3d : Shape3d // a:sp3d
