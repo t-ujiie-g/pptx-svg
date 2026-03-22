@@ -29,6 +29,23 @@ fn char_to_str(c : Char) -> String {
   @ffi.ffi_char_code_to_str(Char::to_int(c))
 }
 
+///|
+/// True if the character is in an astral plane (code > 0xFFFF, e.g. emoji).
+pub fn is_astral(c : Char) -> Bool {
+  Char::to_int(c) > 0xFFFF
+}
+
+///|
+/// Return the number of UTF-16 code units for a character.
+/// Astral-plane characters occupy 2 code units (surrogate pair).
+pub fn char_step(c : Char) -> Int {
+  if is_astral(c) {
+    2
+  } else {
+    1
+  }
+}
+
 // ── Parser state ──────────────────────────────────────────────────────────────
 
 ///|
@@ -58,6 +75,12 @@ fn Parser::peek_char(self : Parser) -> Char {
 ///|
 fn Parser::advance(self : Parser) -> Unit {
   self.pos = self.pos + 1
+}
+
+///|
+/// Advance by the correct number of UTF-16 code units for the given character.
+fn Parser::advance_char(self : Parser, c : Char) -> Unit {
+  self.pos = self.pos + char_step(c)
 }
 
 ///|
@@ -99,8 +122,9 @@ fn collect_chars(s : String, start : Int, end_exclusive : Int) -> String {
   let mut result = ""
   let mut i = start
   while i < lim {
-    result = result + char_to_str(s.get_char(i).unwrap())
-    i = i + 1
+    let c = s.get_char(i).unwrap()
+    result = result + char_to_str(c)
+    i = i + char_step(c)
   }
   result
 }
@@ -114,7 +138,7 @@ fn Parser::read_until_char(self : Parser, stop : Char) -> String {
       break
     }
     result = result + char_to_str(c)
-    self.advance()
+    self.advance_char(c)
   }
   result
 }
@@ -126,8 +150,9 @@ fn Parser::read_until_str(self : Parser, stop : String) -> String {
     if self.starts_with(stop) {
       break
     }
-    result = result + char_to_str(self.peek_char())
-    self.advance()
+    let c = self.peek_char()
+    result = result + char_to_str(c)
+    self.advance_char(c)
   }
   result
 }
@@ -141,11 +166,12 @@ fn decode_entities(s : String) -> String {
   let mut has_amp = false
   let mut k = 0
   while k < len {
-    if s.get_char(k).unwrap() == '&' {
+    let kc = s.get_char(k).unwrap()
+    if kc == '&' {
       has_amp = true
       break
     }
-    k = k + 1
+    k = k + char_step(kc)
   }
   if not(has_amp) {
     return s
@@ -176,7 +202,7 @@ fn decode_entities(s : String) -> String {
       i = j + 1
     } else {
       result = result + char_to_str(c)
-      i = i + 1
+      i = i + char_step(c)
     }
   }
   result
@@ -536,9 +562,9 @@ pub fn str_suffix(s : String, from : Int) -> String {
   let mut result = ""
   let mut i = from
   while i < len {
-    result = result +
-      @ffi.ffi_char_code_to_str(Char::to_int(s.get_char(i).unwrap()))
-    i = i + 1
+    let c = s.get_char(i).unwrap()
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    i = i + char_step(c)
   }
   result
 }
@@ -582,9 +608,9 @@ pub fn str_substring(s : String, from : Int, to : Int) -> String {
   let mut result = ""
   let mut i = from
   while i < to {
-    result = result +
-      @ffi.ffi_char_code_to_str(Char::to_int(s.get_char(i).unwrap()))
-    i = i + 1
+    let c = s.get_char(i).unwrap()
+    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    i = i + char_step(c)
   }
   result
 }
@@ -596,12 +622,12 @@ pub fn xml_escape(s : String) -> String {
   let mut needs = false
   let mut k = 0
   while k < len {
-    let c = s.get_char(k).unwrap()
-    if c == '<' || c == '>' || c == '&' || c == '"' || c == '\'' {
+    let kc = s.get_char(k).unwrap()
+    if kc == '<' || kc == '>' || kc == '&' || kc == '"' || kc == '\'' {
       needs = true
       break
     }
-    k = k + 1
+    k = k + char_step(kc)
   }
   if not(needs) {
     return s
@@ -623,7 +649,7 @@ pub fn xml_escape(s : String) -> String {
     } else {
       result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
     }
-    i = i + 1
+    i = i + char_step(c)
   }
   result
 }
@@ -636,13 +662,15 @@ pub fn split_by_space(s : String) -> Array[String] {
   let mut start = 0
   let mut i = 0
   while i < len {
-    if s.get_char(i).unwrap() == ' ' {
+    let c = s.get_char(i).unwrap()
+    let step = char_step(c)
+    if c == ' ' {
       if i > start {
         tokens.push(str_substring(s, start, i))
       }
-      start = i + 1
+      start = i + step
     }
-    i = i + 1
+    i = i + step
   }
   if start < len {
     tokens.push(str_substring(s, start, len))

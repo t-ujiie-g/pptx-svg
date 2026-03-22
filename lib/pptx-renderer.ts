@@ -251,7 +251,7 @@ export class PptxRenderer {
         get_file:         (path: string) => this.files.get(path) ?? '',
         get_entry_list:   () => [...this.files.keys(), ...this.rawFiles.keys()].join('\n'),
         get_file_base64:  (path: string) => bytesToBase64(this.rawFiles.get(path)),
-        char_code_to_str: (n: number) => String.fromCharCode(n),
+        char_code_to_str: (n: number) => String.fromCodePoint(n),
         log:   (msg: string) => console.log('[pptx]', msg),
         warn:  (msg: string) => console.warn('[pptx]', msg),
         error: (msg: string) => console.error('[pptx]', msg),
