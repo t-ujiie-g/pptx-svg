@@ -76,6 +76,7 @@ Slides:
  71. Text gradient fill (a:rPr/a:gradFill — gradient on text)
  72. Text warp (a:prstTxWarp — preset text warp with adjust values)
  73. Stacked / Percent-stacked bar charts (BAR_STACKED_100, COLUMN_STACKED, COLUMN_STACKED_100)
+ 74. Speaker notes (p:notes) + comments (p:cmAuthorLst / p:cmLst)
 """
 
 from pptx import Presentation
@@ -4962,6 +4963,79 @@ lbl73 = slide73.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0
 lbl73.text_frame.paragraphs[0].text = "Slide 73: Stacked / Percent-stacked bar charts"
 lbl73.text_frame.paragraphs[0].font.size = Pt(18)
 lbl73.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 74: Speaker notes + comments ──────────────────────────────────────
+
+slide74 = prs.slides.add_slide(blank)
+
+lbl74 = slide74.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl74.text_frame.paragraphs[0].text = "Slide 74: Speaker notes + comments"
+lbl74.text_frame.paragraphs[0].font.size = Pt(18)
+lbl74.text_frame.paragraphs[0].font.bold = True
+
+body74 = slide74.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(8), Inches(3))
+body74.text_frame.paragraphs[0].text = (
+    "This slide has speaker notes and comments attached.\n"
+    "Notes and comments are metadata not rendered on slide, "
+    "but preserved in round-trip export."
+)
+body74.text_frame.paragraphs[0].font.size = Pt(14)
+body74.text_frame.word_wrap = True
+
+# Add speaker notes
+notes_slide74 = slide74.notes_slide
+notes_tf = notes_slide74.notes_text_frame
+notes_tf.text = ""
+p1 = notes_tf.paragraphs[0]
+p1.text = "These are the speaker notes for slide 74."
+p2 = notes_tf.add_paragraph()
+p2.text = "Second paragraph of notes with key points."
+p3 = notes_tf.add_paragraph()
+p3.text = "Remember to mention the round-trip preservation."
+
+# Add comments via raw XML (python-pptx has no public comment API)
+from pptx.opc.package import Part as OpcPart
+from pptx.opc.packuri import PackURI
+
+authors_xml = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<p:cmAuthorLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+    '<p:cmAuthor id="1" name="Test User" initials="TU" lastIdx="2" clrIdx="0"/>'
+    '</p:cmAuthorLst>'
+)
+
+# Add commentAuthors part
+authors_part = OpcPart(
+    PackURI('/ppt/commentAuthors.xml'),
+    'application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml',
+    prs.part.package,
+    authors_xml.encode('utf-8'),
+)
+prs.part.relate_to(authors_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/commentAuthors')
+
+# Add comments part for slide 74
+comment_xml = (
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    '<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+    '<p:cm authorId="1" dt="2025-01-15T10:30:00.000" idx="1">'
+    '<p:pos x="100" y="200"/>'
+    '<p:text>This is a test comment on slide 74.</p:text>'
+    '</p:cm>'
+    '<p:cm authorId="1" dt="2025-01-15T11:00:00.000" idx="2">'
+    '<p:pos x="300" y="400"/>'
+    '<p:text>Second comment with review feedback.</p:text>'
+    '</p:cm>'
+    '</p:cmLst>'
+)
+
+slide74_idx = len(prs.slides)
+comment_part = OpcPart(
+    PackURI(f'/ppt/comments/comment{slide74_idx}.xml'),
+    'application/vnd.openxmlformats-officedocument.presentationml.comments+xml',
+    prs.part.package,
+    comment_xml.encode('utf-8'),
+)
+slide74.part.relate_to(comment_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments')
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

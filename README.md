@@ -116,6 +116,16 @@ const renderer = new PptxRenderer(options?);
 
 All `update*` methods modify the cached SlideData in-place, mark the slide as modified for export, and return the re-rendered shape SVG. See [`docs/editing-guide.md`](docs/editing-guide.md) for usage patterns.
 
+**Notes & Comments:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getSlideNotes(idx)` | `string[]` | Speaker notes as array of paragraph strings. |
+| `getSlideComments(idx)` | `SlideComment[]` | Comments with text, author ID, date, and position. |
+| `getCommentAuthors()` | `CommentAuthor[]` | All comment authors (id, name, initials). |
+
+Notes and comments are automatically preserved in round-trip export.
+
 **Unit Conversion Helpers:**
 
 ```ts
@@ -157,6 +167,8 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Background**: Solid, gradient, image, pattern backgrounds
 - **3D**: Data preservation for round-trip (bevel, extrusion, contour, material, camera, lighting)
 - **Placeholder auto content**: Slide number, date, footer
+- **Speaker notes**: Read via `getSlideNotes()`, preserved in round-trip export
+- **Comments**: Read via `getSlideComments()` / `getCommentAuthors()`, preserved in round-trip export
 
 ### Not Yet Supported
 
@@ -167,8 +179,6 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **TIFF images** - not supported by browser `<img>`
 - **Math equations** (OMML `m:oMath`) - planned: plain text fallback
 - **Embedded fonts** - uses system font fallback
-- **Speaker notes** (`p:notes`) - planned
-- **Comments** (`p:cmAuthorLst` / `p:cmLst`) - planned
 
 ### Out of Scope
 

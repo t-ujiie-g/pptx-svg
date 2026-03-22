@@ -61,8 +61,8 @@
 
 レンダリング対象外だが、保持が望ましい。
 
-- [ ] **スピーカーノート** (`p:notes`) — パース + round-trip 保持
-- [ ] **コメント** (`p:cmAuthorLst` / `p:cmLst`) — パース + round-trip 保持
+- [x] **スピーカーノート** (`p:notes`) — `getSlideNotes()` API + round-trip 保持
+- [x] **コメント** (`p:cmAuthorLst` / `p:cmLst`) — `getSlideComments()` / `getCommentAuthors()` API + round-trip 保持
 
 ---
 
@@ -87,5 +87,5 @@
 | **P1** | テキスト高度 (ワープ/アウトライン/グラデーション) | 近似 | 完全 | **完了** |
 | **P1** | ライブラリ公開 (ビルド/npm/テスト/ドキュメント/CI) | — | — | **完了** |
 | **P2** | SmartArt/OLE/メディア/EMF/WMF/TIFF/数式/フォント | FB画像 | 完全 | 未着手 |
-| **P3** | ノート/コメント (API取得) | — | 完全 | 未着手 |
+| **P3** | ノート/コメント (API取得) | — | 完全 | **完了** |
 | **—** | アニメーション/トランジション/VBA | — | — | **対象外** |

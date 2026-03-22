@@ -99,13 +99,6 @@ function countSlideIds(xml) {
 
 // ── XML helpers ──────────────────────────────────────────────────────────────
 
-/** Simple attribute extraction (no full XML parsing needed) */
-function getAttrValue(xml, tag, attr) {
-  const re = new RegExp(`<${tag}[^>]*\\s${attr}="([^"]*)"`, 's');
-  const m = xml.match(re);
-  return m ? m[1] : null;
-}
-
 /** Check if a tag exists in XML */
 function hasTag(xml, tag) {
   return xml.includes(`<${tag}`) || xml.includes(`<${tag}/`);
@@ -200,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 73', slideCount === 73, `got ${slideCount}`);
+  assert('slide count = 74', slideCount === 74, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 73; i++) {
+  for (let i = 1; i <= 74; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 73; i++) {
+  for (let i = 1; i <= 74; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1328,7 +1321,6 @@ async function testFeaturesPptx() {
 
   // ── Slide 73: Stacked / Percent-stacked bar charts ─────────────────────────
   {
-    const slide73 = textFiles.get('ppt/slides/slide73.xml') || '';
     section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
     // Should have chart references
     const rels73 = textFiles.get('ppt/slides/_rels/slide73.xml.rels') || '';
@@ -1345,6 +1337,56 @@ async function testFeaturesPptx() {
     }
     assert('has percentStacked grouping', foundPercentStacked);
     assert('has stacked grouping', foundStacked);
+  }
+
+  // ── Slide 74: Speaker notes + comments ──────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 74: Speaker notes + comments');
+    const slide74 = textFiles.get('ppt/slides/slide74.xml') || '';
+    assert('slide74 has text content', slide74.includes('speaker notes'));
+
+    // Notes
+    const rels74 = textFiles.get('ppt/slides/_rels/slide74.xml.rels') || '';
+    const notesRefs = findRelTarget(rels74, 'notesSlide');
+    assert('slide74 has notesSlide relationship', notesRefs.length > 0);
+
+    // Find and check notes content
+    let notesPath = '';
+    for (const ref of notesRefs) {
+      const resolved = 'ppt/notesSlides/' + ref.replace('../notesSlides/', '');
+      if (textFiles.has(resolved)) { notesPath = resolved; break; }
+    }
+    assert('notesSlide XML exists', notesPath !== '');
+    if (notesPath) {
+      const notesXml = textFiles.get(notesPath) || '';
+      assert('notes contain speaker notes text', notesXml.includes('speaker notes for slide 74'));
+      assert('notes have multiple paragraphs', notesXml.includes('round-trip preservation'));
+    }
+
+    // Comments
+    const commentRefs = findRelTarget(rels74, 'comments');
+    assert('slide74 has comments relationship', commentRefs.length > 0);
+
+    // Check commentAuthors
+    const authorsXml = textFiles.get('ppt/commentAuthors.xml') || '';
+    assert('commentAuthors.xml exists', authorsXml.length > 0);
+    assert('commentAuthors has Test User', authorsXml.includes('name="Test User"'));
+    assert('commentAuthors has initials', authorsXml.includes('initials="TU"'));
+
+    // Check comments content
+    let commentsPath = '';
+    for (const ref of commentRefs) {
+      const resolved = 'ppt/comments/' + ref.replace('../comments/', '');
+      if (textFiles.has(resolved)) { commentsPath = resolved; break; }
+    }
+    assert('comments XML exists', commentsPath !== '');
+    if (commentsPath) {
+      const commentsXml = textFiles.get(commentsPath) || '';
+      assert('comments contain test comment', commentsXml.includes('test comment on slide 74'));
+      assert('comments contain review feedback', commentsXml.includes('review feedback'));
+      assert('comments have position data', commentsXml.includes('<p:pos'));
+      assert('comments have 2 entries', (commentsXml.match(/<p:cm\b/g) || []).length === 2);
+    }
   }
 }
 
