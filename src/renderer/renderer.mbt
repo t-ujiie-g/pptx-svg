@@ -1300,6 +1300,11 @@ pub fn render_shape(
     dai("end-cxn-idx", shape.end_cxn_idx) +
     da("sh-link-rid", shape.sh_link_rid) +
     da("sh-link-hover-rid", shape.sh_link_hover_rid) +
+    (if shape.mc_choice_xml.length() > 0 {
+      " data-ooxml-mc-choice=\"" + @xml.xml_escape(shape.mc_choice_xml) + "\""
+    } else {
+      ""
+    }) +
     // Effect data attributes for round-trip
     (if not(shape.effects.is_none()) {
       let eff = shape.effects

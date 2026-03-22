@@ -1345,7 +1345,7 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
 }
 
 ///|
-fn serialize_shape(shape : @ooxml.Shape) -> String {
+fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
   match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
       // Connectors with connection refs serialize as p:cxnSp
@@ -1365,6 +1365,20 @@ fn serialize_shape(shape : @ooxml.Shape) -> String {
     @ooxml.ShapeKind::GroupShape(grp) => serialize_group(shape, grp)
     @ooxml.ShapeKind::ChartShape(_) => "" // Charts preserved via chart_xml round-trip
     _ => ""
+  }
+}
+
+///|
+fn serialize_shape(shape : @ooxml.Shape) -> String {
+  let inner = serialize_shape_inner(shape)
+  if shape.mc_choice_xml.length() == 0 {
+    inner
+  } else {
+    "<mc:AlternateContent>" +
+    shape.mc_choice_xml +
+    "<mc:Fallback>" +
+    inner +
+    "</mc:Fallback></mc:AlternateContent>"
   }
 }
 
@@ -1425,7 +1439,8 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out +
     " xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\""
   out = out +
-    " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">"
+    " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"" +
+    " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\">"
   out = out + "<p:cSld>"
   // Background
   if not(slide.bg_blip_fill.is_none()) {

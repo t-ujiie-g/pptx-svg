@@ -948,6 +948,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     end_cxn_idx: -1,
     sh_link_rid,
     sh_link_hover_rid,
+    mc_choice_xml: "",
     effects: parse_effect_lst(sppr_ch, theme),
     scene_3d: parse_scene_3d(sppr_ch),
     sp_3d: parse_sp_3d(sppr_ch),
@@ -1895,6 +1896,39 @@ fn parse_shapes_from_children(
           shapes.push(parse_grp_sp(children[i], theme))
         } else if tag == "p:cxnSp" {
           shapes.push(parse_cxn_sp(children[i], theme))
+        } else if tag == "mc:AlternateContent" {
+          let ac_ch = @xml.get_children(children[i])
+          let mut choice_xml = ""
+          let mut fallback_node : @xml.XmlNode? = None
+          let mut j = 0
+          while j < ac_ch.length() {
+            match ac_ch[j] {
+              @xml.XmlNode::Element(ac_tag, _, _) =>
+                if ac_tag == "mc:Choice" {
+                  choice_xml = @xml.serialize_node(ac_ch[j])
+                } else if ac_tag == "mc:Fallback" {
+                  fallback_node = Some(ac_ch[j])
+                }
+              _ => ()
+            }
+            j = j + 1
+          }
+          match fallback_node {
+            Some(fb) => {
+              let fb_shapes = parse_shapes_from_children(
+                @xml.get_children(fb),
+                theme,
+              )
+              let mut k = 0
+              while k < fb_shapes.length() {
+                shapes.push(
+                  { ..fb_shapes[k], mc_choice_xml: choice_xml },
+                )
+                k = k + 1
+              }
+            }
+            None => ()
+          }
         }
       _ => ()
     }

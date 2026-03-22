@@ -77,6 +77,7 @@ Slides:
  72. Text warp (a:prstTxWarp — preset text warp with adjust values)
  73. Stacked / Percent-stacked bar charts (BAR_STACKED_100, COLUMN_STACKED, COLUMN_STACKED_100)
  74. Speaker notes (p:notes) + comments (p:cmAuthorLst / p:cmLst)
+ 75. SmartArt fallback (mc:AlternateContent with mc:Choice + mc:Fallback group shapes)
 """
 
 from pptx import Presentation
@@ -5036,6 +5037,165 @@ comment_part = OpcPart(
     comment_xml.encode('utf-8'),
 )
 slide74.part.relate_to(comment_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments')
+
+# ── Slide 75: SmartArt fallback (mc:AlternateContent) ────────────────────────
+
+slide75 = prs.slides.add_slide(blank)
+
+# We inject raw XML with mc:AlternateContent containing:
+#   mc:Choice  → dummy p:graphicFrame referencing diagram (preserved for round-trip)
+#   mc:Fallback → p:grpSp with 3 rectangles representing a simple process flow
+slide75_sp_tree = slide75.shapes._spTree
+# Register mc: namespace prefix on the root <p:sld> element so lxml uses mc: prefix
+sld_root = slide75_sp_tree.getparent()  # p:cSld -> p:sld
+if sld_root is not None and sld_root.getparent() is not None:
+    sld_root = sld_root.getparent()
+MC_NS = 'http://schemas.openxmlformats.org/markup-compatibility/2006'
+DGM_NS = 'http://schemas.openxmlformats.org/drawingml/2006/diagram'
+etree.register_namespace('mc', MC_NS)
+etree.register_namespace('dgm', DGM_NS)
+
+mc_ac = etree.SubElement(slide75_sp_tree, f'{{{MC_NS}}}AlternateContent')
+
+# mc:Choice — dummy SmartArt reference (for round-trip preservation)
+mc_choice = etree.SubElement(mc_ac, f'{{{MC_NS}}}Choice', attrib={'Requires': 'dgm'})
+choice_gf = etree.SubElement(mc_choice,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}graphicFrame')
+choice_nvgf = etree.SubElement(choice_gf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvGraphicFramePr')
+choice_cnvpr = etree.SubElement(choice_nvgf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvPr',
+    attrib={'id': '100', 'name': 'SmartArt Diagram'})
+choice_cnvgf = etree.SubElement(choice_nvgf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvGraphicFramePr')
+choice_nvpr = etree.SubElement(choice_nvgf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvPr')
+choice_xfrm = etree.SubElement(choice_gf,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}xfrm')
+etree.SubElement(choice_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}off',
+    attrib={'x': '457200', 'y': '1371600'})
+etree.SubElement(choice_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}ext',
+    attrib={'cx': '8229600', 'y': '4572000'})
+# Dummy graphic with dgm:relIds
+choice_graphic = etree.SubElement(choice_gf,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}graphic')
+choice_gd = etree.SubElement(choice_graphic,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}graphicData',
+    attrib={'uri': 'http://schemas.openxmlformats.org/drawingml/2006/diagram'})
+etree.SubElement(choice_gd,
+    f'{{{DGM_NS}}}relIds',
+    attrib={
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}dm': 'rId10',
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}lo': 'rId11',
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}qs': 'rId12',
+        '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}cs': 'rId13',
+    })
+
+# mc:Fallback — pre-rendered shapes (3 rectangles as a simple process flow)
+mc_fallback = etree.SubElement(mc_ac,
+    f'{{{MC_NS}}}Fallback')
+
+# Create a group shape containing 3 process boxes
+grp_sp = etree.SubElement(mc_fallback,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}grpSp')
+grp_nv = etree.SubElement(grp_sp,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvGrpSpPr')
+etree.SubElement(grp_nv,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvPr',
+    attrib={'id': '101', 'name': 'SmartArt Fallback Group'})
+etree.SubElement(grp_nv,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvGrpSpPr')
+etree.SubElement(grp_nv,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}nvPr')
+
+grp_sp_pr = etree.SubElement(grp_sp,
+    '{http://schemas.openxmlformats.org/presentationml/2006/main}grpSpPr')
+grp_xfrm = etree.SubElement(grp_sp_pr,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}off',
+    attrib={'x': '457200', 'y': '1371600'})
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}ext',
+    attrib={'cx': '8229600', 'cy': '2743200'})
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}chOff',
+    attrib={'x': '0', 'y': '0'})
+etree.SubElement(grp_xfrm,
+    '{http://schemas.openxmlformats.org/drawingml/2006/main}chExt',
+    attrib={'cx': '8229600', 'cy': '2743200'})
+
+# Helper to add a rectangle shape inside the group
+def add_smartart_box(parent, sp_id, name, x, y, cx, cy, text, fill_hex):
+    sp = etree.SubElement(parent,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}sp')
+    nv = etree.SubElement(sp,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}nvSpPr')
+    etree.SubElement(nv,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvPr',
+        attrib={'id': str(sp_id), 'name': name})
+    etree.SubElement(nv,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}cNvSpPr')
+    etree.SubElement(nv,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}nvPr')
+    spPr = etree.SubElement(sp,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}spPr')
+    xfrm = etree.SubElement(spPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm')
+    etree.SubElement(xfrm,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}off',
+        attrib={'x': str(x), 'y': str(y)})
+    etree.SubElement(xfrm,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}ext',
+        attrib={'cx': str(cx), 'cy': str(cy)})
+    etree.SubElement(spPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}prstGeom',
+        attrib={'prst': 'roundRect'}).append(
+        etree.Element('{http://schemas.openxmlformats.org/drawingml/2006/main}avLst'))
+    solid = etree.SubElement(spPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+    etree.SubElement(solid,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr',
+        attrib={'val': fill_hex})
+    # Text body
+    txBody = etree.SubElement(sp,
+        '{http://schemas.openxmlformats.org/presentationml/2006/main}txBody')
+    bodyPr = etree.SubElement(txBody,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}bodyPr',
+        attrib={'anchor': 'ctr', 'wrap': 'square'})
+    etree.SubElement(txBody,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}lstStyle')
+    p = etree.SubElement(txBody,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}p')
+    pPr = etree.SubElement(p,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}pPr',
+        attrib={'algn': 'ctr'})
+    r = etree.SubElement(p,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}r')
+    rPr = etree.SubElement(r,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}rPr',
+        attrib={'lang': 'en-US', 'sz': '1800', 'b': '1'})
+    solid_font = etree.SubElement(rPr,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+    etree.SubElement(solid_font,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr',
+        attrib={'val': 'FFFFFF'})
+    t = etree.SubElement(r,
+        '{http://schemas.openxmlformats.org/drawingml/2006/main}t')
+    t.text = text
+
+# Three process boxes: Plan → Build → Ship
+add_smartart_box(grp_sp, 102, 'Step 1', 0, 457200, 2286000, 1828800, 'Plan', '4472C4')
+add_smartart_box(grp_sp, 103, 'Step 2', 2971800, 457200, 2286000, 1828800, 'Build', 'ED7D31')
+add_smartart_box(grp_sp, 104, 'Step 3', 5943600, 457200, 2286000, 1828800, 'Ship', '70AD47')
+
+# Also add a title textbox
+title75 = slide75.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title75.text_frame.paragraphs[0].text = "Slide 75: SmartArt Fallback (mc:AlternateContent)"
+title75.text_frame.paragraphs[0].font.size = Pt(24)
+title75.text_frame.paragraphs[0].font.bold = True
 
 # Save
 output_path = 'test_fixtures/test_features.pptx'

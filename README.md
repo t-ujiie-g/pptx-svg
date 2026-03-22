@@ -169,10 +169,9 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Placeholder auto content**: Slide number, date, footer
 - **Speaker notes**: Read via `getSlideNotes()`, preserved in round-trip export
 - **Comments**: Read via `getSlideComments()` / `getCommentAuthors()`, preserved in round-trip export
+- **SmartArt**: Fallback shapes from `mc:AlternateContent` rendered; `mc:Choice` (DiagramML) preserved for round-trip
 
 ### Not Yet Supported
-
-- **SmartArt** (`dgm:*` DiagramML) - planned: fallback image display
 - **OLE / Embedded objects** (`p:oleObj`) - planned: fallback image display
 - **Media** (video/audio) - planned: poster frame display
 - **WMF images** - cannot be decoded in browser (EMF is supported via built-in converter)

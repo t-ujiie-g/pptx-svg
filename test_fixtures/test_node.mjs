@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 74', slideCount === 74, `got ${slideCount}`);
+  assert('slide count = 75', slideCount === 75, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 74; i++) {
+  for (let i = 1; i <= 75; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 74; i++) {
+  for (let i = 1; i <= 75; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1387,6 +1387,29 @@ async function testFeaturesPptx() {
       assert('comments have position data', commentsXml.includes('<p:pos'));
       assert('comments have 2 entries', (commentsXml.match(/<p:cm\b/g) || []).length === 2);
     }
+  }
+
+  // ── Slide 75: SmartArt fallback (mc:AlternateContent) ─────────────────────
+  {
+    section('test_features.pptx — Slide 75: SmartArt fallback');
+    const slide75 = textFiles.get('ppt/slides/slide75.xml') || '';
+    assert('slide75 exists', slide75.length > 0);
+    assert('slide75 has mc:AlternateContent', slide75.includes('mc:AlternateContent'));
+    assert('slide75 has mc:Choice', slide75.includes('mc:Choice'));
+    assert('slide75 has mc:Fallback', slide75.includes('mc:Fallback'));
+    assert('slide75 has grpSp in fallback', slide75.includes('p:grpSp'));
+    // Check that the fallback contains our 3 process boxes
+    assert('slide75 has roundRect shapes', slide75.includes('roundRect'));
+    const spCount = (slide75.match(/<p:sp\b/g) || []).length;
+    assert('slide75 has at least 4 p:sp elements (3 boxes + title)', spCount >= 4);
+    // Check text content of SmartArt boxes
+    assert('slide75 has "Plan" text', slide75.includes('Plan'));
+    assert('slide75 has "Build" text', slide75.includes('Build'));
+    assert('slide75 has "Ship" text', slide75.includes('Ship'));
+    // Check fill colors
+    assert('slide75 has blue fill (4472C4)', slide75.includes('4472C4'));
+    assert('slide75 has orange fill (ED7D31)', slide75.includes('ED7D31'));
+    assert('slide75 has green fill (70AD47)', slide75.includes('70AD47'));
   }
 }
 
