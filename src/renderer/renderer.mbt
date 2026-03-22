@@ -1246,17 +1246,19 @@ pub fn render_shape(
   let y_p = px(t.y, scale)
   let cx_p = px(t.cx, scale)
   let mut cy_p = px(t.cy, scale)
-  // Apply autoFit: expand shape height if text overflows (never shrink)
-  if shape.body_props.auto_fit && shape.paragraphs.length() > 0 {
-    let text_h = estimate_text_height(shape.paragraphs, scale, shape.body_props)
-    if text_h > cy_p {
-      cy_p = text_h
-    }
-  }
   let is_line = match shape.kind {
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Line) => true
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, _)) => true
     _ => false
+  }
+  // Apply autoFit: expand shape height if text overflows (never shrink)
+  // Also auto-size when cy is 0 and shape has text (common in generated PPTXs)
+  // Skip lines/connectors — cy=0 means horizontal line, not "auto-size"
+  if not(is_line) && (shape.body_props.auto_fit || t.cy == 0) && shape.paragraphs.length() > 0 {
+    let text_h = estimate_text_height(shape.paragraphs, scale, shape.body_props)
+    if text_h > cy_p {
+      cy_p = text_h
+    }
   }
   if cx_p <= 0 && not(is_line) {
     return ""
@@ -1670,8 +1672,8 @@ pub fn render_shape(
           compute_custom_text_rect(data, cx_p, cy_p)
         _ => (0, 0, cx_p, cy_p)
       }
-      // For autoFit, use adjusted cy for text rendering if shape was expanded
-      let eff_cy = if shape.body_props.auto_fit && cy_p > px(t.cy, scale) {
+      // For autoFit or zero-height shapes, use adjusted cy for text rendering
+      let eff_cy = if (shape.body_props.auto_fit || t.cy == 0) && cy_p > px(t.cy, scale) {
         cy_p
       } else {
         tr_h
