@@ -35,6 +35,9 @@ export interface MeasureTextFn {
   (text: string, fontFace: string, fontSizePx: number): number;
 }
 
+/** Log level for controlling console output. */
+export type LogLevel = 'silent' | 'error' | 'warn' | 'info' | 'debug';
+
 /** Options for initializing PptxRenderer. */
 export interface PptxRendererOptions {
   /** Custom text measurement function. If not provided, uses Canvas 2D (browser only). */
@@ -44,6 +47,37 @@ export interface PptxRendererOptions {
    * User entries override built-in entries for the same font name.
    */
   fontFallbacks?: FontFallbackMap;
+  /**
+   * Log level for console output. Default: `'error'`.
+   * - `'silent'`: No console output at all
+   * - `'error'`:  Errors only (default)
+   * - `'warn'`:   Errors + warnings
+   * - `'info'`:   Errors + warnings + info messages
+   * - `'debug'`:  All messages including debug details
+   */
+  logLevel?: LogLevel;
+}
+
+const LOG_LEVELS: Record<LogLevel, number> = {
+  silent: 0, error: 1, warn: 2, info: 3, debug: 4,
+};
+
+/** Internal logger that respects log level. */
+export interface Logger {
+  debug(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+}
+
+function createLogger(level: LogLevel): Logger {
+  const threshold = LOG_LEVELS[level];
+  return {
+    debug: threshold >= 4 ? (...args: unknown[]) => console.log('[pptx]', ...args) : () => {},
+    info:  threshold >= 3 ? (...args: unknown[]) => console.log('[pptx]', ...args) : () => {},
+    warn:  threshold >= 2 ? (...args: unknown[]) => console.warn('[pptx]', ...args) : () => {},
+    error: threshold >= 1 ? (...args: unknown[]) => console.error('[pptx]', ...args) : () => {},
+  };
 }
 
 /** Default Wasm URL resolved relative to this module. */
@@ -71,7 +105,11 @@ export class PptxRenderer {
   /** Font fallback lookup map (source → comma-separated fallbacks) */
   private fontFallbackCache = new Map<string, string>();
 
+  /** Internal logger */
+  private log: Logger;
+
   constructor(options?: PptxRendererOptions) {
+    this.log = createLogger(options?.logLevel ?? 'error');
     if (options?.measureText) {
       this.measureTextFn = options.measureText;
     }
@@ -109,7 +147,7 @@ export class PptxRenderer {
       bytes = await response.arrayBuffer();
     }
 
-    const result = await instantiateWasmWithFallback(bytes, this.buildImportObject());
+    const result = await instantiateWasmWithFallback(bytes, this.buildImportObject(), this.log);
     this.wasm = result.instance;
   }
 
@@ -122,14 +160,14 @@ export class PptxRenderer {
       throw new Error('Wasm not initialized — wait for init() to complete before loading files.');
     }
     this.originalBuffer = arrayBuffer.slice(0); // keep a copy for export
-    console.log('[pptx] Parsing ZIP archive...');
-    const { textFiles, binaryFiles } = await extractZip(arrayBuffer);
+    this.log.debug('Parsing ZIP archive...');
+    const { textFiles, binaryFiles } = await extractZip(arrayBuffer, this.log);
     this.files = textFiles;
     this.rawFiles = binaryFiles;
-    console.log(`[pptx] Extracted ${textFiles.size} text entries, ${binaryFiles.size} binary entries`);
+    this.log.debug(`Extracted ${textFiles.size} text entries, ${binaryFiles.size} binary entries`);
 
     const result = this.exports.initialize_pptx();
-    console.log('[pptx] initialize_pptx result:', result);
+    this.log.debug('initialize_pptx result:', result);
 
     if (result.startsWith('ERROR:')) throw new Error(result.slice(6));
 
@@ -201,7 +239,7 @@ export class PptxRenderer {
       }
     }
 
-    console.log(`[pptx] Exporting PPTX with ${modifications.size} modified entries`);
+    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries`);
     return buildZip(this.originalBuffer, modifications);
   }
 
@@ -252,9 +290,9 @@ export class PptxRenderer {
         get_entry_list:   () => [...this.files.keys(), ...this.rawFiles.keys()].join('\n'),
         get_file_base64:  (path: string) => bytesToBase64(this.rawFiles.get(path)),
         char_code_to_str: (n: number) => String.fromCodePoint(n),
-        log:   (msg: string) => console.log('[pptx]', msg),
-        warn:  (msg: string) => console.warn('[pptx]', msg),
-        error: (msg: string) => console.error('[pptx]', msg),
+        log:   (msg: string) => this.log.debug(msg),
+        warn:  (msg: string) => this.log.warn(msg),
+        error: (msg: string) => this.log.error(msg),
         measure_text: (text: string, fontFace: string, fontSizePt: number) =>
           this.measureText(text, fontFace, fontSizePt),
         get_font_fallback: (font: string) => this.fontFallbackCache.get(font) ?? '',

@@ -100,7 +100,7 @@
     import { PptxRenderer } from '../dist/index.js';
     import { $, setStatus, setupDropZone, initRenderer, setupExportButton } from './common.js';
 
-    const renderer = new PptxRenderer();
+    const renderer = new PptxRenderer({ logLevel: 'debug' });
     let currentSlide = 0;
     let totalSlides = 0;
     let xmlMode = 'none';

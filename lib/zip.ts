@@ -75,7 +75,10 @@ export interface ZipContents {
 /**
  * Extract all entries from a ZIP archive.
  */
-export async function extractZip(buffer: ArrayBuffer): Promise<ZipContents> {
+export async function extractZip(
+  buffer: ArrayBuffer,
+  log?: { warn(...args: unknown[]): void },
+): Promise<ZipContents> {
   const bytes = new Uint8Array(buffer);
   const view = new DataView(buffer);
   const textFiles = new Map<string, string>();
@@ -102,7 +105,7 @@ export async function extractZip(buffer: ArrayBuffer): Promise<ZipContents> {
     } else if (method === 8) {
       decompressed = await inflate(compressed);
     } else {
-      console.warn(`[pptx] Unsupported compression method ${method} for ${name}, skipping`);
+      log?.warn(`Unsupported compression method ${method} for ${name}, skipping`);
       offset = dataOffset + compressedSize;
       continue;
     }

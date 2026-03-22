@@ -160,7 +160,7 @@
     const MIN_OVERLAY_PX = 10;     // minimum overlay dimension in CSS pixels
     const HANDLE_POSITIONS = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'];
 
-    const renderer = new PptxRenderer();
+    const renderer = new PptxRenderer({ logLevel: 'debug' });
     let currentSlide = 0;
     let totalSlides = 0;
     let selectedShapeIdx = -1;
