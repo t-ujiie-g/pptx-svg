@@ -211,6 +211,10 @@ fn parse_stroke(
         None => ""
       }
       let ln_ch = @xml.get_children(ln)
+      // Empty <a:ln></a:ln> with no width and no children = no visible line
+      if ln_ch.length() == 0 && w == 0 {
+        return StrokeProps::default()
+      }
       let no_fill = match @xml.find_child(ln_ch, "a:noFill") {
         Some(_) => true
         None => false
