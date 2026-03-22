@@ -92,17 +92,20 @@ function makeUnderscoreModule(constants: string[]): Record<string, WebAssembly.G
 export async function instantiateWasmWithFallback(
   bytes: ArrayBuffer,
   importObject: Record<string, Record<string, unknown>>,
+  log?: { debug(...args: unknown[]): void; info(...args: unknown[]): void; warn(...args: unknown[]): void; error(...args: unknown[]): void },
 ): Promise<WebAssembly.WebAssemblyInstantiatedSource> {
+  const noop = () => {};
+  const l = log ?? { debug: noop, info: noop, warn: noop, error: noop };
   const stringConstants = parseWasmStringConstants(bytes);
-  console.log(`[pptx] Parsed ${stringConstants.length} string constants from Wasm binary`);
+  l.debug(`Parsed ${stringConstants.length} string constants from Wasm binary`);
 
   // Tier 1: modern builtins
   try {
     const r = await (WebAssembly as any).instantiate(bytes, importObject, { builtins: ['js-string'] });
-    console.log('[pptx] Wasm init: tier-1 (js-string builtins)');
+    l.info('Wasm init: tier-1 (js-string builtins)');
     return r;
   } catch (e1: any) {
-    console.warn('[pptx] Tier-1 failed:', e1.message, '— trying tier-2');
+    l.info('Tier-1 failed:', e1.message, '— trying tier-2');
 
     // Tier 2: importedStringConstants + manual wasm:js-string
     const imports2 = { ...importObject, 'wasm:js-string': JS_STRING_MODULE };
@@ -110,10 +113,10 @@ export async function instantiateWasmWithFallback(
       const r = await (WebAssembly as any).instantiate(
         bytes, imports2, { importedStringConstants: '_' },
       );
-      console.log('[pptx] Wasm init: tier-2 (importedStringConstants)');
+      l.info('Wasm init: tier-2 (importedStringConstants)');
       return r;
     } catch (e2: any) {
-      console.warn('[pptx] Tier-2 failed:', e2.message, '— trying tier-3');
+      l.info('Tier-2 failed:', e2.message, '— trying tier-3');
 
       // Tier 3: fully manual (any wasm-gc browser, Chrome 111+)
       const imports3 = {
@@ -123,13 +126,13 @@ export async function instantiateWasmWithFallback(
       };
       try {
         const r = await WebAssembly.instantiate(bytes, imports3);
-        console.log('[pptx] Wasm init: tier-3 (full manual)');
+        l.info('Wasm init: tier-3 (full manual)');
         return r;
       } catch (e3: any) {
-        console.error('[pptx] All instantiation tiers failed.');
-        console.error('  Tier-1:', e1.message);
-        console.error('  Tier-2:', e2.message);
-        console.error('  Tier-3:', e3.message);
+        l.error('All instantiation tiers failed.');
+        l.error('  Tier-1:', e1.message);
+        l.error('  Tier-2:', e2.message);
+        l.error('  Tier-3:', e3.message);
         throw new Error(
           `Wasm init failed — browser may not support WebAssembly GC (Chrome 111+). ` +
           `Tier-3 error: ${e3.message}`,

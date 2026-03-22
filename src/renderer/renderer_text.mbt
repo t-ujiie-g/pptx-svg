@@ -56,7 +56,7 @@ fn to_upper_ascii(s : String) -> String {
     } else {
       result = result + @ffi.ffi_char_code_to_str(code)
     }
-    i = i + 1
+    i = i + @xml.char_step(c)
   }
   result
 }
@@ -173,16 +173,17 @@ fn wrap_paragraph(
     while seg_start < text_len {
       let c = text.get_char(seg_start).unwrap()
       let mut seg_end = seg_start
-      if is_cjk(c) {
-        seg_end = seg_start + 1
+      if is_cjk(c) || @xml.is_astral(c) {
+        // CJK or astral-plane character (emoji): treat as single segment
+        seg_end = seg_start + @xml.char_step(c)
       } else {
         seg_end = seg_start
         while seg_end < text_len {
           let sc = text.get_char(seg_end).unwrap()
-          if is_cjk(sc) {
+          if is_cjk(sc) || @xml.is_astral(sc) {
             break
           }
-          seg_end = seg_end + 1
+          seg_end = seg_end + @xml.char_step(sc)
           if sc == ' ' || sc == '\t' {
             break
           }
@@ -234,10 +235,11 @@ fn contains_tab(s : String) -> Bool {
   let len = s.length()
   let mut i = 0
   while i < len {
-    if s.get_char(i).unwrap() == '\t' {
+    let c = s.get_char(i).unwrap()
+    if c == '\t' {
       return true
     }
-    i = i + 1
+    i = i + @xml.char_step(c)
   }
   false
 }
@@ -250,11 +252,13 @@ fn split_by_tab(s : String) -> Array[String] {
   let mut start = 0
   let mut i = 0
   while i < len {
-    if s.get_char(i).unwrap() == '\t' {
+    let c = s.get_char(i).unwrap()
+    let step = @xml.char_step(c)
+    if c == '\t' {
       parts.push(@xml.str_substring(s, start, i))
-      start = i + 1
+      start = i + step
     }
-    i = i + 1
+    i = i + step
   }
   parts.push(@xml.str_substring(s, start, len))
   parts

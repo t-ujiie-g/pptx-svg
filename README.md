@@ -85,10 +85,11 @@ const renderer = new PptxRenderer(options?);
 
 **Options:**
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `measureText` | `(text, fontFace, fontSizePx) => number` | Custom text width measurement. Defaults to Canvas 2D. |
-| `fontFallbacks` | `Record<string, string[]>` | Custom font fallback mappings. Merged with built-in defaults. |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `measureText` | `(text, fontFace, fontSizePx) => number` | Canvas 2D | Custom text width measurement. |
+| `fontFallbacks` | `Record<string, string[]>` | (built-in) | Custom font fallback mappings. Merged with built-in defaults. |
+| `logLevel` | `'silent' \| 'error' \| 'warn' \| 'info' \| 'debug'` | `'error'` | Console output verbosity. |
 
 **Methods:**
 
@@ -179,16 +180,6 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 
 The generated SVG embeds `data-ooxml-*` attributes that preserve all OOXML metadata for round-trip conversion. See [`docs/svg-specification.md`](docs/svg-specification.md) for the complete attribute reference.
 
-## Browser Compatibility
-
-| Browser | Minimum Version | Notes |
-|---------|----------------|-------|
-| Chrome | 111+ | Full support (Tier 3 Wasm fallback) |
-| Firefox | 120+ | Full support |
-| Safari | 17+ | Full support |
-| Edge | 111+ | Same as Chrome |
-| Node.js | Not supported | Wasm-GC requires browser runtime |
-
 ## Architecture
 
 ```
@@ -238,7 +229,6 @@ Releases are published to npm via GitHub Actions when a version tag is pushed:
 # Update version in package.json, then:
 git tag v0.1.0
 git push origin v0.1.0
-# GitHub Actions builds, tests, and publishes to npm
 ```
 
 Requires `NPM_TOKEN` secret configured in GitHub repository settings.
