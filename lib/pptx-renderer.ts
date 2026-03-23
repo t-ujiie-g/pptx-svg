@@ -15,6 +15,7 @@ import type { FontFallbackMap } from './font-fallbacks.js';
 interface PptxWasmExports {
   initialize_pptx(): string;
   get_slide_count(): number;
+  is_slide_hidden(idx: number): number;
   get_slide_xml_raw(idx: number): string;
   get_entry_list(): string;
   render_slide_svg(idx: number): string;
@@ -195,6 +196,11 @@ export class PptxRenderer {
   /** Number of slides in the loaded presentation. */
   getSlideCount(): number {
     return this.exports.get_slide_count();
+  }
+
+  /** Check if a slide is hidden (0-indexed). */
+  isSlideHidden(slideIdx: number): boolean {
+    return this.exports.is_slide_hidden(slideIdx) === 1;
   }
 
   /** Get the raw XML of a slide (0-indexed). For debugging. */

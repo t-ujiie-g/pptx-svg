@@ -833,12 +833,16 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
         background: @ooxml.Color::white(),
         bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(),
         shapes: [],
+        transition_xml: "", timing_xml: "", hidden: false,
       }
   }
   // Read slide metadata from SVG root
   let slide_cx = get_dai(svg_node, "slide-cx")
   let slide_cy = get_dai(svg_node, "slide-cy")
   let bg_hex = get_da(svg_node, "bg")
+  let hidden = get_da(svg_node, "hidden") == "1"
+  let transition_xml = get_da(svg_node, "transition-xml")
+  let timing_xml = get_da(svg_node, "timing-xml")
 
   let slide_size : @ooxml.SlideSize = if slide_cx > 0 && slide_cy > 0 {
     { cx: slide_cx, cy: slide_cy }
@@ -871,5 +875,5 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     i = i + 1
   }
 
-  { slide_size, background, bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(), shapes }
+  { slide_size, background, bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(), shapes, transition_xml, timing_xml, hidden }
 }

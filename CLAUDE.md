@@ -32,7 +32,7 @@ python3 -m http.server 8765 --directory .
 **FFI boundary:**
 - JS pre-decompresses all ZIP entries → stores in `Map<path, string>` and `Map<path, Uint8Array>`
 - MoonBit calls `ffi_get_file(path)` to pull individual files on demand
-- MoonBit exports: `initialize_pptx`, `get_slide_count`, `get_slide_xml_raw`, `get_entry_list`, `render_slide_svg`, `update_slide_from_svg`, `get_slide_ooxml`, `get_modified_entries`
+- MoonBit exports: `initialize_pptx`, `get_slide_count`, `is_slide_hidden`, `get_slide_xml_raw`, `get_entry_list`, `render_slide_svg`, `update_slide_from_svg`, `get_slide_ooxml`, `get_modified_entries`
 
 **Module dependency (no cycles):**
 ```
@@ -72,7 +72,7 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 ## Data model (ooxml.mbt)
 
 ```
-SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, bg_blip_fill: BlipFill, bg_patt_fill: PatternFill, shapes: Array[Shape] }
+SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, bg_blip_fill: BlipFill, bg_patt_fill: PatternFill, shapes: Array[Shape], transition_xml: String, timing_xml: String, hidden: Bool }
 Shape { kind: ShapeKind, transform: ShapeTransform,
   fill: Color, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill,
   stroke: Color, stroke_w: Int,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2
+
+### Bug Fixes
+
+- Fix text not rendering in shapes with `cy="0"` (auto-size text boxes common in generated PPTXs)
+- Fix spurious black borders on shapes with empty `<a:ln></a:ln>` elements (now treated as no stroke)
+- Fix horizontal lines becoming diagonal after cy=0 auto-size (lines/connectors excluded from auto-size logic)
+
 ## 0.4.1
 
 ### Features

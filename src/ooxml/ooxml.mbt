@@ -1567,6 +1567,9 @@ pub(all) struct SlideData {
   bg_blip_fill : BlipFill // background image fill; BlipFill::none() = no image
   bg_patt_fill : PatternFill // background pattern fill; PatternFill::none() = no pattern
   shapes : Array[Shape]
+  transition_xml : String // raw <p:transition> XML for round-trip (empty = none)
+  timing_xml : String // raw <p:timing> XML for round-trip (empty = none)
+  hidden : Bool // <p:sld show="0"> — hidden slide
 }
 
 // ── Relationship type ─────────────────────────────────────────────────────────

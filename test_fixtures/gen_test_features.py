@@ -81,6 +81,8 @@ Slides:
  76. OLE embedded object (p:oleObj with fallback image in p:graphicFrame)
  77. Media (video with poster frame — a:videoFile in p:nvPr)
  78. Math equation (OMML m:oMathPara / m:oMath in text body)
+ 79. Transition + Timing (p:transition + p:timing round-trip preservation)
+ 80. Hidden slide (p:sld show="0")
 """
 
 import base64
@@ -5388,6 +5390,32 @@ math_tb = slide78.shapes.add_textbox(Inches(2), Inches(2), Inches(6), Inches(2))
 math_tb.text_frame.paragraphs[0].text = "MATH_PLACEHOLDER"
 math_tb.text_frame.paragraphs[0].font.size = Pt(24)
 
+# ── Slide 79: Transition + Timing (round-trip preservation) ───────────────────
+
+slide79 = prs.slides.add_slide(blank)
+
+title79 = slide79.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title79.text_frame.paragraphs[0].text = "Slide 79: Transition + Timing (round-trip)"
+title79.text_frame.paragraphs[0].font.size = Pt(24)
+title79.text_frame.paragraphs[0].font.bold = True
+
+desc79 = slide79.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(1))
+desc79.text_frame.paragraphs[0].text = "This slide has a fade transition and timing data for round-trip."
+desc79.text_frame.paragraphs[0].font.size = Pt(16)
+
+# ── Slide 80: Hidden slide ───────────────────────────────────────────────────
+
+slide80 = prs.slides.add_slide(blank)
+
+title80 = slide80.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title80.text_frame.paragraphs[0].text = "Slide 80: Hidden Slide"
+title80.text_frame.paragraphs[0].font.size = Pt(24)
+title80.text_frame.paragraphs[0].font.bold = True
+
+desc80 = slide80.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(1))
+desc80.text_frame.paragraphs[0].text = "This slide is marked as hidden (show='0')."
+desc80.text_frame.paragraphs[0].font.size = Pt(16)
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5396,8 +5424,9 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-slide78_num = len(prs.slides)
-slide78_path = f'ppt/slides/slide{slide78_num}.xml'
+total_slides = len(prs.slides)  # 80
+# python-pptx numbers slide files sequentially
+slide78_path = 'ppt/slides/slide78.xml'
 
 # Read entire ZIP into memory, then close it before writing
 zin = zipfile.ZipFile(output_path, 'r')
@@ -5436,12 +5465,34 @@ if 'xmlns:m=' not in slide78_xml:
         f'xmlns:m="{OMML_NS}" xmlns:a='
     )
 
-# Rewrite ZIP with patched slide
+# ── Patch slide 79: inject transition + timing XML ──
+slide79_path = 'ppt/slides/slide79.xml'
+slide79_xml = all_entries[slide79_path][1].decode('utf-8') if isinstance(all_entries[slide79_path][1], bytes) else all_entries[slide79_path][1]
+# Inject p:transition and p:timing before </p:sld>
+transition_xml = '<p:transition spd="med"><p:fade/></p:transition>'
+timing_xml = (
+    '<p:timing>'
+    '<p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"/></p:par></p:tnLst>'
+    '</p:timing>'
+)
+slide79_xml = slide79_xml.replace('</p:sld>', transition_xml + timing_xml + '</p:sld>')
+
+# ── Patch slide 80: inject show="0" for hidden slide ──
+slide80_path = 'ppt/slides/slide80.xml'
+slide80_xml = all_entries[slide80_path][1].decode('utf-8') if isinstance(all_entries[slide80_path][1], bytes) else all_entries[slide80_path][1]
+# Add show="0" to p:sld element
+slide80_xml = slide80_xml.replace('<p:sld ', '<p:sld show="0" ', 1)
+
+# Rewrite ZIP with patched slides
 with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
     for fname, (item, data) in all_entries.items():
         if fname == slide78_path:
             zout.writestr(item, slide78_xml.encode('utf-8'))
+        elif fname == slide79_path:
+            zout.writestr(item, slide79_xml.encode('utf-8'))
+        elif fname == slide80_path:
+            zout.writestr(item, slide80_xml.encode('utf-8'))
         else:
             zout.writestr(item, data)
 
-print(f"Saved {output_path} with {slide78_num} slides")
+print(f"Saved {output_path} with {total_slides} slides")

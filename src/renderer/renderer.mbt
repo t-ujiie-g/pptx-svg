@@ -2011,6 +2011,13 @@ pub fn render_slide_svg(
     dai("slide-cy", sh) +
     da("bg", slide.background.to_hex()) +
     dai("scale", scale) +
+    (if slide.hidden { da("hidden", "1") } else { "" }) +
+    (if slide.transition_xml.length() > 0 {
+      " data-ooxml-transition-xml=\"" + @xml.xml_escape(slide.transition_xml) + "\""
+    } else { "" }) +
+    (if slide.timing_xml.length() > 0 {
+      " data-ooxml-timing-xml=\"" + @xml.xml_escape(slide.timing_xml) + "\""
+    } else { "" }) +
     ">"
   // Collect all <defs> in a single pass per shape set
   let mut defs = ""
