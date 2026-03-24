@@ -1450,7 +1450,11 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out +
     " xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\"" +
     " xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"" +
-    " xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\">"
+    " xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\""
+  if slide.hidden {
+    out = out + " show=\"0\""
+  }
+  out = out + ">"
   out = out + "<p:cSld>"
   // Background
   if not(slide.bg_blip_fill.is_none()) {
@@ -1500,5 +1504,12 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out + "</p:spTree>"
   out = out + "</p:cSld>"
   out = out + "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>"
+  // Preserve transition and timing XML for round-trip
+  if slide.transition_xml.length() > 0 {
+    out = out + slide.transition_xml
+  }
+  if slide.timing_xml.length() > 0 {
+    out = out + slide.timing_xml
+  }
   out + "</p:sld>"
 }

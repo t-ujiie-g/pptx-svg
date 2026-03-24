@@ -196,6 +196,24 @@ fn decode_entities(s : String) -> String {
         result = result + "\""
       } else if entity == "apos" {
         result = result + "'"
+      } else if str_starts_with(entity, "#x") || str_starts_with(entity, "#X") {
+        // Hex numeric character reference: &#xHHHH;
+        let hex = str_suffix(entity, 2)
+        let code = parse_hex_int(hex)
+        if code > 0 {
+          result = result + @ffi.ffi_char_code_to_str(code)
+        } else {
+          result = result + "&" + entity + ";"
+        }
+      } else if str_starts_with(entity, "#") {
+        // Decimal numeric character reference: &#DDD;
+        let dec = str_suffix(entity, 1)
+        let code = parse_int(dec)
+        if code > 0 {
+          result = result + @ffi.ffi_char_code_to_str(code)
+        } else {
+          result = result + "&" + entity + ";"
+        }
       } else {
         result = result + "&" + entity + ";"
       }
@@ -522,6 +540,35 @@ pub fn parse_int(s : String) -> Int {
   } else {
     result
   }
+}
+
+///|
+/// Parse a hexadecimal string to an integer.
+pub fn parse_hex_int(s : String) -> Int {
+  let len = s.length()
+  if len == 0 {
+    return 0
+  }
+  let mut result = 0
+  let mut i = 0
+  while i < len {
+    let c = Char::to_int(s.get_char(i).unwrap())
+    let d = if c >= 48 && c <= 57 {
+      c - 48 // '0'-'9'
+    } else if c >= 65 && c <= 70 {
+      c - 55 // 'A'-'F'
+    } else if c >= 97 && c <= 102 {
+      c - 87 // 'a'-'f'
+    } else {
+      -1
+    }
+    if d < 0 {
+      break
+    }
+    result = result * 16 + d
+    i = i + 1
+  }
+  result
 }
 
 ///|

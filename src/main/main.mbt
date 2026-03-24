@@ -80,21 +80,6 @@ let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [] }
 // ── Package-local string/int helpers ─────────────────────────────────────────
 
 ///|
-fn ends_with(s : String, pat : String) -> Bool {
-  @xml.str_ends_with(s, pat)
-}
-
-///|
-fn starts_with(s : String, pat : String) -> Bool {
-  @xml.str_starts_with(s, pat)
-}
-
-///|
-fn suffix(s : String, from : Int) -> String {
-  @xml.str_suffix(s, from)
-}
-
-///|
 fn int_to_str(n : Int) -> String {
   @xml.int_to_str(n)
 }
@@ -150,10 +135,10 @@ fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
   while i < n {
     let rel = rels[i]
     // Theme relationship type ends with "/theme"
-    if ends_with(rel.type_, "/theme") {
+    if @xml.str_ends_with(rel.type_, "/theme") {
       // Target is relative to ppt/ directory
-      if starts_with(rel.target, "/") {
-        return suffix(rel.target, 1)
+      if @xml.str_starts_with(rel.target, "/") {
+        return @xml.str_suffix(rel.target, 1)
       } else {
         return "ppt/" + rel.target
       }
@@ -175,7 +160,7 @@ fn load_master_theme(
   let mut i = 0
   while i < n {
     let rel = mrels[i]
-    if ends_with(rel.type_, "/theme") {
+    if @xml.str_ends_with(rel.type_, "/theme") {
       // Resolve target relative to master's directory
       let slash = last_index_of(master_path, '/')
       let base_dir = if slash >= 0 {
@@ -213,13 +198,13 @@ fn get_master_theme(master_path : String) -> @ooxml.ThemeData {
 ///  e.g. resolve_rel_path("ppt/slides", "../slideLayouts/slideLayout1.xml")
 ///    → "ppt/slideLayouts/slideLayout1.xml"
 fn resolve_rel_path(base_dir : String, target : String) -> String {
-  if starts_with(target, "/") {
-    return suffix(target, 1)
+  if @xml.str_starts_with(target, "/") {
+    return @xml.str_suffix(target, 1)
   }
   // Handle ../ prefixes
   let mut dir = base_dir
   let mut tgt = target
-  while starts_with(tgt, "../") {
+  while @xml.str_starts_with(tgt, "../") {
     // Remove trailing "/" from dir if present
     let dlen = dir.length()
     let d2 = if dlen > 0 && dir.get_char(dlen - 1).unwrap() == '/' {
@@ -234,7 +219,7 @@ fn resolve_rel_path(base_dir : String, target : String) -> String {
     } else {
       dir = ""
     }
-    tgt = suffix(tgt, 3)
+    tgt = @xml.str_suffix(tgt, 3)
   }
   if dir.is_empty() {
     tgt
@@ -317,7 +302,7 @@ fn find_rel_by_type_suffix(
   let n = rels.length()
   let mut i = 0
   while i < n {
-    if ends_with(rels[i].type_, type_suffix) {
+    if @xml.str_ends_with(rels[i].type_, type_suffix) {
       return rels[i].target
     }
     i = i + 1
@@ -357,7 +342,7 @@ fn array_index_of(arr : Array[String], val : String) -> Int {
 /// Get the .rels path for a given content path.
 fn rels_path_for(path : String) -> String {
   let dir = dir_of(path)
-  let filename = suffix(path, dir.length() + 1)
+  let filename = @xml.str_suffix(path, dir.length() + 1)
   dir + "/_rels/" + filename + ".rels"
 }
 
@@ -691,6 +676,9 @@ pub fn initialize_pptx() -> String {
       bg_blip_fill: @ooxml.BlipFill::none(),
       bg_patt_fill: @ooxml.PatternFill::none(),
       shapes: [],
+      transition_xml: "",
+      timing_xml: "",
+      hidden: false,
     })
     modified.push(false)
     i = i + 1
@@ -712,6 +700,34 @@ pub fn initialize_pptx() -> String {
 /// Get the number of slides in the loaded presentation.
 pub fn get_slide_count() -> Int {
   g_slide_count.val
+}
+
+///|
+/// Check if a slide is hidden (0-indexed). Returns 1 if hidden, 0 otherwise.
+pub fn is_slide_hidden(slide_idx : Int) -> Int {
+  if slide_idx < 0 || slide_idx >= g_slide_count.val {
+    return 0
+  }
+  // If slide is already cached, use cached data
+  if g_modified.val[slide_idx] {
+    return if g_slides.val[slide_idx].hidden { 1 } else { 0 }
+  }
+  // Otherwise check the raw XML
+  let slide_num = slide_idx + 1
+  let slide_path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
+  let slide_xml = @ffi.ffi_get_file(slide_path)
+  if slide_xml.is_empty() {
+    return 0
+  }
+  let nodes = @xml.parse_xml(slide_xml)
+  match @xml.find_child(nodes, "p:sld") {
+    Some(sld) =>
+      match @xml.get_attr(sld, "show") {
+        Some("0") => 1
+        _ => 0
+      }
+    None => 0
+  }
 }
 
 ///|
@@ -920,6 +936,9 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       bg_blip_fill,
       bg_patt_fill,
       shapes: slide_data.shapes,
+      transition_xml: slide_data.transition_xml,
+      timing_xml: slide_data.timing_xml,
+      hidden: slide_data.hidden,
     }
     g_slides.val[slide_idx] = s
     ignore(bg_fill_rels)

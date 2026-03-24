@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 78', slideCount === 78, `got ${slideCount}`);
+  assert('slide count = 80', slideCount === 80, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 78; i++) {
+  for (let i = 1; i <= 80; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 78; i++) {
+  for (let i = 1; i <= 80; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1460,6 +1460,25 @@ async function testFeaturesPptx() {
     assert('slide78 has m:rad (radical)', slide78.includes('<m:rad>'));
     assert('slide78 has m:sSup (superscript)', slide78.includes('<m:sSup>'));
     assert('slide78 has xmlns:m namespace', slide78.includes('xmlns:m='));
+  }
+
+  // ── Slide 79: Transition + Timing (round-trip) ──────────────────────────────
+  {
+    section('test_features.pptx — Slide 79: Transition + Timing');
+    const slide79 = textFiles.get('ppt/slides/slide79.xml') || '';
+    assert('slide79 exists', slide79.length > 0);
+    assert('slide79 has p:transition', slide79.includes('<p:transition'));
+    assert('slide79 transition has fade', slide79.includes('<p:fade'));
+    assert('slide79 has p:timing', slide79.includes('<p:timing'));
+    assert('slide79 has p:tnLst', slide79.includes('<p:tnLst>'));
+  }
+
+  // ── Slide 80: Hidden slide ──────────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 80: Hidden slide');
+    const slide80 = textFiles.get('ppt/slides/slide80.xml') || '';
+    assert('slide80 exists', slide80.length > 0);
+    assert('slide80 has show="0"', slide80.includes('show="0"'));
   }
 }
 

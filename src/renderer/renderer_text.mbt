@@ -717,11 +717,6 @@ fn render_text(
   let pad_b = px(b_ins, scale)
   let avail_h = shape_h - pad_t - pad_b
 
-  // normAutofit: dynamically adjust font_scale / ln_spc_reduction to fit text.
-  // PowerPoint stores hints in the PPTX, but our font metrics may differ, so
-  // we recompute if needed.  font_scale >= 0 means <a:normAutofit> was present.
-  let is_norm_autofit = body_props.font_scale >= 0
-
   // Calculate total text height for vertical alignment
   let np = paragraphs.length()
   let mut total_text_h = 0
@@ -798,8 +793,9 @@ fn render_text(
       }
       ti = ti + 1
     }
-    // normAutofit: if text overflows, adjust parameters and retry
-    if is_norm_autofit && total_text_h > avail_h && avail_h > 0 {
+    // Auto-shrink text to fit: apply normAutofit-like scaling when text overflows.
+    // This handles both explicit normAutofit and implicit overflow in fixed-size text boxes.
+    if total_text_h > avail_h && avail_h > 0 {
       // First try increasing line spacing reduction (up to 20%)
       if lr < 20000 {
         lr = lr + 5000

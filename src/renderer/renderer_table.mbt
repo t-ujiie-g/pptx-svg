@@ -375,7 +375,91 @@ fn render_table(
   let mut rhi = 0
   while rhi < nrows {
     let h = table.rows[rhi].height
-    row_heights_emu.push(if h > 0 { h } else { min_row_h_emu })
+    if h > 0 {
+      row_heights_emu.push(h)
+    } else {
+      // Auto-size: compute max text height across all cells in this row
+      let row = table.rows[rhi]
+      let mut max_cell_h_emu = min_row_h_emu
+      let nc = row.cells.length()
+      let mut ci2 = 0
+      let mut col2 = 0
+      while ci2 < nc {
+        let cell = row.cells[ci2]
+        if not(cell.h_merge) && not(cell.v_merge) {
+          let mar_t_emu = if cell.mar_t >= 0 { cell.mar_t } else { default_cell_mar_tb }
+          let mar_b_emu = if cell.mar_b >= 0 { cell.mar_b } else { default_cell_mar_tb }
+          let mar_l_emu = if cell.mar_l >= 0 { cell.mar_l } else { default_cell_mar_lr }
+          let mar_r_emu = if cell.mar_r >= 0 { cell.mar_r } else { default_cell_mar_lr }
+          // Compute cell width from grid spans
+          let gs = if cell.grid_span > 1 { cell.grid_span } else { 1 }
+          let mut cell_w_emu = 0
+          let mut gsi = 0
+          while gsi < gs && col2 + gsi < ncols {
+            cell_w_emu = cell_w_emu + table.col_widths[col2 + gsi]
+            gsi = gsi + 1
+          }
+          let content_w_emu = cell_w_emu - mar_l_emu - mar_r_emu
+          // Estimate text height from paragraphs
+          let np = cell.paragraphs.length()
+          let mut text_h_emu = 0
+          let mut pi = 0
+          while pi < np {
+            let para = cell.paragraphs[pi]
+            // Find max font size in this paragraph
+            let mut max_fs_emu = 0
+            let nr = para.runs.length()
+            let mut rri = 0
+            while rri < nr {
+              let rsz = para.runs[rri].font_size
+              if rsz > 0 {
+                let fs_emu = rsz * @ooxml.emu_per_hundredth_pt
+                if fs_emu > max_fs_emu {
+                  max_fs_emu = fs_emu
+                }
+              }
+              rri = rri + 1
+            }
+            if max_fs_emu == 0 {
+              max_fs_emu = default_table_font_size_emu
+            }
+            let lh_emu = max_fs_emu * line_height_numer / line_height_denom
+            // Estimate wrapped line count
+            let bul_mar_emu = if para.mar_l >= 0 { para.mar_l } else { 0 }
+            let wrap_w_emu = content_w_emu - bul_mar_emu
+            let mut wrap_lines = 1
+            if nr > 0 && wrap_w_emu > 0 {
+              // Estimate total text width and compute line count
+              let wrap_w_px = px(wrap_w_emu, scale)
+              let vlines = wrap_paragraph(para, wrap_w_px, scale, px(default_table_font_size_emu, scale), -1, theme)
+              wrap_lines = vlines.length()
+              if wrap_lines < 1 {
+                wrap_lines = 1
+              }
+            }
+            if para.spc_before > 0 && pi > 0 {
+              text_h_emu = text_h_emu + para.spc_before
+            }
+            text_h_emu = text_h_emu + lh_emu * wrap_lines
+            if para.spc_after > 0 {
+              text_h_emu = text_h_emu + para.spc_after
+            }
+            pi = pi + 1
+          }
+          if np == 0 {
+            text_h_emu = default_table_font_size_emu * line_height_numer / line_height_denom
+          }
+          let cell_h_emu = text_h_emu + mar_t_emu + mar_b_emu
+          if cell_h_emu > max_cell_h_emu {
+            max_cell_h_emu = cell_h_emu
+          }
+        }
+        let gs3 = if row.cells[ci2].grid_span > 1 { row.cells[ci2].grid_span } else { 1 }
+        col2 = col2 + gs3
+        ci2 = ci2 + 1
+      }
+      row_heights_emu.push(max_cell_h_emu)
+    }
     rhi = rhi + 1
   }
   // Precompute row y-offsets in EMU

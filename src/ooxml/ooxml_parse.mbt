@@ -1842,8 +1842,32 @@ pub fn parse_slide(
 ) -> SlideData {
   let nodes = @xml.parse_xml(slide_xml)
   let shapes : Array[Shape] = []
+  // Find p:sld element for attributes and children
+  let sld_node = @xml.find_child(nodes, "p:sld")
+  // Parse hidden attribute: <p:sld show="0">
+  let hidden = match sld_node {
+    Some(sld) =>
+      match @xml.get_attr(sld, "show") {
+        Some("0") => true
+        _ => false
+      }
+    None => false
+  }
+  // Extract p:transition and p:timing as raw XML for round-trip
+  let sld_children = match sld_node {
+    Some(sld) => @xml.get_children(sld)
+    None => []
+  }
+  let transition_xml = match @xml.find_child(sld_children, "p:transition") {
+    Some(n) => @xml.serialize_node(n)
+    None => ""
+  }
+  let timing_xml = match @xml.find_child(sld_children, "p:timing") {
+    Some(n) => @xml.serialize_node(n)
+    None => ""
+  }
   // Navigate p:sld → p:cSld
-  let csld = @xml.find_path(nodes, ["p:sld", "p:cSld"])
+  let csld = @xml.find_child(sld_children, "p:cSld")
   match csld {
     None =>
       {
@@ -1853,6 +1877,9 @@ pub fn parse_slide(
         bg_blip_fill: BlipFill::none(),
         bg_patt_fill: PatternFill::none(),
         shapes,
+        transition_xml,
+        timing_xml,
+        hidden,
       }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
@@ -1892,6 +1919,9 @@ pub fn parse_slide(
             bg_blip_fill: bg_bf,
             bg_patt_fill: bg_pf,
             shapes,
+            transition_xml,
+            timing_xml,
+            hidden,
           }
         Some(tree) => {
           let parsed = parse_shapes_from_children(
@@ -1905,6 +1935,9 @@ pub fn parse_slide(
             bg_blip_fill: bg_bf,
             bg_patt_fill: bg_pf,
             shapes: parsed,
+            transition_xml,
+            timing_xml,
+            hidden,
           }
         }
       }

@@ -13,6 +13,7 @@ options(
       "exports": [
         "initialize_pptx",
         "get_slide_count",
+        "is_slide_hidden",
         "get_slide_xml_raw",
         "get_entry_list",
         "render_slide_svg",

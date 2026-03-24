@@ -98,6 +98,7 @@ const renderer = new PptxRenderer(options?);
 | `init(wasmSource?)` | `Promise<void>` | Load the Wasm module. No arguments needed (auto-resolved). Pass URL or ArrayBuffer to override. |
 | `loadPptx(buffer)` | `Promise<{ slideCount }>` | Load a PPTX file from ArrayBuffer. |
 | `getSlideCount()` | `number` | Number of slides. |
+| `isSlideHidden(idx)` | `boolean` | Check if a slide is hidden (`show="0"`). |
 | `renderSlideSvg(idx)` | `string` | Render slide as SVG string (0-indexed). |
 | `updateSlideFromSvg(idx, svg)` | `string` | Update slide data from edited SVG. Returns `"OK"` or `"ERROR:..."`. |
 | `getSlideOoxml(idx)` | `string` | Get OOXML XML for a slide. |
@@ -179,10 +180,14 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Math equations** (OMML `m:oMath`) - plain text fallback display; original XML preserved for round-trip
 - **Embedded fonts** - binary preserved for round-trip; uses system font fallback for rendering
 
+### Data Preservation (no visual rendering)
+
+- **Animations** (`p:timing`) - preserved in round-trip export; static rendering only
+- **Transitions** (`p:transition`) - preserved in round-trip export; static rendering only
+- **Hidden slides** - detected via `isSlideHidden()` API; `show="0"` preserved in round-trip export
+
 ### Out of Scope
 
-- **Animations** (`p:timing`) - static rendering only
-- **Transitions** (`p:transition`) - static rendering only
 - **Macros / VBA** - not supported for security reasons
 
 ## SVG Output Format
