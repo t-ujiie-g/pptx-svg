@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 80', slideCount === 80, `got ${slideCount}`);
+  assert('slide count = 81', slideCount === 81, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 80; i++) {
+  for (let i = 1; i <= 81; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 80; i++) {
+  for (let i = 1; i <= 81; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1323,7 +1323,7 @@ async function testFeaturesPptx() {
   {
     section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
     // Should have chart references
-    const rels73 = textFiles.get('ppt/slides/_rels/slide73.xml.rels') || '';
+    const rels73 = textFiles.get('ppt/slides/_rels/slide74.xml.rels') || '';
     const chartRefs73 = findRelTarget(rels73, 'chart');
     assert('slide73 has chart references', chartRefs73.length >= 2, `got ${chartRefs73.length}`);
     // Check the chart XMLs for grouping types
@@ -1342,11 +1342,11 @@ async function testFeaturesPptx() {
   // ── Slide 74: Speaker notes + comments ──────────────────────────────────────
   {
     section('test_features.pptx — Slide 74: Speaker notes + comments');
-    const slide74 = textFiles.get('ppt/slides/slide74.xml') || '';
+    const slide74 = textFiles.get('ppt/slides/slide75.xml') || '';
     assert('slide74 has text content', slide74.includes('speaker notes'));
 
     // Notes
-    const rels74 = textFiles.get('ppt/slides/_rels/slide74.xml.rels') || '';
+    const rels74 = textFiles.get('ppt/slides/_rels/slide75.xml.rels') || '';
     const notesRefs = findRelTarget(rels74, 'notesSlide');
     assert('slide74 has notesSlide relationship', notesRefs.length > 0);
 
@@ -1392,7 +1392,7 @@ async function testFeaturesPptx() {
   // ── Slide 75: SmartArt fallback (mc:AlternateContent) ─────────────────────
   {
     section('test_features.pptx — Slide 75: SmartArt fallback');
-    const slide75 = textFiles.get('ppt/slides/slide75.xml') || '';
+    const slide75 = textFiles.get('ppt/slides/slide76.xml') || '';
     assert('slide75 exists', slide75.length > 0);
     assert('slide75 has mc:AlternateContent', slide75.includes('mc:AlternateContent'));
     assert('slide75 has mc:Choice', slide75.includes('mc:Choice'));
@@ -1415,7 +1415,7 @@ async function testFeaturesPptx() {
   // ── Slide 76: OLE embedded object ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 76: OLE embedded object');
-    const slide76 = textFiles.get('ppt/slides/slide76.xml') || '';
+    const slide76 = textFiles.get('ppt/slides/slide77.xml') || '';
     assert('slide76 exists', slide76.length > 0);
     assert('slide76 has p:graphicFrame', slide76.includes('p:graphicFrame'));
     assert('slide76 has p:oleObj', slide76.includes('p:oleObj'));
@@ -1426,7 +1426,7 @@ async function testFeaturesPptx() {
     assert('slide76 has blip r:embed', slide76.includes('r:embed'));
     assert('slide76 has OLE name', slide76.includes('Embedded Spreadsheet'));
     // Check rels for image and OLE binary
-    const rels76 = textFiles.get('ppt/slides/_rels/slide76.xml.rels') || '';
+    const rels76 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
     assert('slide76 has image relationship', rels76.includes('image'));
     assert('slide76 has oleObject relationship', rels76.includes('oleObject'));
   }
@@ -1434,7 +1434,7 @@ async function testFeaturesPptx() {
   // ── Slide 77: Media (video with poster frame) ─────────────────────────────
   {
     section('test_features.pptx — Slide 77: Media (video with poster frame)');
-    const slide77 = textFiles.get('ppt/slides/slide77.xml') || '';
+    const slide77 = textFiles.get('ppt/slides/slide78.xml') || '';
     assert('slide77 exists', slide77.length > 0);
     assert('slide77 has p:pic', slide77.includes('p:pic'));
     assert('slide77 has a:videoFile', slide77.includes('a:videoFile'));
@@ -1442,7 +1442,7 @@ async function testFeaturesPptx() {
     assert('slide77 has p:blipFill for poster', slide77.includes('p:blipFill'));
     assert('slide77 has a:blip r:embed', slide77.includes('r:embed'));
     // Check rels for video and image
-    const rels77 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
+    const rels77 = textFiles.get('ppt/slides/_rels/slide78.xml.rels') || '';
     assert('slide77 has image relationship', rels77.includes('image'));
     assert('slide77 has video relationship', rels77.includes('video'));
   }
@@ -1450,7 +1450,7 @@ async function testFeaturesPptx() {
   // ── Slide 78: Math equation (OMML) ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 78: Math equation (OMML)');
-    const slide78 = textFiles.get('ppt/slides/slide78.xml') || '';
+    const slide78 = textFiles.get('ppt/slides/slide79.xml') || '';
     assert('slide78 exists', slide78.length > 0);
     assert('slide78 has m:oMathPara', slide78.includes('m:oMathPara'));
     assert('slide78 has m:oMath', slide78.includes('m:oMath'));
@@ -1465,7 +1465,7 @@ async function testFeaturesPptx() {
   // ── Slide 79: Transition + Timing (round-trip) ──────────────────────────────
   {
     section('test_features.pptx — Slide 79: Transition + Timing');
-    const slide79 = textFiles.get('ppt/slides/slide79.xml') || '';
+    const slide79 = textFiles.get('ppt/slides/slide80.xml') || '';
     assert('slide79 exists', slide79.length > 0);
     assert('slide79 has p:transition', slide79.includes('<p:transition'));
     assert('slide79 transition has fade', slide79.includes('<p:fade'));
@@ -1476,7 +1476,7 @@ async function testFeaturesPptx() {
   // ── Slide 80: Hidden slide ──────────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 80: Hidden slide');
-    const slide80 = textFiles.get('ppt/slides/slide80.xml') || '';
+    const slide80 = textFiles.get('ppt/slides/slide81.xml') || '';
     assert('slide80 exists', slide80.length > 0);
     assert('slide80 has show="0"', slide80.includes('show="0"'));
   }

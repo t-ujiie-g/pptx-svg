@@ -75,6 +75,7 @@ Slides:
  70. Text outline (a:rPr/a:ln — stroke on text glyphs)
  71. Text gradient fill (a:rPr/a:gradFill — gradient on text)
  72. Text warp (a:prstTxWarp — preset text warp with adjust values)
+ 72b. Additional text warp presets (slant, curve, inflate, chevron, circle)
  73. Stacked / Percent-stacked bar charts (BAR_STACKED_100, COLUMN_STACKED, COLUMN_STACKED_100)
  74. Speaker notes (p:notes) + comments (p:cmAuthorLst / p:cmLst)
  75. SmartArt fallback (mc:AlternateContent with mc:Choice + mc:Fallback group shapes)
@@ -4932,6 +4933,94 @@ warp72c = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textDeflate">
 </a:prstTxWarp>"""
 body_pr72c.insert(0, etree.fromstring(warp72c))
 
+# ── Slide 72b: Additional text warp presets ──────────────────────────────────
+slide72b = prs.slides.add_slide(blank)
+lbl72b = slide72b.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))
+lbl72b.text_frame.paragraphs[0].text = "Slide 72b: Additional text warp presets"
+lbl72b.text_frame.paragraphs[0].font.size = Pt(18)
+lbl72b.text_frame.paragraphs[0].font.bold = True
+
+# textSlantUp
+tb72d = slide72b.shapes.add_textbox(Inches(0.5), Inches(1), Inches(4), Inches(1.5))
+tf72d = tb72d.text_frame
+r72d = tf72d.paragraphs[0].add_run()
+r72d.text = "Slant Up"
+r72d.font.size = Pt(36)
+r72d.font.bold = True
+sp72d = tb72d._element
+body_pr72d = sp72d.find(f'.//{{{ns_a}}}bodyPr')
+warp72d = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textSlantUp">
+  <a:avLst>
+    <a:gd name="adj" fmla="val 55556"/>
+  </a:avLst>
+</a:prstTxWarp>"""
+body_pr72d.insert(0, etree.fromstring(warp72d))
+
+# textCurveUp
+tb72e = slide72b.shapes.add_textbox(Inches(5), Inches(1), Inches(4), Inches(1.5))
+tf72e = tb72e.text_frame
+r72e = tf72e.paragraphs[0].add_run()
+r72e.text = "Curve Up"
+r72e.font.size = Pt(36)
+r72e.font.bold = True
+r72e.font.color.rgb = RGBColor(0x00, 0x70, 0xC0)
+sp72e = tb72e._element
+body_pr72e = sp72e.find(f'.//{{{ns_a}}}bodyPr')
+warp72e = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textCurveUp">
+  <a:avLst>
+    <a:gd name="adj" fmla="val 45977"/>
+  </a:avLst>
+</a:prstTxWarp>"""
+body_pr72e.insert(0, etree.fromstring(warp72e))
+
+# textInflate
+tb72f = slide72b.shapes.add_textbox(Inches(0.5), Inches(3), Inches(4), Inches(1.5))
+tf72f = tb72f.text_frame
+r72f = tf72f.paragraphs[0].add_run()
+r72f.text = "Inflate"
+r72f.font.size = Pt(36)
+r72f.font.bold = True
+r72f.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+sp72f = tb72f._element
+body_pr72f = sp72f.find(f'.//{{{ns_a}}}bodyPr')
+warp72f = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textInflate">
+  <a:avLst/>
+</a:prstTxWarp>"""
+body_pr72f.insert(0, etree.fromstring(warp72f))
+
+# textChevron
+tb72g = slide72b.shapes.add_textbox(Inches(5), Inches(3), Inches(4), Inches(1.5))
+tf72g = tb72g.text_frame
+r72g = tf72g.paragraphs[0].add_run()
+r72g.text = "Chevron"
+r72g.font.size = Pt(36)
+r72g.font.bold = True
+r72g.font.color.rgb = RGBColor(0x00, 0xB0, 0x50)
+sp72g = tb72g._element
+body_pr72g = sp72g.find(f'.//{{{ns_a}}}bodyPr')
+warp72g = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textChevron">
+  <a:avLst>
+    <a:gd name="adj" fmla="val 25000"/>
+  </a:avLst>
+</a:prstTxWarp>"""
+body_pr72g.insert(0, etree.fromstring(warp72g))
+
+# textCircle
+tb72h = slide72b.shapes.add_textbox(Inches(2.5), Inches(5), Inches(4), Inches(2.5))
+tf72h = tb72h.text_frame
+r72h = tf72h.paragraphs[0].add_run()
+r72h.text = "Circle Text Example"
+r72h.font.size = Pt(28)
+r72h.font.bold = True
+sp72h = tb72h._element
+body_pr72h = sp72h.find(f'.//{{{ns_a}}}bodyPr')
+warp72h = f"""<a:prstTxWarp xmlns:a="{ns_a}" prst="textCircle">
+  <a:avLst>
+    <a:gd name="adj" fmla="val 10800000"/>
+  </a:avLst>
+</a:prstTxWarp>"""
+body_pr72h.insert(0, etree.fromstring(warp72h))
+
 # ── Slide 73: Stacked / Percent-stacked bar charts ──────────────────────────
 
 slide73 = prs.slides.add_slide(blank)
@@ -5424,9 +5513,9 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 80
+total_slides = len(prs.slides)  # 81
 # python-pptx numbers slide files sequentially
-slide78_path = 'ppt/slides/slide78.xml'
+slide78_path = 'ppt/slides/slide79.xml'
 
 # Read entire ZIP into memory, then close it before writing
 zin = zipfile.ZipFile(output_path, 'r')
@@ -5466,7 +5555,7 @@ if 'xmlns:m=' not in slide78_xml:
     )
 
 # ── Patch slide 79: inject transition + timing XML ──
-slide79_path = 'ppt/slides/slide79.xml'
+slide79_path = 'ppt/slides/slide80.xml'
 slide79_xml = all_entries[slide79_path][1].decode('utf-8') if isinstance(all_entries[slide79_path][1], bytes) else all_entries[slide79_path][1]
 # Inject p:transition and p:timing before </p:sld>
 transition_xml = '<p:transition spd="med"><p:fade/></p:transition>'
@@ -5478,7 +5567,7 @@ timing_xml = (
 slide79_xml = slide79_xml.replace('</p:sld>', transition_xml + timing_xml + '</p:sld>')
 
 # ── Patch slide 80: inject show="0" for hidden slide ──
-slide80_path = 'ppt/slides/slide80.xml'
+slide80_path = 'ppt/slides/slide81.xml'
 slide80_xml = all_entries[slide80_path][1].decode('utf-8') if isinstance(all_entries[slide80_path][1], bytes) else all_entries[slide80_path][1]
 # Add show="0" to p:sld element
 slide80_xml = slide80_xml.replace('<p:sld ', '<p:sld show="0" ', 1)
