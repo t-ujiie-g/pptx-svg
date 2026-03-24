@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.3
+
+### Features
+
+- **Slide transitions & timing**: preserve `<p:transition>` and `<p:timing>` XML in round-trip export
+- **Hidden slide detection**: `isSlideHidden()` API and `data-ooxml-hidden` SVG attribute for `<p:sld show="0">`
+
+### Bug Fixes
+
+- Fix table rows with `h="0"` rendering as crushed/compressed — auto-compute row height from cell text content (font size, wrapping, margins)
+- Fix text overlapping in fixed-size text boxes — auto-shrink now applies to all overflowing text, not just explicit `<a:normAutofit>`
+- Fix XML numeric character references (`&#x2022;`, `&#8226;`, etc.) rendering as literal text instead of decoded characters
+
 ## 0.4.2
 
 ### Bug Fixes
