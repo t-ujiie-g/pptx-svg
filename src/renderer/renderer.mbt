@@ -1696,6 +1696,8 @@ pub fn render_shape(
         theme,
         shape.body_props,
         rels,
+        slide_num,
+        shape_idx,
       )
     }
     @ooxml.ShapeKind::Picture(_) => {

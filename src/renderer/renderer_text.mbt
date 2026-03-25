@@ -656,9 +656,24 @@ fn render_text(
   theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
   rels : Array[@ooxml.Relationship],
+  slide_num : Int,
+  shape_idx : Int,
 ) -> String {
   if paragraphs.length() == 0 {
     return ""
+  }
+  // Warp text: delegate to warp renderer for non-trivial presets
+  let wp = body_props.warp_prst
+  if not(wp.is_empty()) && wp != "textNoShape" && wp != "textPlain" {
+    return render_warp_text(
+      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
+    )
+  }
+  // Math text: delegate to math renderer for OMML-only text boxes
+  if is_all_math(paragraphs) {
+    return render_math_text(
+      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
+    )
   }
   // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
   let l_ins = if body_props.l_ins >= 0 {

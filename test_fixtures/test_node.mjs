@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 80', slideCount === 80, `got ${slideCount}`);
+  assert('slide count = 85', slideCount === 85, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 80; i++) {
+  for (let i = 1; i <= 85; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 80; i++) {
+  for (let i = 1; i <= 85; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1323,7 +1323,7 @@ async function testFeaturesPptx() {
   {
     section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
     // Should have chart references
-    const rels73 = textFiles.get('ppt/slides/_rels/slide73.xml.rels') || '';
+    const rels73 = textFiles.get('ppt/slides/_rels/slide74.xml.rels') || '';
     const chartRefs73 = findRelTarget(rels73, 'chart');
     assert('slide73 has chart references', chartRefs73.length >= 2, `got ${chartRefs73.length}`);
     // Check the chart XMLs for grouping types
@@ -1342,11 +1342,11 @@ async function testFeaturesPptx() {
   // ── Slide 74: Speaker notes + comments ──────────────────────────────────────
   {
     section('test_features.pptx — Slide 74: Speaker notes + comments');
-    const slide74 = textFiles.get('ppt/slides/slide74.xml') || '';
+    const slide74 = textFiles.get('ppt/slides/slide75.xml') || '';
     assert('slide74 has text content', slide74.includes('speaker notes'));
 
     // Notes
-    const rels74 = textFiles.get('ppt/slides/_rels/slide74.xml.rels') || '';
+    const rels74 = textFiles.get('ppt/slides/_rels/slide75.xml.rels') || '';
     const notesRefs = findRelTarget(rels74, 'notesSlide');
     assert('slide74 has notesSlide relationship', notesRefs.length > 0);
 
@@ -1392,7 +1392,7 @@ async function testFeaturesPptx() {
   // ── Slide 75: SmartArt fallback (mc:AlternateContent) ─────────────────────
   {
     section('test_features.pptx — Slide 75: SmartArt fallback');
-    const slide75 = textFiles.get('ppt/slides/slide75.xml') || '';
+    const slide75 = textFiles.get('ppt/slides/slide76.xml') || '';
     assert('slide75 exists', slide75.length > 0);
     assert('slide75 has mc:AlternateContent', slide75.includes('mc:AlternateContent'));
     assert('slide75 has mc:Choice', slide75.includes('mc:Choice'));
@@ -1415,7 +1415,7 @@ async function testFeaturesPptx() {
   // ── Slide 76: OLE embedded object ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 76: OLE embedded object');
-    const slide76 = textFiles.get('ppt/slides/slide76.xml') || '';
+    const slide76 = textFiles.get('ppt/slides/slide77.xml') || '';
     assert('slide76 exists', slide76.length > 0);
     assert('slide76 has p:graphicFrame', slide76.includes('p:graphicFrame'));
     assert('slide76 has p:oleObj', slide76.includes('p:oleObj'));
@@ -1426,7 +1426,7 @@ async function testFeaturesPptx() {
     assert('slide76 has blip r:embed', slide76.includes('r:embed'));
     assert('slide76 has OLE name', slide76.includes('Embedded Spreadsheet'));
     // Check rels for image and OLE binary
-    const rels76 = textFiles.get('ppt/slides/_rels/slide76.xml.rels') || '';
+    const rels76 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
     assert('slide76 has image relationship', rels76.includes('image'));
     assert('slide76 has oleObject relationship', rels76.includes('oleObject'));
   }
@@ -1434,7 +1434,7 @@ async function testFeaturesPptx() {
   // ── Slide 77: Media (video with poster frame) ─────────────────────────────
   {
     section('test_features.pptx — Slide 77: Media (video with poster frame)');
-    const slide77 = textFiles.get('ppt/slides/slide77.xml') || '';
+    const slide77 = textFiles.get('ppt/slides/slide78.xml') || '';
     assert('slide77 exists', slide77.length > 0);
     assert('slide77 has p:pic', slide77.includes('p:pic'));
     assert('slide77 has a:videoFile', slide77.includes('a:videoFile'));
@@ -1442,7 +1442,7 @@ async function testFeaturesPptx() {
     assert('slide77 has p:blipFill for poster', slide77.includes('p:blipFill'));
     assert('slide77 has a:blip r:embed', slide77.includes('r:embed'));
     // Check rels for video and image
-    const rels77 = textFiles.get('ppt/slides/_rels/slide77.xml.rels') || '';
+    const rels77 = textFiles.get('ppt/slides/_rels/slide78.xml.rels') || '';
     assert('slide77 has image relationship', rels77.includes('image'));
     assert('slide77 has video relationship', rels77.includes('video'));
   }
@@ -1450,7 +1450,7 @@ async function testFeaturesPptx() {
   // ── Slide 78: Math equation (OMML) ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 78: Math equation (OMML)');
-    const slide78 = textFiles.get('ppt/slides/slide78.xml') || '';
+    const slide78 = textFiles.get('ppt/slides/slide79.xml') || '';
     assert('slide78 exists', slide78.length > 0);
     assert('slide78 has m:oMathPara', slide78.includes('m:oMathPara'));
     assert('slide78 has m:oMath', slide78.includes('m:oMath'));
@@ -1465,7 +1465,7 @@ async function testFeaturesPptx() {
   // ── Slide 79: Transition + Timing (round-trip) ──────────────────────────────
   {
     section('test_features.pptx — Slide 79: Transition + Timing');
-    const slide79 = textFiles.get('ppt/slides/slide79.xml') || '';
+    const slide79 = textFiles.get('ppt/slides/slide80.xml') || '';
     assert('slide79 exists', slide79.length > 0);
     assert('slide79 has p:transition', slide79.includes('<p:transition'));
     assert('slide79 transition has fade', slide79.includes('<p:fade'));
@@ -1476,9 +1476,41 @@ async function testFeaturesPptx() {
   // ── Slide 80: Hidden slide ──────────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 80: Hidden slide');
-    const slide80 = textFiles.get('ppt/slides/slide80.xml') || '';
+    const slide80 = textFiles.get('ppt/slides/slide81.xml') || '';
     assert('slide80 exists', slide80.length > 0);
     assert('slide80 has show="0"', slide80.includes('show="0"'));
+  }
+
+  // ── Slide 82: OMML — Large operators + delimiters ───────────────────────────
+  {
+    section('test_features.pptx — Slide 82: OMML nary');
+    const slide82 = textFiles.get('ppt/slides/slide83.xml') || '';
+    assert('slide82 exists', slide82.length > 0);
+    assert('slide82 has m:nary', slide82.includes('m:nary'));
+    assert('slide82 has integral char', slide82.includes('\u222B') || slide82.includes('&#x222B;'));
+    assert('slide82 has m:limLoc', slide82.includes('m:limLoc'));
+    assert('slide82 has m:sSup', slide82.includes('m:sSup'));
+  }
+
+  // ── Slide 83: OMML — Matrix + delimiters ──────────────────────────────────
+  {
+    section('test_features.pptx — Slide 83: OMML matrix');
+    const slide83 = textFiles.get('ppt/slides/slide84.xml') || '';
+    assert('slide83 exists', slide83.length > 0);
+    assert('slide83 has m:m (matrix)', slide83.includes('m:m'));
+    assert('slide83 has m:mr (matrix row)', slide83.includes('m:mr'));
+    assert('slide83 has m:d (delimiter)', slide83.includes('m:d'));
+    assert('slide83 has m:begChr', slide83.includes('m:begChr'));
+  }
+
+  // ── Slide 84: OMML — Accent + bar + subsup ───────────────────────────────
+  {
+    section('test_features.pptx — Slide 84: OMML accent/bar/subsup');
+    const slide84 = textFiles.get('ppt/slides/slide85.xml') || '';
+    assert('slide84 exists', slide84.length > 0);
+    assert('slide84 has m:acc (accent)', slide84.includes('m:acc'));
+    assert('slide84 has m:bar', slide84.includes('m:bar'));
+    assert('slide84 has m:sSubSup', slide84.includes('m:sSubSup'));
   }
 }
 
@@ -1724,6 +1756,188 @@ function buildTestEmfWithWindowExtent() {
   return buf.subarray(0, off);
 }
 
+// ── Tests: WMF converter ─────────────────────────────────────────────────────
+
+async function testWmfConverter() {
+  const { wmfToSvg } = await import('../dist/wmf-converter.js');
+
+  section('WMF converter — invalid input');
+  assert('empty data returns ""', wmfToSvg(new Uint8Array(0)) === '');
+  assert('too small returns ""', wmfToSvg(new Uint8Array(10)) === '');
+  assert('non-WMF data returns ""', wmfToSvg(new Uint8Array(100)) === '');
+
+  section('WMF converter — minimal standard WMF (no drawings)');
+  // Build: METAHEADER(18) + EOF record(6)
+  const minWmf = new Uint8Array(24);
+  const dv = new DataView(minWmf.buffer);
+  dv.setUint16(0, 1, true);     // mtType = memory
+  dv.setUint16(2, 9, true);     // mtHeaderSize = 9 words
+  dv.setUint16(4, 0x0300, true); // mtVersion
+  dv.setUint32(6, 12, true);    // mtSize = 12 words (24 bytes total)
+  dv.setUint16(10, 0, true);    // mtNoObjects
+  dv.setUint32(12, 3, true);    // mtMaxRecord = 3 words
+  dv.setUint16(16, 0, true);    // mtNoParameters
+  // EOF record at offset 18
+  dv.setUint32(18, 3, true);    // size = 3 words
+  dv.setUint16(22, 0, true);    // function = META_EOF
+  assert('minimal WMF returns "" (no drawings)', wmfToSvg(minWmf) === '');
+
+  section('WMF converter — standard WMF with rectangle');
+  const rectWmf = buildTestWmfWithRect();
+  const rectResult = wmfToSvg(rectWmf);
+  assert('rect WMF returns non-empty SVG', rectResult.length > 0);
+  assert('SVG starts with <svg', rectResult.startsWith('<svg'));
+  assert('SVG ends with </svg>', rectResult.endsWith('</svg>'));
+  assert('SVG contains <rect', rectResult.includes('<rect '));
+  assert('SVG has viewBox', rectResult.includes('viewBox='));
+
+  section('WMF converter — placeable WMF with polygon');
+  const placeableWmf = buildTestPlaceableWmf();
+  const placeableResult = wmfToSvg(placeableWmf);
+  assert('placeable WMF returns non-empty SVG', placeableResult.length > 0);
+  assert('SVG contains <path (polygon)', placeableResult.includes('<path '));
+  assert('SVG contains fill color', placeableResult.includes('#ff0000'));
+  assert('viewBox uses placeable bbox', placeableResult.includes('viewBox="0 0 200 100"'));
+}
+
+// ── WMF test fixture builders ───────────────────────────────────────────────
+
+function buildTestWmfWithRect() {
+  // METAHEADER(18) + SetWindowOrg(10) + SetWindowExt(10) +
+  // CreateBrushIndirect(14) + SelectObject(8) + Rectangle(14) + EOF(6)
+  // Total: 80 bytes
+  const buf = new Uint8Array(80);
+  const dv = new DataView(buf.buffer);
+  let off = 0;
+
+  // METAHEADER (18 bytes)
+  dv.setUint16(off, 1, true);      // mtType
+  dv.setUint16(off + 2, 9, true);  // mtHeaderSize
+  dv.setUint16(off + 4, 0x0300, true); // mtVersion
+  dv.setUint32(off + 6, 40, true); // mtSize in words (80 bytes)
+  dv.setUint16(off + 10, 1, true); // mtNoObjects
+  dv.setUint32(off + 12, 7, true); // mtMaxRecord
+  dv.setUint16(off + 16, 0, true);
+  off = 18;
+
+  // META_SETWINDOWORG (size=5 words, func=0x020B): Y=0, X=0
+  dv.setUint32(off, 5, true);
+  dv.setUint16(off + 4, 0x020B, true);
+  dv.setInt16(off + 6, 0, true);  // Y
+  dv.setInt16(off + 8, 0, true);  // X
+  off += 10;
+
+  // META_SETWINDOWEXT (size=5 words, func=0x020C): CY=100, CX=200
+  dv.setUint32(off, 5, true);
+  dv.setUint16(off + 4, 0x020C, true);
+  dv.setInt16(off + 6, 100, true); // CY
+  dv.setInt16(off + 8, 200, true); // CX
+  off += 10;
+
+  // META_CREATEBRUSHINDIRECT (size=7 words, func=0x02FC): solid green
+  dv.setUint32(off, 7, true);
+  dv.setUint16(off + 4, 0x02FC, true);
+  dv.setUint16(off + 6, 0, true);     // BS_SOLID
+  dv.setUint8(off + 8, 0x00);         // R
+  dv.setUint8(off + 9, 0xFF);         // G
+  dv.setUint8(off + 10, 0x00);        // B
+  dv.setUint8(off + 11, 0x00);        // reserved
+  dv.setInt16(off + 12, 0, true);     // BrushHatch
+  off += 14;
+
+  // META_SELECTOBJECT (size=4 words, func=0x012D): object 0
+  dv.setUint32(off, 4, true);
+  dv.setUint16(off + 4, 0x012D, true);
+  dv.setUint16(off + 6, 0, true);
+  off += 8;
+
+  // META_RECTANGLE (size=7 words, func=0x041B): bottom=80, right=150, top=10, left=20
+  dv.setUint32(off, 7, true);
+  dv.setUint16(off + 4, 0x041B, true);
+  dv.setInt16(off + 6, 80, true);  // bottom
+  dv.setInt16(off + 8, 150, true); // right
+  dv.setInt16(off + 10, 10, true); // top
+  dv.setInt16(off + 12, 20, true); // left
+  off += 14;
+
+  // META_EOF (size=3 words)
+  dv.setUint32(off, 3, true);
+  dv.setUint16(off + 4, 0, true);
+  off += 6;
+
+  return buf.subarray(0, off);
+}
+
+function buildTestPlaceableWmf() {
+  // PlaceableHeader(22) + METAHEADER(18) +
+  // CreateBrushIndirect(14) + SelectObject(8) + Polygon(14 for 3 pts) + EOF(6)
+  const buf = new Uint8Array(120);
+  const dv = new DataView(buf.buffer);
+  let off = 0;
+
+  // Placeable WMF header (22 bytes)
+  dv.setUint32(off, 0x9AC6CDD7, true); // magic key
+  dv.setUint16(off + 4, 0, true);       // HWmf
+  dv.setInt16(off + 6, 0, true);        // BboxLeft
+  dv.setInt16(off + 8, 0, true);        // BboxTop
+  dv.setInt16(off + 10, 200, true);     // BboxRight
+  dv.setInt16(off + 12, 100, true);     // BboxBottom
+  dv.setUint16(off + 14, 96, true);     // Inch
+  dv.setUint32(off + 16, 0, true);      // Reserved
+  dv.setUint16(off + 20, 0, true);      // Checksum (ignored)
+  off = 22;
+
+  // METAHEADER (18 bytes)
+  dv.setUint16(off, 1, true);
+  dv.setUint16(off + 2, 9, true);
+  dv.setUint16(off + 4, 0x0300, true);
+  dv.setUint32(off + 6, 50, true);  // total size in words
+  dv.setUint16(off + 10, 1, true);
+  dv.setUint32(off + 12, 7, true);
+  dv.setUint16(off + 16, 0, true);
+  off += 18;
+
+  // META_CREATEBRUSHINDIRECT: solid red
+  dv.setUint32(off, 7, true);
+  dv.setUint16(off + 4, 0x02FC, true);
+  dv.setUint16(off + 6, 0, true);    // BS_SOLID
+  dv.setUint8(off + 8, 0xFF);        // R
+  dv.setUint8(off + 9, 0x00);        // G
+  dv.setUint8(off + 10, 0x00);       // B
+  dv.setUint8(off + 11, 0x00);
+  dv.setInt16(off + 12, 0, true);
+  off += 14;
+
+  // META_SELECTOBJECT: object 0
+  dv.setUint32(off, 4, true);
+  dv.setUint16(off + 4, 0x012D, true);
+  dv.setUint16(off + 6, 0, true);
+  off += 8;
+
+  // META_POLYGON (size = 4 + nPts*2 words): 3 points (triangle)
+  // size = 4 + 3*2 = 10 words
+  dv.setUint32(off, 10, true);
+  dv.setUint16(off + 4, 0x0324, true);
+  dv.setInt16(off + 6, 3, true);   // nPts
+  // point 1: (10, 90)
+  dv.setInt16(off + 8, 10, true);
+  dv.setInt16(off + 10, 90, true);
+  // point 2: (100, 10)
+  dv.setInt16(off + 12, 100, true);
+  dv.setInt16(off + 14, 10, true);
+  // point 3: (190, 90)
+  dv.setInt16(off + 16, 190, true);
+  dv.setInt16(off + 18, 90, true);
+  off += 20;
+
+  // META_EOF
+  dv.setUint32(off, 3, true);
+  dv.setUint16(off + 4, 0, true);
+  off += 6;
+
+  return buf.subarray(0, off);
+}
+
 // ── Tests: utility functions ────────────────────────────────────────────────
 
 async function testUtilities() {
@@ -1750,6 +1964,7 @@ async function main() {
   await testMinimalPptx();
   await testFeaturesPptx();
   await testEmfConverter();
+  await testWmfConverter();
   await testUtilities();
 
   console.log(`\n${'═'.repeat(50)}`);

@@ -155,6 +155,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape rendering + public API |
 | `src/renderer/renderer_table.mbt` | Table SVG rendering (cell borders, merging, conditional formatting) |
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
+| `src/renderer/renderer_warp.mbt` | Text warp rendering (SVG `<textPath>` + transforms for prstTxWarp presets) |
+| `src/renderer/renderer_math.mbt` | OMML math rendering (fractions, radicals, integrals, matrices → SVG) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
 | `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
@@ -170,6 +172,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `lib/utils.ts` | bytesToBase64, crc32 utilities |
 | `lib/font-fallbacks.ts` | Font fallback mappings (customizable via `PptxRendererOptions`) |
 | `lib/emf-converter.ts` | Lightweight EMF→SVG converter (vector paths, text, bitmaps) |
+| `lib/wmf-converter.ts` | Lightweight WMF→SVG converter (vector paths, text, bitmaps) |
 | `docs/svg-specification.md` | SVG output format specification (`data-ooxml-*` attributes) |
 | `web/index.html` | Browser demo UI |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |

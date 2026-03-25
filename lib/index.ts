@@ -22,6 +22,7 @@ export { extractZip, buildZip } from './zip.js';
 export type { ZipContents } from './zip.js';
 export { parseWasmStringConstants, instantiateWasmWithFallback } from './wasm-compat.js';
 export { emfToSvg } from './emf-converter.js';
+export { wmfToSvg } from './wmf-converter.js';
 export {
   EMU_PER_PT, EMU_PER_PX_96DPI,
   pxToEmu, emuToPx, ptToHundredths, hundredthsToPt,

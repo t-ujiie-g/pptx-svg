@@ -6,6 +6,7 @@
 
 import { bytesToBase64 } from './utils.js';
 import { emfToSvg } from './emf-converter.js';
+import { wmfToSvg } from './wmf-converter.js';
 import { instantiateWasmWithFallback } from './wasm-compat.js';
 import { extractZip, buildZip } from './zip.js';
 import { DEFAULT_FONT_FALLBACKS } from './font-fallbacks.js';
@@ -367,11 +368,11 @@ export class PptxRenderer {
     };
   }
 
-  /** Convert an EMF file to an SVG data URI. Returns "" if conversion fails. */
+  /** Convert an EMF/WMF file to an SVG data URI. Returns "" if conversion fails. */
   private convertEmf(path: string): string {
     const bytes = this.rawFiles.get(path);
     if (!bytes) return '';
-    const svg = emfToSvg(bytes);
+    const svg = path.toLowerCase().endsWith('.wmf') ? wmfToSvg(bytes) : emfToSvg(bytes);
     if (!svg) return '';
     const encoded = encodeURIComponent(svg);
     return `data:image/svg+xml,${encoded}`;
