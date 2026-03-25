@@ -177,7 +177,7 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 ### Supported with Limitations
 - **WMF images** - converted to SVG at runtime via built-in converter (same approach as EMF)
 - **TIFF images** - binary preserved for round-trip; not supported by browser `<img>` in all browsers
-- **Math equations** (OMML `m:oMath`) - plain text fallback display; original XML preserved for round-trip
+- **Math equations** (OMML `m:oMath`) - SVG rendering of fractions, radicals, integrals, matrices, accents, and operators; original XML preserved for round-trip
 - **Embedded fonts** - binary preserved for round-trip; uses system font fallback for rendering
 
 ### Data Preservation (no visual rendering)

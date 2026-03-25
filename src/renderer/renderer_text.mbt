@@ -669,6 +669,12 @@ fn render_text(
       paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
     )
   }
+  // Math text: delegate to math renderer for OMML-only text boxes
+  if is_all_math(paragraphs) {
+    return render_math_text(
+      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
+    )
+  }
   // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
   let l_ins = if body_props.l_ins >= 0 {
     body_props.l_ins

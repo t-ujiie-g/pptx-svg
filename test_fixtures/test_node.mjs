@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 82', slideCount === 82, `got ${slideCount}`);
+  assert('slide count = 85', slideCount === 85, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 82; i++) {
+  for (let i = 1; i <= 85; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 82; i++) {
+  for (let i = 1; i <= 85; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1479,6 +1479,38 @@ async function testFeaturesPptx() {
     const slide80 = textFiles.get('ppt/slides/slide81.xml') || '';
     assert('slide80 exists', slide80.length > 0);
     assert('slide80 has show="0"', slide80.includes('show="0"'));
+  }
+
+  // ── Slide 82: OMML — Large operators + delimiters ───────────────────────────
+  {
+    section('test_features.pptx — Slide 82: OMML nary');
+    const slide82 = textFiles.get('ppt/slides/slide83.xml') || '';
+    assert('slide82 exists', slide82.length > 0);
+    assert('slide82 has m:nary', slide82.includes('m:nary'));
+    assert('slide82 has integral char', slide82.includes('\u222B') || slide82.includes('&#x222B;'));
+    assert('slide82 has m:limLoc', slide82.includes('m:limLoc'));
+    assert('slide82 has m:sSup', slide82.includes('m:sSup'));
+  }
+
+  // ── Slide 83: OMML — Matrix + delimiters ──────────────────────────────────
+  {
+    section('test_features.pptx — Slide 83: OMML matrix');
+    const slide83 = textFiles.get('ppt/slides/slide84.xml') || '';
+    assert('slide83 exists', slide83.length > 0);
+    assert('slide83 has m:m (matrix)', slide83.includes('m:m'));
+    assert('slide83 has m:mr (matrix row)', slide83.includes('m:mr'));
+    assert('slide83 has m:d (delimiter)', slide83.includes('m:d'));
+    assert('slide83 has m:begChr', slide83.includes('m:begChr'));
+  }
+
+  // ── Slide 84: OMML — Accent + bar + subsup ───────────────────────────────
+  {
+    section('test_features.pptx — Slide 84: OMML accent/bar/subsup');
+    const slide84 = textFiles.get('ppt/slides/slide85.xml') || '';
+    assert('slide84 exists', slide84.length > 0);
+    assert('slide84 has m:acc (accent)', slide84.includes('m:acc'));
+    assert('slide84 has m:bar', slide84.includes('m:bar'));
+    assert('slide84 has m:sSubSup', slide84.includes('m:sSubSup'));
   }
 }
 

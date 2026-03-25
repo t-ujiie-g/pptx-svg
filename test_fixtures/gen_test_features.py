@@ -85,6 +85,9 @@ Slides:
  79. Transition + Timing (p:transition + p:timing round-trip preservation)
  80. Hidden slide (p:sld show="0")
  81. WMF image (WMF → SVG conversion via wmfToSvg)
+ 82. OMML — Large operators + delimiters (m:nary integral + m:sSup)
+ 83. OMML — Matrix + delimiters (m:d + m:m 2x2 matrix)
+ 84. OMML — Accent + bar + sub/superscript (m:acc + m:bar + m:sSubSup)
 """
 
 import base64
@@ -5524,6 +5527,45 @@ wmf_placeholder = slide81.shapes.add_textbox(Inches(1), Inches(2.5), Inches(3), 
 wmf_placeholder.text_frame.paragraphs[0].text = "WMF_PLACEHOLDER"
 wmf_placeholder.text_frame.paragraphs[0].font.size = Pt(12)
 
+# ── Slide 82: OMML — Large operator (integral) + delimiters ─────────────────
+
+slide82 = prs.slides.add_slide(blank)
+
+title82 = slide82.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title82.text_frame.paragraphs[0].text = "Slide 82: OMML — Large Operators + Delimiters"
+title82.text_frame.paragraphs[0].font.size = Pt(24)
+title82.text_frame.paragraphs[0].font.bold = True
+
+math82 = slide82.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(3))
+math82.text_frame.paragraphs[0].text = "NARY_PLACEHOLDER"
+math82.text_frame.paragraphs[0].font.size = Pt(24)
+
+# ── Slide 83: OMML — Matrix + Delimiters ────────────────────────────────────
+
+slide83 = prs.slides.add_slide(blank)
+
+title83 = slide83.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title83.text_frame.paragraphs[0].text = "Slide 83: OMML — Matrix + Delimiters"
+title83.text_frame.paragraphs[0].font.size = Pt(24)
+title83.text_frame.paragraphs[0].font.bold = True
+
+math83 = slide83.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(3))
+math83.text_frame.paragraphs[0].text = "MATRIX_PLACEHOLDER"
+math83.text_frame.paragraphs[0].font.size = Pt(24)
+
+# ── Slide 84: OMML — Accent + Bar + SubSup ──────────────────────────────────
+
+slide84 = prs.slides.add_slide(blank)
+
+title84 = slide84.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title84.text_frame.paragraphs[0].text = "Slide 84: OMML — Accent + Bar + SubSup"
+title84.text_frame.paragraphs[0].font.size = Pt(24)
+title84.text_frame.paragraphs[0].font.bold = True
+
+math84 = slide84.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(3))
+math84.text_frame.paragraphs[0].text = "ACC_BAR_PLACEHOLDER"
+math84.text_frame.paragraphs[0].font.size = Pt(24)
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5532,7 +5574,7 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 82
+total_slides = len(prs.slides)  # 85
 # python-pptx numbers slide files sequentially
 slide78_path = 'ppt/slides/slide79.xml'
 
@@ -5590,6 +5632,87 @@ slide80_path = 'ppt/slides/slide81.xml'
 slide80_xml = all_entries[slide80_path][1].decode('utf-8') if isinstance(all_entries[slide80_path][1], bytes) else all_entries[slide80_path][1]
 # Add show="0" to p:sld element
 slide80_xml = slide80_xml.replace('<p:sld ', '<p:sld show="0" ', 1)
+
+# ── Patch slide 82: inject OMML nary (integral) ──
+slide82_path = 'ppt/slides/slide83.xml'
+slide82_xml = all_entries[slide82_path][1].decode('utf-8') if isinstance(all_entries[slide82_path][1], bytes) else all_entries[slide82_path][1]
+nary_omml = (
+    '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    '<m:oMath>'
+    '<m:nary>'
+    '<m:naryPr><m:chr m:val="\u222B"/><m:limLoc m:val="subSup"/></m:naryPr>'
+    '<m:sub><m:r><m:t>0</m:t></m:r></m:sub>'
+    '<m:sup><m:r><m:t>\u221E</m:t></m:r></m:sup>'
+    '<m:e>'
+    '<m:sSup><m:e><m:r><m:t>e</m:t></m:r></m:e>'
+    '<m:sup><m:r><m:t>-x</m:t></m:r></m:sup></m:sSup>'
+    '<m:r><m:t>dx</m:t></m:r>'
+    '</m:e>'
+    '</m:nary>'
+    '<m:r><m:t>=</m:t></m:r>'
+    '<m:r><m:t>1</m:t></m:r>'
+    '</m:oMath>'
+    '</m:oMathPara>'
+)
+slide82_xml = re.sub(
+    r'<a:r>(?:<a:rPr[^/]*/>)?<a:t>NARY_PLACEHOLDER</a:t></a:r>',
+    nary_omml, slide82_xml
+)
+if 'xmlns:m=' not in slide82_xml:
+    slide82_xml = slide82_xml.replace('xmlns:a=', f'xmlns:m="{OMML_NS}" xmlns:a=')
+
+# ── Patch slide 83: inject OMML matrix ──
+slide83_path = 'ppt/slides/slide84.xml'
+slide83_xml = all_entries[slide83_path][1].decode('utf-8') if isinstance(all_entries[slide83_path][1], bytes) else all_entries[slide83_path][1]
+matrix_omml = (
+    '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    '<m:oMath>'
+    '<m:r><m:t>A=</m:t></m:r>'
+    '<m:d>'
+    '<m:dPr><m:begChr m:val="["/><m:endChr m:val="]"/></m:dPr>'
+    '<m:e>'
+    '<m:m>'
+    '<m:mr><m:e><m:r><m:t>a</m:t></m:r></m:e><m:e><m:r><m:t>b</m:t></m:r></m:e></m:mr>'
+    '<m:mr><m:e><m:r><m:t>c</m:t></m:r></m:e><m:e><m:r><m:t>d</m:t></m:r></m:e></m:mr>'
+    '</m:m>'
+    '</m:e>'
+    '</m:d>'
+    '</m:oMath>'
+    '</m:oMathPara>'
+)
+slide83_xml = re.sub(
+    r'<a:r>(?:<a:rPr[^/]*/>)?<a:t>MATRIX_PLACEHOLDER</a:t></a:r>',
+    matrix_omml, slide83_xml
+)
+if 'xmlns:m=' not in slide83_xml:
+    slide83_xml = slide83_xml.replace('xmlns:a=', f'xmlns:m="{OMML_NS}" xmlns:a=')
+
+# ── Patch slide 84: inject OMML accent + bar + subsup ──
+slide84_path = 'ppt/slides/slide85.xml'
+slide84_xml = all_entries[slide84_path][1].decode('utf-8') if isinstance(all_entries[slide84_path][1], bytes) else all_entries[slide84_path][1]
+acc_bar_omml = (
+    '<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+    '<m:oMath>'
+    '<m:acc><m:accPr><m:chr m:val="\u0302"/></m:accPr>'
+    '<m:e><m:r><m:t>x</m:t></m:r></m:e></m:acc>'
+    '<m:r><m:t>=</m:t></m:r>'
+    '<m:bar><m:barPr><m:pos m:val="top"/></m:barPr>'
+    '<m:e><m:r><m:t>y</m:t></m:r></m:e></m:bar>'
+    '<m:r><m:t>+</m:t></m:r>'
+    '<m:sSubSup>'
+    '<m:e><m:r><m:t>z</m:t></m:r></m:e>'
+    '<m:sub><m:r><m:t>i</m:t></m:r></m:sub>'
+    '<m:sup><m:r><m:t>n</m:t></m:r></m:sup>'
+    '</m:sSubSup>'
+    '</m:oMath>'
+    '</m:oMathPara>'
+)
+slide84_xml = re.sub(
+    r'<a:r>(?:<a:rPr[^/]*/>)?<a:t>ACC_BAR_PLACEHOLDER</a:t></a:r>',
+    acc_bar_omml, slide84_xml
+)
+if 'xmlns:m=' not in slide84_xml:
+    slide84_xml = slide84_xml.replace('xmlns:a=', f'xmlns:m="{OMML_NS}" xmlns:a=')
 
 # ── Patch slide 81: inject WMF image + picture shape ──
 slide81_path = 'ppt/slides/slide82.xml'
@@ -5742,6 +5865,12 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide81_xml.encode('utf-8'))
         elif fname == slide81_rels_path:
             zout.writestr(item, slide81_rels.encode('utf-8'))
+        elif fname == slide82_path:
+            zout.writestr(item, slide82_xml.encode('utf-8'))
+        elif fname == slide83_path:
+            zout.writestr(item, slide83_xml.encode('utf-8'))
+        elif fname == slide84_path:
+            zout.writestr(item, slide84_xml.encode('utf-8'))
         elif fname == content_types_path:
             zout.writestr(item, content_types_xml.encode('utf-8'))
         else:

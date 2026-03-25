@@ -161,7 +161,7 @@ Present on `<tspan>` elements that represent math equations:
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `data-ooxml-math-xml` | string (XML-escaped) | Raw `m:oMath` or `m:oMathPara` XML. The tspan text content shows a plain-text fallback extracted from `m:t` elements. |
+| `data-ooxml-math-xml` | string (XML-escaped) | Raw `m:oMath` or `m:oMathPara` XML. Visual SVG rendering of fractions, radicals, integrals, matrices, etc. is generated alongside this attribute for round-trip preservation. |
 
 ### Custom Geometry
 
