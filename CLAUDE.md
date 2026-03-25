@@ -171,6 +171,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `lib/utils.ts` | bytesToBase64, crc32 utilities |
 | `lib/font-fallbacks.ts` | Font fallback mappings (customizable via `PptxRendererOptions`) |
 | `lib/emf-converter.ts` | Lightweight EMF→SVG converter (vector paths, text, bitmaps) |
+| `lib/wmf-converter.ts` | Lightweight WMF→SVG converter (vector paths, text, bitmaps) |
 | `docs/svg-specification.md` | SVG output format specification (`data-ooxml-*` attributes) |
 | `web/index.html` | Browser demo UI |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |

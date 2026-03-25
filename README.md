@@ -175,7 +175,7 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Media** (video/audio): Poster frame image rendered; original XML preserved for round-trip
 
 ### Supported with Limitations
-- **WMF images** - binary preserved for round-trip; cannot be rendered in browser (EMF is supported via built-in converter)
+- **WMF images** - converted to SVG at runtime via built-in converter (same approach as EMF)
 - **TIFF images** - binary preserved for round-trip; not supported by browser `<img>` in all browsers
 - **Math equations** (OMML `m:oMath`) - plain text fallback display; original XML preserved for round-trip
 - **Embedded fonts** - binary preserved for round-trip; uses system font fallback for rendering

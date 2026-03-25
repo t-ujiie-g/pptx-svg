@@ -84,6 +84,7 @@ Slides:
  78. Math equation (OMML m:oMathPara / m:oMath in text body)
  79. Transition + Timing (p:transition + p:timing round-trip preservation)
  80. Hidden slide (p:sld show="0")
+ 81. WMF image (WMF → SVG conversion via wmfToSvg)
 """
 
 import base64
@@ -5505,6 +5506,24 @@ desc80 = slide80.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(
 desc80.text_frame.paragraphs[0].text = "This slide is marked as hidden (show='0')."
 desc80.text_frame.paragraphs[0].font.size = Pt(16)
 
+# ── Slide 81: WMF → SVG conversion ───────────────────────────────────────────
+
+slide81 = prs.slides.add_slide(blank)
+
+title81 = slide81.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title81.text_frame.paragraphs[0].text = "Slide 81: WMF Image (WMF → SVG conversion)"
+title81.text_frame.paragraphs[0].font.size = Pt(24)
+title81.text_frame.paragraphs[0].font.bold = True
+
+desc81 = slide81.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(0.5))
+desc81.text_frame.paragraphs[0].text = "WMF images below are converted to SVG at runtime."
+desc81.text_frame.paragraphs[0].font.size = Pt(14)
+
+# Placeholder — will be replaced with p:pic referencing a WMF via ZIP patching
+wmf_placeholder = slide81.shapes.add_textbox(Inches(1), Inches(2.5), Inches(3), Inches(3))
+wmf_placeholder.text_frame.paragraphs[0].text = "WMF_PLACEHOLDER"
+wmf_placeholder.text_frame.paragraphs[0].font.size = Pt(12)
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5513,7 +5532,7 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 81
+total_slides = len(prs.slides)  # 82
 # python-pptx numbers slide files sequentially
 slide78_path = 'ppt/slides/slide79.xml'
 
@@ -5572,7 +5591,145 @@ slide80_xml = all_entries[slide80_path][1].decode('utf-8') if isinstance(all_ent
 # Add show="0" to p:sld element
 slide80_xml = slide80_xml.replace('<p:sld ', '<p:sld show="0" ', 1)
 
-# Rewrite ZIP with patched slides
+# ── Patch slide 81: inject WMF image + picture shape ──
+slide81_path = 'ppt/slides/slide82.xml'
+slide81_xml = all_entries[slide81_path][1].decode('utf-8') if isinstance(all_entries[slide81_path][1], bytes) else all_entries[slide81_path][1]
+
+# Build a Placeable WMF binary with colored shapes (rectangle + ellipse + polygon)
+def build_wmf_binary():
+    """Generate a Placeable WMF with a blue rectangle, red ellipse, and green triangle."""
+    records = bytearray()
+
+    def add_record(func_num, params=b''):
+        # WMF record: size (uint32 words) + function (uint16) + params
+        param_words = len(params) // 2
+        size = 3 + param_words  # 3 words for header
+        records.extend(struct.pack('<IH', size, func_num) + params)
+
+    # SetMapMode (MM_ANISOTROPIC = 8)
+    add_record(0x0103, struct.pack('<h', 8))
+    # SetWindowOrg (0, 0)
+    add_record(0x020B, struct.pack('<hh', 0, 0))
+    # SetWindowExt (1000, 800)
+    add_record(0x020C, struct.pack('<hh', 800, 1000))
+
+    # ── Blue filled rectangle ──
+    # CreateBrushIndirect: style=0(solid), colorR=0x0000FF, hatch=0
+    add_record(0x02FC, struct.pack('<h', 0) + struct.pack('<BBBx', 0, 0, 255) + struct.pack('<h', 0))
+    # SelectObject (index 0)
+    add_record(0x012D, struct.pack('<h', 0))
+    # Rectangle (bottom=400, right=450, top=50, left=50) — Y,X order
+    add_record(0x041B, struct.pack('<hhhh', 400, 450, 50, 50))
+
+    # ── Red filled ellipse ──
+    # CreateBrushIndirect: style=0(solid), color=0xFF0000, hatch=0
+    add_record(0x02FC, struct.pack('<h', 0) + struct.pack('<BBBx', 255, 0, 0) + struct.pack('<h', 0))
+    # SelectObject (index 1)
+    add_record(0x012D, struct.pack('<h', 1))
+    # Ellipse (bottom=400, right=950, top=50, left=550)
+    add_record(0x0418, struct.pack('<hhhh', 400, 950, 50, 550))
+
+    # ── Green filled triangle (Polygon) ──
+    # CreateBrushIndirect: style=0(solid), color=0x00FF00, hatch=0
+    add_record(0x02FC, struct.pack('<h', 0) + struct.pack('<BBBx', 0, 255, 0) + struct.pack('<h', 0))
+    # SelectObject (index 2)
+    add_record(0x012D, struct.pack('<h', 2))
+    # Polygon: 3 points — (500,750), (250,500), (750,500) — X,Y order in params
+    add_record(0x0324, struct.pack('<h', 3) + struct.pack('<hh', 500, 750) + struct.pack('<hh', 250, 500) + struct.pack('<hh', 750, 500))
+
+    # DeleteObject (0, 1, 2)
+    add_record(0x01F0, struct.pack('<h', 0))
+    add_record(0x01F0, struct.pack('<h', 1))
+    add_record(0x01F0, struct.pack('<h', 2))
+
+    # EOF record
+    records.extend(struct.pack('<IH', 3, 0x0000))
+
+    # Build standard WMF header (18 bytes)
+    file_type = 1  # memory metafile
+    header_size = 9  # words
+    version = 0x0300
+    file_size = (18 + len(records)) // 2  # in words
+    num_objects = 3
+    max_record = max(struct.unpack_from('<I', records, i)[0] for i in range(0, len(records), 2) if i + 4 <= len(records) and i % 2 == 0)  # approximate
+    # Recalculate max_record properly
+    max_rec_size = 0
+    pos = 0
+    while pos < len(records):
+        rec_size = struct.unpack_from('<I', records, pos)[0]
+        if rec_size > max_rec_size:
+            max_rec_size = rec_size
+        pos += rec_size * 2
+    std_header = struct.pack('<HHIHIHH', file_type, header_size, version, file_size, num_objects, max_rec_size, 0)
+
+    # Placeable WMF header (22 bytes)
+    magic = 0x9AC6CDD7
+    hmf = 0
+    bbox_left, bbox_top, bbox_right, bbox_bottom = 0, 0, 1000, 800
+    inch = 96  # units per inch
+    reserved = 0
+    placeable = struct.pack('<IHhhhhHI', magic, hmf, bbox_left, bbox_top, bbox_right, bbox_bottom, inch, reserved)
+    # Checksum: XOR of first 10 uint16 values
+    chk = 0
+    for i in range(0, 20, 2):
+        chk ^= struct.unpack_from('<H', placeable, i)[0]
+    placeable += struct.pack('<H', chk & 0xFFFF)
+
+    return bytes(placeable) + bytes(std_header) + bytes(records)
+
+wmf_data = build_wmf_binary()
+
+# Replace WMF_PLACEHOLDER textbox with a p:pic shape
+# Find and remove the placeholder <p:sp> containing "WMF_PLACEHOLDER"
+slide81_xml = re.sub(
+    r'<p:sp>.*?WMF_PLACEHOLDER.*?</p:sp>',
+    '',
+    slide81_xml,
+    flags=re.DOTALL
+)
+
+# Insert p:pic shape referencing the WMF image before </p:spTree>
+pic_xml = (
+    '<p:pic>'
+    '<p:nvPicPr>'
+    '<p:cNvPr id="100" name="WMF Picture"/>'
+    '<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr>'
+    '<p:nvPr/>'
+    '</p:nvPicPr>'
+    '<p:blipFill>'
+    '<a:blip r:embed="rWmf1"/>'
+    '<a:stretch><a:fillRect/></a:stretch>'
+    '</p:blipFill>'
+    '<p:spPr>'
+    '<a:xfrm>'
+    '<a:off x="914400" y="2286000"/>'
+    '<a:ext cx="4572000" cy="3657600"/>'
+    '</a:xfrm>'
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+    '</p:spPr>'
+    '</p:pic>'
+)
+slide81_xml = slide81_xml.replace('</p:spTree>', pic_xml + '</p:spTree>')
+
+# Add relationship for the WMF image in slide81.xml.rels
+slide81_rels_path = 'ppt/slides/_rels/slide82.xml.rels'
+if slide81_rels_path in all_entries:
+    slide81_rels = all_entries[slide81_rels_path][1].decode('utf-8')
+else:
+    slide81_rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
+wmf_rel = '<Relationship Id="rWmf1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image_wmf1.wmf"/>'
+slide81_rels = slide81_rels.replace('</Relationships>', wmf_rel + '</Relationships>')
+
+# Add [Content_Types].xml entry for .wmf
+content_types_path = '[Content_Types].xml'
+content_types_xml = all_entries[content_types_path][1].decode('utf-8')
+if 'Extension="wmf"' not in content_types_xml:
+    content_types_xml = content_types_xml.replace(
+        '</Types>',
+        '<Default Extension="wmf" ContentType="image/x-wmf"/></Types>'
+    )
+
+# Rewrite ZIP with patched slides + WMF image
 with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
     for fname, (item, data) in all_entries.items():
         if fname == slide78_path:
@@ -5581,7 +5738,15 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide79_xml.encode('utf-8'))
         elif fname == slide80_path:
             zout.writestr(item, slide80_xml.encode('utf-8'))
+        elif fname == slide81_path:
+            zout.writestr(item, slide81_xml.encode('utf-8'))
+        elif fname == slide81_rels_path:
+            zout.writestr(item, slide81_rels.encode('utf-8'))
+        elif fname == content_types_path:
+            zout.writestr(item, content_types_xml.encode('utf-8'))
         else:
             zout.writestr(item, data)
+    # Add WMF binary as new entry
+    zout.writestr('ppt/media/image_wmf1.wmf', wmf_data)
 
 print(f"Saved {output_path} with {total_slides} slides")
