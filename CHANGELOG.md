@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.4
+
+### Features
+
+- **OMML math rendering** — full SVG rendering of math equations: fractions (`m:f`), radicals (`m:rad`), superscript/subscript (`m:sSup`/`m:sSub`/`m:sSubSup`), large operators (`m:nary` — ∫/Σ/Π), delimiters (`m:d`), accents (`m:acc`), matrices (`m:m`), over/under bars (`m:bar`). Replaces previous plain-text fallback
+- **Text warp visual rendering** — SVG `<textPath>` and transform-based rendering for `prstTxWarp` presets (arch, wave, chevron, etc.). Previously data-only preservation
+- **WMF → SVG converter** — built-in converter for WMF (Windows Metafile) images, matching the existing EMF converter approach
+
+### Documentation
+
+- Update README / README.ja.md to reflect math rendering and WMF conversion capabilities
+- Update `docs/svg-specification.md` with math rendering details
+
 ## 0.4.3
 
 ### Features

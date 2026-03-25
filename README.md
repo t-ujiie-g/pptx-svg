@@ -173,11 +173,11 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **SmartArt**: Fallback shapes from `mc:AlternateContent` rendered; `mc:Choice` (DiagramML) preserved for round-trip
 - **OLE / Embedded objects**: Fallback image from `p:oleObj` rendered; original XML preserved for round-trip
 - **Media** (video/audio): Poster frame image rendered; original XML preserved for round-trip
+- **EMF / WMF images**: Converted to SVG at runtime via built-in converter
+- **Math equations** (OMML `m:oMath`): SVG rendering of fractions, radicals, integrals, matrices, accents, and operators; original XML preserved for round-trip
 
 ### Supported with Limitations
-- **WMF images** - converted to SVG at runtime via built-in converter (same approach as EMF)
 - **TIFF images** - binary preserved for round-trip; not supported by browser `<img>` in all browsers
-- **Math equations** (OMML `m:oMath`) - SVG rendering of fractions, radicals, integrals, matrices, accents, and operators; original XML preserved for round-trip
 - **Embedded fonts** - binary preserved for round-trip; uses system font fallback for rendering
 
 ### Data Preservation (no visual rendering)
