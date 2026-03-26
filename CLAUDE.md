@@ -14,8 +14,14 @@ tsc
 # Build everything (Wasm + TypeScript)
 npm run build
 
-# Run JS-layer tests (no browser needed, tests ZIP extraction + slide counting)
-node test_fixtures/test_node.mjs
+# Run all tests (MoonBit unit + Node.js integration)
+npm test
+
+# Run MoonBit unit tests only (xml, ooxml, renderer, svg_parser, serializer)
+npm run test:moon
+
+# Run Node.js integration tests only
+npm run test:node
 
 # Serve for browser testing
 python3 -m http.server 8765 --directory .
@@ -53,6 +59,18 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 **No external packages.** `bobzhang/zip` and `ruifeng/XMLParser` are incompatible with the current compiler (Feb 2026). Do not add external deps; implement needed parsers inline.
 
 **pub(all) for cross-package construction.** Structs and enums in `ooxml` that need to be constructed from other packages (svg_parser, serializer, main) use `pub(all)` visibility. `pub struct` fields are read-only from other packages.
+
+## MoonBit unit tests
+
+Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with FFI stubs.
+
+**Why JS target?** MoonBit FFI functions (`pptx_ffi.*`) are unresolved in the wasm-gc test runner. The JS target compiles to Node.js and allows injecting stubs via `NODE_OPTIONS='--require ./test_fixtures/ffi_stub.js'`.
+
+**Why not remove FFI from xml?** `Char::to_string()` and `String::make(1, c)` both use `wasm:js-string "fromCharCodeArray"` which breaks Tier-2/3 browser polyfill compatibility. The `ffi_char_code_to_str` FFI (→ `String.fromCharCode`) only uses the polyfillable `concat` path.
+
+**Test-only imports:** Use `import { ... } for "test"` in `moon.pkg` to add dependencies needed only by test files (e.g. svg_parser in renderer tests).
+
+**Adding tests:** Place test files in the same package directory as `<name>_test.mbt`. Use `assert_eq(actual, expected)` (not `assert_eq!` which is deprecated). For snapshot testing use `inspect!(value, content="expected")`.
 
 ## Browser compatibility and string constants
 
@@ -175,6 +193,12 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `lib/wmf-converter.ts` | Lightweight WMF→SVG converter (vector paths, text, bitmaps) |
 | `docs/svg-specification.md` | SVG output format specification (`data-ooxml-*` attributes) |
 | `web/index.html` | Browser demo UI |
+| `src/xml/xml_test.mbt` | XML parser unit tests |
+| `src/ooxml/ooxml_test.mbt` | OOXML types/parsing unit tests |
+| `src/renderer/renderer_test.mbt` | Renderer + round-trip unit tests |
+| `src/svg_parser/svg_parser_test.mbt` | SVG parser unit tests |
+| `src/serializer/serializer_test.mbt` | Serializer unit tests |
+| `test_fixtures/ffi_stub.js` | FFI stubs for MoonBit JS-target tests |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |
 | `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |
 | `test_fixtures/gen_test_features.py` | Python script to regenerate test_features.pptx |
@@ -200,23 +224,29 @@ Follow the round-trip pipeline — update each relevant file:
 - `src/main/main.mbt`: Wasm exports, global state
 - `src/main/main_inherit.mbt`: Placeholder inheritance + text style defaults
 
-### 2. Test fixture (`gen_test_features.py`)
+### 2. MoonBit unit tests
+- Add tests in the relevant `*_test.mbt` file (e.g. `src/ooxml/ooxml_test.mbt`, `src/renderer/renderer_test.mbt`)
+- Test pure functions (color parsing, geometry, serialization) and round-trip (render → parse → compare)
+- Run `npm run test:moon` to confirm all MoonBit tests pass
+
+### 3. Test fixture (`gen_test_features.py`)
 - Add new slide(s) to `gen_test_features.py` exercising the feature
 - Update the docstring at the top of the file with the new slide number/description
 - Run `python3 test_fixtures/gen_test_features.py` to regenerate `test_features.pptx`
 - The `set_gradient_fill()` helper shows how to inject raw XML into shapes via lxml
 
-### 3. Test assertions (`test_node.mjs`)
+### 4. Test assertions (`test_node.mjs`)
 - Update `slide count = N` assertion to match new total
 - Update iteration bounds (`for (let i = 1; i <= N; ...)`) for slide existence and .rels checks
 - Add a new test section verifying the XML structure of the new slides
 - Run `node test_fixtures/test_node.mjs` to confirm all tests pass
 
-### 4. Verification checklist
+### 5. Verification checklist
 ```bash
 python3 test_fixtures/gen_test_features.py  # Regenerate PPTX
+npm run test:moon                           # MoonBit unit tests pass
 moon build --target wasm-gc --release       # Wasm build (0 errors)
 npm run build                               # Full build (Wasm + TypeScript)
-node test_fixtures/test_node.mjs            # All tests pass
+npm run test:node                           # Node.js integration tests pass
 # Browser: http://localhost:8765/web/index.html  # Visual check
 ```

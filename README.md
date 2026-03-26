@@ -225,7 +225,9 @@ npm run build          # Wasm + TypeScript + copy wasm to dist/
 ### Test
 
 ```bash
-npm test               # Node.js test suite (ZIP + XML structure)
+npm test               # All tests (MoonBit unit + Node.js integration)
+npm run test:moon      # MoonBit unit tests only (84 tests)
+npm run test:node      # Node.js integration tests only
 ```
 
 ### Browser Test
@@ -252,7 +254,7 @@ Requires `NPM_TOKEN` secret configured in GitHub repository settings.
 1. Fork the repository
 2. Create a feature branch
 3. Make changes following the existing code style
-4. Add tests in `test_fixtures/gen_test_features.py` and `test_fixtures/test_node.mjs`
+4. Add MoonBit unit tests in `src/*/..._test.mbt` and/or integration tests in `test_fixtures/`
 5. Run `npm run build && npm test` to verify
 6. Submit a pull request
 

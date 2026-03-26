@@ -225,7 +225,9 @@ npm run build          # Wasm + TypeScript + wasm を dist/ にコピー
 ### テスト
 
 ```bash
-npm test               # Node.js テスト (ZIP + XML 構造アサーション)
+npm test               # 全テスト (MoonBit ユニット + Node.js 統合)
+npm run test:moon      # MoonBit ユニットテストのみ (84 テスト)
+npm run test:node      # Node.js 統合テストのみ
 ```
 
 ### ブラウザテスト
@@ -252,7 +254,7 @@ GitHub リポジトリ設定で `NPM_TOKEN` シークレットの設定が必要
 1. リポジトリをフォーク
 2. フィーチャーブランチを作成
 3. 既存のコードスタイルに従って変更
-4. `test_fixtures/gen_test_features.py` と `test_fixtures/test_node.mjs` にテストを追加
+4. `src/*/..._test.mbt` に MoonBit ユニットテスト、または `test_fixtures/` に統合テストを追加
 5. `npm run build && npm test` で検証
 6. プルリクエストを提出
 
