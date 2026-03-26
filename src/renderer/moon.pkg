@@ -3,3 +3,7 @@ import {
   "pptx-svg/ooxml" @ooxml,
   "pptx-svg/ffi" @ffi,
 }
+
+import {
+  "pptx-svg/svg_parser" @svg_parser,
+} for "test"

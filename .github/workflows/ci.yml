@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: MoonBit unit tests
+        run: NODE_OPTIONS='--require ./test_fixtures/ffi_stub.js' moon test --target js
+
       - name: Build Wasm
         run: moon build --target wasm-gc --release
 
@@ -32,8 +35,8 @@ jobs:
       - name: Copy Wasm to dist
         run: cp _build/wasm-gc/release/build/main/main.wasm dist/main.wasm
 
-      - name: Run tests
+      - name: Run Node.js tests
         run: node test_fixtures/test_node.mjs
 
-      - name: Run tests
+      - name: Run editing helper tests
         run: node test_fixtures/test_editing_helpers.mjs
