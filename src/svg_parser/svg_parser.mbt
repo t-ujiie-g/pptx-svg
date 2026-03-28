@@ -118,12 +118,15 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       rot_with_shape: get_da(node, "eff-refl-rot") != "0",
     }
   }
+  let blur_rad = get_dai(node, "eff-blur-rad")
+  let bl : @ooxml.Blur = { rad: blur_rad }
   {
     outer_shadow: os,
     inner_shadow: ishdw,
     glow: gl,
     soft_edge: se,
     reflection: refl,
+    blur: bl,
   }
 }
 

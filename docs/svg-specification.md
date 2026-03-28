@@ -264,6 +264,7 @@ These attributes preserve text-run-level effects for round-trip. Prefixed `reff-
 | `data-ooxml-reff-os-clr` | string | Outer shadow color (`RRGGBB`) |
 | `data-ooxml-reff-gl-rad` | int | Glow radius (EMU) |
 | `data-ooxml-reff-gl-clr` | string | Glow color (`RRGGBB`) |
+| `data-ooxml-reff-blur-rad` | int | Blur radius (EMU) |
 
 ### Text Gradient/Pattern Fill (on `<tspan>`)
 
@@ -322,6 +323,12 @@ Set on the shape `<g>` element.
 | `data-ooxml-eff-refl-sx/sy` | int | Scale |
 | `data-ooxml-eff-refl-algn` | string | Alignment |
 | `data-ooxml-eff-refl-rot` | string | Rotate with shape |
+
+### Blur
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-eff-blur-rad` | int | Blur radius (EMU) |
 
 ## 3D Properties
 

@@ -593,12 +593,17 @@ fn parse_run_effect_lst(rpr_ch : Array[@xml.XmlNode], theme : ThemeData) -> Effe
         None => Glow::none()
         Some(gn) => parse_glow(gn, theme)
       }
+      let bl = match @xml.find_child(eff_ch, "a:blur") {
+        None => Blur::none()
+        Some(node) => { rad: attr_int(node, "rad") }
+      }
       {
         outer_shadow: os,
         inner_shadow: ishdw,
         glow: gl,
         soft_edge: SoftEdge::none(),
         reflection: Reflection::none(),
+        blur: bl,
       }
     }
   }

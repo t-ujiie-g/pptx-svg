@@ -1007,6 +1007,9 @@ fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
       (if not(r.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
     inner = inner + "<a:reflection" + attrs + "/>"
   }
+  if not(eff.blur.is_none()) {
+    inner = inner + "<a:blur" + xml_int_attr("rad", eff.blur.rad) + "/>"
+  }
   "<a:effectLst>" + inner + "</a:effectLst>"
 }
 

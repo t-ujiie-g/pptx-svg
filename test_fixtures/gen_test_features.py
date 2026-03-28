@@ -88,6 +88,7 @@ Slides:
  82. OMML — Large operators + delimiters (m:nary integral + m:sSup)
  83. OMML — Matrix + delimiters (m:d + m:m 2x2 matrix)
  84. OMML — Accent + bar + sub/superscript (m:acc + m:bar + m:sSubSup)
+ 85. Blur effect (a:blur — shape-level Gaussian blur)
 """
 
 import base64
@@ -5566,6 +5567,14 @@ math84 = slide84.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(3))
 math84.text_frame.paragraphs[0].text = "ACC_BAR_PLACEHOLDER"
 math84.text_frame.paragraphs[0].font.size = Pt(24)
 
+# ── Slide 85: Blur effect (a:blur) ───────────────────────────────────────────
+slide85 = prs.slides.add_slide(blank)
+
+title85 = slide85.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title85.text_frame.paragraphs[0].text = "Slide 85: Blur Effect (a:blur)"
+title85.text_frame.paragraphs[0].font.size = Pt(24)
+title85.text_frame.paragraphs[0].font.bold = True
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5574,7 +5583,7 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 85
+total_slides = len(prs.slides)  # 86
 # python-pptx numbers slide files sequentially
 slide78_path = 'ppt/slides/slide79.xml'
 
@@ -5713,6 +5722,37 @@ slide84_xml = re.sub(
 )
 if 'xmlns:m=' not in slide84_xml:
     slide84_xml = slide84_xml.replace('xmlns:a=', f'xmlns:m="{OMML_NS}" xmlns:a=')
+
+# ── Patch slide 85: inject blur effect shape ──
+slide85_path = 'ppt/slides/slide86.xml'
+slide85_xml = all_entries[slide85_path][1].decode('utf-8') if isinstance(all_entries[slide85_path][1], bytes) else all_entries[slide85_path][1]
+
+# Add a shape with a:blur effect
+blur_shape_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="401" name="BlurShape"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="1828800" y="1828800"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:effectLst>
+      <a:blur rad="76200"/>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="2400" b="1"/><a:t>Blur Effect</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+# Insert the blur shape into the slide's spTree
+slide85_xml = slide85_xml.replace('</p:spTree>', blur_shape_xml + '\n</p:spTree>')
 
 # ── Patch slide 81: inject WMF image + picture shape ──
 slide81_path = 'ppt/slides/slide82.xml'
@@ -5871,6 +5911,8 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide83_xml.encode('utf-8'))
         elif fname == slide84_path:
             zout.writestr(item, slide84_xml.encode('utf-8'))
+        elif fname == slide85_path:
+            zout.writestr(item, slide85_xml.encode('utf-8'))
         elif fname == content_types_path:
             zout.writestr(item, content_types_xml.encode('utf-8'))
         else:

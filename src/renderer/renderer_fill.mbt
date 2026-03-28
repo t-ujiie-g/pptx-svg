@@ -578,6 +578,16 @@ fn render_effect_filter(
       "<feMerge><feMergeNode in=\"SourceGraphic\"/><feMergeNode in=\"isClip\"/></feMerge>"
     ()
   }
+  // Blur: simple feGaussianBlur on SourceGraphic
+  if not(eff.blur.is_none()) {
+    let rad = emu_to_filter_px(eff.blur.rad, scale)
+    let std_dev = rad / 2
+    filters = filters +
+      "<feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"" +
+      int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+      "\"/>"
+    ()
+  }
   // Note: Reflection requires structural approach (shape duplication), not SVG filter.
   let def = "<filter id=\"" +
     filter_id +

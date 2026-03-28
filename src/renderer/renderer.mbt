@@ -1358,6 +1358,9 @@ pub fn render_shape(
           da("eff-refl-algn", r.algn) +
           da("eff-refl-rot", if r.rot_with_shape { "1" } else { "0" })
       }
+      if not(eff.blur.is_none()) {
+        ea = ea + dai("eff-blur-rad", eff.blur.rad)
+      }
       ea
     } else {
       ""

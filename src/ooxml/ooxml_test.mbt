@@ -200,6 +200,100 @@ test "EffectList::none" {
   assert_true(e.glow.is_none())
   assert_true(e.soft_edge.is_none())
   assert_true(e.reflection.is_none())
+  assert_true(e.blur.is_none())
+}
+
+test "OuterShadow::none and is_none" {
+  let os = OuterShadow::none()
+  assert_true(os.is_none())
+  assert_eq(os.blur_rad, 0)
+  assert_eq(os.dist, 0)
+  assert_true(os.color.is_none())
+  let os2 : OuterShadow = {
+    blur_rad: 152400, dist: 114300, dir: 5400000,
+    color: parse_hex_color("000000"), sx: 0, sy: 0, algn: "ctr", rot_with_shape: false,
+  }
+  assert_true(not(os2.is_none()))
+  assert_eq(os2.blur_rad, 152400)
+  assert_eq(os2.dir, 5400000)
+}
+
+test "InnerShadow::none and is_none" {
+  let ishdw = InnerShadow::none()
+  assert_true(ishdw.is_none())
+  let ishdw2 : InnerShadow = {
+    blur_rad: 114300, dist: 76200, dir: 2700000,
+    color: parse_hex_color("000000"),
+  }
+  assert_true(not(ishdw2.is_none()))
+}
+
+test "Glow::none and is_none" {
+  let gl = Glow::none()
+  assert_true(gl.is_none())
+  assert_eq(gl.rad, 0)
+  assert_true(gl.color.is_none())
+  let gl2 : Glow = { rad: 228600, color: parse_hex_color("FFC000") }
+  assert_true(not(gl2.is_none()))
+  assert_eq(gl2.rad, 228600)
+}
+
+test "SoftEdge::none and is_none" {
+  let se = SoftEdge::none()
+  assert_true(se.is_none())
+  assert_eq(se.rad, 0)
+  let se2 : SoftEdge = { rad: 63500 }
+  assert_true(not(se2.is_none()))
+}
+
+test "Reflection::none and is_none" {
+  let r = Reflection::none()
+  assert_true(r.is_none())
+  assert_eq(r.st_alpha, 0)
+  assert_eq(r.end_alpha, 0)
+  let r2 : Reflection = {
+    blur_rad: 6350, dist: 0, dir: 5400000,
+    st_alpha: 50000, end_alpha: 300, fade_dir: 5400000,
+    sx: 100000, sy: -100000, algn: "bl", rot_with_shape: false,
+  }
+  assert_true(not(r2.is_none()))
+}
+
+test "Blur::none and is_none" {
+  let b = Blur::none()
+  assert_true(b.is_none())
+  assert_eq(b.rad, 0)
+  let b2 : Blur = { rad: 50800 }
+  assert_true(not(b2.is_none()))
+  assert_eq(b2.rad, 50800)
+}
+
+test "EffectList with single effect is not none" {
+  // Only outer shadow set
+  let e1 : EffectList = {
+    ..EffectList::none(),
+    outer_shadow: { blur_rad: 100, dist: 0, dir: 0, color: parse_hex_color("000000"), sx: 0, sy: 0, algn: "", rot_with_shape: true },
+  }
+  assert_true(not(e1.is_none()))
+  // Only glow set
+  let e2 : EffectList = { ..EffectList::none(), glow: { rad: 100, color: parse_hex_color("FF0000") } }
+  assert_true(not(e2.is_none()))
+  // Only soft edge set
+  let e3 : EffectList = { ..EffectList::none(), soft_edge: { rad: 100 } }
+  assert_true(not(e3.is_none()))
+}
+
+test "EffectList with blur is not none" {
+  let e : EffectList = {
+    outer_shadow: OuterShadow::none(),
+    inner_shadow: InnerShadow::none(),
+    glow: Glow::none(),
+    soft_edge: SoftEdge::none(),
+    reflection: Reflection::none(),
+    blur: { rad: 76200 },
+  }
+  assert_true(not(e.is_none()))
+  assert_eq(e.blur.rad, 76200)
 }
 
 // ── GradientFill / BlipFill / PatternFill ───────────────────────────────────

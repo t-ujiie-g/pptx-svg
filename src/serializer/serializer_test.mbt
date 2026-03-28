@@ -88,3 +88,110 @@ test "serialize_slide with single shape" {
     None => assert_true(false)
   }
 }
+
+test "serialize_slide shape with blur effect" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200 } },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  // Should contain a:effectLst with a:blur
+  assert_true(xml.contains("<a:effectLst>"))
+  assert_true(xml.contains("<a:blur"))
+  assert_true(xml.contains("rad=\"76200\""))
+}
+
+test "serialize_slide shape with outer shadow" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      outer_shadow: {
+        blur_rad: 152400, dist: 114300, dir: 5400000,
+        color: @ooxml.parse_hex_color("000000"),
+        sx: 0, sy: 0, algn: "ctr", rot_with_shape: false,
+      },
+    },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  assert_true(xml.contains("<a:outerShdw"))
+  assert_true(xml.contains("blurRad=\"152400\""))
+  assert_true(xml.contains("dir=\"5400000\""))
+  assert_true(xml.contains("algn=\"ctr\""))
+}
+
+test "serialize_slide shape with glow" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      glow: { rad: 228600, color: @ooxml.parse_hex_color("FFC000") },
+    },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  assert_true(xml.contains("<a:glow"))
+  assert_true(xml.contains("rad=\"228600\""))
+}
+
+test "serialize_slide no effectLst when none" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  // No effects → no a:effectLst in output
+  assert_true(not(xml.contains("<a:effectLst>")))
+}

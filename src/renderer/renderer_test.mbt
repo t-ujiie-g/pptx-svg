@@ -141,3 +141,144 @@ test "roundtrip shape transform" {
   assert_eq(parsed.shapes[0].transform.cx, 2743200)
   assert_eq(parsed.shapes[0].transform.cy, 1828800)
 }
+
+test "roundtrip shape with blur effect" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 100000, y: 200000, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200 } },
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes.length(), 1)
+  assert_eq(parsed.shapes[0].effects.blur.rad, 76200)
+  assert_true(not(parsed.shapes[0].effects.blur.is_none()))
+}
+
+test "roundtrip shape with outer shadow" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      outer_shadow: {
+        blur_rad: 152400, dist: 114300, dir: 5400000,
+        color: @ooxml.parse_hex_color("000000"),
+        sx: 0, sy: 0, algn: "ctr", rot_with_shape: false,
+      },
+    },
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].effects.outer_shadow.blur_rad, 152400)
+  assert_eq(parsed.shapes[0].effects.outer_shadow.dist, 114300)
+  assert_eq(parsed.shapes[0].effects.outer_shadow.dir, 5400000)
+  assert_eq(parsed.shapes[0].effects.outer_shadow.algn, "ctr")
+}
+
+test "roundtrip shape with glow" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Ellipse),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      glow: { rad: 228600, color: @ooxml.parse_hex_color("FFC000") },
+    },
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].effects.glow.rad, 228600)
+  assert_eq(parsed.shapes[0].effects.glow.color.r, 0xFF)
+  assert_eq(parsed.shapes[0].effects.glow.color.g, 0xC0)
+}
+
+test "roundtrip shape with soft edge" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: { ..@ooxml.EffectList::none(), soft_edge: { rad: 63500 } },
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].effects.soft_edge.rad, 63500)
+}
+
+test "roundtrip shape with solid fill" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    fill: @ooxml.parse_hex_color("FF6633"),
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].fill.r, 0xFF)
+  assert_eq(parsed.shapes[0].fill.g, 0x66)
+  assert_eq(parsed.shapes[0].fill.b, 0x33)
+}
+
+test "roundtrip shape with stroke" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    stroke: @ooxml.parse_hex_color("0000FF"),
+    stroke_w: 25400,
+    stroke_dash: "dash",
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].stroke.r, 0)
+  assert_eq(parsed.shapes[0].stroke.g, 0)
+  assert_eq(parsed.shapes[0].stroke.b, 0xFF)
+  assert_eq(parsed.shapes[0].stroke_w, 25400)
+  assert_eq(parsed.shapes[0].stroke_dash, "dash")
+}
+
+test "roundtrip ellipse geometry" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Ellipse),
+    { x: 100000, y: 100000, cx: 400000, cy: 400000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes.length(), 1)
+  match parsed.shapes[0].kind {
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Ellipse) => ()
+    _ => assert_true(false)
+  }
+}
+
+test "roundtrip multiple shapes" {
+  let shape1 = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 200000, cy: 200000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let shape2 = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Ellipse),
+    { x: 300000, y: 300000, cx: 200000, cy: 200000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape1, shape2] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes.length(), 2)
+  assert_eq(parsed.shapes[0].transform.x, 0)
+  assert_eq(parsed.shapes[1].transform.x, 300000)
+}

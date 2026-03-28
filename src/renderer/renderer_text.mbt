@@ -480,6 +480,15 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
     filters = filters + "drop-shadow(0px 0px " +
       int_to_str(std_dev) + "px " + css_rgba(eff.glow.color, "0.7") + ")"
   }
+  // Blur
+  if not(eff.blur.is_none()) {
+    let rad = emu_to_filter_px(eff.blur.rad, scale)
+    let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
+    if not(filters.is_empty()) {
+      filters = filters + " "
+    }
+    filters = filters + "blur(" + int_to_str(std_dev) + "px)"
+  }
   if filters.is_empty() {
     ""
   } else {
@@ -625,6 +634,9 @@ fn render_run_tspan(
       if not(eff.glow.is_none()) {
         ea = ea + dai("reff-gl-rad", eff.glow.rad) +
           da("reff-gl-clr", eff.glow.color.to_hex())
+      }
+      if not(eff.blur.is_none()) {
+        ea = ea + dai("reff-blur-rad", eff.blur.rad)
       }
       ea
     } else { "" }) +

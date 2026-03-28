@@ -446,12 +446,17 @@ fn parse_effect_lst(
             },
           }
       }
+      let bl = match @xml.find_child(eff_ch, "a:blur") {
+        None => Blur::none()
+        Some(node) => { rad: attr_int(node, "rad") }
+      }
       {
         outer_shadow: os,
         inner_shadow: ishdw,
         glow: gl,
         soft_edge: se,
         reflection: refl,
+        blur: bl,
       }
     }
   }

@@ -1227,6 +1227,22 @@ pub fn SoftEdge::is_none(self : SoftEdge) -> Bool {
 }
 
 ///|
+/// Blur effect (a:blur).
+pub(all) struct Blur {
+  rad : Int // rad in EMU; 0 = no blur
+}
+
+///|
+pub fn Blur::none() -> Blur {
+  { rad: 0 }
+}
+
+///|
+pub fn Blur::is_none(self : Blur) -> Bool {
+  self.rad == 0
+}
+
+///|
 /// Reflection effect (a:reflection).
 pub(all) struct Reflection {
   blur_rad : Int // blurRad in EMU
@@ -1270,6 +1286,7 @@ pub(all) struct EffectList {
   glow : Glow
   soft_edge : SoftEdge
   reflection : Reflection
+  blur : Blur
 }
 
 ///|
@@ -1280,6 +1297,7 @@ pub fn EffectList::none() -> EffectList {
     glow: Glow::none(),
     soft_edge: SoftEdge::none(),
     reflection: Reflection::none(),
+    blur: Blur::none(),
   }
 }
 
@@ -1289,7 +1307,8 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
   self.inner_shadow.is_none() &&
   self.glow.is_none() &&
   self.soft_edge.is_none() &&
-  self.reflection.is_none()
+  self.reflection.is_none() &&
+  self.blur.is_none()
 }
 
 // ── 3D ───────────────────────────────────────────────────────────────────────

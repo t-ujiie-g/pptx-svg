@@ -105,14 +105,13 @@ Office 2016+ で追加されたチャート型。`c:chart` ではなく `cx:char
 
 ### P4: 追加エフェクト
 
-- [ ] **blur エフェクト** (`a:blur`) — SVG `filter: blur()` で容易に対応可能
+- [x] **blur エフェクト** (`a:blur`) — SVG `filter: blur()` で容易に対応可能
 - [ ] **プリセットシャドウ** (`a:prstShdw`) — 現在は `a:outerShdw` のみ対応
 - [ ] **fillOverlay** (`a:fillOverlay`) — 塗りつぶしのオーバーレイ合成
 
 ### P4: その他
 
 - [ ] **均等割り付け** (align="just") — SVG にはネイティブの justify がないため、ワード間スペーシングで近似
-- [ ] **TIFF デコーダ** — LZW/JPEG 圧縮対応が必要で難易度高。TIFF は PPTX 内で稀
 
 ---
 
@@ -146,5 +145,5 @@ Office 2016+ で追加されたチャート型。`c:chart` ではなく `cx:char
 | **P3** | テキストワープ視覚レンダリング | ワープ | 完全 | **完了** |
 | **P3** | WMF → SVG 変換 | 変換 | 完全 | **完了** |
 | **P3** | Office 2016+ チャート (cx namespace) | 完全 | 完全 | 未着手 |
-| **P4** | 追加エフェクト (blur/prstShdw/fillOverlay) | 完全 | 完全 | 未着手 |
+| **P4** | 追加エフェクト (blur/prstShdw/fillOverlay) | 完全 | 完全 | blur完了 |
 | **P4** | 均等割り付け / TIFF デコーダ | 近似 | 完全 | 未着手 |

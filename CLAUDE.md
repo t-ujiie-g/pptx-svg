@@ -117,11 +117,12 @@ GradientFill { stops, angle, path_type, rot_with_shape, fill_to_l/t/r/b, tile_fl
 BlipFill { rid, stretch, src_l/t/r/b, tile_tx/ty/sx/sy, tile_flip, tile_algn, alpha, svg_rid, bright, contrast, duotone_1/2: Color, clr_from/to: Color }
 PatternFill { prst, fg_color: Color, bg_color: Color }
 
-EffectList { outer_shadow: OuterShadow, inner_shadow: InnerShadow, glow: Glow, soft_edge: SoftEdge, reflection: Reflection }
+EffectList { outer_shadow: OuterShadow, inner_shadow: InnerShadow, glow: Glow, soft_edge: SoftEdge, reflection: Reflection, blur: Blur }
 OuterShadow { blur_rad, dist, dir: Int, color: Color, sx, sy: Int, algn: String, rot_with_shape: Bool }
 InnerShadow { blur_rad, dist, dir: Int, color: Color }
 Glow { rad: Int, color: Color }
 SoftEdge { rad: Int }
+Blur { rad: Int }
 Reflection { blur_rad, dist, dir, st_alpha, end_alpha, fade_dir, sx, sy: Int, algn: String, rot_with_shape: Bool }
 
 Bevel { w, h: Int, prst: String }

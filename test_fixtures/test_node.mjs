@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 85', slideCount === 85, `got ${slideCount}`);
+  assert('slide count = 86', slideCount === 86, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 85; i++) {
+  for (let i = 1; i <= 86; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 85; i++) {
+  for (let i = 1; i <= 86; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1511,6 +1511,16 @@ async function testFeaturesPptx() {
     assert('slide84 has m:acc (accent)', slide84.includes('m:acc'));
     assert('slide84 has m:bar', slide84.includes('m:bar'));
     assert('slide84 has m:sSubSup', slide84.includes('m:sSubSup'));
+  }
+
+  // ── Slide 85: Blur effect ─────────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 85: blur effect');
+    const slide85 = textFiles.get('ppt/slides/slide86.xml') || '';
+    assert('slide85 exists', slide85.length > 0);
+    assert('slide85 has a:effectLst', hasTag(slide85, 'a:effectLst'));
+    assert('slide85 has a:blur', hasTag(slide85, 'a:blur'));
+    assert('slide85 blur rad=76200', slide85.includes('rad="76200"'));
   }
 }
 
