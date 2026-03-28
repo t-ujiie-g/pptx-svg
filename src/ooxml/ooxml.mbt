@@ -1243,6 +1243,47 @@ pub fn Blur::is_none(self : Blur) -> Bool {
 }
 
 ///|
+/// Preset shadow effect (a:prstShdw).
+/// Maps to predefined outer shadow parameters based on preset name.
+pub(all) struct PresetShadow {
+  prst : String // preset name: "shdw1".."shdw20"; "" = none
+  dist : Int // dist in EMU
+  dir : Int // dir in 60000ths of degree
+  color : Color // shadow color with alpha
+}
+
+///|
+pub fn PresetShadow::none() -> PresetShadow {
+  { prst: "", dist: 0, dir: 0, color: Color::none() }
+}
+
+///|
+pub fn PresetShadow::is_none(self : PresetShadow) -> Bool {
+  self.prst.is_empty()
+}
+
+///|
+/// Get blur radius for a preset shadow (shdw1-shdw20).
+/// Values based on ECMA-376 §20.1.10.52 preset shadow definitions.
+pub fn PresetShadow::blur_rad(self : PresetShadow) -> Int {
+  // shdw1-shdw8: offset shadows — moderate blur
+  // shdw9: center shadow — large blur
+  // shdw10-shdw12: perspective shadows — moderate blur
+  // shdw13-shdw16: inside shadows — moderate blur
+  // shdw17-shdw20: below perspective — large blur
+  if self.prst == "shdw9" {
+    76200 // 6pt
+  } else if self.prst == "shdw17" ||
+    self.prst == "shdw18" ||
+    self.prst == "shdw19" ||
+    self.prst == "shdw20" {
+    57150 // 4.5pt
+  } else {
+    38100 // 3pt (default for shdw1-shdw8, shdw10-shdw16)
+  }
+}
+
+///|
 /// Reflection effect (a:reflection).
 pub(all) struct Reflection {
   blur_rad : Int // blurRad in EMU
@@ -1287,6 +1328,7 @@ pub(all) struct EffectList {
   soft_edge : SoftEdge
   reflection : Reflection
   blur : Blur
+  prst_shadow : PresetShadow
 }
 
 ///|
@@ -1298,6 +1340,7 @@ pub fn EffectList::none() -> EffectList {
     soft_edge: SoftEdge::none(),
     reflection: Reflection::none(),
     blur: Blur::none(),
+    prst_shadow: PresetShadow::none(),
   }
 }
 
@@ -1308,7 +1351,8 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
   self.glow.is_none() &&
   self.soft_edge.is_none() &&
   self.reflection.is_none() &&
-  self.blur.is_none()
+  self.blur.is_none() &&
+  self.prst_shadow.is_none()
 }
 
 // ── 3D ───────────────────────────────────────────────────────────────────────

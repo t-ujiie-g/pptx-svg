@@ -284,16 +284,39 @@ test "EffectList with single effect is not none" {
 }
 
 test "EffectList with blur is not none" {
-  let e : EffectList = {
-    outer_shadow: OuterShadow::none(),
-    inner_shadow: InnerShadow::none(),
-    glow: Glow::none(),
-    soft_edge: SoftEdge::none(),
-    reflection: Reflection::none(),
-    blur: { rad: 76200 },
-  }
+  let e : EffectList = { ..EffectList::none(), blur: { rad: 76200 } }
   assert_true(not(e.is_none()))
   assert_eq(e.blur.rad, 76200)
+}
+
+test "PresetShadow::none and is_none" {
+  let ps = PresetShadow::none()
+  assert_true(ps.is_none())
+  assert_eq(ps.prst, "")
+  let ps2 : PresetShadow = {
+    prst: "shdw1", dist: 38100, dir: 2700000,
+    color: parse_hex_color("000000"),
+  }
+  assert_true(not(ps2.is_none()))
+  assert_eq(ps2.prst, "shdw1")
+}
+
+test "PresetShadow::blur_rad by preset" {
+  let ps1 : PresetShadow = { prst: "shdw1", dist: 0, dir: 0, color: Color::none() }
+  assert_eq(ps1.blur_rad(), 38100) // standard offset shadow
+  let ps9 : PresetShadow = { prst: "shdw9", dist: 0, dir: 0, color: Color::none() }
+  assert_eq(ps9.blur_rad(), 76200) // center shadow — larger blur
+  let ps17 : PresetShadow = { prst: "shdw17", dist: 0, dir: 0, color: Color::none() }
+  assert_eq(ps17.blur_rad(), 57150) // below perspective
+}
+
+test "EffectList with prst_shadow is not none" {
+  let e : EffectList = {
+    ..EffectList::none(),
+    prst_shadow: { prst: "shdw2", dist: 38100, dir: 5400000, color: parse_hex_color("333333") },
+  }
+  assert_true(not(e.is_none()))
+  assert_eq(e.prst_shadow.prst, "shdw2")
 }
 
 // ── GradientFill / BlipFill / PatternFill ───────────────────────────────────

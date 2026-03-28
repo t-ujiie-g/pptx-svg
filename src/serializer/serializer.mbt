@@ -1010,6 +1010,13 @@ fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
   if not(eff.blur.is_none()) {
     inner = inner + "<a:blur" + xml_int_attr("rad", eff.blur.rad) + "/>"
   }
+  if not(eff.prst_shadow.is_none()) {
+    let ps = eff.prst_shadow
+    let attrs = " prst=\"" + ps.prst + "\"" +
+      xml_int_attr("dist", ps.dist) +
+      xml_int_attr("dir", ps.dir)
+    inner = inner + "<a:prstShdw" + attrs + ">" + serialize_eff_color(ps.color) + "</a:prstShdw>"
+  }
   "<a:effectLst>" + inner + "</a:effectLst>"
 }
 

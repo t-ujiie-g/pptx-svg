@@ -89,6 +89,7 @@ Slides:
  83. OMML — Matrix + delimiters (m:d + m:m 2x2 matrix)
  84. OMML — Accent + bar + sub/superscript (m:acc + m:bar + m:sSubSup)
  85. Blur effect (a:blur — shape-level Gaussian blur)
+ 86. Preset shadow (a:prstShdw — shdw1/shdw2 preset shadows)
 """
 
 import base64
@@ -5575,6 +5576,14 @@ title85.text_frame.paragraphs[0].text = "Slide 85: Blur Effect (a:blur)"
 title85.text_frame.paragraphs[0].font.size = Pt(24)
 title85.text_frame.paragraphs[0].font.bold = True
 
+# ── Slide 86: Preset shadow (a:prstShdw) ─────────────────────────────────────
+slide86 = prs.slides.add_slide(blank)
+
+title86 = slide86.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title86.text_frame.paragraphs[0].text = "Slide 86: Preset Shadow (a:prstShdw)"
+title86.text_frame.paragraphs[0].font.size = Pt(24)
+title86.text_frame.paragraphs[0].font.bold = True
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5583,7 +5592,7 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 86
+total_slides = len(prs.slides)  # 87
 # python-pptx numbers slide files sequentially
 slide78_path = 'ppt/slides/slide79.xml'
 
@@ -5754,6 +5763,75 @@ blur_shape_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentatio
 # Insert the blur shape into the slide's spTree
 slide85_xml = slide85_xml.replace('</p:spTree>', blur_shape_xml + '\n</p:spTree>')
 
+# ── Patch slide 86: inject preset shadow shapes ──
+slide86_path = 'ppt/slides/slide87.xml'
+slide86_xml = all_entries[slide86_path][1].decode('utf-8') if isinstance(all_entries[slide86_path][1], bytes) else all_entries[slide86_path][1]
+
+# Add white background to slide 86
+slide86_bg_xml = '''<p:bg>
+  <p:bgPr>
+    <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+    <a:effectLst/>
+  </p:bgPr>
+</p:bg>'''
+slide86_xml = slide86_xml.replace('<p:spTree>', slide86_bg_xml + '\n<p:spTree>')
+
+prstshdw_shape1_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="501" name="PrstShdw1"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="1828800"/><a:ext cx="3657600" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:effectLst>
+      <a:prstShdw prst="shdw1" dist="76200" dir="2700000">
+        <a:srgbClr val="000000"><a:alpha val="60000"/></a:srgbClr>
+      </a:prstShdw>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1">
+      <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+    </a:rPr><a:t>shdw1 (Bottom Right)</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+prstshdw_shape2_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="502" name="PrstShdw2"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="1828800"/><a:ext cx="3657600" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+    <a:effectLst>
+      <a:prstShdw prst="shdw2" dist="76200" dir="5400000">
+        <a:srgbClr val="000000"><a:alpha val="60000"/></a:srgbClr>
+      </a:prstShdw>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1">
+      <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+    </a:rPr><a:t>shdw2 (Bottom)</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+slide86_xml = slide86_xml.replace('</p:spTree>', prstshdw_shape1_xml + '\n' + prstshdw_shape2_xml + '\n</p:spTree>')
+
 # ── Patch slide 81: inject WMF image + picture shape ──
 slide81_path = 'ppt/slides/slide82.xml'
 slide81_xml = all_entries[slide81_path][1].decode('utf-8') if isinstance(all_entries[slide81_path][1], bytes) else all_entries[slide81_path][1]
@@ -5913,6 +5991,8 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide84_xml.encode('utf-8'))
         elif fname == slide85_path:
             zout.writestr(item, slide85_xml.encode('utf-8'))
+        elif fname == slide86_path:
+            zout.writestr(item, slide86_xml.encode('utf-8'))
         elif fname == content_types_path:
             zout.writestr(item, content_types_xml.encode('utf-8'))
         else:

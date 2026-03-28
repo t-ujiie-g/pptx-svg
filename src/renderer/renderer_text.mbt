@@ -450,6 +450,26 @@ fn css_rgba(clr : @ooxml.Color, alpha_fallback : String) -> String {
 }
 
 ///|
+/// Render a CSS drop-shadow() value from shadow parameters.
+fn render_css_drop_shadow(
+  blur_rad : Int,
+  dist : Int,
+  dir : Int,
+  color : @ooxml.Color,
+  scale : Int,
+) -> String {
+  let blur = emu_to_filter_px(blur_rad, scale)
+  let d = emu_to_filter_px(dist, scale)
+  let angle_deg = dir / ooxml_angle_unit
+  let dx = d * cos_deg(angle_deg) / 100
+  let dy = d * sin_deg(angle_deg) / 100
+  let std_dev = if blur / 2 > 0 { blur / 2 } else { 1 }
+  "drop-shadow(" +
+    int_to_str(dx) + "px " + int_to_str(dy) + "px " +
+    int_to_str(std_dev) + "px " + css_rgba(color, "0.5") + ")"
+}
+
+///|
 /// Generate CSS style attribute with filter for text-level effects (shadow/glow).
 /// Returns empty string if no visual effects, or ` style="filter: ..."` attribute.
 fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
@@ -460,15 +480,17 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
   // Outer shadow → CSS drop-shadow(dx dy blur color)
   if not(eff.outer_shadow.is_none()) {
     let os = eff.outer_shadow
-    let blur = emu_to_filter_px(os.blur_rad, scale)
-    let dist = emu_to_filter_px(os.dist, scale)
-    let angle_deg = os.dir / ooxml_angle_unit
-    let dx = dist * cos_deg(angle_deg) / 100
-    let dy = dist * sin_deg(angle_deg) / 100
-    let std_dev = if blur / 2 > 0 { blur / 2 } else { 1 }
-    filters = filters + "drop-shadow(" +
-      int_to_str(dx) + "px " + int_to_str(dy) + "px " +
-      int_to_str(std_dev) + "px " + css_rgba(os.color, "0.5") + ")"
+    filters = filters +
+      render_css_drop_shadow(os.blur_rad, os.dist, os.dir, os.color, scale)
+  }
+  // Preset shadow → CSS drop-shadow (same as outer shadow, using preset blur)
+  if not(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
+    let ps = eff.prst_shadow
+    if not(filters.is_empty()) {
+      filters = filters + " "
+    }
+    filters = filters +
+      render_css_drop_shadow(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
   // Glow → approximation as drop-shadow with no offset
   if not(eff.glow.is_none()) {
@@ -637,6 +659,14 @@ fn render_run_tspan(
       }
       if not(eff.blur.is_none()) {
         ea = ea + dai("reff-blur-rad", eff.blur.rad)
+      }
+      if not(eff.prst_shadow.is_none()) {
+        let ps = eff.prst_shadow
+        ea = ea +
+          da("reff-ps-prst", ps.prst) +
+          dai("reff-ps-dist", ps.dist) +
+          dai("reff-ps-dir", ps.dir) +
+          da("reff-ps-clr", ps.color.to_hex())
       }
       ea
     } else { "" }) +

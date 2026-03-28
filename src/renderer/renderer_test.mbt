@@ -266,6 +266,28 @@ test "roundtrip ellipse geometry" {
   }
 }
 
+test "roundtrip shape with preset shadow" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      prst_shadow: {
+        prst: "shdw1", dist: 38100, dir: 2700000,
+        color: @ooxml.parse_hex_color("000000"),
+      },
+    },
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].effects.prst_shadow.prst, "shdw1")
+  assert_eq(parsed.shapes[0].effects.prst_shadow.dist, 38100)
+  assert_eq(parsed.shapes[0].effects.prst_shadow.dir, 2700000)
+}
+
 test "roundtrip multiple shapes" {
   let shape1 = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),

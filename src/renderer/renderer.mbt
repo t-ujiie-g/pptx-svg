@@ -1361,6 +1361,14 @@ pub fn render_shape(
       if not(eff.blur.is_none()) {
         ea = ea + dai("eff-blur-rad", eff.blur.rad)
       }
+      if not(eff.prst_shadow.is_none()) {
+        let ps = eff.prst_shadow
+        ea = ea +
+          da("eff-ps-prst", ps.prst) +
+          dai("eff-ps-dist", ps.dist) +
+          dai("eff-ps-dir", ps.dir) +
+          da("eff-ps-clr", ps.color.to_hex())
+      }
       ea
     } else {
       ""

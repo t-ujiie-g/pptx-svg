@@ -450,6 +450,22 @@ fn parse_effect_lst(
         None => Blur::none()
         Some(node) => { rad: attr_int(node, "rad") }
       }
+      let ps = match @xml.find_child(eff_ch, "a:prstShdw") {
+        None => PresetShadow::none()
+        Some(node) => {
+          let ch = @xml.get_children(node)
+          let color = parse_color_from_children(ch, theme)
+          {
+            prst: match @xml.get_attr(node, "prst") {
+              Some(v) => v
+              None => ""
+            },
+            dist: attr_int(node, "dist"),
+            dir: attr_int(node, "dir"),
+            color,
+          }
+        }
+      }
       {
         outer_shadow: os,
         inner_shadow: ishdw,
@@ -457,6 +473,7 @@ fn parse_effect_lst(
         soft_edge: se,
         reflection: refl,
         blur: bl,
+        prst_shadow: ps,
       }
     }
   }

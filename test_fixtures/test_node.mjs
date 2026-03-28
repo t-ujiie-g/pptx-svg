@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 86', slideCount === 86, `got ${slideCount}`);
+  assert('slide count = 87', slideCount === 87, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 86; i++) {
+  for (let i = 1; i <= 87; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 86; i++) {
+  for (let i = 1; i <= 87; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1521,6 +1521,18 @@ async function testFeaturesPptx() {
     assert('slide85 has a:effectLst', hasTag(slide85, 'a:effectLst'));
     assert('slide85 has a:blur', hasTag(slide85, 'a:blur'));
     assert('slide85 blur rad=76200', slide85.includes('rad="76200"'));
+  }
+
+  // ── Slide 86: Preset shadow ─────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 86: preset shadow');
+    const slide86 = textFiles.get('ppt/slides/slide87.xml') || '';
+    assert('slide86 exists', slide86.length > 0);
+    assert('slide86 has a:effectLst', hasTag(slide86, 'a:effectLst'));
+    assert('slide86 has a:prstShdw', hasTag(slide86, 'a:prstShdw'));
+    assert('slide86 has prst=shdw1', slide86.includes('prst="shdw1"'));
+    assert('slide86 has prst=shdw2', slide86.includes('prst="shdw2"'));
+    assert('slide86 has dist=76200', slide86.includes('dist="76200"'));
   }
 }
 

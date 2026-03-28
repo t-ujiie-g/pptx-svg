@@ -476,6 +476,35 @@ fn emu_to_filter_px(emu : Int, scale : Int) -> Int {
 }
 
 ///|
+/// Render an SVG feDropShadow element from shadow parameters.
+fn render_drop_shadow_filter(
+  blur_rad : Int,
+  dist : Int,
+  dir : Int,
+  color : @ooxml.Color,
+  scale : Int,
+) -> String {
+  let blur = emu_to_filter_px(blur_rad, scale)
+  let d = emu_to_filter_px(dist, scale)
+  let angle_deg = dir / ooxml_angle_unit
+  let dx = d * cos_deg(angle_deg) / 100
+  let dy = d * sin_deg(angle_deg) / 100
+  let std_dev = blur / 2
+  let alpha_str = eff_alpha_str(color, "0.5")
+  "<feDropShadow dx=\"" +
+    int_to_str(dx) +
+    "\" dy=\"" +
+    int_to_str(dy) +
+    "\" stdDeviation=\"" +
+    int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+    "\" flood-color=\"" +
+    color.to_css() +
+    "\" flood-opacity=\"" +
+    alpha_str +
+    "\" result=\"shadow\"/>"
+}
+
+///|
 /// Render SVG filter definition for shape effects (a:effectLst).
 /// Returns (filter_defs, filter_attr) — defs SVG string and filter="url(#id)" attribute.
 fn render_effect_filter(
@@ -487,32 +516,17 @@ fn render_effect_filter(
     return ("", "")
   }
   let mut filters = ""
-  // Outer shadow: SVG feDropShadow or feGaussianBlur+feOffset+feFlood+feComposite
+  // Outer shadow: SVG feDropShadow
   if not(eff.outer_shadow.is_none()) {
     let os = eff.outer_shadow
-    let blur = emu_to_filter_px(os.blur_rad, scale)
-    let dist = emu_to_filter_px(os.dist, scale)
-    // dir is in 60000ths of a degree — convert to radians for dx/dy
-    // 0 = right, 5400000 = bottom, etc.
-    let angle_deg = os.dir / ooxml_angle_unit
-    let dx = dist * cos_deg(angle_deg) / 100
-    let dy = dist * sin_deg(angle_deg) / 100
-    let std_dev = blur / 2
-    let clr = os.color
-    let alpha_str = eff_alpha_str(clr, "0.5")
     filters = filters +
-      "<feDropShadow dx=\"" +
-      int_to_str(dx) +
-      "\" dy=\"" +
-      int_to_str(dy) +
-      "\" stdDeviation=\"" +
-      int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
-      "\" flood-color=\"" +
-      clr.to_css() +
-      "\" flood-opacity=\"" +
-      alpha_str +
-      "\" result=\"shadow\"/>"
-    ()
+      render_drop_shadow_filter(os.blur_rad, os.dist, os.dir, os.color, scale)
+  }
+  // Preset shadow: render as equivalent outer shadow using preset blur radius
+  if not(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
+    let ps = eff.prst_shadow
+    filters = filters +
+      render_drop_shadow_filter(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
   // Glow: feGaussianBlur + feFlood + feComposite + feMerge
   if not(eff.glow.is_none()) {

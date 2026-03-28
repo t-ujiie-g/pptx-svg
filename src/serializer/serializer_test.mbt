@@ -175,6 +175,38 @@ test "serialize_slide shape with glow" {
   assert_true(xml.contains("rad=\"228600\""))
 }
 
+test "serialize_slide shape with preset shadow" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      prst_shadow: {
+        prst: "shdw1", dist: 38100, dir: 2700000,
+        color: @ooxml.parse_hex_color("000000"),
+      },
+    },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  assert_true(xml.contains("<a:prstShdw"))
+  assert_true(xml.contains("prst=\"shdw1\""))
+  assert_true(xml.contains("dist=\"38100\""))
+  assert_true(xml.contains("dir=\"2700000\""))
+}
+
 test "serialize_slide no effectLst when none" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
