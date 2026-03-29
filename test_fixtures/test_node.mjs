@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 88', slideCount === 88, `got ${slideCount}`);
+  assert('slide count = 89', slideCount === 89, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 88; i++) {
+  for (let i = 1; i <= 89; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 88; i++) {
+  for (let i = 1; i <= 89; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1546,6 +1546,14 @@ async function testFeaturesPptx() {
     assert('slide87 has blend=screen', slide87.includes('blend="screen"'));
     assert('slide87 has blend=darken', slide87.includes('blend="darken"'));
     assert('slide87 has blend=lighten', slide87.includes('blend="lighten"'));
+  }
+
+  // ── Slide 88: Justified text ───────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 88: justified text');
+    const slide88 = textFiles.get('ppt/slides/slide89.xml') || '';
+    assert('slide88 exists', slide88.length > 0);
+    assert('slide88 has algn=just', slide88.includes('algn="just"'));
   }
 }
 

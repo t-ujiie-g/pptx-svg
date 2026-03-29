@@ -91,6 +91,7 @@ Slides:
  85. Blur effect (a:blur — shape-level Gaussian blur)
  86. Preset shadow (a:prstShdw — shdw1/shdw2 preset shadows)
  87. Fill overlay (a:fillOverlay — blend modes: over/mult/screen/darken/lighten)
+ 88. Justified text (algn="just" — word-spacing distribution)
 """
 
 import base64
@@ -5608,6 +5609,38 @@ for i, (label, base_clr) in enumerate(zip(fo_labels, fo_colors)):
     box.fill.fore_color.rgb = RGBColor(
         int(base_clr[0:2], 16), int(base_clr[2:4], 16), int(base_clr[4:6], 16)
     )
+
+# ── Slide 88: Justified text (algn="just") ────────────────────────────────────
+slide88 = prs.slides.add_slide(blank)
+
+title88 = slide88.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title88.text_frame.paragraphs[0].text = "Slide 88: Justified Text (algn=\"just\")"
+title88.text_frame.paragraphs[0].font.size = Pt(24)
+title88.text_frame.paragraphs[0].font.bold = True
+
+# Add text box with justified paragraphs
+from pptx.enum.text import PP_ALIGN
+just_box = slide88.shapes.add_textbox(Inches(1), Inches(1.5), Inches(5), Inches(3))
+tf = just_box.text_frame
+tf.word_wrap = True
+p1 = tf.paragraphs[0]
+p1.text = "This is a justified paragraph with enough text to wrap across multiple lines. The word spacing should be adjusted so that each line extends to fill the full width of the text box evenly."
+p1.alignment = PP_ALIGN.JUSTIFY
+p1.font.size = Pt(16)
+
+p2 = tf.add_paragraph()
+p2.text = "Short last line."
+p2.alignment = PP_ALIGN.JUSTIFY
+p2.font.size = Pt(16)
+
+# Japanese justified text (CJK — uses letter-spacing fallback)
+just_box2 = slide88.shapes.add_textbox(Inches(1), Inches(5), Inches(5), Inches(2))
+tf2 = just_box2.text_frame
+tf2.word_wrap = True
+p3 = tf2.paragraphs[0]
+p3.text = "均等割り付けのテスト文章です。日本語テキストはスペースがないため文字間隔で調整されます。"
+p3.alignment = PP_ALIGN.JUSTIFY
+p3.font.size = Pt(16)
 
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'

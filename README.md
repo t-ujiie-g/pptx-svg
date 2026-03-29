@@ -156,7 +156,7 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 ### Fully Supported
 
 - **Shapes**: AutoShape (rect, ellipse, roundRect, line, ~154 preset geometries), custom geometry (`a:custGeom`), connectors (straight/elbow/curved)
-- **Text**: Paragraphs, runs, bullets (char/auto/image), fonts (Latin/EA/CS/Symbol), bold/italic/underline/strikethrough, superscript/subscript, character spacing, kerning, capitalization, hyperlinks, tabs, RTL
+- **Text**: Paragraphs, runs, bullets (char/auto/image), fonts (Latin/EA/CS/Symbol), bold/italic/underline/strikethrough, superscript/subscript, character spacing, kerning, capitalization, hyperlinks, tabs, RTL, justify (word-spacing distribution)
 - **Text body**: Vertical alignment, margins, auto-fit, font scale, rotation, vertical text, multi-column, text warp (prstTxWarp)
 - **Fill**: Solid color, gradient (linear/radial with stops), pattern (48 presets), image fill (stretch/tile/crop)
 - **Stroke**: 11 dash patterns, 5 arrow types, line cap/join, compound lines, gradient/pattern stroke

@@ -312,6 +312,38 @@ test "roundtrip fill overlay effect" {
   assert_eq(parsed.shapes[0].effects.fill_overlay.color.g, 0)
 }
 
+test "roundtrip justify alignment" {
+  let run : @ooxml.TextRun = {
+    text: "Hello world test", bold: false, bold_explicit: false, italic: false,
+    font_size: 1800, color: @ooxml.Color::none(), font_face: "", ea_font: "",
+    cs_font: "", sym_font: "", underline: "", strike: "", baseline: 0,
+    char_spacing: 0, kern: 0, cap: "", hlink_rid: "", hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(), outline_color: @ooxml.Color::none(),
+    outline_w: 0, text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(), math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run], align: "just", level: 0, spc_before: 0, spc_after: 0,
+    line_spacing: 0, mar_l: -1, indent: 0, bullet: "", bullet_auto: "",
+    bullet_none: false, bullet_font: "", bullet_size: 0,
+    bullet_color: @ooxml.Color::none(), bullet_img_rid: "", tab_stops: [], rtl: false,
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 5000000, cy: 2000000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    paragraphs: [para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  // SVG should contain para-align="just"
+  assert_true(svg.contains("para-align=\"just\""))
+  // Round-trip: parse back
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].paragraphs[0].align, "just")
+}
+
 test "roundtrip multiple shapes" {
   let shape1 = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),

@@ -101,6 +101,81 @@ fn is_kinsoku_start_prohibited(c : Char) -> Bool {
 
 ///|
 /// Returns Array of lines, each line being Array of (run_idx, text).
+///|
+/// Count space characters in a text fragment.
+fn count_spaces(text : String) -> Int {
+  let len = text.length()
+  let mut count = 0
+  let mut i = 0
+  while i < len {
+    if text.get_char(i).unwrap() == ' ' {
+      count = count + 1
+    }
+    i = i + 1
+  }
+  count
+}
+
+///|
+/// Measure total rendered width of a visual line (array of run fragments).
+/// Returns (width_px, space_count).
+fn measure_line_width(
+  vline : Array[(Int, String)],
+  para : @ooxml.TextParagraph,
+  scale : Int,
+  def_sz : Int,
+  font_scale : Int,
+  theme : @ooxml.ThemeData,
+) -> (Double, Int) {
+  let mut total_w : Double = 0.0
+  let mut total_spaces = 0
+  let mut accum = ""
+  let mut accum_ff = ""
+  let mut accum_fs : Double = 0.0
+  let nf = vline.length()
+  let mut fi = 0
+  while fi < nf {
+    let (run_idx, frag_text) = vline[fi]
+    let run = para.runs[run_idx]
+    let fs_raw = if run.font_size > 0 {
+      run.font_size
+    } else if def_sz > 0 {
+      def_sz * scale / @ooxml.emu_per_hundredth_pt
+    } else {
+      1800
+    }
+    let fs_px = px(
+      apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
+      scale,
+    ).to_double()
+    let ff = if not(run.ea_font.is_empty()) {
+      run.ea_font
+    } else if not(run.font_face.is_empty()) {
+      run.font_face
+    } else {
+      theme.minor_font
+    }
+    let text = if run.cap == "all" { to_upper_ascii(frag_text) } else { frag_text }
+    total_spaces = total_spaces + count_spaces(text)
+    // Accumulate same-font text for accurate measurement
+    if ff == accum_ff && fs_px == accum_fs {
+      accum = accum + text
+    } else {
+      if not(accum.is_empty()) {
+        total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
+      }
+      accum = text
+      accum_ff = ff
+      accum_fs = fs_px
+    }
+    fi = fi + 1
+  }
+  if not(accum.is_empty()) {
+    total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
+  }
+  (total_w, total_spaces)
+}
+
 fn wrap_paragraph(
   para : @ooxml.TextParagraph,
   max_width : Int,
@@ -1008,7 +1083,9 @@ fn render_text(
       } else {
         para.align
       }
+      let is_justify = effective_align == "just"
       // anchor_x: first line uses first_line_indent, continuation uses indent (marL)
+      // Justify uses left-align positioning as base
       let (anchor_x, cont_anchor_x_init, anchor_attr) = if effective_align == "ctr" ||
         effective_align == "c" {
         (
@@ -1016,13 +1093,13 @@ fn render_text(
           text_x + indent + (text_w - indent) / 2,
           " text-anchor=\"middle\"",
         )
-      } else if effective_align == "r" || (para.rtl && effective_align != "l") {
+      } else if effective_align == "r" || (para.rtl && effective_align != "l" && not(is_justify)) {
         if para.rtl {
           (text_x + text_w, text_x + text_w, " text-anchor=\"start\"")
         } else {
           (text_x + text_w, text_x + text_w, " text-anchor=\"end\"")
         }
-      } else if para.rtl {
+      } else if para.rtl && not(is_justify) {
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"end\"")
       } else {
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"start\"")
@@ -1180,6 +1257,69 @@ fn render_text(
               ai("y", cur_y) +
               anchor_attr +
               rtl_attr +
+              ">"
+          }
+          // Justify: calculate word-spacing for non-last lines
+          let justify_ws_attr = if is_justify && vli < nvl - 1 && vline.length() > 0 {
+            let avail_w = if vli == 0 {
+              text_w - first_line_indent
+            } else {
+              text_w - indent
+            }
+            let (line_w, space_count) = measure_line_width(
+              vline, para, scale, def_sz, fs, theme,
+            )
+            if space_count > 0 {
+              let extra_px = avail_w.to_double() - line_w
+              if extra_px > 0.0 {
+                let ws = extra_px / space_count.to_double()
+                // Round to 1 decimal
+                let ws_10 = (ws * 10.0).to_int()
+                " word-spacing=\"" + int_to_str(ws_10 / 10) + "." + int_to_str(
+                  if ws_10 % 10 < 0 { -(ws_10 % 10) } else { ws_10 % 10 },
+                ) + "\""
+              } else {
+                ""
+              }
+            } else {
+              // No spaces: use letter-spacing as fallback
+              let total_chars = {
+                let mut n = 0
+                let mut j = 0
+                while j < vline.length() {
+                  n = n + vline[j].1.length()
+                  j = j + 1
+                }
+                n
+              }
+              if total_chars > 1 {
+                let extra_px = avail_w.to_double() - line_w
+                if extra_px > 0.0 {
+                  let ls = extra_px / (total_chars - 1).to_double()
+                  let ls_10 = (ls * 10.0).to_int()
+                  " letter-spacing=\"" + int_to_str(ls_10 / 10) + "." + int_to_str(
+                    if ls_10 % 10 < 0 { -(ls_10 % 10) } else { ls_10 % 10 },
+                  ) + "\""
+                } else {
+                  ""
+                }
+              } else {
+                ""
+              }
+            }
+          } else {
+            ""
+          }
+          // Apply justify spacing to current line's tspan if needed
+          if not(justify_ws_attr.is_empty()) {
+            // Re-emit the current tspan with word-spacing
+            // Close and reopen with the spacing attribute
+            out = out + "</tspan><tspan" +
+              ai("x", cur_anchor_x) +
+              ai("y", cur_y) +
+              anchor_attr +
+              rtl_attr +
+              justify_ws_attr +
               ">"
           }
           // Render fragments in this visual line
