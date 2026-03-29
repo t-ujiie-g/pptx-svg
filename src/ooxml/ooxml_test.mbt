@@ -376,3 +376,279 @@ test "Scene3d::none" {
 test "Bevel::none" {
   assert_true(Bevel::none().is_none())
 }
+
+// ── ChartEx parsing ─────────────────────────────────────────────────────────
+
+test "parse_chartex_xml waterfall" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+    #|  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl ptCount="3">
+    #|          <cx:pt idx="0">Q1</cx:pt>
+    #|          <cx:pt idx="1">Q2</cx:pt>
+    #|          <cx:pt idx="2">Total</cx:pt>
+    #|        </cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl ptCount="3" formatCode="General">
+    #|          <cx:pt idx="0">100</cx:pt>
+    #|          <cx:pt idx="1">50</cx:pt>
+    #|          <cx:pt idx="2">150</cx:pt>
+    #|        </cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="waterfall">
+    #|          <cx:dataId val="0"/>
+    #|          <cx:layoutPr>
+    #|            <cx:subtotals>
+    #|              <cx:idx val="2"/>
+    #|            </cx:subtotals>
+    #|          </cx:layoutPr>
+    #|        </cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.groups.length(), 1)
+  assert_true(
+    match chart.groups[0].chart_type {
+      WaterfallChart => true
+      _ => false
+    },
+  )
+  assert_eq(chart.groups[0].subtotals.length(), 1)
+  assert_eq(chart.groups[0].subtotals[0], 2)
+  assert_eq(chart.groups[0].series.length(), 1)
+  // Check data was mapped correctly
+  let cats = match chart.groups[0].series[0].cat {
+    StrSource(_, data) => data.points
+    _ => []
+  }
+  assert_eq(cats.length(), 3)
+  assert_eq(cats[0].value, "Q1")
+}
+
+test "parse_chartex_xml funnel" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">Stage1</cx:pt><cx:pt idx="1">Stage2</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">1000</cx:pt><cx:pt idx="1">500</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|    <cx:legend pos="b"/>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.groups.length(), 1)
+  assert_true(
+    match chart.groups[0].chart_type {
+      FunnelChart => true
+      _ => false
+    },
+  )
+  assert_eq(chart.legend.position, "b")
+  assert_true(chart.legend.show)
+}
+
+test "parse_chartex_xml treemap" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">A</cx:pt><cx:pt idx="1">B</cx:pt><cx:pt idx="2">C</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">50</cx:pt><cx:pt idx="1">30</cx:pt><cx:pt idx="2">20</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:title><cx:tx><cx:txData><cx:v>My Treemap</cx:v></cx:txData></cx:tx></cx:title>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="treemap"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.title, "My Treemap")
+  assert_true(
+    match chart.groups[0].chart_type {
+      TreemapChart => true
+      _ => false
+    },
+  )
+}
+
+test "parse_chartex_xml all layout types" {
+  // Test all 6 layout types map to correct ChartKind
+  let layout_ids = ["waterfall", "treemap", "sunburst", "boxWhisker", "funnel", "clusteredColumn"]
+  let expected_types = ["WaterfallChart", "TreemapChart", "SunburstChart", "BoxWhiskerChart", "FunnelChart", "HistogramChart"]
+  for li in 0..<layout_ids.length() {
+    let lid = layout_ids[li]
+    let xml = "<?xml version=\"1.0\"?><cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData><cx:data id=\"0\"><cx:numDim type=\"val\"><cx:lvl><cx:pt idx=\"0\">10</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"" + lid + "\"><cx:dataId val=\"0\"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"
+    let chart = parse_chartex_xml(xml, ThemeData::default())
+    assert_eq(chart.groups.length(), 1)
+    let kind_str = match chart.groups[0].chart_type {
+      WaterfallChart => "WaterfallChart"
+      TreemapChart => "TreemapChart"
+      SunburstChart => "SunburstChart"
+      BoxWhiskerChart => "BoxWhiskerChart"
+      FunnelChart => "FunnelChart"
+      HistogramChart => "HistogramChart"
+      _ => "other"
+    }
+    assert_eq(kind_str, expected_types[li])
+  }
+}
+
+test "parse_chartex_xml sunburst" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">N</cx:pt><cx:pt idx="1">S</cx:pt><cx:pt idx="2">E</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="size">
+    #|        <cx:lvl><cx:pt idx="0">40</cx:pt><cx:pt idx="1">30</cx:pt><cx:pt idx="2">20</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="sunburst"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_true(
+    match chart.groups[0].chart_type {
+      SunburstChart => true
+      _ => false
+    },
+  )
+  // type="size" should be parsed as numDim
+  let vals = match chart.groups[0].series[0].val {
+    NumSource(_, data) => data.points
+    _ => []
+  }
+  assert_eq(vals.length(), 3)
+  assert_eq(vals[0].value, "40")
+}
+
+test "parse_chartex_xml waterfall values and multiple subtotals" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">A</cx:pt><cx:pt idx="1">B</cx:pt><cx:pt idx="2">Sub</cx:pt><cx:pt idx="3">C</cx:pt><cx:pt idx="4">Total</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">100</cx:pt><cx:pt idx="1">-30</cx:pt><cx:pt idx="2">70</cx:pt><cx:pt idx="3">50</cx:pt><cx:pt idx="4">120</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="waterfall">
+    #|          <cx:dataId val="0"/>
+    #|          <cx:layoutPr>
+    #|            <cx:subtotals><cx:idx val="2"/><cx:idx val="4"/></cx:subtotals>
+    #|          </cx:layoutPr>
+    #|        </cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  // Multiple subtotals
+  assert_eq(chart.groups[0].subtotals.length(), 2)
+  assert_eq(chart.groups[0].subtotals[0], 2)
+  assert_eq(chart.groups[0].subtotals[1], 4)
+  // Values parsed correctly
+  let vals = match chart.groups[0].series[0].val {
+    NumSource(_, data) => data.points
+    _ => []
+  }
+  assert_eq(vals.length(), 5)
+  assert_eq(vals[0].value, "100")
+  assert_eq(vals[1].value, "-30")
+}
+
+test "parse_chartex_xml empty chartSpace" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.groups.length(), 0)
+  assert_true(not(chart.chart_xml.is_empty()))
+}
+
+test "parse_chartex_xml histogram no strDim" {
+  // Real histograms may have only numDim (no categories)
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">5</cx:pt><cx:pt idx="1">15</cx:pt><cx:pt idx="2">25</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="clusteredColumn"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_true(
+    match chart.groups[0].chart_type {
+      HistogramChart => true
+      _ => false
+    },
+  )
+  // No categories — cat should be NoData
+  assert_true(
+    match chart.groups[0].series[0].cat {
+      NoData => true
+      _ => false
+    },
+  )
+}

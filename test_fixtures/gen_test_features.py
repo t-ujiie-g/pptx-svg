@@ -92,6 +92,12 @@ Slides:
  86. Preset shadow (a:prstShdw — shdw1/shdw2 preset shadows)
  87. Fill overlay (a:fillOverlay — blend modes: over/mult/screen/darken/lighten)
  88. Justified text (algn="just" — word-spacing distribution)
+ 89. Waterfall chart (cx:chart layoutId="waterfall")
+ 90. Treemap chart (cx:chart layoutId="treemap")
+ 91. Sunburst chart (cx:chart layoutId="sunburst")
+ 92. Histogram chart (cx:chart layoutId="clusteredColumn")
+ 93. Box & Whisker chart (cx:chart layoutId="boxWhisker")
+ 94. Funnel chart (cx:chart layoutId="funnel")
 """
 
 import base64
@@ -5642,6 +5648,24 @@ p3.text = "均等割り付けのテスト文章です。日本語テキストは
 p3.alignment = PP_ALIGN.JUSTIFY
 p3.font.size = Pt(16)
 
+# ── Slides 89-94: Office 2016+ ChartEx (cx: namespace) ──────────────────────
+cx_chart_names = [
+    "Waterfall Chart",
+    "Treemap Chart",
+    "Sunburst Chart",
+    "Histogram Chart",
+    "Box & Whisker Chart",
+    "Funnel Chart",
+]
+cx_chart_slides = []
+for i, name in enumerate(cx_chart_names):
+    s = prs.slides.add_slide(blank)
+    t = s.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+    t.text_frame.paragraphs[0].text = f"Slide {89 + i}: {name} (cx:chart)"
+    t.text_frame.paragraphs[0].font.size = Pt(18)
+    t.text_frame.paragraphs[0].font.bold = True
+    cx_chart_slides.append(s)
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5650,7 +5674,7 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 87
+total_slides = len(prs.slides)  # 94 (88 + 6 cx charts)
 # python-pptx numbers slide files sequentially
 slide78_path = 'ppt/slides/slide79.xml'
 
@@ -6057,6 +6081,180 @@ if 'Extension="wmf"' not in content_types_xml:
         '<Default Extension="wmf" ContentType="image/x-wmf"/></Types>'
     )
 
+# ── Inject cx:chart (ChartEx) data into slides 89-94 ─────────────────────────
+# cx:chartSpace XML templates for each chart type
+cx_chart_xmls = {
+    'waterfall': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="5">
+      <cx:pt idx="0">Q1</cx:pt><cx:pt idx="1">Q2</cx:pt><cx:pt idx="2">Q3</cx:pt>
+      <cx:pt idx="3">Q4</cx:pt><cx:pt idx="4">Total</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="5" formatCode="General">
+      <cx:pt idx="0">100</cx:pt><cx:pt idx="1">-20</cx:pt><cx:pt idx="2">50</cx:pt>
+      <cx:pt idx="3">-10</cx:pt><cx:pt idx="4">120</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="waterfall"><cx:dataId val="0"/>
+      <cx:layoutPr><cx:subtotals><cx:idx val="4"/></cx:subtotals></cx:layoutPr>
+    </cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'treemap': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="5">
+      <cx:pt idx="0">Product A</cx:pt><cx:pt idx="1">Product B</cx:pt>
+      <cx:pt idx="2">Product C</cx:pt><cx:pt idx="3">Product D</cx:pt>
+      <cx:pt idx="4">Product E</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="5">
+      <cx:pt idx="0">50</cx:pt><cx:pt idx="1">30</cx:pt><cx:pt idx="2">20</cx:pt>
+      <cx:pt idx="3">15</cx:pt><cx:pt idx="4">10</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="treemap"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'sunburst': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="4">
+      <cx:pt idx="0">North</cx:pt><cx:pt idx="1">South</cx:pt>
+      <cx:pt idx="2">East</cx:pt><cx:pt idx="3">West</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="4">
+      <cx:pt idx="0">40</cx:pt><cx:pt idx="1">30</cx:pt>
+      <cx:pt idx="2">20</cx:pt><cx:pt idx="3">10</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="sunburst"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'histogram': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="5">
+      <cx:pt idx="0">0-20</cx:pt><cx:pt idx="1">20-40</cx:pt>
+      <cx:pt idx="2">40-60</cx:pt><cx:pt idx="3">60-80</cx:pt>
+      <cx:pt idx="4">80-100</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="5">
+      <cx:pt idx="0">5</cx:pt><cx:pt idx="1">15</cx:pt>
+      <cx:pt idx="2">25</cx:pt><cx:pt idx="3">12</cx:pt>
+      <cx:pt idx="4">8</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="clusteredColumn"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'boxWhisker': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="1">
+      <cx:pt idx="0">Dataset</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="10">
+      <cx:pt idx="0">12</cx:pt><cx:pt idx="1">15</cx:pt>
+      <cx:pt idx="2">18</cx:pt><cx:pt idx="3">22</cx:pt>
+      <cx:pt idx="4">25</cx:pt><cx:pt idx="5">28</cx:pt>
+      <cx:pt idx="6">30</cx:pt><cx:pt idx="7">35</cx:pt>
+      <cx:pt idx="8">40</cx:pt><cx:pt idx="9">45</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="boxWhisker"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'funnel': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="4">
+      <cx:pt idx="0">Prospects</cx:pt><cx:pt idx="1">Qualified</cx:pt>
+      <cx:pt idx="2">Proposals</cx:pt><cx:pt idx="3">Closed</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="4">
+      <cx:pt idx="0">1000</cx:pt><cx:pt idx="1">600</cx:pt>
+      <cx:pt idx="2">300</cx:pt><cx:pt idx="3">100</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea>
+    <cx:legend pos="r"/>
+  </cx:chart>
+</cx:chartSpace>''',
+}
+
+# Chart type keys in order matching slides 89-94
+cx_types = ['waterfall', 'treemap', 'sunburst', 'histogram', 'boxWhisker', 'funnel']
+
+# Patch each cx:chart slide XML to include a graphicFrame + create chartex files
+cx_chartex_files = {}  # path -> xml content
+cx_slide_patches = {}  # slide_path -> patched xml
+
+for i, cx_type in enumerate(cx_types):
+    slide_num = 89 + i
+    # python-pptx slide files are 1-indexed but may start from different offset
+    slide_file = f'ppt/slides/slide{slide_num + 1}.xml'  # 0-indexed in files
+    chartex_file = f'ppt/charts/chartEx{i + 1}.xml'
+    chartex_rid = f'rIdCx{i + 1}'
+
+    # Store chartex XML
+    cx_chartex_files[chartex_file] = cx_chart_xmls[cx_type]
+
+    # Patch slide XML to inject graphicFrame
+    if slide_file in all_entries:
+        slide_xml = all_entries[slide_file][1].decode('utf-8')
+        # Build graphicFrame XML
+        gf_xml = (
+            '<p:graphicFrame>'
+            '<p:nvGraphicFramePr>'
+            f'<p:cNvPr id="99{i}" name="ChartEx {i+1}"/>'
+            '<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>'
+            '<p:nvPr/>'
+            '</p:nvGraphicFramePr>'
+            '<p:xfrm><a:off x="914400" y="1371600"/><a:ext cx="7315200" cy="4572000"/></p:xfrm>'
+            '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/drawing/2014/chartex">'
+            f'<cx:chart xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"'
+            f' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+            f' r:id="{chartex_rid}"/>'
+            '</a:graphicData></a:graphic>'
+            '</p:graphicFrame>'
+        )
+        # Insert before </p:spTree>
+        slide_xml = slide_xml.replace('</p:spTree>', gf_xml + '</p:spTree>')
+        cx_slide_patches[slide_file] = slide_xml
+
+        # Patch slide rels to add chartex relationship
+        rels_file = f'ppt/slides/_rels/slide{slide_num + 1}.xml.rels'
+        if rels_file in all_entries:
+            rels_xml = all_entries[rels_file][1].decode('utf-8')
+        else:
+            rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
+        cx_rel = f'<Relationship Id="{chartex_rid}" Type="http://schemas.microsoft.com/office/2014/relationships/chartEx" Target="../charts/chartEx{i+1}.xml"/>'
+        rels_xml = rels_xml.replace('</Relationships>', cx_rel + '</Relationships>')
+        # Store patched rels
+        cx_slide_patches[rels_file] = rels_xml
+
+# Add chartex content type overrides
+for i in range(len(cx_types)):
+    chartex_override = f'<Override PartName="/ppt/charts/chartEx{i+1}.xml" ContentType="application/vnd.ms-office.chartex+xml"/>'
+    if chartex_override not in content_types_xml:
+        content_types_xml = content_types_xml.replace('</Types>', chartex_override + '</Types>')
+
 # Rewrite ZIP with patched slides + WMF image
 with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
     for fname, (item, data) in all_entries.items():
@@ -6084,9 +6282,18 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide87_xml.encode('utf-8'))
         elif fname == content_types_path:
             zout.writestr(item, content_types_xml.encode('utf-8'))
+        elif fname in cx_slide_patches:
+            zout.writestr(item, cx_slide_patches[fname].encode('utf-8'))
         else:
             zout.writestr(item, data)
     # Add WMF binary as new entry
     zout.writestr('ppt/media/image_wmf1.wmf', wmf_data)
+    # Add ChartEx XML files
+    for cx_path, cx_xml in cx_chartex_files.items():
+        zout.writestr(cx_path, cx_xml.encode('utf-8'))
+    # Add patched rels that are new (not in original ZIP)
+    for rels_path, rels_xml in cx_slide_patches.items():
+        if rels_path not in all_entries:
+            zout.writestr(rels_path, rels_xml.encode('utf-8'))
 
 print(f"Saved {output_path} with {total_slides} slides")

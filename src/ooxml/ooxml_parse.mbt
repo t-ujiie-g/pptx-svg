@@ -1226,6 +1226,27 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
     }
     None => ()
   }
+  // Check for ChartEx (cx:chart) — Office 2016+ chart types
+  match @xml.find_child(gdata_ch, "cx:chart") {
+    Some(cn) => {
+      let rid = match @xml.get_attr(cn, "r:id") {
+        Some(v) => v
+        None => ""
+      }
+      if not(rid.is_empty()) {
+        // Prefix "cx:" to distinguish from classic c:chart during resolution
+        let chart_data : ChartData = {
+          ..ChartData::empty(),
+          chart_xml: "cx:" + rid,
+        }
+        return Shape::default_with(
+          ShapeKind::ChartShape(chart_data),
+          transform,
+        )
+      }
+    }
+    None => ()
+  }
   // Check for OLE object (p:oleObj)
   match @xml.find_child(gdata_ch, "p:oleObj") {
     Some(ole_obj) => {

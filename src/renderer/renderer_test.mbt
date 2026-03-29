@@ -344,6 +344,135 @@ test "roundtrip justify alignment" {
   assert_eq(parsed.shapes[0].paragraphs[0].align, "just")
 }
 
+// ── ChartEx rendering tests ──────────────────────────────────────────────────
+
+fn make_chart_shape(chart : @ooxml.ChartData) -> @ooxml.Shape {
+  @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::ChartShape(chart),
+    { x: 0, y: 0, cx: 9144000, cy: 6858000, rot: 0, flip_h: false, flip_v: false },
+  )
+}
+
+fn make_cx_chart_xml(layout_id : String, cats : String, vals : String, extra~ : String = "") -> String {
+  let cat_dim = if cats.is_empty() {
+    ""
+  } else {
+    "<cx:strDim type=\"cat\"><cx:lvl>" + cats + "</cx:lvl></cx:strDim>"
+  }
+  "<?xml version=\"1.0\"?><cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData><cx:data id=\"0\">" + cat_dim + "<cx:numDim type=\"val\"><cx:lvl>" + vals + "</cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"" + layout_id + "\"><cx:dataId val=\"0\"/>" + extra + "</cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"
+}
+
+test "render waterfall chart produces rects and connectors" {
+  let xml = make_cx_chart_xml(
+    "waterfall",
+    "<cx:pt idx=\"0\">Q1</cx:pt><cx:pt idx=\"1\">Q2</cx:pt><cx:pt idx=\"2\">Total</cx:pt>",
+    "<cx:pt idx=\"0\">100</cx:pt><cx:pt idx=\"1\">-20</cx:pt><cx:pt idx=\"2\">80</cx:pt>",
+    extra="<cx:layoutPr><cx:subtotals><cx:idx val=\"2\"/></cx:subtotals></cx:layoutPr>",
+  )
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_true(svg.contains("<rect"))
+  assert_true(svg.contains("stroke-dasharray"))
+  assert_true(svg.contains("Q1"))
+  assert_true(svg.contains("Total"))
+}
+
+test "render treemap chart produces labeled rects" {
+  let xml = make_cx_chart_xml(
+    "treemap",
+    "<cx:pt idx=\"0\">A</cx:pt><cx:pt idx=\"1\">B</cx:pt><cx:pt idx=\"2\">C</cx:pt>",
+    "<cx:pt idx=\"0\">50</cx:pt><cx:pt idx=\"1\">30</cx:pt><cx:pt idx=\"2\">20</cx:pt>",
+  )
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_true(svg.contains("<rect"))
+  assert_true(svg.contains("stroke=\"white\""))
+}
+
+test "render sunburst chart produces arc paths" {
+  let xml = make_cx_chart_xml(
+    "sunburst",
+    "<cx:pt idx=\"0\">N</cx:pt><cx:pt idx=\"1\">S</cx:pt><cx:pt idx=\"2\">E</cx:pt>",
+    "<cx:pt idx=\"0\">40</cx:pt><cx:pt idx=\"1\">30</cx:pt><cx:pt idx=\"2\">20</cx:pt>",
+  )
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_true(svg.contains("<path d=\"M"))
+}
+
+test "render funnel chart produces centered rects" {
+  let xml = make_cx_chart_xml(
+    "funnel",
+    "<cx:pt idx=\"0\">Prospects</cx:pt><cx:pt idx=\"1\">Qualified</cx:pt><cx:pt idx=\"2\">Closed</cx:pt>",
+    "<cx:pt idx=\"0\">1000</cx:pt><cx:pt idx=\"1\">600</cx:pt><cx:pt idx=\"2\">100</cx:pt>",
+  )
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_true(svg.contains("<rect"))
+  assert_true(svg.contains("Prospects"))
+  assert_true(svg.contains("Closed"))
+}
+
+test "render box-whisker chart produces lines and rects" {
+  let xml = make_cx_chart_xml(
+    "boxWhisker",
+    "<cx:pt idx=\"0\">Data</cx:pt><cx:pt idx=\"1\">Data</cx:pt><cx:pt idx=\"2\">Data</cx:pt><cx:pt idx=\"3\">Data</cx:pt><cx:pt idx=\"4\">Data</cx:pt><cx:pt idx=\"5\">Data</cx:pt><cx:pt idx=\"6\">Data</cx:pt>",
+    "<cx:pt idx=\"0\">10</cx:pt><cx:pt idx=\"1\">15</cx:pt><cx:pt idx=\"2\">20</cx:pt><cx:pt idx=\"3\">25</cx:pt><cx:pt idx=\"4\">30</cx:pt><cx:pt idx=\"5\">35</cx:pt><cx:pt idx=\"6\">40</cx:pt>",
+  )
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_true(svg.contains("fill-opacity=\"0.3\""))
+  assert_true(svg.contains("<line"))
+  assert_true(svg.contains("stroke-width=\"2\""))
+}
+
+test "render histogram chart reuses bar renderer" {
+  let xml = make_cx_chart_xml(
+    "clusteredColumn",
+    "<cx:pt idx=\"0\">0-20</cx:pt><cx:pt idx=\"1\">20-40</cx:pt><cx:pt idx=\"2\">40-60</cx:pt>",
+    "<cx:pt idx=\"0\">5</cx:pt><cx:pt idx=\"1\">15</cx:pt><cx:pt idx=\"2\">25</cx:pt>",
+  )
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_true(svg.contains("<rect"))
+}
+
 test "roundtrip multiple shapes" {
   let shape1 = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),

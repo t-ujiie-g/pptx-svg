@@ -142,6 +142,13 @@ pub(all) enum ChartKind {
   StockChart // c:stockChart
   SurfaceChart // c:surfaceChart / c:surface3DChart — 2D heatmap approximation
   OfPieChart // c:ofPieChart — pie/bar of pie, rendered as standard pie
+  // Office 2016+ ChartEx (cx: namespace)
+  WaterfallChart // cx:series layoutId="waterfall"
+  TreemapChart // cx:series layoutId="treemap"
+  SunburstChart // cx:series layoutId="sunburst"
+  HistogramChart // cx:series layoutId="clusteredColumn" with binning
+  BoxWhiskerChart // cx:series layoutId="boxWhisker"
+  FunnelChart // cx:series layoutId="funnel"
 }
 
 ///|
@@ -249,6 +256,7 @@ pub(all) struct ChartGroup {
   of_pie_type : String // ofPieChart: "pie"|"bar" (c:ofPieType)
   split_pos : Int // ofPieChart: split position (c:splitPos)
   wireframe : Bool // surface chart: wireframe mode
+  subtotals : Array[Int] // waterfall: indices of subtotal/total points
 }
 
 ///|
@@ -268,6 +276,7 @@ pub fn ChartGroup::default(ct : ChartKind) -> ChartGroup {
     of_pie_type: "",
     split_pos: 0,
     wireframe: false,
+    subtotals: [],
   }
 }
 
@@ -1162,5 +1171,402 @@ fn parse_view_3d(ch : Array[@xml.XmlNode]) -> ChartView3D {
     depth_percent: if dp_s.is_empty() { 100 } else { @xml.parse_int(dp_s) },
     r_ang_ax: child_attr_val(ch, "c:rAngAx") != "0",
     perspective: if p_s.is_empty() { 30 } else { @xml.parse_int(p_s) },
+  }
+}
+
+// ── ChartEx (cx: namespace) parsing ─────────────────────────────────────────
+
+///|
+/// Parse cx:chartSpace XML (Office 2016+ charts: waterfall, treemap, etc.)
+pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
+  let nodes = @xml.parse_xml(chart_xml)
+  let root = match @xml.find_child(nodes, "cx:chartSpace") {
+    None => return { ..ChartData::empty(), chart_xml }
+    Some(n) => n
+  }
+  let cs_ch = @xml.get_children(root)
+  // 1. Parse cx:chartData — build data lookup by id
+  let data_map = parse_cx_chart_data(cs_ch)
+  // 2. Parse cx:chart
+  let chart_node = match @xml.find_child(cs_ch, "cx:chart") {
+    None => return { ..ChartData::empty(), chart_xml }
+    Some(n) => n
+  }
+  let chart_ch = @xml.get_children(chart_node)
+  // Title
+  let title = parse_cx_title(chart_ch)
+  // Plot area
+  let (groups, axes) = match @xml.find_child(chart_ch, "cx:plotArea") {
+    None => ([], [])
+    Some(pa) => parse_cx_plot_area(@xml.get_children(pa), data_map, theme)
+  }
+  // Legend
+  let legend = match @xml.find_child(chart_ch, "cx:legend") {
+    None => ChartLegend::none()
+    Some(lg) => {
+      let pos = match @xml.get_attr(lg, "pos") {
+        Some(v) => v
+        None => "r"
+      }
+      { position: pos, overlay: false, show: true }
+    }
+  }
+  { groups, axes, title, legend, style: 0, chart_xml, view_3d: ChartView3D::none() }
+}
+
+///|
+/// Parsed cx:data block — holds category and value data.
+priv struct CxDataBlock {
+  id : Int
+  cats : AxisDataSource // cx:strDim type="cat"
+  vals : AxisDataSource // cx:numDim type="val"
+}
+
+///|
+/// Parse cx:chartData → array of CxDataBlock.
+fn parse_cx_chart_data(cs_ch : Array[@xml.XmlNode]) -> Array[CxDataBlock] {
+  let result : Array[CxDataBlock] = []
+  let cd_node = match @xml.find_child(cs_ch, "cx:chartData") {
+    None => return result
+    Some(n) => n
+  }
+  let cd_ch = @xml.get_children(cd_node)
+  let data_nodes = @xml.find_children(cd_ch, "cx:data")
+  for i in 0..<data_nodes.length() {
+    let id = attr_int(data_nodes[i], "id")
+    let d_ch = @xml.get_children(data_nodes[i])
+    let mut cats : AxisDataSource = AxisDataSource::NoData
+    let mut vals : AxisDataSource = AxisDataSource::NoData
+    for j in 0..<d_ch.length() {
+      match d_ch[j] {
+        @xml.XmlNode::Element(tag, _, _) =>
+          if tag == "cx:strDim" {
+            let dim_type = match @xml.get_attr(d_ch[j], "type") {
+              Some(v) => v
+              None => ""
+            }
+            if dim_type == "cat" {
+              cats = parse_cx_str_dim(d_ch[j])
+            }
+          } else if tag == "cx:numDim" {
+            let dim_type = match @xml.get_attr(d_ch[j], "type") {
+              Some(v) => v
+              None => ""
+            }
+            if dim_type == "val" || dim_type == "size" {
+              vals = parse_cx_num_dim(d_ch[j])
+            }
+          }
+        _ => ()
+      }
+    }
+    result.push({ id, cats, vals })
+  }
+  result
+}
+
+///|
+/// Parse cx:strDim → StrSource with first cx:lvl.
+fn parse_cx_str_dim(node : @xml.XmlNode) -> AxisDataSource {
+  let ch = @xml.get_children(node)
+  // Get formula if present
+  let formula = match @xml.find_child(ch, "cx:f") {
+    None => ""
+    Some(f) => @xml.get_text_content(f)
+  }
+  // Parse first cx:lvl
+  match @xml.find_child(ch, "cx:lvl") {
+    None => AxisDataSource::StrSource(formula, StrData::empty())
+    Some(lvl) => {
+      let points = parse_cx_pt_list(@xml.get_children(lvl))
+      AxisDataSource::StrSource(formula, { points, })
+    }
+  }
+}
+
+///|
+/// Parse cx:numDim → NumSource with first cx:lvl.
+fn parse_cx_num_dim(node : @xml.XmlNode) -> AxisDataSource {
+  let ch = @xml.get_children(node)
+  let formula = match @xml.find_child(ch, "cx:f") {
+    None => ""
+    Some(f) => @xml.get_text_content(f)
+  }
+  match @xml.find_child(ch, "cx:lvl") {
+    None => AxisDataSource::NumSource(formula, NumData::empty())
+    Some(lvl) => {
+      let format_code = match @xml.get_attr(lvl, "formatCode") {
+        Some(v) => v
+        None => ""
+      }
+      let points = parse_cx_pt_list(@xml.get_children(lvl))
+      AxisDataSource::NumSource(formula, { format_code, points })
+    }
+  }
+}
+
+///|
+/// Parse cx:pt list from cx:lvl children.
+fn parse_cx_pt_list(ch : Array[@xml.XmlNode]) -> Array[ChartPoint] {
+  let pts : Array[ChartPoint] = []
+  let pt_nodes = @xml.find_children(ch, "cx:pt")
+  for i in 0..<pt_nodes.length() {
+    let idx = attr_int(pt_nodes[i], "idx")
+    let value = @xml.get_text_content(pt_nodes[i])
+    pts.push({ idx, value })
+  }
+  pts
+}
+
+///|
+/// Parse cx:chart/cx:title text.
+fn parse_cx_title(chart_ch : Array[@xml.XmlNode]) -> String {
+  let title_node = match @xml.find_child(chart_ch, "cx:title") {
+    None => return ""
+    Some(n) => n
+  }
+  let title_ch = @xml.get_children(title_node)
+  let tx = match @xml.find_child(title_ch, "cx:tx") {
+    None => return ""
+    Some(n) => n
+  }
+  let tx_ch = @xml.get_children(tx)
+  // cx:rich uses same a:p/a:r/a:t as c:rich
+  match @xml.find_child(tx_ch, "cx:rich") {
+    Some(rich) => extract_all_text(@xml.get_children(rich))
+    None =>
+      // Fallback: cx:txData/cx:v
+      match @xml.find_child(tx_ch, "cx:txData") {
+        None => ""
+        Some(txd) =>
+          match @xml.find_child(@xml.get_children(txd), "cx:v") {
+            None => ""
+            Some(v) => @xml.get_text_content(v)
+          }
+      }
+  }
+}
+
+///|
+/// Parse cx:plotArea → groups + axes.
+fn parse_cx_plot_area(
+  pa_ch : Array[@xml.XmlNode],
+  data_map : Array[CxDataBlock],
+  theme : ThemeData,
+) -> (Array[ChartGroup], Array[ChartAxis]) {
+  let groups : Array[ChartGroup] = []
+  let axes : Array[ChartAxis] = []
+  // cx:plotAreaRegion contains cx:series
+  match @xml.find_child(pa_ch, "cx:plotAreaRegion") {
+    None => ()
+    Some(par) => {
+      let par_ch = @xml.get_children(par)
+      let ser_nodes = @xml.find_children(par_ch, "cx:series")
+      for i in 0..<ser_nodes.length() {
+        groups.push(parse_cx_series(ser_nodes[i], data_map, i, theme))
+      }
+    }
+  }
+  // cx:axis elements
+  let ax_nodes = @xml.find_children(pa_ch, "cx:axis")
+  for i in 0..<ax_nodes.length() {
+    axes.push(parse_cx_axis(ax_nodes[i]))
+  }
+  (groups, axes)
+}
+
+///|
+/// Map layoutId string to ChartKind.
+fn cx_layout_to_kind(layout_id : String) -> ChartKind {
+  if layout_id == "waterfall" {
+    WaterfallChart
+  } else if layout_id == "treemap" {
+    TreemapChart
+  } else if layout_id == "sunburst" {
+    SunburstChart
+  } else if layout_id == "boxWhisker" {
+    BoxWhiskerChart
+  } else if layout_id == "funnel" {
+    FunnelChart
+  } else {
+    // clusteredColumn with binning → Histogram, else generic bar
+    HistogramChart
+  }
+}
+
+///|
+/// Find CxDataBlock by id.
+fn find_cx_data(data_map : Array[CxDataBlock], id : Int) -> CxDataBlock {
+  for i in 0..<data_map.length() {
+    if data_map[i].id == id {
+      return data_map[i]
+    }
+  }
+  { id: 0, cats: AxisDataSource::NoData, vals: AxisDataSource::NoData }
+}
+
+///|
+/// Parse a single cx:series → ChartGroup (one group per series in cx:chart).
+fn parse_cx_series(
+  node : @xml.XmlNode,
+  data_map : Array[CxDataBlock],
+  idx : Int,
+  theme : ThemeData,
+) -> ChartGroup {
+  let layout_id = match @xml.get_attr(node, "layoutId") {
+    Some(v) => v
+    None => ""
+  }
+  let chart_kind = cx_layout_to_kind(layout_id)
+  let ch = @xml.get_children(node)
+  // Data reference
+  let data_id = match @xml.find_child(ch, "cx:dataId") {
+    None => attr_int(node, "dataId")
+    Some(did) => attr_int(did, "val")
+  }
+  let data_block = find_cx_data(data_map, data_id)
+  // Series title
+  let title = match @xml.find_child(ch, "cx:tx") {
+    None => ""
+    Some(tx) => {
+      let tx_ch = @xml.get_children(tx)
+      match @xml.find_child(tx_ch, "cx:txData") {
+        None => ""
+        Some(txd) =>
+          match @xml.find_child(@xml.get_children(txd), "cx:v") {
+            None => ""
+            Some(v) => @xml.get_text_content(v)
+          }
+      }
+    }
+  }
+  // Per-point formatting (cx:dataPt)
+  let data_points = parse_cx_data_points(ch, theme)
+  // Shape properties
+  let sp_pr = match @xml.find_child(ch, "cx:spPr") {
+    None =>
+      match @xml.find_child(ch, "a:spPr") {
+        None => ChartSpPr::none()
+        Some(sppr) => parse_chart_sp_pr_node(sppr, theme)
+      }
+    Some(sppr) => parse_chart_sp_pr_node(sppr, theme)
+  }
+  // Layout properties (subtotals for waterfall, binning for histogram)
+  let subtotals = parse_cx_subtotals(ch)
+  let series : ChartSeries = {
+    idx,
+    order: idx,
+    title,
+    sp_pr,
+    cat: data_block.cats,
+    val: data_block.vals,
+    x_val: AxisDataSource::NoData,
+    y_val: AxisDataSource::NoData,
+    bubble_size: AxisDataSource::NoData,
+    smooth: false,
+    explosion: 0,
+    data_points,
+    trendlines: [],
+    err_bars: ChartErrBars::none(),
+    data_labels: ChartDataLabels::none(),
+  }
+  { ..ChartGroup::default(chart_kind), series: [series], subtotals }
+}
+
+///|
+/// Parse cx:dataPt elements for per-point formatting.
+fn parse_cx_data_points(
+  ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Array[ChartDataPoint] {
+  let pts : Array[ChartDataPoint] = []
+  let pt_nodes = @xml.find_children(ch, "cx:dataPt")
+  for i in 0..<pt_nodes.length() {
+    let idx = attr_int(pt_nodes[i], "idx")
+    let pt_ch = @xml.get_children(pt_nodes[i])
+    let sp = match @xml.find_child(pt_ch, "a:spPr") {
+      None => ChartSpPr::none()
+      Some(sppr) => parse_chart_sp_pr_node(sppr, theme)
+    }
+    pts.push({ idx, sp_pr: sp })
+  }
+  pts
+}
+
+///|
+/// Parse cx:layoutPr/cx:subtotals for waterfall charts.
+fn parse_cx_subtotals(ch : Array[@xml.XmlNode]) -> Array[Int] {
+  let result : Array[Int] = []
+  let lp = match @xml.find_child(ch, "cx:layoutPr") {
+    None => return result
+    Some(n) => n
+  }
+  let lp_ch = @xml.get_children(lp)
+  match @xml.find_child(lp_ch, "cx:subtotals") {
+    None => ()
+    Some(st) => {
+      let st_ch = @xml.get_children(st)
+      let idx_nodes = @xml.find_children(st_ch, "cx:idx")
+      for i in 0..<idx_nodes.length() {
+        result.push(attr_int(idx_nodes[i], "val"))
+      }
+    }
+  }
+  result
+}
+
+///|
+/// Parse cx:axis element.
+fn parse_cx_axis(node : @xml.XmlNode) -> ChartAxis {
+  let id = attr_int(node, "id")
+  let ch = @xml.get_children(node)
+  let hidden = match @xml.get_attr(node, "hidden") {
+    Some("1") => true
+    _ => false
+  }
+  // Determine if value or category axis
+  let is_val = match @xml.find_child(ch, "cx:valScaling") {
+    Some(_) => true
+    None => false
+  }
+  let title = match @xml.find_child(ch, "cx:title") {
+    None => ""
+    Some(t) => {
+      let t_ch = @xml.get_children(t)
+      match @xml.find_child(t_ch, "cx:tx") {
+        None => ""
+        Some(tx) => {
+          let tx_ch = @xml.get_children(tx)
+          match @xml.find_child(tx_ch, "cx:rich") {
+            Some(rich) => extract_all_text(@xml.get_children(rich))
+            None => ""
+          }
+        }
+      }
+    }
+  }
+  {
+    ax_id: id,
+    cross_ax: 0,
+    ax_pos: if is_val { "l" } else { "b" },
+    delete: hidden,
+    is_val,
+    major_gridlines: match @xml.find_child(ch, "cx:majorGridlines") {
+      Some(_) => true
+      None => false
+    },
+    minor_gridlines: match @xml.find_child(ch, "cx:minorGridlines") {
+      Some(_) => true
+      None => false
+    },
+    title,
+    orientation: "",
+    min_val: "",
+    max_val: "",
+    major_unit: "",
+    num_fmt: "",
+    tick_lbl_pos: "",
+    cross_between: "",
+    sp_pr: ChartSpPr::none(),
   }
 }
