@@ -319,6 +319,35 @@ test "EffectList with prst_shadow is not none" {
   assert_eq(e.prst_shadow.prst, "shdw2")
 }
 
+test "FillOverlay::none is none" {
+  let fo = FillOverlay::none()
+  assert_true(fo.is_none())
+  assert_eq(fo.blend, "")
+}
+
+test "FillOverlay with blend and color is not none" {
+  let fo : FillOverlay = { blend: "mult", color: parse_hex_color("FF0000") }
+  assert_true(not(fo.is_none()))
+  assert_eq(fo.blend, "mult")
+  assert_eq(fo.color.r, 255)
+}
+
+test "FillOverlay with over blend (default)" {
+  let fo : FillOverlay = { blend: "over", color: parse_hex_color("0000FF") }
+  assert_true(not(fo.is_none()))
+  assert_eq(fo.blend, "over")
+  assert_eq(fo.color.b, 255)
+}
+
+test "EffectList with fill_overlay is not none" {
+  let e : EffectList = {
+    ..EffectList::none(),
+    fill_overlay: { blend: "screen", color: parse_hex_color("00FF00") },
+  }
+  assert_true(not(e.is_none()))
+  assert_eq(e.fill_overlay.blend, "screen")
+}
+
 // ── GradientFill / BlipFill / PatternFill ───────────────────────────────────
 
 test "GradientFill::none" {

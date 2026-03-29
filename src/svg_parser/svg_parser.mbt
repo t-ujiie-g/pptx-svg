@@ -134,6 +134,18 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       },
     }
   }
+  let fo_blend = get_da(node, "eff-fo-blend")
+  let fo = if fo_blend.is_empty() {
+    @ooxml.FillOverlay::none()
+  } else {
+    {
+      blend: fo_blend,
+      color: {
+        let clr = get_da(node, "eff-fo-clr")
+        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+      },
+    }
+  }
   {
     outer_shadow: os,
     inner_shadow: ishdw,
@@ -142,6 +154,7 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
     reflection: refl,
     blur: bl,
     prst_shadow: ps,
+    fill_overlay: fo,
   }
 }
 
@@ -212,6 +225,7 @@ fn parse_run_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       reflection: @ooxml.Reflection::none(),
       blur: bl,
       prst_shadow: ps,
+      fill_overlay: @ooxml.FillOverlay::none(),
     }
   }
 }

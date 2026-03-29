@@ -108,6 +108,17 @@ test "parse_svg_to_slide text run effects round-trip" {
   assert_eq(run.effects.prst_shadow.dist, 25400)
 }
 
+test "parse_svg_to_slide fill overlay" {
+  let svg = "<svg data-ooxml-slide-cx=\"9144000\" data-ooxml-slide-cy=\"6858000\"><g data-ooxml-shape-type=\"auto\" data-ooxml-prst=\"rect\" data-ooxml-x=\"0\" data-ooxml-y=\"0\" data-ooxml-cx=\"500000\" data-ooxml-cy=\"300000\" data-ooxml-eff-fo-blend=\"mult\" data-ooxml-eff-fo-clr=\"80FF0000\"><rect/></g></svg>"
+  let slide = parse_svg_to_slide(svg)
+  let fo = slide.shapes[0].effects.fill_overlay
+  assert_true(not(fo.is_none()))
+  assert_eq(fo.blend, "mult")
+  assert_eq(fo.color.r, 255)
+  assert_eq(fo.color.g, 0)
+  assert_eq(fo.color.b, 0)
+}
+
 test "parse_svg_to_slide no effects when absent" {
   let svg = "<svg data-ooxml-slide-cx=\"9144000\" data-ooxml-slide-cy=\"6858000\"><g data-ooxml-shape-type=\"auto\" data-ooxml-prst=\"rect\" data-ooxml-x=\"0\" data-ooxml-y=\"0\" data-ooxml-cx=\"500000\" data-ooxml-cy=\"300000\"><rect/></g></svg>"
   let slide = parse_svg_to_slide(svg)

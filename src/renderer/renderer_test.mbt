@@ -288,6 +288,30 @@ test "roundtrip shape with preset shadow" {
   assert_eq(parsed.shapes[0].effects.prst_shadow.dir, 2700000)
 }
 
+test "roundtrip fill overlay effect" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let shape = {
+    ..shape,
+    fill: @ooxml.parse_hex_color("0000FF"),
+    effects: {
+      ..@ooxml.EffectList::none(),
+      fill_overlay: {
+        blend: "mult",
+        color: @ooxml.parse_hex_color("80FF0000"),
+      },
+    },
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [])
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  assert_eq(parsed.shapes[0].effects.fill_overlay.blend, "mult")
+  assert_eq(parsed.shapes[0].effects.fill_overlay.color.r, 255)
+  assert_eq(parsed.shapes[0].effects.fill_overlay.color.g, 0)
+}
+
 test "roundtrip multiple shapes" {
   let shape1 = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),

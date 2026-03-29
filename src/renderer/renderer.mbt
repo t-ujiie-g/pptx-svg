@@ -1369,6 +1369,12 @@ pub fn render_shape(
           dai("eff-ps-dir", ps.dir) +
           da("eff-ps-clr", ps.color.to_hex())
       }
+      if not(eff.fill_overlay.is_none()) {
+        let fo = eff.fill_overlay
+        ea = ea +
+          da("eff-fo-blend", fo.blend) +
+          da("eff-fo-clr", fo.color.to_hex())
+      }
       ea
     } else {
       ""

@@ -207,6 +207,66 @@ test "serialize_slide shape with preset shadow" {
   assert_true(xml.contains("dir=\"2700000\""))
 }
 
+test "serialize_slide fill overlay" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let shape = {
+    ..shape,
+    effects: {
+      ..@ooxml.EffectList::none(),
+      fill_overlay: { blend: "mult", color: @ooxml.parse_hex_color("FF0000") },
+    },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  assert_true(xml.contains("<a:fillOverlay"))
+  assert_true(xml.contains("blend=\"mult\""))
+  // fillOverlay must wrap color in a:solidFill with RRGGBB val (not AARRGGBB)
+  assert_true(xml.contains("<a:solidFill><a:srgbClr val=\"FF0000\"/></a:solidFill></a:fillOverlay>"))
+}
+
+test "serialize_slide fill overlay with alpha" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let shape = {
+    ..shape,
+    effects: {
+      ..@ooxml.EffectList::none(),
+      fill_overlay: { blend: "over", color: { r: 255, g: 0, b: 0, alpha: 128 } },
+    },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  // val must be RRGGBB (not AARRGGBB), alpha as child element
+  assert_true(xml.contains("val=\"FF0000\""))
+  assert_true(xml.contains("<a:alpha val="))
+  assert_true(not(xml.contains("val=\"80FF0000\"")))
+}
+
 test "serialize_slide no effectLst when none" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),

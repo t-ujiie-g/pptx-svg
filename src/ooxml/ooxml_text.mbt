@@ -605,6 +605,7 @@ fn parse_run_effect_lst(rpr_ch : Array[@xml.XmlNode], theme : ThemeData) -> Effe
         reflection: Reflection::none(),
         blur: bl,
         prst_shadow: PresetShadow::none(),
+        fill_overlay: FillOverlay::none(),
       }
     }
   }

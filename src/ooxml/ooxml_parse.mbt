@@ -466,6 +466,18 @@ fn parse_effect_lst(
           }
         }
       }
+      let fo = match @xml.find_child(eff_ch, "a:fillOverlay") {
+        None => FillOverlay::none()
+        Some(node) => {
+          let blend = match @xml.get_attr(node, "blend") {
+            Some(v) => v
+            None => "over"
+          }
+          let ch = @xml.get_children(node)
+          let color = parse_solid_fill(ch, theme)
+          { blend, color }
+        }
+      }
       {
         outer_shadow: os,
         inner_shadow: ishdw,
@@ -474,6 +486,7 @@ fn parse_effect_lst(
         reflection: refl,
         blur: bl,
         prst_shadow: ps,
+        fill_overlay: fo,
       }
     }
   }

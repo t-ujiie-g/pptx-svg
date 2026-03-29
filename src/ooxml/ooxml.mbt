@@ -1320,6 +1320,24 @@ pub fn Reflection::is_none(self : Reflection) -> Bool {
 }
 
 ///|
+/// Fill overlay effect (a:fillOverlay).
+/// Overlays a fill on top of the shape with a specified blend mode.
+pub(all) struct FillOverlay {
+  blend : String // blend mode: "over", "mult", "screen", "darken", "lighten"; "" = none
+  color : Color // overlay solid fill color with alpha
+}
+
+///|
+pub fn FillOverlay::none() -> FillOverlay {
+  { blend: "", color: Color::none() }
+}
+
+///|
+pub fn FillOverlay::is_none(self : FillOverlay) -> Bool {
+  self.blend.is_empty() && self.color.is_none()
+}
+
+///|
 /// Effect list applied to a shape (a:effectLst).
 pub(all) struct EffectList {
   outer_shadow : OuterShadow
@@ -1329,6 +1347,7 @@ pub(all) struct EffectList {
   reflection : Reflection
   blur : Blur
   prst_shadow : PresetShadow
+  fill_overlay : FillOverlay
 }
 
 ///|
@@ -1341,6 +1360,7 @@ pub fn EffectList::none() -> EffectList {
     reflection: Reflection::none(),
     blur: Blur::none(),
     prst_shadow: PresetShadow::none(),
+    fill_overlay: FillOverlay::none(),
   }
 }
 
@@ -1352,7 +1372,8 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
   self.soft_edge.is_none() &&
   self.reflection.is_none() &&
   self.blur.is_none() &&
-  self.prst_shadow.is_none()
+  self.prst_shadow.is_none() &&
+  self.fill_overlay.is_none()
 }
 
 // ── 3D ───────────────────────────────────────────────────────────────────────

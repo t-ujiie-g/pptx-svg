@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 87', slideCount === 87, `got ${slideCount}`);
+  assert('slide count = 88', slideCount === 88, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 87; i++) {
+  for (let i = 1; i <= 88; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 87; i++) {
+  for (let i = 1; i <= 88; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1533,6 +1533,19 @@ async function testFeaturesPptx() {
     assert('slide86 has prst=shdw1', slide86.includes('prst="shdw1"'));
     assert('slide86 has prst=shdw2', slide86.includes('prst="shdw2"'));
     assert('slide86 has dist=76200', slide86.includes('dist="76200"'));
+  }
+
+  // ── Slide 87: Fill overlay ─────────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 87: fill overlay');
+    const slide87 = textFiles.get('ppt/slides/slide88.xml') || '';
+    assert('slide87 exists', slide87.length > 0);
+    assert('slide87 has a:fillOverlay', hasTag(slide87, 'a:fillOverlay'));
+    assert('slide87 has blend=over', slide87.includes('blend="over"'));
+    assert('slide87 has blend=mult', slide87.includes('blend="mult"'));
+    assert('slide87 has blend=screen', slide87.includes('blend="screen"'));
+    assert('slide87 has blend=darken', slide87.includes('blend="darken"'));
+    assert('slide87 has blend=lighten', slide87.includes('blend="lighten"'));
   }
 }
 

@@ -160,7 +160,7 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Text body**: Vertical alignment, margins, auto-fit, font scale, rotation, vertical text, multi-column, text warp (prstTxWarp)
 - **Fill**: Solid color, gradient (linear/radial with stops), pattern (48 presets), image fill (stretch/tile/crop)
 - **Stroke**: 11 dash patterns, 5 arrow types, line cap/join, compound lines, gradient/pattern stroke
-- **Effects**: Outer shadow, inner shadow, preset shadow, glow, soft edge, reflection, blur (all via SVG filters)
+- **Effects**: Outer shadow, inner shadow, preset shadow, glow, soft edge, reflection, blur, fill overlay (all via SVG filters)
 - **Images**: PNG/JPEG/GIF/SVG, crop, alpha, brightness/contrast, duotone, color change
 - **Tables**: Cell merge (grid span, row span), borders (including diagonal), margins, anchoring, table styles, conditional formatting (banded rows/cols, first/last row/col)
 - **Charts**: Bar (clustered/stacked/percentStacked), Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 types), data labels, data points, trendlines, error bars, composite charts

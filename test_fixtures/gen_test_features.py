@@ -90,6 +90,7 @@ Slides:
  84. OMML — Accent + bar + sub/superscript (m:acc + m:bar + m:sSubSup)
  85. Blur effect (a:blur — shape-level Gaussian blur)
  86. Preset shadow (a:prstShdw — shdw1/shdw2 preset shadows)
+ 87. Fill overlay (a:fillOverlay — blend modes: over/mult/screen/darken/lighten)
 """
 
 import base64
@@ -5584,6 +5585,30 @@ title86.text_frame.paragraphs[0].text = "Slide 86: Preset Shadow (a:prstShdw)"
 title86.text_frame.paragraphs[0].font.size = Pt(24)
 title86.text_frame.paragraphs[0].font.bold = True
 
+# ── Slide 87: Fill overlay (a:fillOverlay) ────────────────────────────────────
+slide87 = prs.slides.add_slide(blank)
+
+title87 = slide87.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title87.text_frame.paragraphs[0].text = "Slide 87: Fill Overlay (a:fillOverlay)"
+title87.text_frame.paragraphs[0].font.size = Pt(24)
+title87.text_frame.paragraphs[0].font.bold = True
+
+# Add shapes with solid fills that will get fillOverlay via patching
+fo_labels = ["over", "mult", "screen", "darken", "lighten"]
+fo_colors = ["0000FF", "00AA00", "FF6600", "8800CC", "CC0000"]
+for i, (label, base_clr) in enumerate(zip(fo_labels, fo_colors)):
+    left = Inches(0.5 + i * 1.8)
+    box = slide87.shapes.add_textbox(left, Inches(1.5), Inches(1.5), Inches(1.5))
+    box.text_frame.paragraphs[0].text = label
+    box.text_frame.paragraphs[0].font.size = Pt(14)
+    box.text_frame.paragraphs[0].font.bold = True
+    from pptx.util import Pt as PtUtil
+    from pptx.dml.color import RGBColor
+    box.fill.solid()
+    box.fill.fore_color.rgb = RGBColor(
+        int(base_clr[0:2], 16), int(base_clr[2:4], 16), int(base_clr[4:6], 16)
+    )
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5832,6 +5857,35 @@ prstshdw_shape2_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presen
 
 slide86_xml = slide86_xml.replace('</p:spTree>', prstshdw_shape1_xml + '\n' + prstshdw_shape2_xml + '\n</p:spTree>')
 
+# ── Patch slide 87: inject fillOverlay effects ──
+slide87_path = 'ppt/slides/slide88.xml'
+slide87_xml = all_entries[slide87_path][1].decode('utf-8') if isinstance(all_entries[slide87_path][1], bytes) else all_entries[slide87_path][1]
+
+# Inject fillOverlay into shapes using regex to find each spPr solidFill
+blend_modes = ["over", "mult", "screen", "darken", "lighten"]
+fo_count = [0]  # mutable counter for replacement callback
+def inject_fill_overlay(m):
+    idx = fo_count[0]
+    fo_count[0] += 1
+    if idx >= len(blend_modes):
+        return m.group(0)  # skip title shape etc.
+    blend = blend_modes[idx]
+    fo_xml = (
+        f'<a:effectLst>'
+        f'<a:fillOverlay blend="{blend}">'
+        f'<a:solidFill><a:srgbClr val="FF0000"><a:alpha val="50000"/></a:srgbClr></a:solidFill>'
+        f'</a:fillOverlay>'
+        f'</a:effectLst>'
+    )
+    return m.group(0).replace('</p:spPr>', fo_xml + '</p:spPr>')
+# Match each <p:spPr>...<a:solidFill>...</a:solidFill>...</p:spPr> block
+slide87_xml = re.sub(
+    r'<p:spPr>.*?<a:solidFill>.*?</a:solidFill>.*?</p:spPr>',
+    inject_fill_overlay,
+    slide87_xml,
+    flags=re.DOTALL,
+)
+
 # ── Patch slide 81: inject WMF image + picture shape ──
 slide81_path = 'ppt/slides/slide82.xml'
 slide81_xml = all_entries[slide81_path][1].decode('utf-8') if isinstance(all_entries[slide81_path][1], bytes) else all_entries[slide81_path][1]
@@ -5993,6 +6047,8 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide85_xml.encode('utf-8'))
         elif fname == slide86_path:
             zout.writestr(item, slide86_xml.encode('utf-8'))
+        elif fname == slide87_path:
+            zout.writestr(item, slide87_xml.encode('utf-8'))
         elif fname == content_types_path:
             zout.writestr(item, content_types_xml.encode('utf-8'))
         else:

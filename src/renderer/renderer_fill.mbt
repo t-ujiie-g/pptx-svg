@@ -602,6 +602,33 @@ fn render_effect_filter(
       "\"/>"
     ()
   }
+  // Fill overlay: feFlood + feBlend with blend mode
+  if not(eff.fill_overlay.is_none()) {
+    let fo = eff.fill_overlay
+    let clr = fo.color
+    let alpha_str = eff_alpha_str(clr, "1.0")
+    // Map OOXML blend modes to SVG feBlend modes
+    let mode = if fo.blend == "mult" {
+      "multiply"
+    } else if fo.blend == "screen" {
+      "screen"
+    } else if fo.blend == "darken" {
+      "darken"
+    } else if fo.blend == "lighten" {
+      "lighten"
+    } else {
+      "normal" // "over" = normal compositing
+    }
+    filters = filters +
+      "<feFlood flood-color=\"" +
+      clr.to_css() +
+      "\" flood-opacity=\"" +
+      alpha_str +
+      "\" result=\"foFlood\"/>" +
+      "<feBlend in=\"foFlood\" in2=\"SourceGraphic\" mode=\"" +
+      mode +
+      "\"/>"
+  }
   // Note: Reflection requires structural approach (shape duplication), not SVG filter.
   let def = "<filter id=\"" +
     filter_id +

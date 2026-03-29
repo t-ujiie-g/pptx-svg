@@ -343,6 +343,13 @@ Set on the shape `<g>` element.
 | `data-ooxml-eff-ps-dir` | int | Direction (60,000ths of degree) |
 | `data-ooxml-eff-ps-clr` | string | Shadow color (`RRGGBB` or `RRGGBBAA`) |
 
+### Fill Overlay
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-eff-fo-blend` | string | Blend mode (`over`, `mult`, `screen`, `darken`, `lighten`) |
+| `data-ooxml-eff-fo-clr` | string | Overlay solid fill color (`RRGGBB` or `AARRGGBB`) |
+
 ## 3D Properties
 
 Data-only preservation for round-trip. Not rendered visually in SVG.
