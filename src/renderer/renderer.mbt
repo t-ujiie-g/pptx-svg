@@ -1358,6 +1358,23 @@ pub fn render_shape(
           da("eff-refl-algn", r.algn) +
           da("eff-refl-rot", if r.rot_with_shape { "1" } else { "0" })
       }
+      if not(eff.blur.is_none()) {
+        ea = ea + dai("eff-blur-rad", eff.blur.rad)
+      }
+      if not(eff.prst_shadow.is_none()) {
+        let ps = eff.prst_shadow
+        ea = ea +
+          da("eff-ps-prst", ps.prst) +
+          dai("eff-ps-dist", ps.dist) +
+          dai("eff-ps-dir", ps.dir) +
+          da("eff-ps-clr", ps.color.to_hex())
+      }
+      if not(eff.fill_overlay.is_none()) {
+        let fo = eff.fill_overlay
+        ea = ea +
+          da("eff-fo-blend", fo.blend) +
+          da("eff-fo-clr", fo.color.to_hex())
+      }
       ea
     } else {
       ""

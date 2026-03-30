@@ -117,11 +117,14 @@ GradientFill { stops, angle, path_type, rot_with_shape, fill_to_l/t/r/b, tile_fl
 BlipFill { rid, stretch, src_l/t/r/b, tile_tx/ty/sx/sy, tile_flip, tile_algn, alpha, svg_rid, bright, contrast, duotone_1/2: Color, clr_from/to: Color }
 PatternFill { prst, fg_color: Color, bg_color: Color }
 
-EffectList { outer_shadow: OuterShadow, inner_shadow: InnerShadow, glow: Glow, soft_edge: SoftEdge, reflection: Reflection }
+EffectList { outer_shadow: OuterShadow, inner_shadow: InnerShadow, glow: Glow, soft_edge: SoftEdge, reflection: Reflection, blur: Blur, prst_shadow: PresetShadow, fill_overlay: FillOverlay }
 OuterShadow { blur_rad, dist, dir: Int, color: Color, sx, sy: Int, algn: String, rot_with_shape: Bool }
 InnerShadow { blur_rad, dist, dir: Int, color: Color }
 Glow { rad: Int, color: Color }
 SoftEdge { rad: Int }
+Blur { rad: Int }
+PresetShadow { prst: String, dist, dir: Int, color: Color }
+FillOverlay { blend: String, color: Color }
 Reflection { blur_rad, dist, dir, st_alpha, end_alpha, fade_dir, sx, sy: Int, algn: String, rot_with_shape: Bool }
 
 Bevel { w, h: Int, prst: String }
@@ -142,8 +145,8 @@ Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
 ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }
 
 ChartData { groups: Array[ChartGroup], axes: Array[ChartAxis], title: String, legend: ChartLegend, style: Int, chart_xml: String, view_3d: ChartView3D }
-ChartKind = BarChart | LineChart | PieChart | DoughnutChart | ScatterChart | AreaChart | RadarChart | BubbleChart | StockChart | SurfaceChart | OfPieChart
-ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap: Int, vary_colors: Bool, hole_size: Int, scatter_style: String, ax_ids: Array[Int], data_labels: ChartDataLabels, of_pie_type: String, split_pos: Int, wireframe: Bool }
+ChartKind = BarChart | LineChart | PieChart | DoughnutChart | ScatterChart | AreaChart | RadarChart | BubbleChart | StockChart | SurfaceChart | OfPieChart | WaterfallChart | TreemapChart | SunburstChart | HistogramChart | BoxWhiskerChart | FunnelChart
+ChartGroup { chart_type: ChartKind, series: Array[ChartSeries], bar_dir, grouping: String, gap_width, overlap: Int, vary_colors: Bool, hole_size: Int, scatter_style: String, ax_ids: Array[Int], data_labels: ChartDataLabels, of_pie_type: String, split_pos: Int, wireframe: Bool, subtotals: Array[Int] }
 ChartSeries { idx, order: Int, title: String, sp_pr: ChartSpPr, cat, val, x_val, y_val, bubble_size: AxisDataSource, smooth: Bool, explosion: Int, data_points: Array[ChartDataPoint], trendlines: Array[ChartTrendline], err_bars: ChartErrBars, data_labels: ChartDataLabels }
 ChartSpPr { fill: Color, grad_fill: GradientFill, patt_fill: PatternFill, stroke: Color, stroke_w: Int, no_fill: Bool }
 ChartView3D { rot_x, rot_y, depth_percent: Int, r_ang_ax: Bool, perspective: Int }

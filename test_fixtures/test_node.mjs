@@ -193,17 +193,17 @@ async function testFeaturesPptx() {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 85', slideCount === 85, `got ${slideCount}`);
+  assert('slide count = 95', slideCount === 95, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 85; i++) {
+  for (let i = 1; i <= 95; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 85; i++) {
+  for (let i = 1; i <= 95; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);
@@ -1511,6 +1511,83 @@ async function testFeaturesPptx() {
     assert('slide84 has m:acc (accent)', slide84.includes('m:acc'));
     assert('slide84 has m:bar', slide84.includes('m:bar'));
     assert('slide84 has m:sSubSup', slide84.includes('m:sSubSup'));
+  }
+
+  // ── Slide 85: Blur effect ─────────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 85: blur effect');
+    const slide85 = textFiles.get('ppt/slides/slide86.xml') || '';
+    assert('slide85 exists', slide85.length > 0);
+    assert('slide85 has a:effectLst', hasTag(slide85, 'a:effectLst'));
+    assert('slide85 has a:blur', hasTag(slide85, 'a:blur'));
+    assert('slide85 blur rad=76200', slide85.includes('rad="76200"'));
+  }
+
+  // ── Slide 86: Preset shadow ─────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 86: preset shadow');
+    const slide86 = textFiles.get('ppt/slides/slide87.xml') || '';
+    assert('slide86 exists', slide86.length > 0);
+    assert('slide86 has a:effectLst', hasTag(slide86, 'a:effectLst'));
+    assert('slide86 has a:prstShdw', hasTag(slide86, 'a:prstShdw'));
+    assert('slide86 has prst=shdw1', slide86.includes('prst="shdw1"'));
+    assert('slide86 has prst=shdw2', slide86.includes('prst="shdw2"'));
+    assert('slide86 has dist=76200', slide86.includes('dist="76200"'));
+  }
+
+  // ── Slide 87: Fill overlay ─────────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 87: fill overlay');
+    const slide87 = textFiles.get('ppt/slides/slide88.xml') || '';
+    assert('slide87 exists', slide87.length > 0);
+    assert('slide87 has a:fillOverlay', hasTag(slide87, 'a:fillOverlay'));
+    assert('slide87 has blend=over', slide87.includes('blend="over"'));
+    assert('slide87 has blend=mult', slide87.includes('blend="mult"'));
+    assert('slide87 has blend=screen', slide87.includes('blend="screen"'));
+    assert('slide87 has blend=darken', slide87.includes('blend="darken"'));
+    assert('slide87 has blend=lighten', slide87.includes('blend="lighten"'));
+  }
+
+  // ── Slide 88: Justified text ───────────────────────────────────────────────
+  {
+    section('test_features.pptx — Slide 88: justified text');
+    const slide88 = textFiles.get('ppt/slides/slide89.xml') || '';
+    assert('slide88 exists', slide88.length > 0);
+    assert('slide88 has algn=just', slide88.includes('algn="just"'));
+  }
+
+  // ── Slides 89-94: ChartEx (cx: namespace) ──────────────────────────────────
+  {
+    section('test_features.pptx — Slides 89-94: ChartEx (cx: namespace)');
+    const chartExTypes = ['waterfall', 'treemap', 'sunburst', 'clusteredColumn', 'boxWhisker', 'funnel'];
+    const chartExNames = ['Waterfall', 'Treemap', 'Sunburst', 'Histogram', 'BoxWhisker', 'Funnel'];
+    for (let i = 0; i < 6; i++) {
+      const slideNum = 89 + i;
+      const slideFile = `ppt/slides/slide${slideNum + 1}.xml`;
+      const slideXml = textFiles.get(slideFile) || '';
+      assert(`slide${slideNum} exists`, slideXml.length > 0);
+      assert(`slide${slideNum} has cx:chart graphicFrame`,
+        slideXml.includes('cx:chart') && slideXml.includes('a:graphicData'));
+
+      // Check chartex file exists
+      const chartExFile = `ppt/charts/chartEx${i + 1}.xml`;
+      const chartExXml = textFiles.get(chartExFile) || '';
+      assert(`chartEx${i + 1}.xml exists`, chartExXml.length > 0);
+      assert(`chartEx${i + 1} has cx:chartSpace`, chartExXml.includes('cx:chartSpace'));
+      assert(`chartEx${i + 1} has layoutId="${chartExTypes[i]}"`,
+        chartExXml.includes(`layoutId="${chartExTypes[i]}"`));
+
+      // Check rels
+      const relsFile = `ppt/slides/_rels/slide${slideNum + 1}.xml.rels`;
+      const relsXml = textFiles.get(relsFile) || '';
+      assert(`slide${slideNum} rels has chartEx relationship`,
+        relsXml.includes('chartEx'));
+    }
+
+    // Check Content_Types
+    const contentTypes = textFiles.get('[Content_Types].xml') || '';
+    assert('Content_Types has chartex content type',
+      contentTypes.includes('chartex+xml'));
   }
 }
 

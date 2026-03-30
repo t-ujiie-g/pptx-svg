@@ -242,16 +242,30 @@ fn resolve_chart_shapes(
     match shapes[i].kind {
       @ooxml.ShapeKind::ChartShape(cd) =>
         // chart_xml field temporarily holds the relationship ID
+        // (prefixed with "cx:" for ChartEx charts)
         if not(cd.chart_xml.is_empty()) && cd.groups.is_empty() {
-          let rid = cd.chart_xml
+          let raw_rid = cd.chart_xml
+          let is_chartex = @xml.str_starts_with(raw_rid, "cx:")
+          let rid = if is_chartex {
+            @xml.str_substring(raw_rid, 3, raw_rid.length())
+          } else {
+            raw_rid
+          }
           let target = @ooxml.find_rel_target(rels, rid)
           if not(target.is_empty()) {
             let chart_path = resolve_rel_path("ppt/slides", target)
             let chart_xml = @ffi.ffi_get_file(chart_path)
             if not(chart_xml.is_empty()) {
-              let parsed = @ooxml.parse_chart_xml(chart_xml, theme)
+              let parsed = if is_chartex {
+                @ooxml.parse_chartex_xml(chart_xml, theme)
+              } else {
+                @ooxml.parse_chart_xml(chart_xml, theme)
+              }
               // Replace the shape in-place
-              shapes[i] = { ..shapes[i], kind: @ooxml.ShapeKind::ChartShape(parsed) }
+              shapes[i] = {
+                ..shapes[i],
+                kind: @ooxml.ShapeKind::ChartShape(parsed),
+              }
             }
           }
         }

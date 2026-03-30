@@ -200,6 +200,152 @@ test "EffectList::none" {
   assert_true(e.glow.is_none())
   assert_true(e.soft_edge.is_none())
   assert_true(e.reflection.is_none())
+  assert_true(e.blur.is_none())
+}
+
+test "OuterShadow::none and is_none" {
+  let os = OuterShadow::none()
+  assert_true(os.is_none())
+  assert_eq(os.blur_rad, 0)
+  assert_eq(os.dist, 0)
+  assert_true(os.color.is_none())
+  let os2 : OuterShadow = {
+    blur_rad: 152400, dist: 114300, dir: 5400000,
+    color: parse_hex_color("000000"), sx: 0, sy: 0, algn: "ctr", rot_with_shape: false,
+  }
+  assert_true(not(os2.is_none()))
+  assert_eq(os2.blur_rad, 152400)
+  assert_eq(os2.dir, 5400000)
+}
+
+test "InnerShadow::none and is_none" {
+  let ishdw = InnerShadow::none()
+  assert_true(ishdw.is_none())
+  let ishdw2 : InnerShadow = {
+    blur_rad: 114300, dist: 76200, dir: 2700000,
+    color: parse_hex_color("000000"),
+  }
+  assert_true(not(ishdw2.is_none()))
+}
+
+test "Glow::none and is_none" {
+  let gl = Glow::none()
+  assert_true(gl.is_none())
+  assert_eq(gl.rad, 0)
+  assert_true(gl.color.is_none())
+  let gl2 : Glow = { rad: 228600, color: parse_hex_color("FFC000") }
+  assert_true(not(gl2.is_none()))
+  assert_eq(gl2.rad, 228600)
+}
+
+test "SoftEdge::none and is_none" {
+  let se = SoftEdge::none()
+  assert_true(se.is_none())
+  assert_eq(se.rad, 0)
+  let se2 : SoftEdge = { rad: 63500 }
+  assert_true(not(se2.is_none()))
+}
+
+test "Reflection::none and is_none" {
+  let r = Reflection::none()
+  assert_true(r.is_none())
+  assert_eq(r.st_alpha, 0)
+  assert_eq(r.end_alpha, 0)
+  let r2 : Reflection = {
+    blur_rad: 6350, dist: 0, dir: 5400000,
+    st_alpha: 50000, end_alpha: 300, fade_dir: 5400000,
+    sx: 100000, sy: -100000, algn: "bl", rot_with_shape: false,
+  }
+  assert_true(not(r2.is_none()))
+}
+
+test "Blur::none and is_none" {
+  let b = Blur::none()
+  assert_true(b.is_none())
+  assert_eq(b.rad, 0)
+  let b2 : Blur = { rad: 50800 }
+  assert_true(not(b2.is_none()))
+  assert_eq(b2.rad, 50800)
+}
+
+test "EffectList with single effect is not none" {
+  // Only outer shadow set
+  let e1 : EffectList = {
+    ..EffectList::none(),
+    outer_shadow: { blur_rad: 100, dist: 0, dir: 0, color: parse_hex_color("000000"), sx: 0, sy: 0, algn: "", rot_with_shape: true },
+  }
+  assert_true(not(e1.is_none()))
+  // Only glow set
+  let e2 : EffectList = { ..EffectList::none(), glow: { rad: 100, color: parse_hex_color("FF0000") } }
+  assert_true(not(e2.is_none()))
+  // Only soft edge set
+  let e3 : EffectList = { ..EffectList::none(), soft_edge: { rad: 100 } }
+  assert_true(not(e3.is_none()))
+}
+
+test "EffectList with blur is not none" {
+  let e : EffectList = { ..EffectList::none(), blur: { rad: 76200 } }
+  assert_true(not(e.is_none()))
+  assert_eq(e.blur.rad, 76200)
+}
+
+test "PresetShadow::none and is_none" {
+  let ps = PresetShadow::none()
+  assert_true(ps.is_none())
+  assert_eq(ps.prst, "")
+  let ps2 : PresetShadow = {
+    prst: "shdw1", dist: 38100, dir: 2700000,
+    color: parse_hex_color("000000"),
+  }
+  assert_true(not(ps2.is_none()))
+  assert_eq(ps2.prst, "shdw1")
+}
+
+test "PresetShadow::blur_rad by preset" {
+  let ps1 : PresetShadow = { prst: "shdw1", dist: 0, dir: 0, color: Color::none() }
+  assert_eq(ps1.blur_rad(), 38100) // standard offset shadow
+  let ps9 : PresetShadow = { prst: "shdw9", dist: 0, dir: 0, color: Color::none() }
+  assert_eq(ps9.blur_rad(), 76200) // center shadow — larger blur
+  let ps17 : PresetShadow = { prst: "shdw17", dist: 0, dir: 0, color: Color::none() }
+  assert_eq(ps17.blur_rad(), 57150) // below perspective
+}
+
+test "EffectList with prst_shadow is not none" {
+  let e : EffectList = {
+    ..EffectList::none(),
+    prst_shadow: { prst: "shdw2", dist: 38100, dir: 5400000, color: parse_hex_color("333333") },
+  }
+  assert_true(not(e.is_none()))
+  assert_eq(e.prst_shadow.prst, "shdw2")
+}
+
+test "FillOverlay::none is none" {
+  let fo = FillOverlay::none()
+  assert_true(fo.is_none())
+  assert_eq(fo.blend, "")
+}
+
+test "FillOverlay with blend and color is not none" {
+  let fo : FillOverlay = { blend: "mult", color: parse_hex_color("FF0000") }
+  assert_true(not(fo.is_none()))
+  assert_eq(fo.blend, "mult")
+  assert_eq(fo.color.r, 255)
+}
+
+test "FillOverlay with over blend (default)" {
+  let fo : FillOverlay = { blend: "over", color: parse_hex_color("0000FF") }
+  assert_true(not(fo.is_none()))
+  assert_eq(fo.blend, "over")
+  assert_eq(fo.color.b, 255)
+}
+
+test "EffectList with fill_overlay is not none" {
+  let e : EffectList = {
+    ..EffectList::none(),
+    fill_overlay: { blend: "screen", color: parse_hex_color("00FF00") },
+  }
+  assert_true(not(e.is_none()))
+  assert_eq(e.fill_overlay.blend, "screen")
 }
 
 // ── GradientFill / BlipFill / PatternFill ───────────────────────────────────
@@ -229,4 +375,280 @@ test "Scene3d::none" {
 
 test "Bevel::none" {
   assert_true(Bevel::none().is_none())
+}
+
+// ── ChartEx parsing ─────────────────────────────────────────────────────────
+
+test "parse_chartex_xml waterfall" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+    #|  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl ptCount="3">
+    #|          <cx:pt idx="0">Q1</cx:pt>
+    #|          <cx:pt idx="1">Q2</cx:pt>
+    #|          <cx:pt idx="2">Total</cx:pt>
+    #|        </cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl ptCount="3" formatCode="General">
+    #|          <cx:pt idx="0">100</cx:pt>
+    #|          <cx:pt idx="1">50</cx:pt>
+    #|          <cx:pt idx="2">150</cx:pt>
+    #|        </cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="waterfall">
+    #|          <cx:dataId val="0"/>
+    #|          <cx:layoutPr>
+    #|            <cx:subtotals>
+    #|              <cx:idx val="2"/>
+    #|            </cx:subtotals>
+    #|          </cx:layoutPr>
+    #|        </cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.groups.length(), 1)
+  assert_true(
+    match chart.groups[0].chart_type {
+      WaterfallChart => true
+      _ => false
+    },
+  )
+  assert_eq(chart.groups[0].subtotals.length(), 1)
+  assert_eq(chart.groups[0].subtotals[0], 2)
+  assert_eq(chart.groups[0].series.length(), 1)
+  // Check data was mapped correctly
+  let cats = match chart.groups[0].series[0].cat {
+    StrSource(_, data) => data.points
+    _ => []
+  }
+  assert_eq(cats.length(), 3)
+  assert_eq(cats[0].value, "Q1")
+}
+
+test "parse_chartex_xml funnel" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">Stage1</cx:pt><cx:pt idx="1">Stage2</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">1000</cx:pt><cx:pt idx="1">500</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|    <cx:legend pos="b"/>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.groups.length(), 1)
+  assert_true(
+    match chart.groups[0].chart_type {
+      FunnelChart => true
+      _ => false
+    },
+  )
+  assert_eq(chart.legend.position, "b")
+  assert_true(chart.legend.show)
+}
+
+test "parse_chartex_xml treemap" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">A</cx:pt><cx:pt idx="1">B</cx:pt><cx:pt idx="2">C</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">50</cx:pt><cx:pt idx="1">30</cx:pt><cx:pt idx="2">20</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:title><cx:tx><cx:txData><cx:v>My Treemap</cx:v></cx:txData></cx:tx></cx:title>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="treemap"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.title, "My Treemap")
+  assert_true(
+    match chart.groups[0].chart_type {
+      TreemapChart => true
+      _ => false
+    },
+  )
+}
+
+test "parse_chartex_xml all layout types" {
+  // Test all 6 layout types map to correct ChartKind
+  let layout_ids = ["waterfall", "treemap", "sunburst", "boxWhisker", "funnel", "clusteredColumn"]
+  let expected_types = ["WaterfallChart", "TreemapChart", "SunburstChart", "BoxWhiskerChart", "FunnelChart", "HistogramChart"]
+  for li in 0..<layout_ids.length() {
+    let lid = layout_ids[li]
+    let xml = "<?xml version=\"1.0\"?><cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData><cx:data id=\"0\"><cx:numDim type=\"val\"><cx:lvl><cx:pt idx=\"0\">10</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"" + lid + "\"><cx:dataId val=\"0\"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"
+    let chart = parse_chartex_xml(xml, ThemeData::default())
+    assert_eq(chart.groups.length(), 1)
+    let kind_str = match chart.groups[0].chart_type {
+      WaterfallChart => "WaterfallChart"
+      TreemapChart => "TreemapChart"
+      SunburstChart => "SunburstChart"
+      BoxWhiskerChart => "BoxWhiskerChart"
+      FunnelChart => "FunnelChart"
+      HistogramChart => "HistogramChart"
+      _ => "other"
+    }
+    assert_eq(kind_str, expected_types[li])
+  }
+}
+
+test "parse_chartex_xml sunburst" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">N</cx:pt><cx:pt idx="1">S</cx:pt><cx:pt idx="2">E</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="size">
+    #|        <cx:lvl><cx:pt idx="0">40</cx:pt><cx:pt idx="1">30</cx:pt><cx:pt idx="2">20</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="sunburst"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_true(
+    match chart.groups[0].chart_type {
+      SunburstChart => true
+      _ => false
+    },
+  )
+  // type="size" should be parsed as numDim
+  let vals = match chart.groups[0].series[0].val {
+    NumSource(_, data) => data.points
+    _ => []
+  }
+  assert_eq(vals.length(), 3)
+  assert_eq(vals[0].value, "40")
+}
+
+test "parse_chartex_xml waterfall values and multiple subtotals" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:strDim type="cat">
+    #|        <cx:lvl><cx:pt idx="0">A</cx:pt><cx:pt idx="1">B</cx:pt><cx:pt idx="2">Sub</cx:pt><cx:pt idx="3">C</cx:pt><cx:pt idx="4">Total</cx:pt></cx:lvl>
+    #|      </cx:strDim>
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">100</cx:pt><cx:pt idx="1">-30</cx:pt><cx:pt idx="2">70</cx:pt><cx:pt idx="3">50</cx:pt><cx:pt idx="4">120</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="waterfall">
+    #|          <cx:dataId val="0"/>
+    #|          <cx:layoutPr>
+    #|            <cx:subtotals><cx:idx val="2"/><cx:idx val="4"/></cx:subtotals>
+    #|          </cx:layoutPr>
+    #|        </cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  // Multiple subtotals
+  assert_eq(chart.groups[0].subtotals.length(), 2)
+  assert_eq(chart.groups[0].subtotals[0], 2)
+  assert_eq(chart.groups[0].subtotals[1], 4)
+  // Values parsed correctly
+  let vals = match chart.groups[0].series[0].val {
+    NumSource(_, data) => data.points
+    _ => []
+  }
+  assert_eq(vals.length(), 5)
+  assert_eq(vals[0].value, "100")
+  assert_eq(vals[1].value, "-30")
+}
+
+test "parse_chartex_xml empty chartSpace" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_eq(chart.groups.length(), 0)
+  assert_true(not(chart.chart_xml.is_empty()))
+}
+
+test "parse_chartex_xml histogram no strDim" {
+  // Real histograms may have only numDim (no categories)
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
+    #|  <cx:chartData>
+    #|    <cx:data id="0">
+    #|      <cx:numDim type="val">
+    #|        <cx:lvl><cx:pt idx="0">5</cx:pt><cx:pt idx="1">15</cx:pt><cx:pt idx="2">25</cx:pt></cx:lvl>
+    #|      </cx:numDim>
+    #|    </cx:data>
+    #|  </cx:chartData>
+    #|  <cx:chart>
+    #|    <cx:plotArea>
+    #|      <cx:plotAreaRegion>
+    #|        <cx:series layoutId="clusteredColumn"><cx:dataId val="0"/></cx:series>
+    #|      </cx:plotAreaRegion>
+    #|    </cx:plotArea>
+    #|  </cx:chart>
+    #|</cx:chartSpace>
+  let chart = parse_chartex_xml(xml, ThemeData::default())
+  assert_true(
+    match chart.groups[0].chart_type {
+      HistogramChart => true
+      _ => false
+    },
+  )
+  // No categories — cat should be NoData
+  assert_true(
+    match chart.groups[0].series[0].cat {
+      NoData => true
+      _ => false
+    },
+  )
 }

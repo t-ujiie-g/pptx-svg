@@ -130,12 +130,14 @@ Notes and comments are automatically preserved in round-trip export.
 **Unit Conversion Helpers:**
 
 ```ts
-import { pxToEmu, emuToPx, ptToHundredths, degreesToOoxml } from 'pptx-svg';
+import { pxToEmu, emuToPx, ptToHundredths, hundredthsToPt, degreesToOoxml, ooxmlToDegrees } from 'pptx-svg';
 
-pxToEmu(100)        // 952500 EMU
-emuToPx(914400)     // 96 px
-ptToHundredths(18)  // 1800
-degreesToOoxml(90)  // 5400000
+pxToEmu(100)          // 952500 EMU
+emuToPx(914400)       // 96 px
+ptToHundredths(18)    // 1800
+hundredthsToPt(1800)  // 18
+degreesToOoxml(90)    // 5400000
+ooxmlToDegrees(5400000) // 90
 ```
 
 **SVG DOM Helpers:**
@@ -154,14 +156,14 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 ### Fully Supported
 
 - **Shapes**: AutoShape (rect, ellipse, roundRect, line, ~154 preset geometries), custom geometry (`a:custGeom`), connectors (straight/elbow/curved)
-- **Text**: Paragraphs, runs, bullets (char/auto/image), fonts (Latin/EA/CS/Symbol), bold/italic/underline/strikethrough, superscript/subscript, character spacing, kerning, capitalization, hyperlinks, tabs, RTL
+- **Text**: Paragraphs, runs, bullets (char/auto/image), fonts (Latin/EA/CS/Symbol), bold/italic/underline/strikethrough, superscript/subscript, character spacing, kerning, capitalization, hyperlinks, tabs, RTL, justify (word-spacing distribution)
 - **Text body**: Vertical alignment, margins, auto-fit, font scale, rotation, vertical text, multi-column, text warp (prstTxWarp)
 - **Fill**: Solid color, gradient (linear/radial with stops), pattern (48 presets), image fill (stretch/tile/crop)
 - **Stroke**: 11 dash patterns, 5 arrow types, line cap/join, compound lines, gradient/pattern stroke
-- **Effects**: Outer shadow, inner shadow, glow, soft edge, reflection (all via SVG filters)
+- **Effects**: Outer shadow, inner shadow, preset shadow, glow, soft edge, reflection, blur, fill overlay (all via SVG filters)
 - **Images**: PNG/JPEG/GIF/SVG, crop, alpha, brightness/contrast, duotone, color change
 - **Tables**: Cell merge (grid span, row span), borders (including diagonal), margins, anchoring, table styles, conditional formatting (banded rows/cols, first/last row/col)
-- **Charts**: Bar (clustered/stacked/percentStacked), Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 types), data labels, data points, trendlines, error bars, composite charts
+- **Charts**: Bar (clustered/stacked/percentStacked), Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 classic types) + Waterfall, Treemap, Sunburst, Histogram, Box & Whisker, Funnel (6 Office 2016+ cx:chart types), data labels, data points, trendlines, error bars, composite charts
 - **Group shapes**: Recursive nesting with coordinate transforms
 - **Theme**: 12 theme colors, font scheme, all color modifiers (tint, shade, saturation, luminance, etc.)
 - **Master/Layout inheritance**: Placeholder inheritance, `p:clrMapOvr`
@@ -226,7 +228,7 @@ npm run build          # Wasm + TypeScript + copy wasm to dist/
 
 ```bash
 npm test               # All tests (MoonBit unit + Node.js integration)
-npm run test:moon      # MoonBit unit tests only (84 tests)
+npm run test:moon      # MoonBit unit tests only
 npm run test:node      # Node.js integration tests only
 ```
 

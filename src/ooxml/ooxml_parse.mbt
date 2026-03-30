@@ -446,12 +446,47 @@ fn parse_effect_lst(
             },
           }
       }
+      let bl = match @xml.find_child(eff_ch, "a:blur") {
+        None => Blur::none()
+        Some(node) => { rad: attr_int(node, "rad") }
+      }
+      let ps = match @xml.find_child(eff_ch, "a:prstShdw") {
+        None => PresetShadow::none()
+        Some(node) => {
+          let ch = @xml.get_children(node)
+          let color = parse_color_from_children(ch, theme)
+          {
+            prst: match @xml.get_attr(node, "prst") {
+              Some(v) => v
+              None => ""
+            },
+            dist: attr_int(node, "dist"),
+            dir: attr_int(node, "dir"),
+            color,
+          }
+        }
+      }
+      let fo = match @xml.find_child(eff_ch, "a:fillOverlay") {
+        None => FillOverlay::none()
+        Some(node) => {
+          let blend = match @xml.get_attr(node, "blend") {
+            Some(v) => v
+            None => "over"
+          }
+          let ch = @xml.get_children(node)
+          let color = parse_solid_fill(ch, theme)
+          { blend, color }
+        }
+      }
       {
         outer_shadow: os,
         inner_shadow: ishdw,
         glow: gl,
         soft_edge: se,
         reflection: refl,
+        blur: bl,
+        prst_shadow: ps,
+        fill_overlay: fo,
       }
     }
   }
@@ -1183,6 +1218,27 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       if not(rid.is_empty()) {
         // Store rid in chart_xml field temporarily; main.mbt will resolve it.
         let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
+        return Shape::default_with(
+          ShapeKind::ChartShape(chart_data),
+          transform,
+        )
+      }
+    }
+    None => ()
+  }
+  // Check for ChartEx (cx:chart) — Office 2016+ chart types
+  match @xml.find_child(gdata_ch, "cx:chart") {
+    Some(cn) => {
+      let rid = match @xml.get_attr(cn, "r:id") {
+        Some(v) => v
+        None => ""
+      }
+      if not(rid.is_empty()) {
+        // Prefix "cx:" to distinguish from classic c:chart during resolution
+        let chart_data : ChartData = {
+          ..ChartData::empty(),
+          chart_xml: "cx:" + rid,
+        }
         return Shape::default_with(
           ShapeKind::ChartShape(chart_data),
           transform,

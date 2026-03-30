@@ -1007,6 +1007,25 @@ fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
       (if not(r.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
     inner = inner + "<a:reflection" + attrs + "/>"
   }
+  if not(eff.blur.is_none()) {
+    inner = inner + "<a:blur" + xml_int_attr("rad", eff.blur.rad) + "/>"
+  }
+  if not(eff.prst_shadow.is_none()) {
+    let ps = eff.prst_shadow
+    let attrs = " prst=\"" + ps.prst + "\"" +
+      xml_int_attr("dist", ps.dist) +
+      xml_int_attr("dir", ps.dir)
+    inner = inner + "<a:prstShdw" + attrs + ">" + serialize_eff_color(ps.color) + "</a:prstShdw>"
+  }
+  if not(eff.fill_overlay.is_none()) {
+    let fo = eff.fill_overlay
+    let blend_attr = if fo.blend.is_empty() || fo.blend == "over" {
+      " blend=\"over\""
+    } else {
+      " blend=\"" + fo.blend + "\""
+    }
+    inner = inner + "<a:fillOverlay" + blend_attr + "><a:solidFill>" + serialize_eff_color(fo.color) + "</a:solidFill></a:fillOverlay>"
+  }
   "<a:effectLst>" + inner + "</a:effectLst>"
 }
 
@@ -1054,7 +1073,7 @@ fn serialize_eff_color(c : @ooxml.Color) -> String {
   if c.is_none() {
     ""
   } else {
-    let hex = c.to_hex()
+    let hex = c.to_hex_rgb()
     if c.alpha < 255 {
       "<a:srgbClr val=\"" + hex + "\"><a:alpha val=\"" + int_to_str(c.alpha * 100000 / 255) + "\"/></a:srgbClr>"
     } else {

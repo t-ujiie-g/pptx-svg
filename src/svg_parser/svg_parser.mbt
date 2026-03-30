@@ -118,12 +118,115 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       rot_with_shape: get_da(node, "eff-refl-rot") != "0",
     }
   }
+  let blur_rad = get_dai(node, "eff-blur-rad")
+  let bl : @ooxml.Blur = { rad: blur_rad }
+  let ps_prst = get_da(node, "eff-ps-prst")
+  let ps = if ps_prst.is_empty() {
+    @ooxml.PresetShadow::none()
+  } else {
+    {
+      prst: ps_prst,
+      dist: get_dai(node, "eff-ps-dist"),
+      dir: get_dai(node, "eff-ps-dir"),
+      color: {
+        let clr = get_da(node, "eff-ps-clr")
+        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+      },
+    }
+  }
+  let fo_blend = get_da(node, "eff-fo-blend")
+  let fo = if fo_blend.is_empty() {
+    @ooxml.FillOverlay::none()
+  } else {
+    {
+      blend: fo_blend,
+      color: {
+        let clr = get_da(node, "eff-fo-clr")
+        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+      },
+    }
+  }
   {
     outer_shadow: os,
     inner_shadow: ishdw,
     glow: gl,
     soft_edge: se,
     reflection: refl,
+    blur: bl,
+    prst_shadow: ps,
+    fill_overlay: fo,
+  }
+}
+
+///|
+/// Parse text-run effects from reff-* data attributes.
+fn parse_run_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
+  let os_blur = get_dai(node, "reff-os-blur")
+  let os_clr = get_da(node, "reff-os-clr")
+  let os = if os_blur == 0 && os_clr.is_empty() {
+    @ooxml.OuterShadow::none()
+  } else {
+    {
+      blur_rad: os_blur,
+      dist: get_dai(node, "reff-os-dist"),
+      dir: get_dai(node, "reff-os-dir"),
+      color: if os_clr.is_empty() {
+        @ooxml.Color::none()
+      } else {
+        parse_hex_color(os_clr)
+      },
+      sx: 100000,
+      sy: 100000,
+      algn: "b",
+      rot_with_shape: true,
+    }
+  }
+  let gl_rad = get_dai(node, "reff-gl-rad")
+  let gl_clr = get_da(node, "reff-gl-clr")
+  let gl = if gl_rad == 0 && gl_clr.is_empty() {
+    @ooxml.Glow::none()
+  } else {
+    {
+      rad: gl_rad,
+      color: if gl_clr.is_empty() {
+        @ooxml.Color::none()
+      } else {
+        parse_hex_color(gl_clr)
+      },
+    }
+  }
+  let blur_rad = get_dai(node, "reff-blur-rad")
+  let bl : @ooxml.Blur = { rad: blur_rad }
+  let ps_prst = get_da(node, "reff-ps-prst")
+  let ps = if ps_prst.is_empty() {
+    @ooxml.PresetShadow::none()
+  } else {
+    {
+      prst: ps_prst,
+      dist: get_dai(node, "reff-ps-dist"),
+      dir: get_dai(node, "reff-ps-dir"),
+      color: {
+        let clr = get_da(node, "reff-ps-clr")
+        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+      },
+    }
+  }
+  if os.is_none() &&
+    gl.is_none() &&
+    bl.is_none() &&
+    ps.is_none() {
+    @ooxml.EffectList::none()
+  } else {
+    {
+      outer_shadow: os,
+      inner_shadow: @ooxml.InnerShadow::none(),
+      glow: gl,
+      soft_edge: @ooxml.SoftEdge::none(),
+      reflection: @ooxml.Reflection::none(),
+      blur: bl,
+      prst_shadow: ps,
+      fill_overlay: @ooxml.FillOverlay::none(),
+    }
   }
 }
 
@@ -379,7 +482,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     cap,
                     hlink_rid,
                     hlink_mouse_over_rid,
-                    effects: @ooxml.EffectList::none(),
+                    effects: parse_run_effects_from_da(run_node),
                     outline_color: color_or_none(run_node, "outline-color"),
                     outline_w: get_dai(run_node, "outline-w"),
                     text_grad_fill: parse_text_grad_fill(run_node),

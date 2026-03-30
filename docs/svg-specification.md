@@ -264,6 +264,11 @@ These attributes preserve text-run-level effects for round-trip. Prefixed `reff-
 | `data-ooxml-reff-os-clr` | string | Outer shadow color (`RRGGBB`) |
 | `data-ooxml-reff-gl-rad` | int | Glow radius (EMU) |
 | `data-ooxml-reff-gl-clr` | string | Glow color (`RRGGBB`) |
+| `data-ooxml-reff-blur-rad` | int | Blur radius (EMU) |
+| `data-ooxml-reff-ps-prst` | string | Preset shadow name (`shdw1`–`shdw20`) |
+| `data-ooxml-reff-ps-dist` | int | Preset shadow distance (EMU) |
+| `data-ooxml-reff-ps-dir` | int | Preset shadow direction (60,000ths of degree) |
+| `data-ooxml-reff-ps-clr` | string | Preset shadow color (`RRGGBB` or `RRGGBBAA`) |
 
 ### Text Gradient/Pattern Fill (on `<tspan>`)
 
@@ -322,6 +327,28 @@ Set on the shape `<g>` element.
 | `data-ooxml-eff-refl-sx/sy` | int | Scale |
 | `data-ooxml-eff-refl-algn` | string | Alignment |
 | `data-ooxml-eff-refl-rot` | string | Rotate with shape |
+
+### Blur
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-eff-blur-rad` | int | Blur radius (EMU) |
+
+### Preset Shadow
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-eff-ps-prst` | string | Preset name (`shdw1`..`shdw20`) |
+| `data-ooxml-eff-ps-dist` | int | Distance (EMU) |
+| `data-ooxml-eff-ps-dir` | int | Direction (60,000ths of degree) |
+| `data-ooxml-eff-ps-clr` | string | Shadow color (`RRGGBB` or `RRGGBBAA`) |
+
+### Fill Overlay
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `data-ooxml-eff-fo-blend` | string | Blend mode (`over`, `mult`, `screen`, `darken`, `lighten`) |
+| `data-ooxml-eff-fo-clr` | string | Overlay solid fill color (`RRGGBB` or `AARRGGBB`) |
 
 ## 3D Properties
 

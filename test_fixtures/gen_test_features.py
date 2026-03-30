@@ -88,6 +88,16 @@ Slides:
  82. OMML — Large operators + delimiters (m:nary integral + m:sSup)
  83. OMML — Matrix + delimiters (m:d + m:m 2x2 matrix)
  84. OMML — Accent + bar + sub/superscript (m:acc + m:bar + m:sSubSup)
+ 85. Blur effect (a:blur — shape-level Gaussian blur)
+ 86. Preset shadow (a:prstShdw — shdw1/shdw2 preset shadows)
+ 87. Fill overlay (a:fillOverlay — blend modes: over/mult/screen/darken/lighten)
+ 88. Justified text (algn="just" — word-spacing distribution)
+ 89. Waterfall chart (cx:chart layoutId="waterfall")
+ 90. Treemap chart (cx:chart layoutId="treemap")
+ 91. Sunburst chart (cx:chart layoutId="sunburst")
+ 92. Histogram chart (cx:chart layoutId="clusteredColumn")
+ 93. Box & Whisker chart (cx:chart layoutId="boxWhisker")
+ 94. Funnel chart (cx:chart layoutId="funnel")
 """
 
 import base64
@@ -5566,6 +5576,96 @@ math84 = slide84.shapes.add_textbox(Inches(1), Inches(2), Inches(8), Inches(3))
 math84.text_frame.paragraphs[0].text = "ACC_BAR_PLACEHOLDER"
 math84.text_frame.paragraphs[0].font.size = Pt(24)
 
+# ── Slide 85: Blur effect (a:blur) ───────────────────────────────────────────
+slide85 = prs.slides.add_slide(blank)
+
+title85 = slide85.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title85.text_frame.paragraphs[0].text = "Slide 85: Blur Effect (a:blur)"
+title85.text_frame.paragraphs[0].font.size = Pt(24)
+title85.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 86: Preset shadow (a:prstShdw) ─────────────────────────────────────
+slide86 = prs.slides.add_slide(blank)
+
+title86 = slide86.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title86.text_frame.paragraphs[0].text = "Slide 86: Preset Shadow (a:prstShdw)"
+title86.text_frame.paragraphs[0].font.size = Pt(24)
+title86.text_frame.paragraphs[0].font.bold = True
+
+# ── Slide 87: Fill overlay (a:fillOverlay) ────────────────────────────────────
+slide87 = prs.slides.add_slide(blank)
+
+title87 = slide87.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title87.text_frame.paragraphs[0].text = "Slide 87: Fill Overlay (a:fillOverlay)"
+title87.text_frame.paragraphs[0].font.size = Pt(24)
+title87.text_frame.paragraphs[0].font.bold = True
+
+# Add shapes with solid fills that will get fillOverlay via patching
+fo_labels = ["over", "mult", "screen", "darken", "lighten"]
+fo_colors = ["0000FF", "00AA00", "FF6600", "8800CC", "CC0000"]
+for i, (label, base_clr) in enumerate(zip(fo_labels, fo_colors)):
+    left = Inches(0.5 + i * 1.8)
+    box = slide87.shapes.add_textbox(left, Inches(1.5), Inches(1.5), Inches(1.5))
+    box.text_frame.paragraphs[0].text = label
+    box.text_frame.paragraphs[0].font.size = Pt(14)
+    box.text_frame.paragraphs[0].font.bold = True
+    from pptx.util import Pt as PtUtil
+    from pptx.dml.color import RGBColor
+    box.fill.solid()
+    box.fill.fore_color.rgb = RGBColor(
+        int(base_clr[0:2], 16), int(base_clr[2:4], 16), int(base_clr[4:6], 16)
+    )
+
+# ── Slide 88: Justified text (algn="just") ────────────────────────────────────
+slide88 = prs.slides.add_slide(blank)
+
+title88 = slide88.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+title88.text_frame.paragraphs[0].text = "Slide 88: Justified Text (algn=\"just\")"
+title88.text_frame.paragraphs[0].font.size = Pt(24)
+title88.text_frame.paragraphs[0].font.bold = True
+
+# Add text box with justified paragraphs
+from pptx.enum.text import PP_ALIGN
+just_box = slide88.shapes.add_textbox(Inches(1), Inches(1.5), Inches(5), Inches(3))
+tf = just_box.text_frame
+tf.word_wrap = True
+p1 = tf.paragraphs[0]
+p1.text = "This is a justified paragraph with enough text to wrap across multiple lines. The word spacing should be adjusted so that each line extends to fill the full width of the text box evenly."
+p1.alignment = PP_ALIGN.JUSTIFY
+p1.font.size = Pt(16)
+
+p2 = tf.add_paragraph()
+p2.text = "Short last line."
+p2.alignment = PP_ALIGN.JUSTIFY
+p2.font.size = Pt(16)
+
+# Japanese justified text (CJK — uses letter-spacing fallback)
+just_box2 = slide88.shapes.add_textbox(Inches(1), Inches(5), Inches(5), Inches(2))
+tf2 = just_box2.text_frame
+tf2.word_wrap = True
+p3 = tf2.paragraphs[0]
+p3.text = "均等割り付けのテスト文章です。日本語テキストはスペースがないため文字間隔で調整されます。"
+p3.alignment = PP_ALIGN.JUSTIFY
+p3.font.size = Pt(16)
+
+# ── Slides 89-94: Office 2016+ ChartEx (cx: namespace) ──────────────────────
+cx_chart_names = [
+    "Waterfall Chart",
+    "Treemap Chart",
+    "Sunburst Chart",
+    "Histogram Chart",
+    "Box & Whisker Chart",
+    "Funnel Chart",
+]
+cx_chart_slides = []
+for i, name in enumerate(cx_chart_names):
+    s = prs.slides.add_slide(blank)
+    t = s.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(9), Inches(0.8))
+    t.text_frame.paragraphs[0].text = f"Slide {89 + i}: {name} (cx:chart)"
+    t.text_frame.paragraphs[0].font.size = Pt(18)
+    t.text_frame.paragraphs[0].font.bold = True
+    cx_chart_slides.append(s)
+
 # Save first, then patch the OMML into the slide XML
 output_path = 'test_fixtures/test_features.pptx'
 prs.save(output_path)
@@ -5574,7 +5674,7 @@ prs.save(output_path)
 OMML_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
 etree.register_namespace('m', OMML_NS)
 
-total_slides = len(prs.slides)  # 85
+total_slides = len(prs.slides)  # 94 (88 + 6 cx charts)
 # python-pptx numbers slide files sequentially
 slide78_path = 'ppt/slides/slide79.xml'
 
@@ -5714,6 +5814,135 @@ slide84_xml = re.sub(
 if 'xmlns:m=' not in slide84_xml:
     slide84_xml = slide84_xml.replace('xmlns:a=', f'xmlns:m="{OMML_NS}" xmlns:a=')
 
+# ── Patch slide 85: inject blur effect shape ──
+slide85_path = 'ppt/slides/slide86.xml'
+slide85_xml = all_entries[slide85_path][1].decode('utf-8') if isinstance(all_entries[slide85_path][1], bytes) else all_entries[slide85_path][1]
+
+# Add a shape with a:blur effect
+blur_shape_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="401" name="BlurShape"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="1828800" y="1828800"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:effectLst>
+      <a:blur rad="76200"/>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="2400" b="1"/><a:t>Blur Effect</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+# Insert the blur shape into the slide's spTree
+slide85_xml = slide85_xml.replace('</p:spTree>', blur_shape_xml + '\n</p:spTree>')
+
+# ── Patch slide 86: inject preset shadow shapes ──
+slide86_path = 'ppt/slides/slide87.xml'
+slide86_xml = all_entries[slide86_path][1].decode('utf-8') if isinstance(all_entries[slide86_path][1], bytes) else all_entries[slide86_path][1]
+
+# Add white background to slide 86
+slide86_bg_xml = '''<p:bg>
+  <p:bgPr>
+    <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+    <a:effectLst/>
+  </p:bgPr>
+</p:bg>'''
+slide86_xml = slide86_xml.replace('<p:spTree>', slide86_bg_xml + '\n<p:spTree>')
+
+prstshdw_shape1_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="501" name="PrstShdw1"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="457200" y="1828800"/><a:ext cx="3657600" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+    <a:effectLst>
+      <a:prstShdw prst="shdw1" dist="76200" dir="2700000">
+        <a:srgbClr val="000000"><a:alpha val="60000"/></a:srgbClr>
+      </a:prstShdw>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1">
+      <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+    </a:rPr><a:t>shdw1 (Bottom Right)</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+prstshdw_shape2_xml = '''<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvSpPr>
+    <p:cNvPr id="502" name="PrstShdw2"/>
+    <p:cNvSpPr/>
+    <p:nvPr/>
+  </p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="5029200" y="1828800"/><a:ext cx="3657600" cy="2286000"/></a:xfrm>
+    <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
+    <a:effectLst>
+      <a:prstShdw prst="shdw2" dist="76200" dir="5400000">
+        <a:srgbClr val="000000"><a:alpha val="60000"/></a:srgbClr>
+      </a:prstShdw>
+    </a:effectLst>
+  </p:spPr>
+  <p:txBody>
+    <a:bodyPr anchor="ctr"/>
+    <a:lstStyle/>
+    <a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US" sz="1400" b="1">
+      <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
+    </a:rPr><a:t>shdw2 (Bottom)</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>'''
+
+slide86_xml = slide86_xml.replace('</p:spTree>', prstshdw_shape1_xml + '\n' + prstshdw_shape2_xml + '\n</p:spTree>')
+
+# ── Patch slide 87: inject fillOverlay effects ──
+slide87_path = 'ppt/slides/slide88.xml'
+slide87_xml = all_entries[slide87_path][1].decode('utf-8') if isinstance(all_entries[slide87_path][1], bytes) else all_entries[slide87_path][1]
+
+# Inject fillOverlay into shapes using regex to find each spPr solidFill
+blend_modes = ["over", "mult", "screen", "darken", "lighten"]
+fo_count = [0]  # mutable counter for replacement callback
+def inject_fill_overlay(m):
+    idx = fo_count[0]
+    fo_count[0] += 1
+    if idx >= len(blend_modes):
+        return m.group(0)  # skip title shape etc.
+    blend = blend_modes[idx]
+    fo_xml = (
+        f'<a:effectLst>'
+        f'<a:fillOverlay blend="{blend}">'
+        f'<a:solidFill><a:srgbClr val="FF0000"><a:alpha val="50000"/></a:srgbClr></a:solidFill>'
+        f'</a:fillOverlay>'
+        f'</a:effectLst>'
+    )
+    return m.group(0).replace('</p:spPr>', fo_xml + '</p:spPr>')
+# Match each <p:spPr>...<a:solidFill>...</a:solidFill>...</p:spPr> block
+slide87_xml = re.sub(
+    r'<p:spPr>.*?<a:solidFill>.*?</a:solidFill>.*?</p:spPr>',
+    inject_fill_overlay,
+    slide87_xml,
+    flags=re.DOTALL,
+)
+
 # ── Patch slide 81: inject WMF image + picture shape ──
 slide81_path = 'ppt/slides/slide82.xml'
 slide81_xml = all_entries[slide81_path][1].decode('utf-8') if isinstance(all_entries[slide81_path][1], bytes) else all_entries[slide81_path][1]
@@ -5852,6 +6081,180 @@ if 'Extension="wmf"' not in content_types_xml:
         '<Default Extension="wmf" ContentType="image/x-wmf"/></Types>'
     )
 
+# ── Inject cx:chart (ChartEx) data into slides 89-94 ─────────────────────────
+# cx:chartSpace XML templates for each chart type
+cx_chart_xmls = {
+    'waterfall': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="5">
+      <cx:pt idx="0">Q1</cx:pt><cx:pt idx="1">Q2</cx:pt><cx:pt idx="2">Q3</cx:pt>
+      <cx:pt idx="3">Q4</cx:pt><cx:pt idx="4">Total</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="5" formatCode="General">
+      <cx:pt idx="0">100</cx:pt><cx:pt idx="1">-20</cx:pt><cx:pt idx="2">50</cx:pt>
+      <cx:pt idx="3">-10</cx:pt><cx:pt idx="4">120</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="waterfall"><cx:dataId val="0"/>
+      <cx:layoutPr><cx:subtotals><cx:idx val="4"/></cx:subtotals></cx:layoutPr>
+    </cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'treemap': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="5">
+      <cx:pt idx="0">Product A</cx:pt><cx:pt idx="1">Product B</cx:pt>
+      <cx:pt idx="2">Product C</cx:pt><cx:pt idx="3">Product D</cx:pt>
+      <cx:pt idx="4">Product E</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="5">
+      <cx:pt idx="0">50</cx:pt><cx:pt idx="1">30</cx:pt><cx:pt idx="2">20</cx:pt>
+      <cx:pt idx="3">15</cx:pt><cx:pt idx="4">10</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="treemap"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'sunburst': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="4">
+      <cx:pt idx="0">North</cx:pt><cx:pt idx="1">South</cx:pt>
+      <cx:pt idx="2">East</cx:pt><cx:pt idx="3">West</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="4">
+      <cx:pt idx="0">40</cx:pt><cx:pt idx="1">30</cx:pt>
+      <cx:pt idx="2">20</cx:pt><cx:pt idx="3">10</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="sunburst"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'histogram': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="5">
+      <cx:pt idx="0">0-20</cx:pt><cx:pt idx="1">20-40</cx:pt>
+      <cx:pt idx="2">40-60</cx:pt><cx:pt idx="3">60-80</cx:pt>
+      <cx:pt idx="4">80-100</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="5">
+      <cx:pt idx="0">5</cx:pt><cx:pt idx="1">15</cx:pt>
+      <cx:pt idx="2">25</cx:pt><cx:pt idx="3">12</cx:pt>
+      <cx:pt idx="4">8</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="clusteredColumn"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'boxWhisker': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="1">
+      <cx:pt idx="0">Dataset</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="10">
+      <cx:pt idx="0">12</cx:pt><cx:pt idx="1">15</cx:pt>
+      <cx:pt idx="2">18</cx:pt><cx:pt idx="3">22</cx:pt>
+      <cx:pt idx="4">25</cx:pt><cx:pt idx="5">28</cx:pt>
+      <cx:pt idx="6">30</cx:pt><cx:pt idx="7">35</cx:pt>
+      <cx:pt idx="8">40</cx:pt><cx:pt idx="9">45</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="boxWhisker"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea></cx:chart>
+</cx:chartSpace>''',
+    'funnel': '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <cx:chartData><cx:data id="0">
+    <cx:strDim type="cat"><cx:lvl ptCount="4">
+      <cx:pt idx="0">Prospects</cx:pt><cx:pt idx="1">Qualified</cx:pt>
+      <cx:pt idx="2">Proposals</cx:pt><cx:pt idx="3">Closed</cx:pt>
+    </cx:lvl></cx:strDim>
+    <cx:numDim type="val"><cx:lvl ptCount="4">
+      <cx:pt idx="0">1000</cx:pt><cx:pt idx="1">600</cx:pt>
+      <cx:pt idx="2">300</cx:pt><cx:pt idx="3">100</cx:pt>
+    </cx:lvl></cx:numDim>
+  </cx:data></cx:chartData>
+  <cx:chart><cx:plotArea><cx:plotAreaRegion>
+    <cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series>
+  </cx:plotAreaRegion></cx:plotArea>
+    <cx:legend pos="r"/>
+  </cx:chart>
+</cx:chartSpace>''',
+}
+
+# Chart type keys in order matching slides 89-94
+cx_types = ['waterfall', 'treemap', 'sunburst', 'histogram', 'boxWhisker', 'funnel']
+
+# Patch each cx:chart slide XML to include a graphicFrame + create chartex files
+cx_chartex_files = {}  # path -> xml content
+cx_slide_patches = {}  # slide_path -> patched xml
+
+for i, cx_type in enumerate(cx_types):
+    slide_num = 89 + i
+    # python-pptx slide files are 1-indexed but may start from different offset
+    slide_file = f'ppt/slides/slide{slide_num + 1}.xml'  # 0-indexed in files
+    chartex_file = f'ppt/charts/chartEx{i + 1}.xml'
+    chartex_rid = f'rIdCx{i + 1}'
+
+    # Store chartex XML
+    cx_chartex_files[chartex_file] = cx_chart_xmls[cx_type]
+
+    # Patch slide XML to inject graphicFrame
+    if slide_file in all_entries:
+        slide_xml = all_entries[slide_file][1].decode('utf-8')
+        # Build graphicFrame XML
+        gf_xml = (
+            '<p:graphicFrame>'
+            '<p:nvGraphicFramePr>'
+            f'<p:cNvPr id="99{i}" name="ChartEx {i+1}"/>'
+            '<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr>'
+            '<p:nvPr/>'
+            '</p:nvGraphicFramePr>'
+            '<p:xfrm><a:off x="914400" y="1371600"/><a:ext cx="7315200" cy="4572000"/></p:xfrm>'
+            '<a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/drawing/2014/chartex">'
+            f'<cx:chart xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"'
+            f' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+            f' r:id="{chartex_rid}"/>'
+            '</a:graphicData></a:graphic>'
+            '</p:graphicFrame>'
+        )
+        # Insert before </p:spTree>
+        slide_xml = slide_xml.replace('</p:spTree>', gf_xml + '</p:spTree>')
+        cx_slide_patches[slide_file] = slide_xml
+
+        # Patch slide rels to add chartex relationship
+        rels_file = f'ppt/slides/_rels/slide{slide_num + 1}.xml.rels'
+        if rels_file in all_entries:
+            rels_xml = all_entries[rels_file][1].decode('utf-8')
+        else:
+            rels_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
+        cx_rel = f'<Relationship Id="{chartex_rid}" Type="http://schemas.microsoft.com/office/2014/relationships/chartEx" Target="../charts/chartEx{i+1}.xml"/>'
+        rels_xml = rels_xml.replace('</Relationships>', cx_rel + '</Relationships>')
+        # Store patched rels
+        cx_slide_patches[rels_file] = rels_xml
+
+# Add chartex content type overrides
+for i in range(len(cx_types)):
+    chartex_override = f'<Override PartName="/ppt/charts/chartEx{i+1}.xml" ContentType="application/vnd.ms-office.chartex+xml"/>'
+    if chartex_override not in content_types_xml:
+        content_types_xml = content_types_xml.replace('</Types>', chartex_override + '</Types>')
+
 # Rewrite ZIP with patched slides + WMF image
 with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
     for fname, (item, data) in all_entries.items():
@@ -5871,11 +6274,26 @@ with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zout:
             zout.writestr(item, slide83_xml.encode('utf-8'))
         elif fname == slide84_path:
             zout.writestr(item, slide84_xml.encode('utf-8'))
+        elif fname == slide85_path:
+            zout.writestr(item, slide85_xml.encode('utf-8'))
+        elif fname == slide86_path:
+            zout.writestr(item, slide86_xml.encode('utf-8'))
+        elif fname == slide87_path:
+            zout.writestr(item, slide87_xml.encode('utf-8'))
         elif fname == content_types_path:
             zout.writestr(item, content_types_xml.encode('utf-8'))
+        elif fname in cx_slide_patches:
+            zout.writestr(item, cx_slide_patches[fname].encode('utf-8'))
         else:
             zout.writestr(item, data)
     # Add WMF binary as new entry
     zout.writestr('ppt/media/image_wmf1.wmf', wmf_data)
+    # Add ChartEx XML files
+    for cx_path, cx_xml in cx_chartex_files.items():
+        zout.writestr(cx_path, cx_xml.encode('utf-8'))
+    # Add patched rels that are new (not in original ZIP)
+    for rels_path, rels_xml in cx_slide_patches.items():
+        if rels_path not in all_entries:
+            zout.writestr(rels_path, rels_xml.encode('utf-8'))
 
 print(f"Saved {output_path} with {total_slides} slides")

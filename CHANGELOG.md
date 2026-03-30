@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.5
+
+### Features
+
+- **Office 2016+ charts (cx:chart)** — full parsing and SVG rendering for 6 ChartEx types: waterfall, treemap, sunburst, histogram, box & whisker, funnel. Includes `mc:AlternateContent` detection, cx:chartSpace XML parser with hierarchical data support
+- **Justified text** — `algn="just"` word-spacing distribution for paragraph justification
+- **Fill overlay effect** — `a:fillOverlay` with 5 blend modes (over, mult, screen, darken, lighten)
+- **Preset shadow effect** — `a:prstShdw` rendering with all OOXML preset shadow types
+- **Blur effect** — `a:blur` Gaussian blur via SVG filter
+
+### Tests
+
+- MoonBit unit tests expanded from 84 to 139 (cx:chart parser, renderer, effects, text)
+- CI integration for MoonBit test runner
+
+### Documentation
+
+- Update README / README.ja.md with cx:chart types and new effect support
+- Update CLAUDE.md data model with ChartKind variants and cx:chart architecture
+
 ## 0.4.4
 
 ### Features

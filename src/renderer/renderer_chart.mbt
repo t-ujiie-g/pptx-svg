@@ -1,7 +1,9 @@
 // SVG renderer — Chart rendering
 //
 // Renders ChartData (parsed from ChartML / ECMA-376 Part 1 Chapter 21) as SVG.
-// Supports: bar/column, line, pie, donut, scatter, area, radar, bubble, stock charts.
+// Supports: bar/column, line, pie, donut, scatter, area, radar, bubble, stock,
+// surface, ofPie charts (c:chart), and waterfall, treemap, sunburst, histogram,
+// box & whisker, funnel charts (cx:chart / Office 2016+).
 //
 // Layout strategy:
 //   - Title at top (if present)
@@ -64,6 +66,24 @@ let chart_heatmap_min_sentinel : Int = 2147483647 // Int max sentinel for heatma
 
 ///|
 let chart_val_scale : Int = 10000 // fixed-point scale for chart numeric values (4 decimal places)
+
+///|
+let chart_waterfall_gap_pct : Int = 20 // gap percentage for waterfall bars
+
+///|
+let chart_box_whisker_gap_pct : Int = 40 // gap percentage for box-whisker boxes
+
+///|
+let chart_funnel_gap : Int = 2 // gap between funnel bars in px
+
+///|
+let chart_sunburst_inner_pct : Int = 40 // inner radius as % of outer for sunburst
+
+///|
+let chart_pie_start_angle : Int = -9000 // -90° in hundredths (start from top)
+
+///|
+let chart_label_offset_y : Int = 12 // vertical offset for bottom axis labels
 
 // ── Chart style constants ─────────────────────────────────────────────────
 
@@ -138,7 +158,7 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
 // ── Main chart renderer ─────────────────────────────────────────────────────
 
 ///|
-/// Detect if any chart group is a pie or donut chart (no axes needed).
+/// Detect if a chart needs no axes (pie, donut, treemap, sunburst, funnel).
 fn is_pie_or_donut_chart(groups : Array[@ooxml.ChartGroup]) -> Bool {
   if groups.is_empty() {
     return false
@@ -146,7 +166,10 @@ fn is_pie_or_donut_chart(groups : Array[@ooxml.ChartGroup]) -> Bool {
   match groups[0].chart_type {
     @ooxml.ChartKind::PieChart
     | @ooxml.ChartKind::DoughnutChart
-    | @ooxml.ChartKind::OfPieChart => true
+    | @ooxml.ChartKind::OfPieChart
+    | @ooxml.ChartKind::TreemapChart
+    | @ooxml.ChartKind::SunburstChart
+    | @ooxml.ChartKind::FunnelChart => true
     _ => false
   }
 }
@@ -278,6 +301,18 @@ fn render_chart_group(
       render_surface_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::OfPieChart =>
       render_pie_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::WaterfallChart =>
+      render_waterfall_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::TreemapChart =>
+      render_treemap_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::SunburstChart =>
+      render_sunburst_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::HistogramChart =>
+      render_bar_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::BoxWhiskerChart =>
+      render_box_whisker_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::FunnelChart =>
+      render_funnel_chart(group, px_, py, pw, ph, colors)
   }
 }
 
@@ -587,7 +622,7 @@ fn render_pie_slices(
     return ""
   }
   let mut svg = ""
-  let mut start_angle = -90 * 100 // in hundredths of degrees, start from top
+  let mut start_angle = chart_pie_start_angle
   for i in 0..<nv {
     let sweep = mul_div(values[i], 36000, total) // hundredths of degrees
     if sweep > 0 {
@@ -1866,7 +1901,7 @@ fn render_pie_data_labels(
   let cats = get_cat_labels(ser.cat)
   let label_r = if inner_r > 0 { (r + inner_r) / 2 } else { r * 2 / 3 }
   let mut svg = ""
-  let mut start_angle = -90 * 100
+  let mut start_angle = chart_pie_start_angle
   for i in 0..<nv {
     let sweep = mul_div(values[i], 36000, total)
     if sweep > 0 {
@@ -2098,4 +2133,566 @@ fn cos1000(angle_hundredths : Int) -> Int {
 /// Returns result × 1000.
 fn sin1000(angle_hundredths : Int) -> Int {
   cos1000(angle_hundredths - 9000) // sin(x) = cos(x - 90°)
+}
+
+// ── ChartEx (cx: namespace) renderers ───────────────────────────────────────
+
+///|
+/// Check if an index is in the subtotals array.
+fn is_subtotal(subtotals : Array[Int], idx : Int) -> Bool {
+  for i in 0..<subtotals.length() {
+    if subtotals[i] == idx {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Waterfall chart: cumulative bars with connector lines.
+fn render_waterfall_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
+) -> String {
+  if group.series.is_empty() {
+    return ""
+  }
+  let ser = group.series[0]
+  let values = get_num_values(ser.val)
+  let cats = get_cat_labels(ser.cat)
+  let nv = values.length()
+  if nv == 0 {
+    return ""
+  }
+  // Compute cumulative positions and find global min/max for axis scaling
+  let cumulative : Array[Int] = Array::make(nv, 0)
+  let bar_bottom : Array[Int] = Array::make(nv, 0)
+  let bar_top : Array[Int] = Array::make(nv, 0)
+  let mut running = 0
+  let mut global_min = 0
+  let mut global_max = 0
+  for i in 0..<nv {
+    if is_subtotal(group.subtotals, i) {
+      // Subtotal: bar from 0 to running total
+      bar_bottom[i] = 0
+      bar_top[i] = running
+    } else {
+      bar_bottom[i] = running
+      running = running + values[i]
+      bar_top[i] = running
+    }
+    cumulative[i] = running
+    if bar_top[i] > global_max {
+      global_max = bar_top[i]
+    }
+    if bar_bottom[i] > global_max {
+      global_max = bar_bottom[i]
+    }
+    if bar_top[i] < global_min {
+      global_min = bar_top[i]
+    }
+    if bar_bottom[i] < global_min {
+      global_min = bar_bottom[i]
+    }
+  }
+  let val_range = global_max - global_min
+  let max_val = if val_range == 0 { 1 } else { compute_axis_max(val_range, axes) }
+  // Gap between bars
+  let gap_pct = chart_waterfall_gap_pct
+  let total_units = nv * 100 + (nv + 1) * gap_pct
+  let mut svg = ""
+  // Connector color
+  let conn_color = chart_gridline_color
+  for i in 0..<nv {
+    let bar_x = px_ + mul_div((i * 100 + (i + 1) * gap_pct), pw, total_units)
+    let bar_w = mul_div(100, pw, total_units)
+    // Y coordinates (inverted: higher values = lower Y)
+    let top_val = if bar_top[i] > bar_bottom[i] { bar_top[i] } else { bar_bottom[i] }
+    let bot_val = if bar_top[i] > bar_bottom[i] { bar_bottom[i] } else { bar_top[i] }
+    let top_y = py + ph - mul_div(top_val - global_min, ph, max_val)
+    let bot_y = py + ph - mul_div(bot_val - global_min, ph, max_val)
+    let bar_h = bot_y - top_y
+    let bar_h_clamped = if bar_h < 1 { 1 } else { bar_h }
+    // Color: subtotal = accent1, positive = accent2, negative = accent3
+    let color = if is_subtotal(group.subtotals, i) {
+      colors[0 % colors.length()]
+    } else {
+      let pt_color = get_dpt_color(ser.data_points, i, colors)
+      if pt_color != colors[i % colors.length()] {
+        pt_color
+      } else if values[i] >= 0 {
+        colors[1 % colors.length()]
+      } else {
+        colors[2 % colors.length()]
+      }
+    }
+    svg = svg + "<rect x=\"" + int_to_str(bar_x) + "\" y=\"" + int_to_str(
+        top_y,
+      ) + "\" width=\"" + int_to_str(bar_w) + "\" height=\"" + int_to_str(
+        bar_h_clamped,
+      ) + "\" fill=\"" + color + "\"/>"
+    // Connector line from this bar's top to next bar's start
+    if i < nv - 1 {
+      let next_bar_x = px_ + mul_div(
+          ((i + 1) * 100 + (i + 2) * gap_pct),
+          pw,
+          total_units,
+        )
+      let conn_y = py + ph - mul_div(cumulative[i] - global_min, ph, max_val)
+      svg = svg + "<line x1=\"" + int_to_str(bar_x + bar_w) + "\" y1=\"" + int_to_str(
+          conn_y,
+        ) + "\" x2=\"" + int_to_str(next_bar_x) + "\" y2=\"" + int_to_str(
+          conn_y,
+        ) + "\" stroke=\"" + conn_color + "\" stroke-width=\"1\" stroke-dasharray=\"3,2\"/>"
+    }
+    // Category label
+    if i < cats.length() {
+      svg = svg + "<text x=\"" + int_to_str(bar_x + bar_w / 2) + "\" y=\"" + int_to_str(
+          py + ph + chart_label_offset_y,
+        ) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"" + chart_axis_label_color + "\">" + svg_escape(
+          cats[i],
+        ) + "</text>"
+    }
+  }
+  svg
+}
+
+///|
+/// Treemap chart: nested rectangles proportional to values.
+fn render_treemap_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+) -> String {
+  if group.series.is_empty() {
+    return ""
+  }
+  let ser = group.series[0]
+  let values = get_num_values(ser.val)
+  let cats = get_cat_labels(ser.cat)
+  let nv = values.length()
+  if nv == 0 {
+    return ""
+  }
+  // Sort indices by value descending (for better layout)
+  let indices : Array[Int] = Array::make(nv, 0)
+  for i in 0..<nv {
+    indices[i] = i
+  }
+  // Simple selection sort (small n)
+  for i in 0..<nv {
+    let mut max_idx = i
+    for j in (i + 1)..<nv {
+      if values[indices[j]] > values[indices[max_idx]] {
+        max_idx = j
+      }
+    }
+    if max_idx != i {
+      let tmp = indices[i]
+      indices[i] = indices[max_idx]
+      indices[max_idx] = tmp
+    }
+  }
+  let mut total = 0
+  for i in 0..<nv {
+    total = total + values[i]
+  }
+  if total == 0 {
+    total = 1
+  }
+  // Slice-and-dice layout: alternate horizontal/vertical splits
+  treemap_layout(
+    indices, values, cats, colors, px_, py, pw, ph, total, true, "",
+  )
+}
+
+///|
+/// Recursive slice-and-dice treemap layout.
+fn treemap_layout(
+  indices : Array[Int],
+  values : Array[Int],
+  cats : Array[String],
+  colors : Array[String],
+  x : Int,
+  y : Int,
+  w : Int,
+  h : Int,
+  total : Int,
+  horizontal : Bool,
+  svg : String,
+) -> String {
+  let n = indices.length()
+  if n == 0 || total == 0 {
+    return svg
+  }
+  let mut result = svg
+  if n == 1 {
+    let idx = indices[0]
+    let color = get_dpt_color([], idx, colors)
+    result = result + "<rect x=\"" + int_to_str(x) + "\" y=\"" + int_to_str(
+        y,
+      ) + "\" width=\"" + int_to_str(w) + "\" height=\"" + int_to_str(h) + "\" fill=\"" + color + "\" stroke=\"white\" stroke-width=\"1\"/>"
+    // Label if large enough
+    if w > 30 && h > 14 && idx < cats.length() {
+      result = result + "<text x=\"" + int_to_str(x + 4) + "\" y=\"" + int_to_str(
+          y + 13,
+        ) + "\" font-size=\"10\" fill=\"white\" clip-path=\"inset(0)\">" + svg_escape(
+          cats[idx],
+        ) + "</text>"
+    }
+    return result
+  }
+  // Split roughly in half by value
+  let mut half_total = 0
+  let mut split = 0
+  let half_target = total / 2
+  for i in 0..<n {
+    half_total = half_total + values[indices[i]]
+    split = i + 1
+    if half_total >= half_target {
+      break
+    }
+  }
+  if split == 0 {
+    split = 1
+  }
+  if split >= n {
+    split = n - 1
+  }
+  let first : Array[Int] = []
+  let second : Array[Int] = []
+  let mut first_total = 0
+  for i in 0..<split {
+    first.push(indices[i])
+    first_total = first_total + values[indices[i]]
+  }
+  for i in split..<n {
+    second.push(indices[i])
+  }
+  let second_total = total - first_total
+  if horizontal {
+    let w1 = mul_div(first_total, w, total)
+    let w2 = w - w1
+    result = treemap_layout(
+      first, values, cats, colors, x, y, w1, h, first_total, not(horizontal),
+      result,
+    )
+    result = treemap_layout(
+      second, values, cats, colors, x + w1, y, w2, h, second_total,
+      not(horizontal), result,
+    )
+  } else {
+    let h1 = mul_div(first_total, h, total)
+    let h2 = h - h1
+    result = treemap_layout(
+      first, values, cats, colors, x, y, w, h1, first_total, not(horizontal),
+      result,
+    )
+    result = treemap_layout(
+      second, values, cats, colors, x, y + h1, w, h2, second_total,
+      not(horizontal), result,
+    )
+  }
+  result
+}
+
+///|
+/// Sunburst chart: single-level concentric pie chart.
+fn render_sunburst_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+) -> String {
+  // Sunburst with single level is equivalent to a pie chart
+  if group.series.is_empty() {
+    return ""
+  }
+  let ser = group.series[0]
+  let values = get_num_values(ser.val)
+  let nv = values.length()
+  if nv == 0 {
+    return ""
+  }
+  let mut total = 0
+  for i in 0..<nv {
+    total = total + values[i]
+  }
+  if total == 0 {
+    return ""
+  }
+  let cx = px_ + pw / 2
+  let cy = py + ph / 2
+  let r = (if pw < ph { pw } else { ph }) / 2 - chart_pie_pad
+  let inner_r = r * chart_sunburst_inner_pct / 100
+  // Render as donut slices
+  let mut svg = ""
+  let mut start_angle = chart_pie_start_angle
+  for i in 0..<nv {
+    let sweep = mul_div(values[i], 36000, total)
+    if sweep == 0 {
+      continue
+    }
+    let end_angle = start_angle + sweep
+    let color = get_dpt_color(ser.data_points, i, colors)
+    let large_arc = if sweep > 18000 { "1" } else { "0" }
+    // Outer arc points
+    let sx = cx + mul_div(r, cos1000(start_angle), 1000)
+    let sy = cy + mul_div(r, sin1000(start_angle), 1000)
+    let ex = cx + mul_div(r, cos1000(end_angle), 1000)
+    let ey = cy + mul_div(r, sin1000(end_angle), 1000)
+    // Inner arc points
+    let isx = cx + mul_div(inner_r, cos1000(start_angle), 1000)
+    let isy = cy + mul_div(inner_r, sin1000(start_angle), 1000)
+    let iex = cx + mul_div(inner_r, cos1000(end_angle), 1000)
+    let iey = cy + mul_div(inner_r, sin1000(end_angle), 1000)
+    let r_str = int_to_str(r)
+    let ir_str = int_to_str(inner_r)
+    svg = svg + "<path d=\"M" + int_to_str(sx) + " " + int_to_str(sy) + "A" + r_str + " " + r_str + " 0 " + large_arc + " 1 " + int_to_str(
+        ex,
+      ) + " " + int_to_str(ey) + "L" + int_to_str(iex) + " " + int_to_str(
+        iey,
+      ) + "A" + ir_str + " " + ir_str + " 0 " + large_arc + " 0 " + int_to_str(
+        isx,
+      ) + " " + int_to_str(isy) + "Z\" fill=\"" + color + "\" stroke=\"white\" stroke-width=\"1\"/>"
+    start_angle = end_angle
+  }
+  svg
+}
+
+///|
+/// Funnel chart: centered bars decreasing in width.
+fn render_funnel_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+) -> String {
+  if group.series.is_empty() {
+    return ""
+  }
+  let ser = group.series[0]
+  let values = get_num_values(ser.val)
+  let cats = get_cat_labels(ser.cat)
+  let nv = values.length()
+  if nv == 0 {
+    return ""
+  }
+  let mut max_val = 0
+  for i in 0..<nv {
+    if values[i] > max_val {
+      max_val = values[i]
+    }
+  }
+  if max_val == 0 {
+    max_val = 1
+  }
+  let gap = chart_funnel_gap
+  let bar_h = (ph - gap * (nv - 1)) / nv
+  let bar_h_final = if bar_h < 4 { 4 } else { bar_h }
+  let cx = px_ + pw / 2
+  let mut svg = ""
+  for i in 0..<nv {
+    let bar_w = mul_div(values[i], pw, max_val)
+    let bar_x = cx - bar_w / 2
+    let bar_y = py + i * (bar_h_final + gap)
+    let color = get_dpt_color(ser.data_points, i, colors)
+    svg = svg + "<rect x=\"" + int_to_str(bar_x) + "\" y=\"" + int_to_str(
+        bar_y,
+      ) + "\" width=\"" + int_to_str(bar_w) + "\" height=\"" + int_to_str(
+        bar_h_final,
+      ) + "\" fill=\"" + color + "\" rx=\"2\"/>"
+    // Label
+    if i < cats.length() {
+      svg = svg + "<text x=\"" + int_to_str(cx) + "\" y=\"" + int_to_str(
+          bar_y + bar_h_final / 2 + 4,
+        ) + "\" text-anchor=\"middle\" font-size=\"10\" fill=\"white\">" + svg_escape(
+          cats[i],
+        ) + "</text>"
+    }
+  }
+  svg
+}
+
+///|
+/// Box & Whisker chart: statistical box plots.
+fn render_box_whisker_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
+) -> String {
+  if group.series.is_empty() {
+    return ""
+  }
+  let ser = group.series[0]
+  let values = get_num_values(ser.val)
+  let cats = get_cat_labels(ser.cat)
+  let nv = values.length()
+  if nv == 0 {
+    return ""
+  }
+  // For box-whisker we expect data in groups:
+  // Simple approach: if only 1 series, sort values and compute quartiles
+  // per category. If multiple series, treat each series as one box.
+  let ns = group.series.length()
+  if ns >= 2 {
+    // Multiple series: each series is one box category
+    // Gather all values per series to compute quartiles
+    let mut global_max = 0
+    let all_quartiles : Array[Array[Int]] = []
+    for si in 0..<ns {
+      let vals = get_num_values(group.series[si].val)
+      let q = compute_quartiles(vals)
+      all_quartiles.push(q)
+      if q.length() >= 5 && q[4] > global_max {
+        global_max = q[4]
+      }
+    }
+    let max_val = compute_axis_max(global_max, axes)
+    if max_val == 0 {
+      return ""
+    }
+    return render_box_whisker_boxes(
+      all_quartiles, cats, ns, px_, py, pw, ph, max_val, colors,
+    )
+  }
+  // Single series: treat values directly as raw data for one box
+  let q = compute_quartiles(values)
+  if q.length() < 5 {
+    return ""
+  }
+  let max_val = compute_axis_max(q[4], axes)
+  if max_val == 0 {
+    return ""
+  }
+  render_box_whisker_boxes(
+    [q], cats, 1, px_, py, pw, ph, max_val, colors,
+  )
+}
+
+///|
+/// Render box-whisker boxes given pre-computed quartiles.
+fn render_box_whisker_boxes(
+  quartiles : Array[Array[Int]],
+  cats : Array[String],
+  nc : Int,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  max_val : Int,
+  colors : Array[String],
+) -> String {
+  let mut svg = ""
+  let gap_pct = chart_box_whisker_gap_pct
+  let total_units = nc * 100 + (nc + 1) * gap_pct
+  for ci in 0..<nc {
+    if ci >= quartiles.length() || quartiles[ci].length() < 5 {
+      continue
+    }
+    let q = quartiles[ci]
+    let min_v = q[0]
+    let q1 = q[1]
+    let med = q[2]
+    let q3 = q[3]
+    let max_v = q[4]
+    let box_x = px_ + mul_div((ci * 100 + (ci + 1) * gap_pct), pw, total_units)
+    let box_w = mul_div(100, pw, total_units)
+    let cx = box_x + box_w / 2
+    let color = colors[ci % colors.length()]
+    // Y coordinates (inverted)
+    let min_y = py + ph - mul_div(min_v, ph, max_val)
+    let q1_y = py + ph - mul_div(q1, ph, max_val)
+    let med_y = py + ph - mul_div(med, ph, max_val)
+    let q3_y = py + ph - mul_div(q3, ph, max_val)
+    let max_y = py + ph - mul_div(max_v, ph, max_val)
+    // Whisker: vertical line from min to max
+    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" + int_to_str(
+        max_y,
+      ) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" + int_to_str(q3_y) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" + int_to_str(
+        q1_y,
+      ) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" + int_to_str(min_y) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+    // Whisker caps (horizontal lines at min and max)
+    let cap_w = box_w / 3
+    svg = svg + "<line x1=\"" + int_to_str(cx - cap_w) + "\" y1=\"" + int_to_str(
+        max_y,
+      ) + "\" x2=\"" + int_to_str(cx + cap_w) + "\" y2=\"" + int_to_str(
+        max_y,
+      ) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+    svg = svg + "<line x1=\"" + int_to_str(cx - cap_w) + "\" y1=\"" + int_to_str(
+        min_y,
+      ) + "\" x2=\"" + int_to_str(cx + cap_w) + "\" y2=\"" + int_to_str(
+        min_y,
+      ) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+    // Box: Q1 to Q3
+    let box_h = q1_y - q3_y
+    let box_h_clamped = if box_h < 1 { 1 } else { box_h }
+    svg = svg + "<rect x=\"" + int_to_str(box_x) + "\" y=\"" + int_to_str(
+        q3_y,
+      ) + "\" width=\"" + int_to_str(box_w) + "\" height=\"" + int_to_str(
+        box_h_clamped,
+      ) + "\" fill=\"" + color + "\" fill-opacity=\"0.3\" stroke=\"" + color + "\" stroke-width=\"1.5\"/>"
+    // Median line
+    svg = svg + "<line x1=\"" + int_to_str(box_x) + "\" y1=\"" + int_to_str(
+        med_y,
+      ) + "\" x2=\"" + int_to_str(box_x + box_w) + "\" y2=\"" + int_to_str(
+        med_y,
+      ) + "\" stroke=\"" + color + "\" stroke-width=\"2\"/>"
+    // Category label
+    if ci < cats.length() {
+      svg = svg + "<text x=\"" + int_to_str(cx) + "\" y=\"" + int_to_str(
+          py + ph + chart_label_offset_y,
+        ) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"" + chart_axis_label_color + "\">" + svg_escape(
+          cats[ci],
+        ) + "</text>"
+    }
+  }
+  svg
+}
+
+///|
+/// Compute quartiles [min, Q1, median, Q3, max] from an array of values.
+fn compute_quartiles(values : Array[Int]) -> Array[Int] {
+  let n = values.length()
+  if n == 0 {
+    return []
+  }
+  // Copy and sort
+  let sorted : Array[Int] = Array::make(n, 0)
+  for i in 0..<n {
+    sorted[i] = values[i]
+  }
+  // Simple insertion sort (typically small n for chart data)
+  for i in 1..<n {
+    let key = sorted[i]
+    let mut j = i - 1
+    while j >= 0 && sorted[j] > key {
+      sorted[j + 1] = sorted[j]
+      j = j - 1
+    }
+    sorted[j + 1] = key
+  }
+  let min_v = sorted[0]
+  let max_v = sorted[n - 1]
+  let median = sorted[n / 2]
+  let q1 = sorted[n / 4]
+  let q3 = sorted[n * 3 / 4]
+  [min_v, q1, median, q3, max_v]
 }
