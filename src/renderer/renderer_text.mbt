@@ -18,22 +18,26 @@ fn build_font_family(
   latin : String,
 ) -> String {
   let mut ff = ""
-  if not(sym.is_empty()) { ff = sym }
-  if not(cs.is_empty()) { ff = if ff.is_empty() { cs } else { ff + ", " + cs } }
-  if not(ea.is_empty()) {
+  if !(sym.is_empty()) {
+    ff = sym
+  }
+  if !(cs.is_empty()) {
+    ff = if ff.is_empty() { cs } else { ff + ", " + cs }
+  }
+  if !(ea.is_empty()) {
     ff = if ff.is_empty() { ea } else { ff + ", " + ea }
     // Append platform fallbacks for EA font
     let fb = @ffi.ffi_get_font_fallback(ea)
-    if not(fb.is_empty()) {
+    if !(fb.is_empty()) {
       ff = ff + ", " + fb
     }
   }
-  if not(latin.is_empty()) {
+  if !(latin.is_empty()) {
     ff = if ff.is_empty() { latin } else { ff + ", " + latin }
     // Append platform fallbacks for Latin font (if different from EA)
     if latin != ea {
       let fb = @ffi.ffi_get_font_fallback(latin)
-      if not(fb.is_empty()) {
+      if !(fb.is_empty()) {
         ff = ff + ", " + fb
       }
     }
@@ -77,19 +81,65 @@ fn is_cjk(c : Char) -> Bool {
 /// (行頭禁止文字). These must not appear at the beginning of a line.
 fn is_kinsoku_start_prohibited(c : Char) -> Bool {
   // Japanese punctuation, closing brackets, etc.
-  c == '。' || c == '、' || c == '，' || c == '．' || c == '.' || c == ',' ||
-  c == ';' || c == ':' || c == '!' || c == '?' || c == '！' || c == '？' ||
-  c == '）' || c == '」' || c == '』' || c == '】' || c == '》' || c == '〉' ||
-  c == '｝' || c == ')' || c == '>' || c == ']' || c == '}' ||
-  c == 'ー' || c == '～' || c == '…' || c == '‥' ||
-  c == '・' || c == '：' || c == '；' ||
-  c == '゛' || c == '゜' || c == 'ゝ' || c == 'ゞ' || c == 'ヽ' || c == 'ヾ' ||
-  c == '々' || c == '〃' ||
+  c == '。' ||
+  c == '、' ||
+  c == '，' ||
+  c == '．' ||
+  c == '.' ||
+  c == ',' ||
+  c == ';' ||
+  c == ':' ||
+  c == '!' ||
+  c == '?' ||
+  c == '！' ||
+  c == '？' ||
+  c == '）' ||
+  c == '」' ||
+  c == '』' ||
+  c == '】' ||
+  c == '》' ||
+  c == '〉' ||
+  c == '｝' ||
+  c == ')' ||
+  c == '>' ||
+  c == ']' ||
+  c == '}' ||
+  c == 'ー' ||
+  c == '～' ||
+  c == '…' ||
+  c == '‥' ||
+  c == '・' ||
+  c == '：' ||
+  c == '；' ||
+  c == '゛' ||
+  c == '゜' ||
+  c == 'ゝ' ||
+  c == 'ゞ' ||
+  c == 'ヽ' ||
+  c == 'ヾ' ||
+  c == '々' ||
+  c == '〃' ||
   // Small kana
-  c == 'ぁ' || c == 'ぃ' || c == 'ぅ' || c == 'ぇ' || c == 'ぉ' ||
-  c == 'っ' || c == 'ゃ' || c == 'ゅ' || c == 'ょ' || c == 'ゎ' ||
-  c == 'ァ' || c == 'ィ' || c == 'ゥ' || c == 'ェ' || c == 'ォ' ||
-  c == 'ッ' || c == 'ャ' || c == 'ュ' || c == 'ョ' || c == 'ヮ'
+  c == 'ぁ' ||
+  c == 'ぃ' ||
+  c == 'ぅ' ||
+  c == 'ぇ' ||
+  c == 'ぉ' ||
+  c == 'っ' ||
+  c == 'ゃ' ||
+  c == 'ゅ' ||
+  c == 'ょ' ||
+  c == 'ゎ' ||
+  c == 'ァ' ||
+  c == 'ィ' ||
+  c == 'ゥ' ||
+  c == 'ェ' ||
+  c == 'ォ' ||
+  c == 'ッ' ||
+  c == 'ャ' ||
+  c == 'ュ' ||
+  c == 'ョ' ||
+  c == 'ヮ'
 }
 
 // ── Text wrapping ────────────────────────────────────────────────────────────
@@ -101,6 +151,7 @@ fn is_kinsoku_start_prohibited(c : Char) -> Bool {
 
 ///|
 /// Returns Array of lines, each line being Array of (run_idx, text).
+
 ///|
 /// Count space characters in a text fragment.
 fn count_spaces(text : String) -> Int {
@@ -148,20 +199,24 @@ fn measure_line_width(
       apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
       scale,
     ).to_double()
-    let ff = if not(run.ea_font.is_empty()) {
+    let ff = if !(run.ea_font.is_empty()) {
       run.ea_font
-    } else if not(run.font_face.is_empty()) {
+    } else if !(run.font_face.is_empty()) {
       run.font_face
     } else {
       theme.minor_font
     }
-    let text = if run.cap == "all" { to_upper_ascii(frag_text) } else { frag_text }
+    let text = if run.cap == "all" {
+      to_upper_ascii(frag_text)
+    } else {
+      frag_text
+    }
     total_spaces = total_spaces + count_spaces(text)
     // Accumulate same-font text for accurate measurement
     if ff == accum_ff && fs_px == accum_fs {
       accum = accum + text
     } else {
-      if not(accum.is_empty()) {
+      if !(accum.is_empty()) {
         total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
       }
       accum = text
@@ -170,12 +225,13 @@ fn measure_line_width(
     }
     fi = fi + 1
   }
-  if not(accum.is_empty()) {
+  if !(accum.is_empty()) {
     total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
   }
   (total_w, total_spaces)
 }
 
+///|
 fn wrap_paragraph(
   para : @ooxml.TextParagraph,
   max_width : Int,
@@ -209,9 +265,9 @@ fn wrap_paragraph(
       apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
       scale,
     ).to_double()
-    let ff = if not(run.ea_font.is_empty()) {
+    let ff = if !(run.ea_font.is_empty()) {
       run.ea_font
-    } else if not(run.font_face.is_empty()) {
+    } else if !(run.font_face.is_empty()) {
       run.font_face
     } else {
       theme.minor_font
@@ -236,7 +292,7 @@ fn wrap_paragraph(
     }
     // When font changes, lock in the accumulated width and reset
     if ff != run_ff || fs_px != run_fs {
-      if not(run_accum.is_empty()) {
+      if !(run_accum.is_empty()) {
         cur_width = cur_width + @ffi.ffi_measure_text(run_accum, run_ff, run_fs)
         run_accum = ""
       }
@@ -471,7 +527,7 @@ fn para_baseline_shift_extra(
     }
     i = i + 1
   }
-  if not(has_super) && not(has_sub) {
+  if !(has_super) && !(has_sub) {
     return (0, 0)
   }
   let font_emu = para_max_font_emu(para)
@@ -520,8 +576,15 @@ fn para_line_height(
 ///|
 /// Build CSS rgba() color string from Color + alpha fallback.
 fn css_rgba(clr : @ooxml.Color, alpha_fallback : String) -> String {
-  "rgba(" + int_to_str(clr.r) + "," + int_to_str(clr.g) + "," +
-  int_to_str(clr.b) + "," + eff_alpha_str(clr, alpha_fallback) + ")"
+  "rgba(" +
+  int_to_str(clr.r) +
+  "," +
+  int_to_str(clr.g) +
+  "," +
+  int_to_str(clr.b) +
+  "," +
+  eff_alpha_str(clr, alpha_fallback) +
+  ")"
 }
 
 ///|
@@ -540,8 +603,14 @@ fn render_css_drop_shadow(
   let dy = d * sin_deg(angle_deg) / 100
   let std_dev = if blur / 2 > 0 { blur / 2 } else { 1 }
   "drop-shadow(" +
-    int_to_str(dx) + "px " + int_to_str(dy) + "px " +
-    int_to_str(std_dev) + "px " + css_rgba(color, "0.5") + ")"
+  int_to_str(dx) +
+  "px " +
+  int_to_str(dy) +
+  "px " +
+  int_to_str(std_dev) +
+  "px " +
+  css_rgba(color, "0.5") +
+  ")"
 }
 
 ///|
@@ -553,35 +622,39 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
   }
   let mut filters = ""
   // Outer shadow → CSS drop-shadow(dx dy blur color)
-  if not(eff.outer_shadow.is_none()) {
+  if !(eff.outer_shadow.is_none()) {
     let os = eff.outer_shadow
     filters = filters +
       render_css_drop_shadow(os.blur_rad, os.dist, os.dir, os.color, scale)
   }
   // Preset shadow → CSS drop-shadow (same as outer shadow, using preset blur)
-  if not(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
+  if !(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
     let ps = eff.prst_shadow
-    if not(filters.is_empty()) {
+    if !(filters.is_empty()) {
       filters = filters + " "
     }
     filters = filters +
       render_css_drop_shadow(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
   // Glow → approximation as drop-shadow with no offset
-  if not(eff.glow.is_none()) {
+  if !(eff.glow.is_none()) {
     let rad = emu_to_filter_px(eff.glow.rad, scale)
     let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
-    if not(filters.is_empty()) {
+    if !(filters.is_empty()) {
       filters = filters + " "
     }
-    filters = filters + "drop-shadow(0px 0px " +
-      int_to_str(std_dev) + "px " + css_rgba(eff.glow.color, "0.7") + ")"
+    filters = filters +
+      "drop-shadow(0px 0px " +
+      int_to_str(std_dev) +
+      "px " +
+      css_rgba(eff.glow.color, "0.7") +
+      ")"
   }
   // Blur
-  if not(eff.blur.is_none()) {
+  if !(eff.blur.is_none()) {
     let rad = emu_to_filter_px(eff.blur.rad, scale)
     let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
-    if not(filters.is_empty()) {
+    if !(filters.is_empty()) {
       filters = filters + " "
     }
     filters = filters + "blur(" + int_to_str(std_dev) + "px)"
@@ -623,21 +696,26 @@ fn render_run_tspan(
       )
   }
   // font-family: sym_font, cs_font, ea_font, latin_font, sans-serif
-  let ff = build_font_family(run.sym_font, run.cs_font, run.ea_font, run.font_face)
-  if not(ff.is_empty()) {
+  let ff = build_font_family(
+    run.sym_font,
+    run.cs_font,
+    run.ea_font,
+    run.font_face,
+  )
+  if !(ff.is_empty()) {
     span = span + a("font-family", ff + ", sans-serif")
   }
   // Color: explicit color, or theme hlink/folHlink color for hyperlinks
   // For text gradient fill, use the first stop color as fallback display
-  if not(run.text_grad_fill.is_none()) && run.text_grad_fill.stops.length() > 0 {
+  if !(run.text_grad_fill.is_none()) && run.text_grad_fill.stops.length() > 0 {
     span = span + a("fill", run.text_grad_fill.stops[0].color.to_css())
-  } else if not(run.color.is_none()) {
+  } else if !(run.color.is_none()) {
     span = span + a("fill", run.color.to_css())
-  } else if not(run.hlink_rid.is_empty()) && not(theme.hlink.is_none()) {
+  } else if !(run.hlink_rid.is_empty()) && !(theme.hlink.is_none()) {
     span = span + a("fill", theme.hlink.to_css())
   }
   // Text outline: render as SVG stroke on text
-  if not(run.outline_color.is_none()) && run.outline_w > 0 {
+  if !(run.outline_color.is_none()) && run.outline_w > 0 {
     span = span + a("stroke", run.outline_color.to_css())
     let ow_px = px(run.outline_w, scale)
     if ow_px > 0 {
@@ -658,7 +736,7 @@ fn render_run_tspan(
   }
   // Text decorations
   let mut deco = ""
-  if not(run.underline.is_empty()) && run.underline != "none" {
+  if !(run.underline.is_empty()) && run.underline != "none" {
     deco = "underline"
   }
   if run.strike == "sngStrike" || run.strike == "dblStrike" {
@@ -668,7 +746,7 @@ fn render_run_tspan(
       deco = deco + " line-through"
     }
   }
-  if not(deco.is_empty()) {
+  if !(deco.is_empty()) {
     span = span + a("text-decoration", deco)
   }
   // Superscript / subscript via baseline-shift
@@ -702,40 +780,53 @@ fn render_run_tspan(
     da("hlink-rid", run.hlink_rid) +
     da("hlink-hover-rid", run.hlink_mouse_over_rid) +
     // Text outline round-trip
-    da("outline-color", if run.outline_color.is_none() { "" } else { run.outline_color.to_hex() }) +
+    da(
+      "outline-color",
+      if run.outline_color.is_none() {
+        ""
+      } else {
+        run.outline_color.to_hex()
+      },
+    ) +
     dai("outline-w", run.outline_w) +
     // Text gradient fill round-trip
-    (if not(run.text_grad_fill.is_none()) {
+    (if !(run.text_grad_fill.is_none()) {
       da("tgrad-stops", grad_stops_attr(run.text_grad_fill)) +
       dai("tgrad-angle", run.text_grad_fill.angle) +
       da("tgrad-path", run.text_grad_fill.path_type) +
       da("tgrad-rot", if run.text_grad_fill.rot_with_shape { "1" } else { "0" })
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // Text pattern fill round-trip
-    (if not(run.text_patt_fill.is_none()) {
+    (if !(run.text_patt_fill.is_none()) {
       da("tpatt-prst", run.text_patt_fill.prst) +
       da("tpatt-fg", run.text_patt_fill.fg_color.to_hex()) +
       da("tpatt-bg", run.text_patt_fill.bg_color.to_hex())
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // Text-level effect data attributes (round-trip only)
-    (if not(run.effects.is_none()) {
+    (if !(run.effects.is_none()) {
       let eff = run.effects
       let mut ea = ""
-      if not(eff.outer_shadow.is_none()) {
+      if !(eff.outer_shadow.is_none()) {
         let os = eff.outer_shadow
-        ea = ea + dai("reff-os-blur", os.blur_rad) +
+        ea = ea +
+          dai("reff-os-blur", os.blur_rad) +
           dai("reff-os-dist", os.dist) +
           dai("reff-os-dir", os.dir) +
           da("reff-os-clr", os.color.to_hex())
       }
-      if not(eff.glow.is_none()) {
-        ea = ea + dai("reff-gl-rad", eff.glow.rad) +
+      if !(eff.glow.is_none()) {
+        ea = ea +
+          dai("reff-gl-rad", eff.glow.rad) +
           da("reff-gl-clr", eff.glow.color.to_hex())
       }
-      if not(eff.blur.is_none()) {
+      if !(eff.blur.is_none()) {
         ea = ea + dai("reff-blur-rad", eff.blur.rad)
       }
-      if not(eff.prst_shadow.is_none()) {
+      if !(eff.prst_shadow.is_none()) {
         let ps = eff.prst_shadow
         ea = ea +
           da("reff-ps-prst", ps.prst) +
@@ -744,18 +835,22 @@ fn render_run_tspan(
           da("reff-ps-clr", ps.color.to_hex())
       }
       ea
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // OMML math equation raw XML for round-trip
     (if run.math_xml.length() > 0 {
       da("math-xml", @xml.xml_escape(run.math_xml))
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     // CSS filter for text-level effects (shadow/glow visual rendering)
     render_text_effect_style(run.effects, scale)
   // Wrap in hyperlink if present
   let inner = svg_escape(display_text)
-  if not(run.hlink_rid.is_empty()) {
+  if !(run.hlink_rid.is_empty()) {
     let url = @ooxml.find_rel_target(rels, run.hlink_rid)
-    if not(url.is_empty()) {
+    if !(url.is_empty()) {
       span + "><a href=\"" + svg_escape(url) + "\">" + inner + "</a></tspan>"
     } else {
       span + ">" + inner + "</tspan>"
@@ -781,7 +876,7 @@ fn render_text(
   }
   // Warp text: delegate to warp renderer for non-trivial presets
   let wp = body_props.warp_prst
-  if not(wp.is_empty()) && wp != "textNoShape" && wp != "textPlain" {
+  if !(wp.is_empty()) && wp != "textNoShape" && wp != "textPlain" {
     return render_warp_text(
       paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
     )
@@ -931,7 +1026,9 @@ fn render_text(
       // First try increasing line spacing reduction (up to 20%)
       if lr < 20000 {
         lr = lr + 5000
-        if lr > 20000 { lr = 20000 }
+        if lr > 20000 {
+          lr = 20000
+        }
         autofit_pass = autofit_pass + 1
         continue
       }
@@ -969,7 +1066,11 @@ fn render_text(
   // But clamp to -pad_t so text never starts above the shape's top edge.
   // For "t"/"b", clamp to 0 so text stays within the padding boundary.
   let anchor_offset_clamped = if body_props.anchor == "ctr" {
-    if anchor_offset >= 0 - pad_t { anchor_offset } else { 0 - pad_t }
+    if anchor_offset >= 0 - pad_t {
+      anchor_offset
+    } else {
+      0 - pad_t
+    }
   } else if anchor_offset > 0 {
     anchor_offset
   } else {
@@ -1086,20 +1187,22 @@ fn render_text(
       let is_justify = effective_align == "just"
       // anchor_x: first line uses first_line_indent, continuation uses indent (marL)
       // Justify uses left-align positioning as base
-      let (anchor_x, cont_anchor_x_init, anchor_attr) = if effective_align == "ctr" ||
+      let (anchor_x, cont_anchor_x_init, anchor_attr) = if effective_align ==
+        "ctr" ||
         effective_align == "c" {
         (
           text_x + first_line_indent + (text_w - first_line_indent) / 2,
           text_x + indent + (text_w - indent) / 2,
           " text-anchor=\"middle\"",
         )
-      } else if effective_align == "r" || (para.rtl && effective_align != "l" && not(is_justify)) {
+      } else if effective_align == "r" ||
+        (para.rtl && effective_align != "l" && !(is_justify)) {
         if para.rtl {
           (text_x + text_w, text_x + text_w, " text-anchor=\"start\"")
         } else {
           (text_x + text_w, text_x + text_w, " text-anchor=\"end\"")
         }
-      } else if para.rtl && not(is_justify) {
+      } else if para.rtl && !(is_justify) {
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"end\"")
       } else {
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"start\"")
@@ -1120,9 +1223,9 @@ fn render_text(
       // Determine bullet text
       let bullet_text = if para.bullet_none {
         ""
-      } else if not(para.bullet.is_empty()) {
+      } else if !(para.bullet.is_empty()) {
         para.bullet
-      } else if not(para.bullet_auto.is_empty()) {
+      } else if !(para.bullet_auto.is_empty()) {
         let auto_idx = auto_num_counters[cur_level]
         auto_num_counters[cur_level] = auto_idx + 1
         auto_number_text(para.bullet_auto, auto_idx)
@@ -1130,12 +1233,12 @@ fn render_text(
         ""
       }
       // Image bullet: render <image> element before text
-      if not(para.bullet_img_rid.is_empty()) {
+      if !(para.bullet_img_rid.is_empty()) {
         let bu_target = @ooxml.find_rel_target(rels, para.bullet_img_rid)
-        if not(bu_target.is_empty()) {
+        if !(bu_target.is_empty()) {
           let bu_img_path = resolve_image_path(bu_target)
           let bu_b64 = @ffi.ffi_get_file_base64(bu_img_path)
-          if not(bu_b64.is_empty()) {
+          if !(bu_b64.is_empty()) {
             let bu_mime = mime_from_ext(bu_img_path)
             let bu_img_sz = p_font_sz // size bullet image to font size
             let bu_img_x = if para.rtl {
@@ -1172,9 +1275,9 @@ fn render_text(
         da("rtl", bool_str(para.rtl)) +
         ">"
       // Render bullet if present
-      if not(bullet_text.is_empty()) {
+      if !(bullet_text.is_empty()) {
         let mut bu_span = "<tspan"
-        if not(para.bullet_font.is_empty()) {
+        if !(para.bullet_font.is_empty()) {
           bu_span = bu_span +
             a("font-family", para.bullet_font + ", sans-serif")
         }
@@ -1189,7 +1292,7 @@ fn render_text(
           bu_span = bu_span +
             ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
         }
-        if not(para.bullet_color.is_none()) {
+        if !(para.bullet_color.is_none()) {
           bu_span = bu_span + a("fill", para.bullet_color.to_css())
         }
         out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
@@ -1218,7 +1321,8 @@ fn render_text(
               text_x = base_text_x + (col_w + col_spacing_px) * cur_col
               cur_y = base_y + p_font_sz
               // Recompute anchor for new column (use continuation indent)
-              cur_anchor_x = if effective_align == "ctr" || effective_align == "c" {
+              cur_anchor_x = if effective_align == "ctr" ||
+                effective_align == "c" {
                 text_x + indent + (text_w - indent) / 2
               } else if effective_align == "r" {
                 text_x + text_w
@@ -1250,7 +1354,7 @@ fn render_text(
           }
           // On first line with bullet, reposition to cont_anchor_x (= marL)
           // so text aligns with continuation lines (OOXML text starts at marL)
-          if vli == 0 && not(bullet_text.is_empty()) {
+          if vli == 0 && !(bullet_text.is_empty()) {
             out = out +
               "</tspan><tspan" +
               ai("x", cont_anchor_x) +
@@ -1260,7 +1364,9 @@ fn render_text(
               ">"
           }
           // Justify: calculate word-spacing for non-last lines
-          let justify_ws_attr = if is_justify && vli < nvl - 1 && vline.length() > 0 {
+          let justify_ws_attr = if is_justify &&
+            vli < nvl - 1 &&
+            vline.length() > 0 {
             let avail_w = if vli == 0 {
               text_w - first_line_indent
             } else {
@@ -1275,9 +1381,17 @@ fn render_text(
                 let ws = extra_px / space_count.to_double()
                 // Round to 1 decimal
                 let ws_10 = (ws * 10.0).to_int()
-                " word-spacing=\"" + int_to_str(ws_10 / 10) + "." + int_to_str(
-                  if ws_10 % 10 < 0 { -(ws_10 % 10) } else { ws_10 % 10 },
-                ) + "\""
+                " word-spacing=\"" +
+                int_to_str(ws_10 / 10) +
+                "." +
+                int_to_str(
+                  if ws_10 % 10 < 0 {
+                    -(ws_10 % 10)
+                  } else {
+                    ws_10 % 10
+                  },
+                ) +
+                "\""
               } else {
                 ""
               }
@@ -1297,9 +1411,17 @@ fn render_text(
                 if extra_px > 0.0 {
                   let ls = extra_px / (total_chars - 1).to_double()
                   let ls_10 = (ls * 10.0).to_int()
-                  " letter-spacing=\"" + int_to_str(ls_10 / 10) + "." + int_to_str(
-                    if ls_10 % 10 < 0 { -(ls_10 % 10) } else { ls_10 % 10 },
-                  ) + "\""
+                  " letter-spacing=\"" +
+                  int_to_str(ls_10 / 10) +
+                  "." +
+                  int_to_str(
+                    if ls_10 % 10 < 0 {
+                      -(ls_10 % 10)
+                    } else {
+                      ls_10 % 10
+                    },
+                  ) +
+                  "\""
                 } else {
                   ""
                 }
@@ -1311,10 +1433,11 @@ fn render_text(
             ""
           }
           // Apply justify spacing to current line's tspan if needed
-          if not(justify_ws_attr.is_empty()) {
+          if !(justify_ws_attr.is_empty()) {
             // Re-emit the current tspan with word-spacing
             // Close and reopen with the spacing attribute
-            out = out + "</tspan><tspan" +
+            out = out +
+              "</tspan><tspan" +
               ai("x", cur_anchor_x) +
               ai("y", cur_y) +
               anchor_attr +

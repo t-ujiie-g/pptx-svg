@@ -116,11 +116,15 @@ fn render_table_cell_text(
   }
   let y_offset = if y_raw < pad_t { pad_t } else { y_raw }
   // Default text color: style > auto-contrast > black
-  let style_fill = if not(style_cell.font_color.is_none()) {
+  let style_fill = if !(style_cell.font_color.is_none()) {
     style_cell.font_color.to_css()
-  } else if not(cell_fill.is_none()) {
+  } else if !(cell_fill.is_none()) {
     let lum = cell_fill.r * 299 + cell_fill.g * 587 + cell_fill.b * 114
-    if lum < auto_contrast_lum_threshold { "#FFFFFF" } else { default_text_fill }
+    if lum < auto_contrast_lum_threshold {
+      "#FFFFFF"
+    } else {
+      default_text_fill
+    }
   } else {
     default_text_fill
   }
@@ -181,10 +185,15 @@ fn render_table_cell_text(
         (text_x, "start")
       }
       // Render bullet on first line only
-      if li == 0 && not(para.bullet.is_empty()) && algn != "ctr" && algn != "r" {
+      if li == 0 && !(para.bullet.is_empty()) && algn != "ctr" && algn != "r" {
         let bul_x = cell_x + pad_l + bul_mar + bul_indent
-        out = out + "<tspan" + ai("x", bul_x) + ai("y", cur_y) + ">" +
-          para.bullet + " </tspan>"
+        out = out +
+          "<tspan" +
+          ai("x", bul_x) +
+          ai("y", cur_y) +
+          ">" +
+          para.bullet +
+          " </tspan>"
       }
       // Line tspan
       out = out + "<tspan" + ai("x", line_x) + ai("y", cur_y)
@@ -205,9 +214,8 @@ fn render_table_cell_text(
             seg_text
           }
           // Use render_run_tspan with segment text instead of full run text
-          out = out + render_run_tspan(
-            run, run_idx, display, scale, -1, rels, theme,
-          )
+          out = out +
+            render_run_tspan(run, run_idx, display, scale, -1, rels, theme)
         }
         si = si + 1
       }
@@ -239,20 +247,43 @@ fn render_table_border_line(
   if w == -1 {
     return ""
   }
-  let sw = if w > 0 { let v = px(w, scale); if v < 1 { 1 } else { v } } else { 1 }
+  let sw = if w > 0 {
+    let v = px(w, scale)
+    if v < 1 {
+      1
+    } else {
+      v
+    }
+  } else {
+    1
+  }
   let sc = if color.is_none() { table_border_color } else { color.to_css() }
-  "<line" + ai("x1", x1) + ai("y1", y1) + ai("x2", x2) + ai("y2", y2) +
-    a("stroke", sc) + ai("stroke-width", sw) + "/>"
+  "<line" +
+  ai("x1", x1) +
+  ai("y1", y1) +
+  ai("x2", x2) +
+  ai("y2", y2) +
+  a("stroke", sc) +
+  ai("stroke-width", sw) +
+  "/>"
 }
 
 ///|
 fn eff_bdr_w(cell_w : Int, style_w : Int) -> Int {
-  if cell_w != 0 { cell_w } else { style_w }
+  if cell_w != 0 {
+    cell_w
+  } else {
+    style_w
+  }
 }
 
 ///|
 fn eff_bdr_c(cell_c : @ooxml.Color, style_c : @ooxml.Color) -> @ooxml.Color {
-  if not(cell_c.is_none()) { cell_c } else { style_c }
+  if !(cell_c.is_none()) {
+    cell_c
+  } else {
+    style_c
+  }
 }
 
 // ── Table style resolution ──────────────────────────────────────────────────
@@ -288,22 +319,22 @@ fn resolve_table_style_cell(
   // Priority: firstRow/lastRow/firstCol/lastCol > band > wholeTbl
   // Check special row/column positions first
   if table.first_row && row_idx == 0 {
-    if not(style.first_row.is_none()) {
+    if !(style.first_row.is_none()) {
       return style.first_row
     }
   }
   if table.last_row && row_idx == nrows - 1 {
-    if not(style.last_row.is_none()) {
+    if !(style.last_row.is_none()) {
       return style.last_row
     }
   }
   if table.first_col && col_idx == 0 {
-    if not(style.first_col.is_none()) {
+    if !(style.first_col.is_none()) {
       return style.first_col
     }
   }
   if table.last_col && col_idx == ncols - 1 {
-    if not(style.last_col.is_none()) {
+    if !(style.last_col.is_none()) {
       return style.last_col
     }
   }
@@ -312,13 +343,11 @@ fn resolve_table_style_cell(
     let effective_row = if table.first_row { row_idx - 1 } else { row_idx }
     if effective_row >= 0 {
       if effective_row % 2 == 0 {
-        if not(style.band1_h.is_none()) {
+        if !(style.band1_h.is_none()) {
           return style.band1_h
         }
-      } else {
-        if not(style.band2_h.is_none()) {
-          return style.band2_h
-        }
+      } else if !(style.band2_h.is_none()) {
+        return style.band2_h
       }
     }
   }
@@ -327,13 +356,11 @@ fn resolve_table_style_cell(
     let effective_col = if table.first_col { col_idx - 1 } else { col_idx }
     if effective_col >= 0 {
       if effective_col % 2 == 0 {
-        if not(style.band1_v.is_none()) {
+        if !(style.band1_v.is_none()) {
           return style.band1_v
         }
-      } else {
-        if not(style.band2_v.is_none()) {
-          return style.band2_v
-        }
+      } else if !(style.band2_v.is_none()) {
+        return style.band2_v
       }
     }
   }
@@ -369,7 +396,8 @@ fn render_table(
   let nrows = table.rows.length()
   let row_heights_emu : Array[Int] = []
   // Minimum row height: default font size + top/bottom margins
-  let min_row_h_emu = default_table_font_size_emu * line_height_numer /
+  let min_row_h_emu = default_table_font_size_emu *
+    line_height_numer /
     line_height_denom +
     default_cell_mar_tb * 2
   let mut rhi = 0
@@ -386,11 +414,27 @@ fn render_table(
       let mut col2 = 0
       while ci2 < nc {
         let cell = row.cells[ci2]
-        if not(cell.h_merge) && not(cell.v_merge) {
-          let mar_t_emu = if cell.mar_t >= 0 { cell.mar_t } else { default_cell_mar_tb }
-          let mar_b_emu = if cell.mar_b >= 0 { cell.mar_b } else { default_cell_mar_tb }
-          let mar_l_emu = if cell.mar_l >= 0 { cell.mar_l } else { default_cell_mar_lr }
-          let mar_r_emu = if cell.mar_r >= 0 { cell.mar_r } else { default_cell_mar_lr }
+        if !(cell.h_merge) && !(cell.v_merge) {
+          let mar_t_emu = if cell.mar_t >= 0 {
+            cell.mar_t
+          } else {
+            default_cell_mar_tb
+          }
+          let mar_b_emu = if cell.mar_b >= 0 {
+            cell.mar_b
+          } else {
+            default_cell_mar_tb
+          }
+          let mar_l_emu = if cell.mar_l >= 0 {
+            cell.mar_l
+          } else {
+            default_cell_mar_lr
+          }
+          let mar_r_emu = if cell.mar_r >= 0 {
+            cell.mar_r
+          } else {
+            default_cell_mar_lr
+          }
           // Compute cell width from grid spans
           let gs = if cell.grid_span > 1 { cell.grid_span } else { 1 }
           let mut cell_w_emu = 0
@@ -431,7 +475,14 @@ fn render_table(
             if nr > 0 && wrap_w_emu > 0 {
               // Estimate total text width and compute line count
               let wrap_w_px = px(wrap_w_emu, scale)
-              let vlines = wrap_paragraph(para, wrap_w_px, scale, px(default_table_font_size_emu, scale), -1, theme)
+              let vlines = wrap_paragraph(
+                para,
+                wrap_w_px,
+                scale,
+                px(default_table_font_size_emu, scale),
+                -1,
+                theme,
+              )
               wrap_lines = vlines.length()
               if wrap_lines < 1 {
                 wrap_lines = 1
@@ -447,14 +498,20 @@ fn render_table(
             pi = pi + 1
           }
           if np == 0 {
-            text_h_emu = default_table_font_size_emu * line_height_numer / line_height_denom
+            text_h_emu = default_table_font_size_emu *
+              line_height_numer /
+              line_height_denom
           }
           let cell_h_emu = text_h_emu + mar_t_emu + mar_b_emu
           if cell_h_emu > max_cell_h_emu {
             max_cell_h_emu = cell_h_emu
           }
         }
-        let gs3 = if row.cells[ci2].grid_span > 1 { row.cells[ci2].grid_span } else { 1 }
+        let gs3 = if row.cells[ci2].grid_span > 1 {
+          row.cells[ci2].grid_span
+        } else {
+          1
+        }
         col2 = col2 + gs3
         ci2 = ci2 + 1
       }
@@ -498,7 +555,7 @@ fn render_table(
       let span = cell.grid_span
       let mut merged_w_emu = 0
       let mut si = 0
-      while si < span && (col_idx + si) < ncols {
+      while si < span && col_idx + si < ncols {
         merged_w_emu = merged_w_emu + table.col_widths[col_idx + si]
         si = si + 1
       }
@@ -506,7 +563,7 @@ fn render_table(
       let rspan = cell.row_span
       let mut merged_h_emu = 0
       let mut sri = 0
-      while sri < rspan && (ri + sri) < nrows {
+      while sri < rspan && ri + sri < nrows {
         merged_h_emu = merged_h_emu + row_heights_emu[ri + sri]
         sri = sri + 1
       }
@@ -518,9 +575,9 @@ fn render_table(
         style, table, ri, col_idx, nrows, ncols,
       )
       // Cell background: explicit fill > style fill > none
-      let cell_fill = if not(cell.fill.is_none()) {
+      let cell_fill = if !(cell.fill.is_none()) {
         cell.fill.to_css()
-      } else if not(style_cell.fill.is_none()) {
+      } else if !(style_cell.fill.is_none()) {
         style_cell.fill.to_css()
       } else {
         "none"
@@ -534,27 +591,109 @@ fn render_table(
         a("fill", cell_fill) +
         " stroke=\"none\"/>"
       // Cell borders: explicit > style > default (top, bottom, left, right)
-      out = out + render_table_border_line(cx_px, ry, cx_px + cw, ry, eff_bdr_w(cell.bdr_t_w, style_cell.bdr_t_w), eff_bdr_c(cell.bdr_t_color, style_cell.bdr_t_color), scale)
-      out = out + render_table_border_line(cx_px, ry + ch, cx_px + cw, ry + ch, eff_bdr_w(cell.bdr_b_w, style_cell.bdr_b_w), eff_bdr_c(cell.bdr_b_color, style_cell.bdr_b_color), scale)
-      out = out + render_table_border_line(cx_px, ry, cx_px, ry + ch, eff_bdr_w(cell.bdr_l_w, style_cell.bdr_l_w), eff_bdr_c(cell.bdr_l_color, style_cell.bdr_l_color), scale)
-      out = out + render_table_border_line(cx_px + cw, ry, cx_px + cw, ry + ch, eff_bdr_w(cell.bdr_r_w, style_cell.bdr_r_w), eff_bdr_c(cell.bdr_r_color, style_cell.bdr_r_color), scale)
+      out = out +
+        render_table_border_line(
+          cx_px,
+          ry,
+          cx_px + cw,
+          ry,
+          eff_bdr_w(cell.bdr_t_w, style_cell.bdr_t_w),
+          eff_bdr_c(cell.bdr_t_color, style_cell.bdr_t_color),
+          scale,
+        )
+      out = out +
+        render_table_border_line(
+          cx_px,
+          ry + ch,
+          cx_px + cw,
+          ry + ch,
+          eff_bdr_w(cell.bdr_b_w, style_cell.bdr_b_w),
+          eff_bdr_c(cell.bdr_b_color, style_cell.bdr_b_color),
+          scale,
+        )
+      out = out +
+        render_table_border_line(
+          cx_px,
+          ry,
+          cx_px,
+          ry + ch,
+          eff_bdr_w(cell.bdr_l_w, style_cell.bdr_l_w),
+          eff_bdr_c(cell.bdr_l_color, style_cell.bdr_l_color),
+          scale,
+        )
+      out = out +
+        render_table_border_line(
+          cx_px + cw,
+          ry,
+          cx_px + cw,
+          ry + ch,
+          eff_bdr_w(cell.bdr_r_w, style_cell.bdr_r_w),
+          eff_bdr_c(cell.bdr_r_color, style_cell.bdr_r_color),
+          scale,
+        )
       // Diagonal borders
       if cell.bdr_tl_br_w > 0 {
-        out = out + render_table_border_line(cx_px, ry, cx_px + cw, ry + ch, cell.bdr_tl_br_w, cell.bdr_tl_br_color, scale)
+        out = out +
+          render_table_border_line(
+            cx_px,
+            ry,
+            cx_px + cw,
+            ry + ch,
+            cell.bdr_tl_br_w,
+            cell.bdr_tl_br_color,
+            scale,
+          )
       }
       if cell.bdr_bl_tr_w > 0 {
-        out = out + render_table_border_line(cx_px, ry + ch, cx_px + cw, ry, cell.bdr_bl_tr_w, cell.bdr_bl_tr_color, scale)
+        out = out +
+          render_table_border_line(
+            cx_px,
+            ry + ch,
+            cx_px + cw,
+            ry,
+            cell.bdr_bl_tr_w,
+            cell.bdr_bl_tr_color,
+            scale,
+          )
       }
       // Compute cell margins in pixels
-      let pad_l = px(if cell.mar_l >= 0 { cell.mar_l } else { default_cell_mar_lr }, scale)
-      let pad_t = px(if cell.mar_t >= 0 { cell.mar_t } else { default_cell_mar_tb }, scale)
-      let pad_b = px(if cell.mar_b >= 0 { cell.mar_b } else { default_cell_mar_tb }, scale)
+      let pad_l = px(
+        if cell.mar_l >= 0 {
+          cell.mar_l
+        } else {
+          default_cell_mar_lr
+        },
+        scale,
+      )
+      let pad_t = px(
+        if cell.mar_t >= 0 {
+          cell.mar_t
+        } else {
+          default_cell_mar_tb
+        },
+        scale,
+      )
+      let pad_b = px(
+        if cell.mar_b >= 0 {
+          cell.mar_b
+        } else {
+          default_cell_mar_tb
+        },
+        scale,
+      )
       // Cell text
-      let pad_r = px(if cell.mar_r >= 0 { cell.mar_r } else { default_cell_mar_lr }, scale)
+      let pad_r = px(
+        if cell.mar_r >= 0 {
+          cell.mar_r
+        } else {
+          default_cell_mar_lr
+        },
+        scale,
+      )
       // Resolve effective cell fill for auto-contrast text color
-      let eff_fill = if not(cell.fill.is_none()) {
+      let eff_fill = if !(cell.fill.is_none()) {
         cell.fill
-      } else if not(style_cell.fill.is_none()) {
+      } else if !(style_cell.fill.is_none()) {
         style_cell.fill
       } else {
         @ooxml.Color::none()

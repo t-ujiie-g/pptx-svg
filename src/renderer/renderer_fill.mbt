@@ -64,7 +64,7 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     ">" +
     stops_svg +
     "</linearGradient>"
-  } else if not(gf.path_type.is_empty()) {
+  } else if !(gf.path_type.is_empty()) {
     // Radial / path gradient
     let cx_s = if gf.fill_to_l >= 0 && gf.fill_to_r >= 0 {
       int_to_str((gf.fill_to_l + (100000 - gf.fill_to_r)) / ooxml_fill_to_pct)
@@ -462,7 +462,7 @@ fn render_pattern_def(pf : @ooxml.PatternFill, id : String) -> String {
 ///|
 /// Return CSS opacity string for an effect color, with a fallback default.
 fn eff_alpha_str(clr : @ooxml.Color, fallback : String) -> String {
-  if clr.alpha < 255 && not(clr.is_none()) {
+  if clr.alpha < 255 && !(clr.is_none()) {
     @ooxml.alpha_to_css_str(clr.alpha)
   } else {
     fallback
@@ -472,7 +472,11 @@ fn eff_alpha_str(clr : @ooxml.Color, fallback : String) -> String {
 ///|
 /// Convert OOXML EMU to SVG pixel value for filter attributes.
 fn emu_to_filter_px(emu : Int, scale : Int) -> Int {
-  if scale > 0 { emu / scale } else { emu / default_emu_per_px }
+  if scale > 0 {
+    emu / scale
+  } else {
+    emu / default_emu_per_px
+  }
 }
 
 ///|
@@ -492,16 +496,16 @@ fn render_drop_shadow_filter(
   let std_dev = blur / 2
   let alpha_str = eff_alpha_str(color, "0.5")
   "<feDropShadow dx=\"" +
-    int_to_str(dx) +
-    "\" dy=\"" +
-    int_to_str(dy) +
-    "\" stdDeviation=\"" +
-    int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
-    "\" flood-color=\"" +
-    color.to_css() +
-    "\" flood-opacity=\"" +
-    alpha_str +
-    "\" result=\"shadow\"/>"
+  int_to_str(dx) +
+  "\" dy=\"" +
+  int_to_str(dy) +
+  "\" stdDeviation=\"" +
+  int_to_str(if std_dev > 0 { std_dev } else { 1 }) +
+  "\" flood-color=\"" +
+  color.to_css() +
+  "\" flood-opacity=\"" +
+  alpha_str +
+  "\" result=\"shadow\"/>"
 }
 
 ///|
@@ -517,19 +521,19 @@ fn render_effect_filter(
   }
   let mut filters = ""
   // Outer shadow: SVG feDropShadow
-  if not(eff.outer_shadow.is_none()) {
+  if !(eff.outer_shadow.is_none()) {
     let os = eff.outer_shadow
     filters = filters +
       render_drop_shadow_filter(os.blur_rad, os.dist, os.dir, os.color, scale)
   }
   // Preset shadow: render as equivalent outer shadow using preset blur radius
-  if not(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
+  if !(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
     let ps = eff.prst_shadow
     filters = filters +
       render_drop_shadow_filter(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
   // Glow: feGaussianBlur + feFlood + feComposite + feMerge
-  if not(eff.glow.is_none()) {
+  if !(eff.glow.is_none()) {
     let rad = emu_to_filter_px(eff.glow.rad, scale)
     let std_dev = rad / 2
     let clr = eff.glow.color
@@ -548,7 +552,7 @@ fn render_effect_filter(
     ()
   }
   // Soft edge: feGaussianBlur on alpha, composite with source
-  if not(eff.soft_edge.is_none()) {
+  if !(eff.soft_edge.is_none()) {
     let rad = emu_to_filter_px(eff.soft_edge.rad, scale)
     let std_dev = rad / 2
     filters = filters +
@@ -559,7 +563,7 @@ fn render_effect_filter(
     ()
   }
   // Inner shadow: feGaussianBlur+feOffset on inverted alpha, flood+composite, merge
-  if not(eff.inner_shadow.is_none()) {
+  if !(eff.inner_shadow.is_none()) {
     let ishdw = eff.inner_shadow
     let blur = emu_to_filter_px(ishdw.blur_rad, scale)
     let dist = emu_to_filter_px(ishdw.dist, scale)
@@ -593,7 +597,7 @@ fn render_effect_filter(
     ()
   }
   // Blur: simple feGaussianBlur on SourceGraphic
-  if not(eff.blur.is_none()) {
+  if !(eff.blur.is_none()) {
     let rad = emu_to_filter_px(eff.blur.rad, scale)
     let std_dev = rad / 2
     filters = filters +
@@ -603,7 +607,7 @@ fn render_effect_filter(
     ()
   }
   // Fill overlay: feFlood + feBlend with blend mode
-  if not(eff.fill_overlay.is_none()) {
+  if !(eff.fill_overlay.is_none()) {
     let fo = eff.fill_overlay
     let clr = fo.color
     let alpha_str = eff_alpha_str(clr, "1.0")
@@ -651,13 +655,23 @@ fn render_reflection_mask_def(
   let st_opacity = format_ratio(r.st_alpha, @ooxml.pct_100)
   let end_opacity = format_ratio(r.end_alpha, @ooxml.pct_100)
   let grad_id = mask_id + "-g"
-  "<linearGradient id=\"" + grad_id + "\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">" +
-    "<stop offset=\"0%\" stop-color=\"white\" stop-opacity=\"" + st_opacity + "\"/>" +
-    "<stop offset=\"100%\" stop-color=\"white\" stop-opacity=\"" + end_opacity + "\"/>" +
-    "</linearGradient>" +
-    "<mask id=\"" + mask_id + "\">" +
-    "<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"url(#" + grad_id + ")\"/>" +
-    "</mask>"
+  "<linearGradient id=\"" +
+  grad_id +
+  "\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">" +
+  "<stop offset=\"0%\" stop-color=\"white\" stop-opacity=\"" +
+  st_opacity +
+  "\"/>" +
+  "<stop offset=\"100%\" stop-color=\"white\" stop-opacity=\"" +
+  end_opacity +
+  "\"/>" +
+  "</linearGradient>" +
+  "<mask id=\"" +
+  mask_id +
+  "\">" +
+  "<rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"url(#" +
+  grad_id +
+  ")\"/>" +
+  "</mask>"
 }
 
 ///|
@@ -681,27 +695,40 @@ fn render_reflection_element(
   // blur (optional)
   let blur_attr = if r.blur_rad > 0 {
     let blur_px = emu_to_filter_px(r.blur_rad, scale)
-    " filter=\"blur(" + int_to_str(if blur_px > 0 { blur_px } else { 1 }) + "px)\""
+    " filter=\"blur(" +
+    int_to_str(if blur_px > 0 { blur_px } else { 1 }) +
+    "px)\""
   } else {
     ""
   }
-  "<g transform=\"translate(0," + int_to_str(refl_y + cy_p) +
-    ") scale(1,-1) translate(0," + int_to_str(-refl_y) +
-    ")\" mask=\"url(#" + mask_id +
-    ")\" opacity=\"0.5\"" + blur_attr +
-    " style=\"pointer-events:none\">" +
-    "<use href=\"#" + shape_id +
-    "\" x=\"0\" y=\"0\" width=\"" + int_to_str(cx_p) +
-    "\" height=\"" + int_to_str(cy_p) +
-    "\"/></g>"
+  "<g transform=\"translate(0," +
+  int_to_str(refl_y + cy_p) +
+  ") scale(1,-1) translate(0," +
+  int_to_str(-refl_y) +
+  ")\" mask=\"url(#" +
+  mask_id +
+  ")\" opacity=\"0.5\"" +
+  blur_attr +
+  " style=\"pointer-events:none\">" +
+  "<use href=\"#" +
+  shape_id +
+  "\" x=\"0\" y=\"0\" width=\"" +
+  int_to_str(cx_p) +
+  "\" height=\"" +
+  int_to_str(cy_p) +
+  "\"/></g>"
 }
 
 ///|
 /// Simple cos approximation for shadow direction (degrees → *100 result for int math).
 fn cos_deg(deg : Int) -> Int {
   // cos for 0,45,90,135,180,225,270,315 quadrants
-  let d = ((deg % 360) + 360) % 360
-  if d == 0 { 100 } else if d == 90 { 0 } else if d == 180 {
+  let d = (deg % 360 + 360) % 360
+  if d == 0 {
+    100
+  } else if d == 90 {
+    0
+  } else if d == 180 {
     -100
   } else if d == 270 {
     0

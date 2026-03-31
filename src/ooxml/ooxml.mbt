@@ -636,7 +636,9 @@ pub fn apply_color_modifiers(
           let (h, s, l) = rgb_to_hsl(r, g, b)
           let offset = val / 600 * 10 // convert 60000/deg to tenths of degree
           let mut new_h = h + offset
-          if new_h < 0 { new_h = new_h + 3600 }
+          if new_h < 0 {
+            new_h = new_h + 3600
+          }
           new_h = new_h % 3600
           let c2 = hsl_to_rgb(new_h, s, l)
           r = c2.r
@@ -646,8 +648,12 @@ pub fn apply_color_modifiers(
           // Saturation offset: val is percentage (0-100000)
           let (h, s, l) = rgb_to_hsl(r, g, b)
           let mut new_s = s + val * hsl_scale / pct_100
-          if new_s < 0 { new_s = 0 }
-          if new_s > hsl_scale { new_s = hsl_scale }
+          if new_s < 0 {
+            new_s = 0
+          }
+          if new_s > hsl_scale {
+            new_s = hsl_scale
+          }
           let c2 = hsl_to_rgb(h, new_s, l)
           r = c2.r
           g = c2.g
@@ -1049,28 +1055,47 @@ pub(all) struct TableStyleDef {
 ///|
 pub fn TableStyleCell::none() -> TableStyleCell {
   {
-    fill: Color::none(), grad_fill: GradientFill::none(),
-    bdr_l_w: 0, bdr_r_w: 0, bdr_t_w: 0, bdr_b_w: 0,
-    bdr_l_color: Color::none(), bdr_r_color: Color::none(),
-    bdr_t_color: Color::none(), bdr_b_color: Color::none(),
-    bold: false, italic: false, font_color: Color::none(),
+    fill: Color::none(),
+    grad_fill: GradientFill::none(),
+    bdr_l_w: 0,
+    bdr_r_w: 0,
+    bdr_t_w: 0,
+    bdr_b_w: 0,
+    bdr_l_color: Color::none(),
+    bdr_r_color: Color::none(),
+    bdr_t_color: Color::none(),
+    bdr_b_color: Color::none(),
+    bold: false,
+    italic: false,
+    font_color: Color::none(),
   }
 }
 
 ///|
 pub fn TableStyleCell::is_none(self : TableStyleCell) -> Bool {
-  self.fill.is_none() && self.font_color.is_none() && not(self.bold) && not(self.italic) &&
-    self.bdr_l_w == 0 && self.bdr_r_w == 0 && self.bdr_t_w == 0 && self.bdr_b_w == 0
+  self.fill.is_none() &&
+  self.font_color.is_none() &&
+  !(self.bold) &&
+  !(self.italic) &&
+  self.bdr_l_w == 0 &&
+  self.bdr_r_w == 0 &&
+  self.bdr_t_w == 0 &&
+  self.bdr_b_w == 0
 }
 
 ///|
 pub fn TableStyleDef::none() -> TableStyleDef {
   {
-    id: "", whole_tbl: TableStyleCell::none(),
-    band1_h: TableStyleCell::none(), band2_h: TableStyleCell::none(),
-    band1_v: TableStyleCell::none(), band2_v: TableStyleCell::none(),
-    first_row: TableStyleCell::none(), last_row: TableStyleCell::none(),
-    first_col: TableStyleCell::none(), last_col: TableStyleCell::none(),
+    id: "",
+    whole_tbl: TableStyleCell::none(),
+    band1_h: TableStyleCell::none(),
+    band2_h: TableStyleCell::none(),
+    band1_v: TableStyleCell::none(),
+    band2_v: TableStyleCell::none(),
+    first_row: TableStyleCell::none(),
+    last_row: TableStyleCell::none(),
+    first_col: TableStyleCell::none(),
+    last_col: TableStyleCell::none(),
   }
 }
 
@@ -1626,7 +1651,7 @@ pub fn Shape::default_with_blip(
   transform : ShapeTransform,
   blip_fill : BlipFill,
 ) -> Shape {
-  { ..Shape::default_with(kind, transform), blip_fill }
+  { ..Shape::default_with(kind, transform), blip_fill, }
 }
 
 // ── Slide data ────────────────────────────────────────────────────────────────

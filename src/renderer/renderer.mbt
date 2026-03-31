@@ -47,7 +47,6 @@ let pct_line_height_numer : Int = 12 // for %-based spacing: font-size * 12/10 �
 ///|
 let pct_line_height_denom : Int = 10
 
-
 ///|
 let default_text_fill : String = "black"
 
@@ -89,7 +88,12 @@ let ooxml_fill_to_pct : Int = 2000 // fillToRect 0-100000 → center%: divide by
 
 ///|
 /// Core ID builder. All SVG element IDs are built through this function.
-fn svg_id(prefix : String, sep : String, slide_num : Int, shape_idx : Int) -> String {
+fn svg_id(
+  prefix : String,
+  sep : String,
+  slide_num : Int,
+  shape_idx : Int,
+) -> String {
   prefix + sep + int_to_str(slide_num) + sep + int_to_str(shape_idx)
 }
 
@@ -239,7 +243,7 @@ fn stroke_dasharray(dash : String, sw : Int) -> String {
         // val is in percentage * 100 (e.g. 300000 = 300%). Scale: val * sw / ooxml_pct_denom
         let px_val = val * sw / ooxml_pct_denom
         let clamped = if px_val < 1 { 1 } else { px_val }
-        if not(result.is_empty()) {
+        if !(result.is_empty()) {
           result = result + ","
         }
         result = result + int_to_str(clamped)
@@ -296,7 +300,7 @@ fn stroke_linejoin(join : String, miter_limit : Int) -> String {
 ///|
 /// Check if an arrow type string represents an active arrow.
 fn has_arrow(arrow_type : String) -> Bool {
-  not(arrow_type.is_empty()) && arrow_type != "none"
+  !(arrow_type.is_empty()) && arrow_type != "none"
 }
 
 ///|
@@ -543,10 +547,7 @@ fn resolve_image_href(
     return ""
   }
   match rel {
-    Some(r) =>
-      if r.target_mode == "External" {
-        return target
-      }
+    Some(r) => if r.target_mode == "External" { return target }
     None => ()
   }
   let img_path = resolve_image_path(target)
@@ -595,17 +596,30 @@ fn render_cropped_image_with_filter(
   let img_h = if vis_h > 0 { cy_p * ooxml_pct_denom / vis_h } else { cy_p }
   let img_x = x_p - img_w * bf.src_l / ooxml_pct_denom
   let img_y = y_p - img_h * bf.src_t / ooxml_pct_denom
-  "<defs><clipPath id=\"" + clip_id + "\">" +
-  "<rect" + ai("x", x_p) + ai("y", y_p) +
-  ai("width", cx_p) + ai("height", cy_p) + "/>" +
+  "<defs><clipPath id=\"" +
+  clip_id +
+  "\">" +
+  "<rect" +
+  ai("x", x_p) +
+  ai("y", y_p) +
+  ai("width", cx_p) +
+  ai("height", cy_p) +
+  "/>" +
   "</clipPath></defs>" +
   "<image" +
-  ai("x", img_x) + ai("y", img_y) +
-  ai("width", img_w) + ai("height", img_h) +
+  ai("x", img_x) +
+  ai("y", img_y) +
+  ai("width", img_w) +
+  ai("height", img_h) +
   " preserveAspectRatio=\"none\"" +
   a("href", href) +
-  " clip-path=\"url(#" + clip_id + ")\"" +
-  opacity + filter_attr + rot + "/>"
+  " clip-path=\"url(#" +
+  clip_id +
+  ")\"" +
+  opacity +
+  filter_attr +
+  rot +
+  "/>"
 }
 
 ///|
@@ -615,9 +629,9 @@ fn resolve_blip_href(
   bf : @ooxml.BlipFill,
 ) -> String {
   // Prefer SVG image if available
-  if not(bf.svg_rid.is_empty()) {
+  if !(bf.svg_rid.is_empty()) {
     let svg_href = resolve_image_href(rels, bf.svg_rid)
-    if not(svg_href.is_empty()) {
+    if !(svg_href.is_empty()) {
       return svg_href
     }
   }
@@ -629,9 +643,7 @@ fn resolve_blip_href(
 fn blip_has_effects(bf : @ooxml.BlipFill) -> Bool {
   // Note: clrChange is NOT included — it can't be rendered via SVG filters
   // (requires exact pixel color matching). Data is preserved in round-trip only.
-  bf.bright != 0 ||
-  bf.contrast != 0 ||
-  not(bf.duotone_1.is_none())
+  bf.bright != 0 || bf.contrast != 0 || !(bf.duotone_1.is_none())
 }
 
 ///|
@@ -641,7 +653,7 @@ fn render_blip_filter(
   bf : @ooxml.BlipFill,
   filter_id : String,
 ) -> (String, String) {
-  if not(blip_has_effects(bf)) {
+  if !(blip_has_effects(bf)) {
     return ("", "")
   }
   let mut filters = ""
@@ -664,19 +676,33 @@ fn render_blip_filter(
     }
     filters = filters +
       "<feComponentTransfer result=\"lum\">" +
-      "<feFuncR type=\"linear\" slope=\"" + slope + "\" intercept=\"" + intercept + "\"/>" +
-      "<feFuncG type=\"linear\" slope=\"" + slope + "\" intercept=\"" + intercept + "\"/>" +
-      "<feFuncB type=\"linear\" slope=\"" + slope + "\" intercept=\"" + intercept + "\"/>" +
+      "<feFuncR type=\"linear\" slope=\"" +
+      slope +
+      "\" intercept=\"" +
+      intercept +
+      "\"/>" +
+      "<feFuncG type=\"linear\" slope=\"" +
+      slope +
+      "\" intercept=\"" +
+      intercept +
+      "\"/>" +
+      "<feFuncB type=\"linear\" slope=\"" +
+      slope +
+      "\" intercept=\"" +
+      intercept +
+      "\"/>" +
       "</feComponentTransfer>"
     result_name = "lum"
   }
   // Duotone (a:duotone)
-  if not(bf.duotone_1.is_none()) && not(bf.duotone_2.is_none()) {
+  if !(bf.duotone_1.is_none()) && !(bf.duotone_2.is_none()) {
     let c1 = bf.duotone_1
     let c2 = bf.duotone_2
     // Step 1: Convert to grayscale
     filters = filters +
-      "<feColorMatrix type=\"saturate\" values=\"0\" in=\"" + result_name + "\" result=\"gray\"/>"
+      "<feColorMatrix type=\"saturate\" values=\"0\" in=\"" +
+      result_name +
+      "\" result=\"gray\"/>"
     // Step 2: Map grayscale to duotone via component transfer
     // dark pixels → color1, light pixels → color2
     // slope = (c2 - c1) / 255, intercept = c1 / 255
@@ -688,9 +714,21 @@ fn render_blip_filter(
     let b_slope = format_ratio(c2.b - c1.b, 255)
     filters = filters +
       "<feComponentTransfer in=\"gray\" result=\"duotone\">" +
-      "<feFuncR type=\"linear\" slope=\"" + r_slope + "\" intercept=\"" + r1 + "\"/>" +
-      "<feFuncG type=\"linear\" slope=\"" + g_slope + "\" intercept=\"" + g1 + "\"/>" +
-      "<feFuncB type=\"linear\" slope=\"" + b_slope + "\" intercept=\"" + b1 + "\"/>" +
+      "<feFuncR type=\"linear\" slope=\"" +
+      r_slope +
+      "\" intercept=\"" +
+      r1 +
+      "\"/>" +
+      "<feFuncG type=\"linear\" slope=\"" +
+      g_slope +
+      "\" intercept=\"" +
+      g1 +
+      "\"/>" +
+      "<feFuncB type=\"linear\" slope=\"" +
+      b_slope +
+      "\" intercept=\"" +
+      b1 +
+      "\"/>" +
       "</feComponentTransfer>"
     result_name = "duotone"
   }
@@ -698,7 +736,11 @@ fn render_blip_filter(
   // (requires exact pixel color matching which SVG filters can't do)
   // Data is preserved in round-trip via data-ooxml-* attributes
   ignore(result_name)
-  let defs = "<defs><filter id=\"" + filter_id + "\">" + filters + "</filter></defs>"
+  let defs = "<defs><filter id=\"" +
+    filter_id +
+    "\">" +
+    filters +
+    "</filter></defs>"
   let attr = " filter=\"url(#" + filter_id + ")\""
   (defs, attr)
 }
@@ -1254,16 +1296,18 @@ pub fn render_shape(
   // Apply autoFit: expand shape height if text overflows (never shrink)
   // Also auto-size when cy is 0 and shape has text (common in generated PPTXs)
   // Skip lines/connectors — cy=0 means horizontal line, not "auto-size"
-  if not(is_line) && (shape.body_props.auto_fit || t.cy == 0) && shape.paragraphs.length() > 0 {
+  if !(is_line) &&
+    (shape.body_props.auto_fit || t.cy == 0) &&
+    shape.paragraphs.length() > 0 {
     let text_h = estimate_text_height(shape.paragraphs, scale, shape.body_props)
     if text_h > cy_p {
       cy_p = text_h
     }
   }
-  if cx_p <= 0 && not(is_line) {
+  if cx_p <= 0 && !(is_line) {
     return ""
   }
-  if cy_p <= 0 && not(is_line) {
+  if cy_p <= 0 && !(is_line) {
     return ""
   }
   let rot = rotation_attr(t, scale)
@@ -1313,10 +1357,10 @@ pub fn render_shape(
       ""
     }) +
     // Effect data attributes for round-trip
-    (if not(shape.effects.is_none()) {
+    (if !(shape.effects.is_none()) {
       let eff = shape.effects
       let mut ea = ""
-      if not(eff.outer_shadow.is_none()) {
+      if !(eff.outer_shadow.is_none()) {
         let os = eff.outer_shadow
         ea = ea +
           dai("eff-os-blur", os.blur_rad) +
@@ -1328,7 +1372,7 @@ pub fn render_shape(
           da("eff-os-algn", os.algn) +
           da("eff-os-rot", if os.rot_with_shape { "1" } else { "0" })
       }
-      if not(eff.inner_shadow.is_none()) {
+      if !(eff.inner_shadow.is_none()) {
         let ishdw = eff.inner_shadow
         ea = ea +
           dai("eff-is-blur", ishdw.blur_rad) +
@@ -1336,15 +1380,15 @@ pub fn render_shape(
           dai("eff-is-dir", ishdw.dir) +
           da("eff-is-clr", ishdw.color.to_hex())
       }
-      if not(eff.glow.is_none()) {
+      if !(eff.glow.is_none()) {
         ea = ea +
           dai("eff-gl-rad", eff.glow.rad) +
           da("eff-gl-clr", eff.glow.color.to_hex())
       }
-      if not(eff.soft_edge.is_none()) {
+      if !(eff.soft_edge.is_none()) {
         ea = ea + dai("eff-se-rad", eff.soft_edge.rad)
       }
-      if not(eff.reflection.is_none()) {
+      if !(eff.reflection.is_none()) {
         let r = eff.reflection
         ea = ea +
           dai("eff-refl-blur", r.blur_rad) +
@@ -1358,10 +1402,10 @@ pub fn render_shape(
           da("eff-refl-algn", r.algn) +
           da("eff-refl-rot", if r.rot_with_shape { "1" } else { "0" })
       }
-      if not(eff.blur.is_none()) {
+      if !(eff.blur.is_none()) {
         ea = ea + dai("eff-blur-rad", eff.blur.rad)
       }
-      if not(eff.prst_shadow.is_none()) {
+      if !(eff.prst_shadow.is_none()) {
         let ps = eff.prst_shadow
         ea = ea +
           da("eff-ps-prst", ps.prst) +
@@ -1369,7 +1413,7 @@ pub fn render_shape(
           dai("eff-ps-dir", ps.dir) +
           da("eff-ps-clr", ps.color.to_hex())
       }
-      if not(eff.fill_overlay.is_none()) {
+      if !(eff.fill_overlay.is_none()) {
         let fo = eff.fill_overlay
         ea = ea +
           da("eff-fo-blend", fo.blend) +
@@ -1380,28 +1424,35 @@ pub fn render_shape(
       ""
     }) +
     // 3D data attributes for round-trip
-    (if not(shape.scene_3d.is_none()) {
+    (if !(shape.scene_3d.is_none()) {
       da("3d-cam", shape.scene_3d.camera_prst) +
       da("3d-rig", shape.scene_3d.light_rig) +
       da("3d-rig-dir", shape.scene_3d.light_dir)
     } else {
       ""
     }) +
-    (if not(shape.sp_3d.is_none()) {
+    (if !(shape.sp_3d.is_none()) {
       let s3 = shape.sp_3d
       let mut a3 = ""
-      if not(s3.bevel_t.is_none()) {
-        a3 = a3 + dai("3d-bt-w", s3.bevel_t.w) + dai("3d-bt-h", s3.bevel_t.h) + da("3d-bt-prst", s3.bevel_t.prst)
+      if !(s3.bevel_t.is_none()) {
+        a3 = a3 +
+          dai("3d-bt-w", s3.bevel_t.w) +
+          dai("3d-bt-h", s3.bevel_t.h) +
+          da("3d-bt-prst", s3.bevel_t.prst)
       }
-      if not(s3.bevel_b.is_none()) {
-        a3 = a3 + dai("3d-bb-w", s3.bevel_b.w) + dai("3d-bb-h", s3.bevel_b.h) + da("3d-bb-prst", s3.bevel_b.prst)
+      if !(s3.bevel_b.is_none()) {
+        a3 = a3 +
+          dai("3d-bb-w", s3.bevel_b.w) +
+          dai("3d-bb-h", s3.bevel_b.h) +
+          da("3d-bb-prst", s3.bevel_b.prst)
       }
-      a3 + dai("3d-ext-h", s3.extrusion_h) +
-        dai("3d-cnt-w", s3.contour_w) +
-        da("3d-ext-clr", s3.extrusion_clr.to_hex()) +
-        da("3d-cnt-clr", s3.contour_clr.to_hex()) +
-        da("3d-mat", s3.prst_material) +
-        dai("3d-z", s3.z)
+      a3 +
+      dai("3d-ext-h", s3.extrusion_h) +
+      dai("3d-cnt-w", s3.contour_w) +
+      da("3d-ext-clr", s3.extrusion_clr.to_hex()) +
+      da("3d-cnt-clr", s3.contour_clr.to_hex()) +
+      da("3d-mat", s3.prst_material) +
+      dai("3d-z", s3.z)
     } else {
       ""
     }) +
@@ -1419,10 +1470,24 @@ pub fn render_shape(
     dai("bp-num-cols", shape.body_props.num_cols) +
     dai("bp-col-spacing", shape.body_props.col_spacing) +
     da("warp-prst", shape.body_props.warp_prst) +
-    dai("warp-av1", if shape.body_props.warp_av1 >= 0 { shape.body_props.warp_av1 } else { 0 }) +
-    dai("warp-av2", if shape.body_props.warp_av2 >= 0 { shape.body_props.warp_av2 } else { 0 }) +
+    dai(
+      "warp-av1",
+      if shape.body_props.warp_av1 >= 0 {
+        shape.body_props.warp_av1
+      } else {
+        0
+      },
+    ) +
+    dai(
+      "warp-av2",
+      if shape.body_props.warp_av2 >= 0 {
+        shape.body_props.warp_av2
+      } else {
+        0
+      },
+    ) +
     // Gradient fill attributes
-    (if not(shape.grad_fill.is_none()) {
+    (if !(shape.grad_fill.is_none()) {
       da("grad-stops", grad_stops_attr(shape.grad_fill)) +
       dai("grad-angle", shape.grad_fill.angle) +
       da("grad-path", shape.grad_fill.path_type) +
@@ -1436,7 +1501,7 @@ pub fn render_shape(
       ""
     }) +
     // Blip fill attributes
-    (if not(shape.blip_fill.is_none()) {
+    (if !(shape.blip_fill.is_none()) {
       da("blip-rid", shape.blip_fill.rid) +
       da("blip-stretch", if shape.blip_fill.stretch { "1" } else { "0" }) +
       dai("blip-src-l", shape.blip_fill.src_l) +
@@ -1453,19 +1518,23 @@ pub fn render_shape(
       da("blip-svg-rid", shape.blip_fill.svg_rid) +
       dai("blip-bright", shape.blip_fill.bright) +
       dai("blip-contrast", shape.blip_fill.contrast) +
-      (if not(shape.blip_fill.duotone_1.is_none()) {
+      (if !(shape.blip_fill.duotone_1.is_none()) {
         da("blip-duotone1", shape.blip_fill.duotone_1.to_hex()) +
         da("blip-duotone2", shape.blip_fill.duotone_2.to_hex())
-      } else { "" }) +
-      (if not(shape.blip_fill.clr_from.is_none()) {
+      } else {
+        ""
+      }) +
+      (if !(shape.blip_fill.clr_from.is_none()) {
         da("blip-clr-from", shape.blip_fill.clr_from.to_hex()) +
         da("blip-clr-to", shape.blip_fill.clr_to.to_hex())
-      } else { "" })
+      } else {
+        ""
+      })
     } else {
       ""
     }) +
     // Pattern fill attributes
-    (if not(shape.patt_fill.is_none()) {
+    (if !(shape.patt_fill.is_none()) {
       da("patt-prst", shape.patt_fill.prst) +
       da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
       da("patt-bg", shape.patt_fill.bg_color.to_hex())
@@ -1507,17 +1576,17 @@ pub fn render_shape(
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
       let blip_tile_id = blip_clip_id("bliptile", slide_num, shape_idx)
-      let fill = if not(shape.blip_fill.is_none()) &&
-        not(shape.blip_fill.stretch) &&
+      let fill = if !(shape.blip_fill.is_none()) &&
+        !(shape.blip_fill.stretch) &&
         shape.blip_fill.tile_sx > 0 {
         // BlipFill tile: filled via <pattern> defined in defs
         " fill=\"url(#" + blip_tile_id + ")\""
-      } else if not(shape.blip_fill.is_none()) {
+      } else if !(shape.blip_fill.is_none()) {
         // BlipFill stretch: image fill rendered as separate <image> below
         a("fill", "none")
-      } else if not(shape.patt_fill.is_none()) {
+      } else if !(shape.patt_fill.is_none()) {
         " fill=\"url(#" + patt_id(slide_num, shape_idx) + ")\""
-      } else if not(shape.grad_fill.is_none()) {
+      } else if !(shape.grad_fill.is_none()) {
         " fill=\"url(#" + grad_id(slide_num, shape_idx) + ")\""
       } else {
         let fill_base = if shape.fill.is_none() {
@@ -1525,7 +1594,7 @@ pub fn render_shape(
         } else {
           a("fill", shape.fill.to_css())
         }
-        if shape.fill.alpha < 255 && not(shape.fill.is_none()) {
+        if shape.fill.alpha < 255 && !(shape.fill.is_none()) {
           fill_base +
           " fill-opacity=\"" +
           @ooxml.alpha_to_css_str(shape.fill.alpha) +
@@ -1534,7 +1603,8 @@ pub fn render_shape(
           fill_base
         }
       }
-      let stroke = if shape.stroke.is_none() && not(shape.stroke_no_fill) &&
+      let stroke = if shape.stroke.is_none() &&
+        !(shape.stroke_no_fill) &&
         shape.stroke_grad_fill.is_none() &&
         shape.stroke_patt_fill.is_none() {
         " stroke=\"none\""
@@ -1549,9 +1619,9 @@ pub fn render_shape(
         let sw_str = px_frac(stroke_emu, scale)
         let sw = px(stroke_emu, scale)
         let sw_for_dash = if sw <= 0 { 1 } else { sw }
-        let stroke_color = if not(shape.stroke_grad_fill.is_none()) {
+        let stroke_color = if !(shape.stroke_grad_fill.is_none()) {
           "url(#" + stroke_grad_id(slide_num, shape_idx) + ")"
-        } else if not(shape.stroke_patt_fill.is_none()) {
+        } else if !(shape.stroke_patt_fill.is_none()) {
           "url(#" + stroke_patt_id(slide_num, shape_idx) + ")"
         } else {
           shape.stroke.to_css()
@@ -1628,7 +1698,7 @@ pub fn render_shape(
         }
       }
       // BlipFill: render image inside shape
-      let blip_svg = if not(shape.blip_fill.is_none()) {
+      let blip_svg = if !(shape.blip_fill.is_none()) {
         let bf = shape.blip_fill
         let href = resolve_blip_href(rels, bf)
         if href.is_empty() {
@@ -1637,7 +1707,7 @@ pub fn render_shape(
           let opacity = blip_opacity_attr(bf)
           let filter_id = blip_filter_id(slide_num, shape_idx)
           let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
-          if not(bf.stretch) && bf.tile_sx > 0 {
+          if !(bf.stretch) && bf.tile_sx > 0 {
             // Tile mode: create <pattern> definition
             let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
             let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
@@ -1660,12 +1730,16 @@ pub fn render_shape(
             th +
             "\" preserveAspectRatio=\"none\"" +
             a("href", href) +
-            opacity + filter_attr +
+            opacity +
+            filter_attr +
             "/>" +
             "</pattern></defs>"
           } else if bf.has_crop() {
             let clip_id = blip_clip_id("blipclip", slide_num, shape_idx)
-            filter_defs + render_cropped_image_with_filter(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr)
+            filter_defs +
+            render_cropped_image_with_filter(
+              bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr,
+            )
           } else {
             filter_defs +
             "<image" +
@@ -1675,7 +1749,10 @@ pub fn render_shape(
             ai("height", cy_p) +
             " preserveAspectRatio=\"none\"" +
             a("href", href) +
-            opacity + filter_attr + rot + "/>"
+            opacity +
+            filter_attr +
+            rot +
+            "/>"
           }
         }
       } else {
@@ -1690,7 +1767,8 @@ pub fn render_shape(
         _ => (0, 0, cx_p, cy_p)
       }
       // For autoFit or zero-height shapes, use adjusted cy for text rendering
-      let eff_cy = if (shape.body_props.auto_fit || t.cy == 0) && cy_p > px(t.cy, scale) {
+      let eff_cy = if (shape.body_props.auto_fit || t.cy == 0) &&
+        cy_p > px(t.cy, scale) {
         cy_p
       } else {
         tr_h
@@ -1738,7 +1816,10 @@ pub fn render_shape(
         let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
         let img_svg = if bf.has_crop() {
           let clip_id = blip_clip_id("picclip", slide_num, shape_idx)
-          filter_defs + render_cropped_image_with_filter(bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr)
+          filter_defs +
+          render_cropped_image_with_filter(
+            bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr,
+          )
         } else {
           filter_defs +
           "<image" +
@@ -1748,10 +1829,13 @@ pub fn render_shape(
           ai("height", cy_p) +
           " preserveAspectRatio=\"xMidYMid meet\"" +
           a("href", href) +
-          opacity + filter_attr + rot + "/>"
+          opacity +
+          filter_attr +
+          rot +
+          "/>"
         }
         // Render border if picture has a stroke (a:ln)
-        let border = if not(shape.stroke.is_none()) && not(shape.stroke_no_fill) {
+        let border = if !(shape.stroke.is_none()) && !(shape.stroke_no_fill) {
           let stroke_emu = if shape.stroke_w > 0 {
             shape.stroke_w
           } else {
@@ -1776,17 +1860,18 @@ pub fn render_shape(
     }
     @ooxml.ShapeKind::TableShape(table) =>
       render_table(table, t, scale, theme, rels, table_styles)
-    @ooxml.ShapeKind::ChartShape(chart) =>
-      render_chart(chart, t, scale, theme)
+    @ooxml.ShapeKind::ChartShape(chart) => render_chart(chart, t, scale, theme)
     @ooxml.ShapeKind::GroupShape(grp) =>
-      render_group(grp, t, rels, slide_num, scale, shape_idx, theme, table_styles)
+      render_group(
+        grp, t, rels, slide_num, scale, shape_idx, theme, table_styles,
+      )
     _ => ""
   }
 
   if inner.is_empty() {
     ""
   } else {
-    let eff_attr = if not(shape.effects.is_none()) {
+    let eff_attr = if !(shape.effects.is_none()) {
       let (_, fa) = render_effect_filter(
         shape.effects,
         effect_filter_id(slide_num, shape_idx),
@@ -1796,27 +1881,33 @@ pub fn render_shape(
     } else {
       ""
     }
-    let has_refl = not(shape.effects.is_none()) &&
-      not(shape.effects.reflection.is_none())
+    let has_refl = !(shape.effects.is_none()) &&
+      !(shape.effects.reflection.is_none())
     let shape_id_attr = if has_refl {
       " id=\"" + refl_shape_id(slide_num, shape_idx) + "\""
     } else {
       ""
     }
-    let shape_svg = "<g" + g_attrs + eff_attr + shape_id_attr + ">" + inner + "</g>"
+    let shape_svg = "<g" +
+      g_attrs +
+      eff_attr +
+      shape_id_attr +
+      ">" +
+      inner +
+      "</g>"
     if has_refl {
       let t = shape.transform
       shape_svg +
-        render_reflection_element(
-          shape.effects.reflection,
-          refl_shape_id(slide_num, shape_idx),
-          refl_mask_id(slide_num, shape_idx),
-          px(t.x, scale),
-          px(t.y, scale),
-          px(t.cx, scale),
-          cy_p,
-          scale,
-        )
+      render_reflection_element(
+        shape.effects.reflection,
+        refl_shape_id(slide_num, shape_idx),
+        refl_mask_id(slide_num, shape_idx),
+        px(t.x, scale),
+        px(t.y, scale),
+        px(t.cx, scale),
+        cy_p,
+        scale,
+      )
     } else {
       shape_svg
     }
@@ -1889,11 +1980,11 @@ fn render_group(
   while ci < nc {
     let child = grp.children[ci]
     let child_idx = shape_idx * group_child_idx_multiplier + ci
-    if not(child.grad_fill.is_none()) {
+    if !(child.grad_fill.is_none()) {
       defs = defs +
         render_gradient_def(child.grad_fill, grad_id(slide_num, child_idx))
     }
-    if not(child.patt_fill.is_none()) {
+    if !(child.patt_fill.is_none()) {
       defs = defs +
         render_pattern_def(child.patt_fill, patt_id(slide_num, child_idx))
     }
@@ -1918,7 +2009,9 @@ fn render_group(
         )
     }
     children_svg = children_svg +
-      render_shape(child, rels, slide_num, scale, child_idx, theme, table_styles)
+      render_shape(
+        child, rels, slide_num, scale, child_idx, theme, table_styles,
+      )
     ci = ci + 1
   }
   let defs_section = if defs.is_empty() {
@@ -1946,19 +2039,27 @@ pub fn render_shape_defs(
   scale : Int,
 ) -> String {
   let mut defs = ""
-  if not(shape.grad_fill.is_none()) {
-    defs = defs + render_gradient_def(shape.grad_fill, grad_id(slide_num, shape_idx))
-  }
-  if not(shape.patt_fill.is_none()) {
-    defs = defs + render_pattern_def(shape.patt_fill, patt_id(slide_num, shape_idx))
-  }
-  if not(shape.stroke_grad_fill.is_none()) {
+  if !(shape.grad_fill.is_none()) {
     defs = defs +
-      render_gradient_def(shape.stroke_grad_fill, stroke_grad_id(slide_num, shape_idx))
+      render_gradient_def(shape.grad_fill, grad_id(slide_num, shape_idx))
   }
-  if not(shape.stroke_patt_fill.is_none()) {
+  if !(shape.patt_fill.is_none()) {
     defs = defs +
-      render_pattern_def(shape.stroke_patt_fill, stroke_patt_id(slide_num, shape_idx))
+      render_pattern_def(shape.patt_fill, patt_id(slide_num, shape_idx))
+  }
+  if !(shape.stroke_grad_fill.is_none()) {
+    defs = defs +
+      render_gradient_def(
+        shape.stroke_grad_fill,
+        stroke_grad_id(slide_num, shape_idx),
+      )
+  }
+  if !(shape.stroke_patt_fill.is_none()) {
+    defs = defs +
+      render_pattern_def(
+        shape.stroke_patt_fill,
+        stroke_patt_id(slide_num, shape_idx),
+      )
   }
   if has_arrow(shape.stroke_head_type) {
     defs = defs +
@@ -1980,14 +2081,14 @@ pub fn render_shape_defs(
         shape.stroke,
       )
   }
-  if not(shape.effects.is_none()) {
+  if !(shape.effects.is_none()) {
     let (eff_def, _) = render_effect_filter(
       shape.effects,
       effect_filter_id(slide_num, shape_idx),
       scale,
     )
     defs = defs + eff_def
-    if not(shape.effects.reflection.is_none()) {
+    if !(shape.effects.reflection.is_none()) {
       defs = defs +
         render_reflection_mask_def(
           shape.effects.reflection,
@@ -2032,21 +2133,27 @@ pub fn render_slide_svg(
     dai("scale", scale) +
     (if slide.hidden { da("hidden", "1") } else { "" }) +
     (if slide.transition_xml.length() > 0 {
-      " data-ooxml-transition-xml=\"" + @xml.xml_escape(slide.transition_xml) + "\""
-    } else { "" }) +
+      " data-ooxml-transition-xml=\"" +
+      @xml.xml_escape(slide.transition_xml) +
+      "\""
+    } else {
+      ""
+    }) +
     (if slide.timing_xml.length() > 0 {
       " data-ooxml-timing-xml=\"" + @xml.xml_escape(slide.timing_xml) + "\""
-    } else { "" }) +
+    } else {
+      ""
+    }) +
     ">"
   // Collect all <defs> in a single pass per shape set
   let mut defs = ""
   // Background gradient
-  if not(slide.bg_grad.is_none()) {
+  if !(slide.bg_grad.is_none()) {
     defs = defs +
       render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
   }
   // Background pattern
-  if not(slide.bg_patt_fill.is_none()) {
+  if !(slide.bg_patt_fill.is_none()) {
     defs = defs +
       render_pattern_def(
         slide.bg_patt_fill,
@@ -2054,7 +2161,7 @@ pub fn render_slide_svg(
       )
   }
   // Background blip fill filter
-  if not(slide.bg_blip_fill.is_none()) && blip_has_effects(slide.bg_blip_fill) {
+  if !(slide.bg_blip_fill.is_none()) && blip_has_effects(slide.bg_blip_fill) {
     let (fd, _) = render_blip_filter(
       slide.bg_blip_fill,
       "bfilt-bg-s" + int_to_str(slide_num),
@@ -2067,7 +2174,7 @@ pub fn render_slide_svg(
   while bdi < nbg {
     let bs = bg_shapes[bdi]
     let bs_idx = -(bdi + 1)
-    if not(bs.grad_fill.is_none()) {
+    if !(bs.grad_fill.is_none()) {
       defs = defs +
         render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
     }
@@ -2078,18 +2185,18 @@ pub fn render_slide_svg(
   let mut di = 0
   while di < n {
     let sh = slide.shapes[di]
-    if not(sh.grad_fill.is_none()) {
+    if !(sh.grad_fill.is_none()) {
       defs = defs + render_gradient_def(sh.grad_fill, grad_id(slide_num, di))
     }
-    if not(sh.patt_fill.is_none()) {
+    if !(sh.patt_fill.is_none()) {
       defs = defs + render_pattern_def(sh.patt_fill, patt_id(slide_num, di))
     }
     // Stroke gradient/pattern defs
-    if not(sh.stroke_grad_fill.is_none()) {
+    if !(sh.stroke_grad_fill.is_none()) {
       defs = defs +
         render_gradient_def(sh.stroke_grad_fill, stroke_grad_id(slide_num, di))
     }
-    if not(sh.stroke_patt_fill.is_none()) {
+    if !(sh.stroke_patt_fill.is_none()) {
       defs = defs +
         render_pattern_def(sh.stroke_patt_fill, stroke_patt_id(slide_num, di))
     }
@@ -2114,7 +2221,7 @@ pub fn render_slide_svg(
         )
     }
     // Effect filter defs
-    if not(sh.effects.is_none()) {
+    if !(sh.effects.is_none()) {
       let (eff_def, _) = render_effect_filter(
         sh.effects,
         effect_filter_id(slide_num, di),
@@ -2122,7 +2229,7 @@ pub fn render_slide_svg(
       )
       defs = defs + eff_def
       // Reflection mask gradient
-      if not(sh.effects.reflection.is_none()) {
+      if !(sh.effects.reflection.is_none()) {
         defs = defs +
           render_reflection_mask_def(
             sh.effects.reflection,
@@ -2138,9 +2245,9 @@ pub fn render_slide_svg(
     "<defs>" + defs + "</defs>"
   }
 
-  let bg_fill = if not(slide.bg_grad.is_none()) {
+  let bg_fill = if !(slide.bg_grad.is_none()) {
     "url(#grad-bg-s" + int_to_str(slide_num) + ")"
-  } else if not(slide.bg_patt_fill.is_none()) {
+  } else if !(slide.bg_patt_fill.is_none()) {
     "url(#patt-bg-s" + int_to_str(slide_num) + ")"
   } else {
     slide.background.to_css()
@@ -2151,7 +2258,7 @@ pub fn render_slide_svg(
     a("fill", bg_fill) +
     "/>"
   // Background blip fill (image)
-  let bg_blip_svg = if not(slide.bg_blip_fill.is_none()) {
+  let bg_blip_svg = if !(slide.bg_blip_fill.is_none()) {
     let bf = slide.bg_blip_fill
     let bg_resolve_rels = if bg_fill_rels.length() > 0 {
       bg_fill_rels
@@ -2198,7 +2305,15 @@ pub fn render_slide_svg(
       rels
     }
     bg_shapes_svg = bg_shapes_svg +
-      render_shape(bg_shapes[bi], bg_shape_rels, slide_num, scale, -(bi + 1), theme, table_styles)
+      render_shape(
+        bg_shapes[bi],
+        bg_shape_rels,
+        slide_num,
+        scale,
+        -(bi + 1),
+        theme,
+        table_styles,
+      )
     bi = bi + 1
   }
   // Render slide shapes
@@ -2206,8 +2321,22 @@ pub fn render_slide_svg(
   let mut i = 0
   while i < n {
     shapes_svg = shapes_svg +
-      render_shape(slide.shapes[i], rels, slide_num, scale, i, theme, table_styles)
+      render_shape(
+        slide.shapes[i],
+        rels,
+        slide_num,
+        scale,
+        i,
+        theme,
+        table_styles,
+      )
     i = i + 1
   }
-  header + defs_section + bg_rect + bg_blip_svg + bg_shapes_svg + shapes_svg + "</svg>"
+  header +
+  defs_section +
+  bg_rect +
+  bg_blip_svg +
+  bg_shapes_svg +
+  shapes_svg +
+  "</svg>"
 }

@@ -106,7 +106,7 @@ fn Parser::skip_str(self : Parser, s : String) -> Unit {
 
 ///|
 fn Parser::skip_whitespace(self : Parser) -> Unit {
-  while not(self.at_end()) {
+  while !(self.at_end()) {
     match self.peek_char() {
       ' ' | '\t' | '\n' | '\r' => self.advance()
       _ => break
@@ -132,7 +132,7 @@ fn collect_chars(s : String, start : Int, end_exclusive : Int) -> String {
 ///|
 fn Parser::read_until_char(self : Parser, stop : Char) -> String {
   let mut result = ""
-  while not(self.at_end()) {
+  while !(self.at_end()) {
     let c = self.peek_char()
     if c == stop {
       break
@@ -146,7 +146,7 @@ fn Parser::read_until_char(self : Parser, stop : Char) -> String {
 ///|
 fn Parser::read_until_str(self : Parser, stop : String) -> String {
   let mut result = ""
-  while not(self.at_end()) {
+  while !(self.at_end()) {
     if self.starts_with(stop) {
       break
     }
@@ -173,7 +173,7 @@ fn decode_entities(s : String) -> String {
     }
     k = k + char_step(kc)
   }
-  if not(has_amp) {
+  if !(has_amp) {
     return s
   }
   let mut result = ""
@@ -231,7 +231,7 @@ fn decode_entities(s : String) -> String {
 ///|
 fn Parser::parse_name(self : Parser) -> String {
   let mut result = ""
-  while not(self.at_end()) {
+  while !(self.at_end()) {
     let c = self.peek_char()
     match c {
       ' ' | '\t' | '\n' | '\r' | '>' | '/' | '=' => break
@@ -249,7 +249,7 @@ fn Parser::parse_attr_value(self : Parser) -> String {
   let quote = self.peek_char()
   self.advance()
   let raw = self.read_until_char(quote)
-  if not(self.at_end()) {
+  if !(self.at_end()) {
     self.advance() // skip closing quote
   }
   decode_entities(raw)
@@ -273,10 +273,10 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
           self.advance() // skip unexpected char
         } else {
           self.skip_whitespace()
-          if not(self.at_end()) && self.peek_char() == '=' {
+          if !(self.at_end()) && self.peek_char() == '=' {
             self.advance()
             self.skip_whitespace()
-            if not(self.at_end()) {
+            if !(self.at_end()) {
               let q = self.peek_char()
               if q == '"' || q == '\'' {
                 let value = self.parse_attr_value()
@@ -319,7 +319,7 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
             // Closing tag: skip content to '>' (result unused, advances position)
             self.advance()
             let _ = self.read_until_char('>')
-            if not(self.at_end()) {
+            if !(self.at_end()) {
               self.advance()
             }
             running = false
@@ -329,22 +329,22 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
               // HTML comment: skip to end marker
               self.skip_str("--")
               let _ = self.read_until_str("-->")
-              if not(self.at_end()) {
+              if !(self.at_end()) {
                 self.skip_str("-->")
               }
             } else if self.starts_with("[CDATA[") {
               self.skip_str("[CDATA[")
               let text = self.read_until_str("]]>")
-              if not(self.at_end()) {
+              if !(self.at_end()) {
                 self.skip_str("]]>")
               }
-              if not(text.is_empty()) {
+              if !(text.is_empty()) {
                 children.push(XmlNode::Text(text))
               }
             } else {
               // DOCTYPE or other declaration: skip to '>'
               let _ = self.read_until_char('>')
-              if not(self.at_end()) {
+              if !(self.at_end()) {
                 self.advance()
               }
             }
@@ -352,19 +352,19 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
             // Processing instruction: skip to end marker
             self.advance()
             let _ = self.read_until_str("?>")
-            if not(self.at_end()) {
+            if !(self.at_end()) {
               self.skip_str("?>")
             }
           } else {
             let tag = self.parse_name()
-            if not(tag.is_empty()) {
+            if !(tag.is_empty()) {
               let attrs = self.parse_attrs()
               self.skip_whitespace()
-              if not(self.at_end()) {
+              if !(self.at_end()) {
                 let ec = self.peek_char()
                 if ec == '/' {
                   self.advance()
-                  if not(self.at_end()) {
+                  if !(self.at_end()) {
                     self.advance()
                   }
                   children.push(XmlNode::Element(tag, attrs, []))
@@ -383,7 +383,7 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
         let text = self.read_until_char('<')
         // Keep all text nodes including whitespace-only ones.
         // Whitespace is significant inside elements like <a:t xml:space="preserve">.
-        if not(text.is_empty()) {
+        if !(text.is_empty()) {
           children.push(XmlNode::Text(decode_entities(text)))
         }
       }
@@ -682,7 +682,7 @@ pub fn xml_escape(s : String) -> String {
     }
     k = k + char_step(kc)
   }
-  if not(needs) {
+  if !(needs) {
     return s
   }
   let mut result = ""

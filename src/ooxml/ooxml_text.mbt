@@ -574,7 +574,10 @@ fn parse_run_props(
 }
 
 ///|
-fn parse_run_effect_lst(rpr_ch : Array[@xml.XmlNode], theme : ThemeData) -> EffectList {
+fn parse_run_effect_lst(
+  rpr_ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> EffectList {
   // a:effectLst can appear as a child of a:rPr
   match @xml.find_child(rpr_ch, "a:effectLst") {
     None => EffectList::none()
@@ -701,19 +704,19 @@ fn parse_text_body(
     } else {
       def_font_size
     }
-    let def_color = if def_color.is_none() && not(lst_def.color.is_none()) {
+    let def_color = if def_color.is_none() && !(lst_def.color.is_none()) {
       lst_def.color
     } else {
       def_color
     }
     let def_font_face = if def_font_face.is_empty() &&
-      not(lst_def.font_face.is_empty()) {
+      !(lst_def.font_face.is_empty()) {
       lst_def.font_face
     } else {
       def_font_face
     }
     let def_ea_font = if def_ea_font.is_empty() &&
-      not(lst_def.ea_font.is_empty()) {
+      !(lst_def.ea_font.is_empty()) {
       lst_def.ea_font
     } else {
       def_ea_font
@@ -725,20 +728,50 @@ fn parse_text_body(
         let epr_ch = @xml.get_children(epr)
         let epr_clr = parse_solid_fill(epr_ch, theme)
         let epr_sz = attr_int(epr, "sz")
-        let epr_ff = resolve_font_theme(child_attr(epr_ch, "a:latin", "typeface"), theme)
-        let epr_ea = resolve_ea_font_theme(child_attr(epr_ch, "a:ea", "typeface"), theme)
-        if epr_sz > 0 { prev_epr_font_size = epr_sz }
-        if not(epr_clr.is_none()) { prev_epr_color = epr_clr }
-        if not(epr_ff.is_empty()) { prev_epr_font_face = epr_ff }
-        if not(epr_ea.is_empty()) { prev_epr_ea_font = epr_ea }
+        let epr_ff = resolve_font_theme(
+          child_attr(epr_ch, "a:latin", "typeface"),
+          theme,
+        )
+        let epr_ea = resolve_ea_font_theme(
+          child_attr(epr_ch, "a:ea", "typeface"),
+          theme,
+        )
+        if epr_sz > 0 {
+          prev_epr_font_size = epr_sz
+        }
+        if !(epr_clr.is_none()) {
+          prev_epr_color = epr_clr
+        }
+        if !(epr_ff.is_empty()) {
+          prev_epr_font_face = epr_ff
+        }
+        if !(epr_ea.is_empty()) {
+          prev_epr_ea_font = epr_ea
+        }
       }
       None => ()
     }
     // Merge: defRPr/lstStyle take priority, then endParaRPr carry-over (color/font only)
-    let def_font_size = if def_font_size > 0 { def_font_size } else { prev_epr_font_size }
-    let def_color = if not(def_color.is_none()) { def_color } else { prev_epr_color }
-    let def_font_face = if not(def_font_face.is_empty()) { def_font_face } else { prev_epr_font_face }
-    let def_ea_font = if not(def_ea_font.is_empty()) { def_ea_font } else { prev_epr_ea_font }
+    let def_font_size = if def_font_size > 0 {
+      def_font_size
+    } else {
+      prev_epr_font_size
+    }
+    let def_color = if !(def_color.is_none()) {
+      def_color
+    } else {
+      prev_epr_color
+    }
+    let def_font_face = if !(def_font_face.is_empty()) {
+      def_font_face
+    } else {
+      prev_epr_font_face
+    }
+    let def_ea_font = if !(def_ea_font.is_empty()) {
+      def_ea_font
+    } else {
+      prev_epr_ea_font
+    }
     // Iterate over all children to handle a:r (runs), a:fld (fields), and a:br (breaks)
     let runs : Array[TextRun] = []
     let p_ch_len = p_ch.length()
@@ -753,19 +786,19 @@ fn parse_text_body(
           None => ""
           Some(t_node) => @xml.get_text_content(t_node)
         }
-        if not(text.is_empty()) {
+        if !(text.is_empty()) {
           let run = match @xml.find_child(r_ch, "a:rPr") {
             None =>
               default_text_run(
-                text, def_bold, def_bold_explicit, def_italic, def_font_size,
-                def_color, def_font_face, def_ea_font,
+                text, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+                def_font_face, def_ea_font,
               )
             Some(rpr) => {
               let rp = parse_run_props(
-                rpr, def_bold, def_bold_explicit, def_italic, def_font_size,
-                def_color, def_font_face, def_ea_font, theme,
+                rpr, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+                def_font_face, def_ea_font, theme,
               )
-              { ..rp, text }
+              { ..rp, text, }
             }
           }
           runs.push(run)
@@ -776,8 +809,8 @@ fn parse_text_body(
         let math_text = extract_math_text(child)
         let display = if math_text.is_empty() { "[math]" } else { math_text }
         let mut run = default_text_run(
-          display, def_bold, def_bold_explicit, def_italic, def_font_size,
-          def_color, def_font_face, def_ea_font,
+          display, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+          def_font_face, def_ea_font,
         )
         run = { ..run, math_xml: math_raw }
         runs.push(run)
@@ -785,8 +818,8 @@ fn parse_text_body(
         // Line break — insert a newline run
         runs.push(
           default_text_run(
-            "\n", def_bold, def_bold_explicit, def_italic, def_font_size,
-            def_color, def_font_face, def_ea_font,
+            "\n", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+            def_font_face, def_ea_font,
           ),
         )
       }
@@ -827,30 +860,31 @@ fn parse_text_body(
     let mut changed = false
     let mut new_para = para
     // Alignment fallback
-    if para.align.is_empty() && not(lst_def.align.is_empty()) {
+    if para.align.is_empty() && !(lst_def.align.is_empty()) {
       new_para = { ..new_para, align: lst_def.align }
       changed = true
     }
     // Bullet fallback: inherit buChar from lstStyle if paragraph has no explicit bullet
-    if para.bullet.is_empty() && para.bullet_auto.is_empty() &&
-      not(para.bullet_none) &&
+    if para.bullet.is_empty() &&
+      para.bullet_auto.is_empty() &&
+      !(para.bullet_none) &&
       para.bullet_img_rid.is_empty() &&
-      not(lst_def.bullet.is_empty()) {
+      !(lst_def.bullet.is_empty()) {
       new_para = { ..new_para, bullet: lst_def.bullet }
       changed = true
       // Also inherit bullet_font/size/color from lstStyle if not set on paragraph
-      if new_para.bullet_font.is_empty() && not(lst_def.bullet_font.is_empty()) {
+      if new_para.bullet_font.is_empty() && !(lst_def.bullet_font.is_empty()) {
         new_para = { ..new_para, bullet_font: lst_def.bullet_font }
       }
       if new_para.bullet_size == 0 && lst_def.bullet_size != 0 {
         new_para = { ..new_para, bullet_size: lst_def.bullet_size }
       }
-      if new_para.bullet_color.is_none() && not(lst_def.bullet_color.is_none()) {
+      if new_para.bullet_color.is_none() && !(lst_def.bullet_color.is_none()) {
         new_para = { ..new_para, bullet_color: lst_def.bullet_color }
       }
-    } else if not(para.bullet.is_empty()) || not(para.bullet_auto.is_empty()) {
+    } else if !(para.bullet.is_empty()) || !(para.bullet_auto.is_empty()) {
       // Paragraph has explicit bullet, but may still need font/size/color from lstStyle
-      if para.bullet_font.is_empty() && not(lst_def.bullet_font.is_empty()) {
+      if para.bullet_font.is_empty() && !(lst_def.bullet_font.is_empty()) {
         new_para = { ..new_para, bullet_font: lst_def.bullet_font }
         changed = true
       }
@@ -858,13 +892,14 @@ fn parse_text_body(
         new_para = { ..new_para, bullet_size: lst_def.bullet_size }
         changed = true
       }
-      if para.bullet_color.is_none() && not(lst_def.bullet_color.is_none()) {
+      if para.bullet_color.is_none() && !(lst_def.bullet_color.is_none()) {
         new_para = { ..new_para, bullet_color: lst_def.bullet_color }
         changed = true
       }
     }
     // buNone fallback
-    if not(para.bullet_none) && lst_def.bullet_none &&
+    if !(para.bullet_none) &&
+      lst_def.bullet_none &&
       para.bullet.is_empty() &&
       para.bullet_auto.is_empty() &&
       para.bullet_img_rid.is_empty() {

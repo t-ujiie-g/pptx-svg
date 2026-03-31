@@ -106,10 +106,11 @@ let chart_gridline_color : String = "#e0e0e0"
 let chart_slice_stroke : String = "white"
 
 // Fallback series colors (used when theme is unavailable)
+
 ///|
 let chart_colors_fallback : Array[String] = [
-  "#4472C4", "#ED7D31", "#A5A5A5", "#FFC000", "#5B9BD5", "#70AD47",
-  "#264478", "#9B5700", "#636363", "#997300", "#255E91", "#43682B",
+  "#4472C4", "#ED7D31", "#A5A5A5", "#FFC000", "#5B9BD5", "#70AD47", "#264478", "#9B5700",
+  "#636363", "#997300", "#255E91", "#43682B",
 ]
 
 ///|
@@ -134,7 +135,7 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   // Primary 6 accent colors
   let accents = [accent1, accent2, accent3, accent4, accent5, accent6]
   for i in 0..<6 {
-    if not(accents[i].is_none()) {
+    if !(accents[i].is_none()) {
       colors.push(accents[i].to_css())
     } else {
       colors.push(chart_colors_fallback[i])
@@ -142,7 +143,7 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   }
   // Darker variants (lumMod=75000 approximation: multiply RGB by 0.75)
   for i in 0..<6 {
-    if not(accents[i].is_none()) {
+    if !(accents[i].is_none()) {
       let c = accents[i]
       let dr = c.r * 3 / 4
       let dg = c.g * 3 / 4
@@ -202,21 +203,37 @@ fn render_chart(
     return ""
   }
   // Wrap in translate group for positioning
-  let mut svg = "<g transform=\"translate(" + int_to_str(ox) + "," +
-    int_to_str(oy) + ")\">"
+  let mut svg = "<g transform=\"translate(" +
+    int_to_str(ox) +
+    "," +
+    int_to_str(oy) +
+    ")\">"
   // Background rect
-  svg = svg + "<rect width=\"" + int_to_str(w) + "\" height=\"" +
-    int_to_str(h) + "\" fill=\"" + chart_bg_color + "\" stroke=\"" +
-    chart_border_color + "\" stroke-width=\"1\"/>"
+  svg = svg +
+    "<rect width=\"" +
+    int_to_str(w) +
+    "\" height=\"" +
+    int_to_str(h) +
+    "\" fill=\"" +
+    chart_bg_color +
+    "\" stroke=\"" +
+    chart_border_color +
+    "\" stroke-width=\"1\"/>"
   // Title
   let title_h = if chart.title.is_empty() { 0 } else { chart_title_h }
-  if not(chart.title.is_empty()) {
-    svg = svg + "<text x=\"" + int_to_str(w / 2) + "\" y=\"" +
+  if !(chart.title.is_empty()) {
+    svg = svg +
+      "<text x=\"" +
+      int_to_str(w / 2) +
+      "\" y=\"" +
       int_to_str(title_h - chart_title_y_offset) +
       "\" text-anchor=\"middle\" font-size=\"" +
       int_to_str(chart_title_font_size) +
-      "\" font-weight=\"bold\" fill=\"" + chart_title_color + "\">" +
-      svg_escape(chart.title) + "</text>"
+      "\" font-weight=\"bold\" fill=\"" +
+      chart_title_color +
+      "\">" +
+      svg_escape(chart.title) +
+      "</text>"
   }
   // Legend
   let legend_w = if chart.legend.show { chart_legend_w } else { 0 }
@@ -233,8 +250,10 @@ fn render_chart(
     chart_pad + chart_axis_label_w
   }
   // Detect if X-axis labels need rotation (many categories)
-  let has_many_cats = if not(no_axes) && not(h_bar) && not(chart.groups.is_empty()) &&
-    not(chart.groups[0].series.is_empty()) {
+  let has_many_cats = if !(no_axes) &&
+    !(h_bar) &&
+    !(chart.groups.is_empty()) &&
+    !(chart.groups[0].series.is_empty()) {
     let nc = get_cat_labels(chart.groups[0].series[0].cat).length()
     nc > 8
   } else {
@@ -258,12 +277,20 @@ fn render_chart(
   let colors = build_chart_colors(theme)
   // Render chart groups
   for gi in 0..<chart.groups.length() {
-    svg = svg + render_chart_group(
-      chart.groups[gi], plot_x, plot_y, plot_w, plot_h, colors, chart.axes,
-    )
+    svg = svg +
+      render_chart_group(
+        chart.groups[gi],
+        plot_x,
+        plot_y,
+        plot_w,
+        plot_h,
+        colors,
+        chart.axes,
+      )
   }
   // Render axes
-  svg = svg + render_axes(chart.axes, plot_x, plot_y, plot_w, plot_h, chart.groups)
+  svg = svg +
+    render_axes(chart.axes, plot_x, plot_y, plot_w, plot_h, chart.groups)
   // Render legend
   if chart.legend.show {
     svg = svg + render_legend(chart.groups, w - legend_w + 4, plot_y, colors)
@@ -284,15 +311,20 @@ fn render_chart_group(
   axes : Array[@ooxml.ChartAxis],
 ) -> String {
   match group.chart_type {
-    @ooxml.ChartKind::BarChart => render_bar_chart(group, px_, py, pw, ph, colors, axes)
-    @ooxml.ChartKind::LineChart => render_line_chart(group, px_, py, pw, ph, colors, axes)
-    @ooxml.ChartKind::PieChart => render_pie_chart(group, px_, py, pw, ph, colors)
+    @ooxml.ChartKind::BarChart =>
+      render_bar_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::LineChart =>
+      render_line_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::PieChart =>
+      render_pie_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::DoughnutChart =>
       render_donut_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::ScatterChart =>
       render_scatter_chart(group, px_, py, pw, ph, colors)
-    @ooxml.ChartKind::AreaChart => render_area_chart(group, px_, py, pw, ph, colors, axes)
-    @ooxml.ChartKind::RadarChart => render_line_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::AreaChart =>
+      render_area_chart(group, px_, py, pw, ph, colors, axes)
+    @ooxml.ChartKind::RadarChart =>
+      render_line_chart(group, px_, py, pw, ph, colors, axes)
     @ooxml.ChartKind::BubbleChart =>
       render_bubble_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::StockChart =>
@@ -379,22 +411,33 @@ fn render_bar_chart(
           let bar_off = cat_start + gap_pct / 2 * cat_size / nc / units_per_cat
           let bar_w = 100 * cat_size / nc / units_per_cat
           if is_horizontal {
-            svg = svg + "<rect x=\"" +
+            svg = svg +
+              "<rect x=\"" +
               int_to_str(px_ + mul_div(base_offset, val_size, max_val)) +
-              "\" y=\"" + int_to_str(py + bar_off) + "\" width=\"" +
-              int_to_str(bar_len) + "\" height=\"" +
+              "\" y=\"" +
+              int_to_str(py + bar_off) +
+              "\" width=\"" +
+              int_to_str(bar_len) +
+              "\" height=\"" +
               int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
-              "\" fill=\"" + pt_color + "\"/>"
+              "\" fill=\"" +
+              pt_color +
+              "\"/>"
           } else {
-            svg = svg + "<rect x=\"" + int_to_str(px_ + bar_off) +
+            svg = svg +
+              "<rect x=\"" +
+              int_to_str(px_ + bar_off) +
               "\" y=\"" +
               int_to_str(
                 py + ph - mul_div(base_offset, val_size, max_val) - bar_len,
               ) +
               "\" width=\"" +
               int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
-              "\" height=\"" + int_to_str(bar_len) +
-              "\" fill=\"" + pt_color + "\"/>"
+              "\" height=\"" +
+              int_to_str(bar_len) +
+              "\" fill=\"" +
+              pt_color +
+              "\"/>"
           }
           stack_offset[ci] = base_offset +
             pct_stacked_val(val, cat_totals[ci], is_pct_stacked)
@@ -416,44 +459,57 @@ fn render_bar_chart(
           let pt_color = point_color(ser, ci, color)
           let bar_len = mul_div(val, val_size, max_val)
           let cat_start = ci * cat_size / nc
-          let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
-            nc /
-            units_per_cat
+          let bar_off = cat_start +
+            (gap_pct / 2 + si * 100) * cat_size / nc / units_per_cat
           let bar_w = 100 * cat_size / nc / units_per_cat
           if is_horizontal {
-            svg = svg + "<rect x=\"" + int_to_str(px_) + "\" y=\"" +
-              int_to_str(py + bar_off) + "\" width=\"" +
+            svg = svg +
+              "<rect x=\"" +
+              int_to_str(px_) +
+              "\" y=\"" +
+              int_to_str(py + bar_off) +
+              "\" width=\"" +
               int_to_str(bar_len) +
               "\" height=\"" +
               int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
-              "\" fill=\"" + pt_color + "\"/>"
+              "\" fill=\"" +
+              pt_color +
+              "\"/>"
           } else {
-            svg = svg + "<rect x=\"" + int_to_str(px_ + bar_off) +
+            svg = svg +
+              "<rect x=\"" +
+              int_to_str(px_ + bar_off) +
               "\" y=\"" +
-              int_to_str(py + ph - bar_len) + "\" width=\"" +
+              int_to_str(py + ph - bar_len) +
+              "\" width=\"" +
               int_to_str(if bar_w > 1 { bar_w } else { 1 }) +
-              "\" height=\"" + int_to_str(bar_len) +
-              "\" fill=\"" + pt_color + "\"/>"
+              "\" height=\"" +
+              int_to_str(bar_len) +
+              "\" fill=\"" +
+              pt_color +
+              "\"/>"
           }
         }
       }
     }
   }
   // Data labels (check group-level and series-level)
-  let has_data_labels = group.data_labels.is_visible() || {
-    let mut found = false
-    for si2 in 0..<ns {
-      if group.series[si2].data_labels.is_visible() { found = true }
-    }
-    found
-  }
+  let has_data_labels = group.data_labels.is_visible() ||
+    ({
+      let mut found = false
+      for si2 in 0..<ns {
+        if group.series[si2].data_labels.is_visible() {
+          found = true
+        }
+      }
+      found
+    })
   if has_data_labels {
-    svg = svg + render_bar_data_labels(
-      group, px_, py, pw, ph, max_val, is_horizontal,
-    )
+    svg = svg +
+      render_bar_data_labels(group, px_, py, pw, ph, max_val, is_horizontal)
   }
   // Trendlines + error bars (vertical column charts only)
-  if not(is_horizontal) {
+  if !(is_horizontal) {
     svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
     svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   }
@@ -494,33 +550,46 @@ fn render_line_chart(
     for ci in 0..<n_pts {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y = py + ph - mul_div(values[ci], ph, max_val)
-      if not(points.is_empty()) {
+      if !(points.is_empty()) {
         points = points + " "
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
     }
-    if not(points.is_empty()) {
-      svg = svg + "<polyline points=\"" + points +
-        "\" fill=\"none\" stroke=\"" + color +
+    if !(points.is_empty()) {
+      svg = svg +
+        "<polyline points=\"" +
+        points +
+        "\" fill=\"none\" stroke=\"" +
+        color +
         "\" stroke-width=\"2\"/>"
       // Draw markers
       for ci in 0..<n_pts {
         let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
         let y = py + ph - mul_div(values[ci], ph, max_val)
-        svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
-          int_to_str(y) + "\" r=\"" + int_to_str(chart_line_marker_r) +
-          "\" fill=\"" + color + "\"/>"
+        svg = svg +
+          "<circle cx=\"" +
+          int_to_str(x) +
+          "\" cy=\"" +
+          int_to_str(y) +
+          "\" r=\"" +
+          int_to_str(chart_line_marker_r) +
+          "\" fill=\"" +
+          color +
+          "\"/>"
       }
     }
   }
   // Data labels (check group-level and series-level)
-  let has_xy_dl = group.data_labels.is_visible() || {
-    let mut found = false
-    for si2 in 0..<ns {
-      if group.series[si2].data_labels.is_visible() { found = true }
-    }
-    found
-  }
+  let has_xy_dl = group.data_labels.is_visible() ||
+    ({
+      let mut found = false
+      for si2 in 0..<ns {
+        if group.series[si2].data_labels.is_visible() {
+          found = true
+        }
+      }
+      found
+    })
   if has_xy_dl {
     svg = svg + render_xy_data_labels(group, px_, py, pw, ph, max_val, nc)
   }
@@ -556,11 +625,18 @@ fn render_pie_chart(
   if r <= 0 {
     return ""
   }
-  let mut svg = render_pie_slices(values, nv, cx, cy, r, 0, ser.data_points, colors)
+  let mut svg = render_pie_slices(
+    values,
+    nv,
+    cx,
+    cy,
+    r,
+    0,
+    ser.data_points,
+    colors,
+  )
   if group.data_labels.is_visible() || ser.data_labels.is_visible() {
-    svg = svg + render_pie_data_labels(
-      group, values, nv, cx, cy, r, 0, ser,
-    )
+    svg = svg + render_pie_data_labels(group, values, nv, cx, cy, r, 0, ser)
   }
   svg
 }
@@ -590,11 +666,19 @@ fn render_donut_chart(
   if r <= 0 {
     return ""
   }
-  let mut svg = render_pie_slices(values, nv, cx, cy, r, inner_r, ser.data_points, colors)
+  let mut svg = render_pie_slices(
+    values,
+    nv,
+    cx,
+    cy,
+    r,
+    inner_r,
+    ser.data_points,
+    colors,
+  )
   if group.data_labels.is_visible() || ser.data_labels.is_visible() {
-    svg = svg + render_pie_data_labels(
-      group, values, nv, cx, cy, r, inner_r, ser,
-    )
+    svg = svg +
+      render_pie_data_labels(group, values, nv, cx, cy, r, inner_r, ser)
   }
   svg
 }
@@ -640,20 +724,66 @@ fn render_pie_slices(
         let isy = cy + inner_r * sin1000(start_angle) / 1000
         let iex = cx + inner_r * cos1000(end_angle) / 1000
         let iey = cy + inner_r * sin1000(end_angle) / 1000
-        svg = svg + "<path d=\"M" + int_to_str(sx) + " " + int_to_str(sy) +
-          " A" + int_to_str(r) + " " + int_to_str(r) + " 0 " + large_arc +
-          " 1 " + int_to_str(ex) + " " + int_to_str(ey) +
-          " L" + int_to_str(iex) + " " + int_to_str(iey) +
-          " A" + int_to_str(inner_r) + " " + int_to_str(inner_r) +
-          " 0 " + large_arc + " 0 " + int_to_str(isx) + " " +
-          int_to_str(isy) + " Z\" fill=\"" + color + "\" stroke=\"" + chart_slice_stroke + "\" stroke-width=\"1\"/>"
+        svg = svg +
+          "<path d=\"M" +
+          int_to_str(sx) +
+          " " +
+          int_to_str(sy) +
+          " A" +
+          int_to_str(r) +
+          " " +
+          int_to_str(r) +
+          " 0 " +
+          large_arc +
+          " 1 " +
+          int_to_str(ex) +
+          " " +
+          int_to_str(ey) +
+          " L" +
+          int_to_str(iex) +
+          " " +
+          int_to_str(iey) +
+          " A" +
+          int_to_str(inner_r) +
+          " " +
+          int_to_str(inner_r) +
+          " 0 " +
+          large_arc +
+          " 0 " +
+          int_to_str(isx) +
+          " " +
+          int_to_str(isy) +
+          " Z\" fill=\"" +
+          color +
+          "\" stroke=\"" +
+          chart_slice_stroke +
+          "\" stroke-width=\"1\"/>"
       } else {
         // Pie slice
-        svg = svg + "<path d=\"M" + int_to_str(cx) + " " + int_to_str(cy) +
-          " L" + int_to_str(sx) + " " + int_to_str(sy) +
-          " A" + int_to_str(r) + " " + int_to_str(r) + " 0 " + large_arc +
-          " 1 " + int_to_str(ex) + " " + int_to_str(ey) +
-          " Z\" fill=\"" + color + "\" stroke=\"" + chart_slice_stroke + "\" stroke-width=\"1\"/>"
+        svg = svg +
+          "<path d=\"M" +
+          int_to_str(cx) +
+          " " +
+          int_to_str(cy) +
+          " L" +
+          int_to_str(sx) +
+          " " +
+          int_to_str(sy) +
+          " A" +
+          int_to_str(r) +
+          " " +
+          int_to_str(r) +
+          " 0 " +
+          large_arc +
+          " 1 " +
+          int_to_str(ex) +
+          " " +
+          int_to_str(ey) +
+          " Z\" fill=\"" +
+          color +
+          "\" stroke=\"" +
+          chart_slice_stroke +
+          "\" stroke-width=\"1\"/>"
       }
       start_angle = end_angle
     }
@@ -686,9 +816,16 @@ fn render_scatter_chart(
     for ci in 0..<n {
       let x = px_ + mul_div(xv[ci], pw, x_max)
       let y = py + ph - mul_div(yv[ci], ph, y_max)
-      svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
-        int_to_str(y) + "\" r=\"" + int_to_str(chart_scatter_marker_r) +
-        "\" fill=\"" + color + "\"/>"
+      svg = svg +
+        "<circle cx=\"" +
+        int_to_str(x) +
+        "\" cy=\"" +
+        int_to_str(y) +
+        "\" r=\"" +
+        int_to_str(chart_scatter_marker_r) +
+        "\" fill=\"" +
+        color +
+        "\"/>"
     }
   }
   svg
@@ -727,7 +864,7 @@ fn render_area_chart(
     for ci in 0..<actual {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y = py + ph - mul_div(values[ci], ph, max_val)
-      if not(points.is_empty()) {
+      if !(points.is_empty()) {
         points = points + " "
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
@@ -736,11 +873,22 @@ fn render_area_chart(
     if actual > 0 {
       let last_x = px_ + ((actual - 1) * 2 + 1) * pw / (nc * 2)
       let first_x = px_ + pw / (nc * 2)
-      points = points + " " + int_to_str(last_x) + "," +
-        int_to_str(py + ph) + " " + int_to_str(first_x) + "," +
+      points = points +
+        " " +
+        int_to_str(last_x) +
+        "," +
+        int_to_str(py + ph) +
+        " " +
+        int_to_str(first_x) +
+        "," +
         int_to_str(py + ph)
-      svg = svg + "<polygon points=\"" + points + "\" fill=\"" + color +
-        "\" fill-opacity=\"0.5\" stroke=\"" + color +
+      svg = svg +
+        "<polygon points=\"" +
+        points +
+        "\" fill=\"" +
+        color +
+        "\" fill-opacity=\"0.5\" stroke=\"" +
+        color +
         "\" stroke-width=\"1\"/>"
     }
   }
@@ -781,10 +929,18 @@ fn render_bubble_chart(
         chart_scatter_marker_r
       }
       let r_clamped = if r < 3 { 3 } else { r }
-      svg = svg + "<circle cx=\"" + int_to_str(x) + "\" cy=\"" +
-        int_to_str(y) + "\" r=\"" + int_to_str(r_clamped) +
-        "\" fill=\"" + color + "\" fill-opacity=\"0.6\" stroke=\"" +
-        color + "\" stroke-width=\"1\"/>"
+      svg = svg +
+        "<circle cx=\"" +
+        int_to_str(x) +
+        "\" cy=\"" +
+        int_to_str(y) +
+        "\" r=\"" +
+        int_to_str(r_clamped) +
+        "\" fill=\"" +
+        color +
+        "\" fill-opacity=\"0.6\" stroke=\"" +
+        color +
+        "\" stroke-width=\"1\"/>"
     }
   }
   svg
@@ -846,22 +1002,46 @@ fn render_stock_chart(
     let ly = py + ph - mul_div(l_val, ph, max_val)
     let cy_ = py + ph - mul_div(c_val, ph, max_val)
     // High-low vertical line
-    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" +
-      int_to_str(hy) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" +
-      int_to_str(ly) + "\" stroke=\"" + colors[0 % colors.length()] +
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx) +
+      "\" y1=\"" +
+      int_to_str(hy) +
+      "\" x2=\"" +
+      int_to_str(cx) +
+      "\" y2=\"" +
+      int_to_str(ly) +
+      "\" stroke=\"" +
+      colors[0 % colors.length()] +
       "\" stroke-width=\"1.5\"/>"
     // Close tick (right)
-    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" +
-      int_to_str(cy_) + "\" x2=\"" + int_to_str(cx + bar_w) +
-      "\" y2=\"" + int_to_str(cy_) + "\" stroke=\"" +
-      colors[2 % colors.length()] + "\" stroke-width=\"2\"/>"
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx) +
+      "\" y1=\"" +
+      int_to_str(cy_) +
+      "\" x2=\"" +
+      int_to_str(cx + bar_w) +
+      "\" y2=\"" +
+      int_to_str(cy_) +
+      "\" stroke=\"" +
+      colors[2 % colors.length()] +
+      "\" stroke-width=\"2\"/>"
     // Open tick (left) if 4 series
     if open_idx >= 0 && ci < open_vals.length() {
       let o_val = open_vals[ci]
       let oy = py + ph - mul_div(o_val, ph, max_val)
-      svg = svg + "<line x1=\"" + int_to_str(cx - bar_w) + "\" y1=\"" +
-        int_to_str(oy) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" +
-        int_to_str(oy) + "\" stroke=\"" + colors[1 % colors.length()] +
+      svg = svg +
+        "<line x1=\"" +
+        int_to_str(cx - bar_w) +
+        "\" y1=\"" +
+        int_to_str(oy) +
+        "\" x2=\"" +
+        int_to_str(cx) +
+        "\" y2=\"" +
+        int_to_str(oy) +
+        "\" stroke=\"" +
+        colors[1 % colors.length()] +
         "\" stroke-width=\"2\"/>"
     }
   }
@@ -897,8 +1077,12 @@ fn render_surface_chart(
       max_cols = vals.length()
     }
     for vi in 0..<vals.length() {
-      if vals[vi] > global_max { global_max = vals[vi] }
-      if vals[vi] < global_min { global_min = vals[vi] }
+      if vals[vi] > global_max {
+        global_max = vals[vi]
+      }
+      if vals[vi] < global_min {
+        global_min = vals[vi]
+      }
     }
     all_values.push(vals)
   }
@@ -917,14 +1101,29 @@ fn render_surface_chart(
       let r = t
       let b = 255 - t
       let g = if t < 128 { t * 2 } else { (255 - t) * 2 }
-      let color = "rgb(" + int_to_str(r) + "," + int_to_str(g) + "," +
-        int_to_str(b) + ")"
+      let color = "rgb(" +
+        int_to_str(r) +
+        "," +
+        int_to_str(g) +
+        "," +
+        int_to_str(b) +
+        ")"
       let x = px_ + ci * cell_w
       let y = py + si * cell_h
-      svg = svg + "<rect x=\"" + int_to_str(x) + "\" y=\"" +
-        int_to_str(y) + "\" width=\"" + int_to_str(cell_w) +
-        "\" height=\"" + int_to_str(cell_h) + "\" fill=\"" + color +
-        "\" stroke=\"" + chart_gridline_color + "\" stroke-width=\"0.5\"/>"
+      svg = svg +
+        "<rect x=\"" +
+        int_to_str(x) +
+        "\" y=\"" +
+        int_to_str(y) +
+        "\" width=\"" +
+        int_to_str(cell_w) +
+        "\" height=\"" +
+        int_to_str(cell_h) +
+        "\" fill=\"" +
+        color +
+        "\" stroke=\"" +
+        chart_gridline_color +
+        "\" stroke-width=\"0.5\"/>"
     }
   }
   svg
@@ -948,12 +1147,20 @@ fn render_axes(
   let h_bar = is_horizontal_bar(groups)
   let mut svg = ""
   // Plot area border
-  svg = svg + "<rect x=\"" + int_to_str(px_) + "\" y=\"" + int_to_str(py) +
-    "\" width=\"" + int_to_str(pw) + "\" height=\"" + int_to_str(ph) +
-    "\" fill=\"none\" stroke=\"" + chart_border_color +
+  svg = svg +
+    "<rect x=\"" +
+    int_to_str(px_) +
+    "\" y=\"" +
+    int_to_str(py) +
+    "\" width=\"" +
+    int_to_str(pw) +
+    "\" height=\"" +
+    int_to_str(ph) +
+    "\" fill=\"none\" stroke=\"" +
+    chart_border_color +
     "\" stroke-width=\"0.5\"/>"
   // Category / X-axis labels
-  let is_xy = if not(groups.is_empty()) {
+  let is_xy = if !(groups.is_empty()) {
     match groups[0].chart_type {
       @ooxml.ChartKind::ScatterChart | @ooxml.ChartKind::BubbleChart => true
       _ => false
@@ -964,17 +1171,22 @@ fn render_axes(
   if is_xy {
     // Scatter/bubble: numeric X-axis tick labels
     let x_max = get_x_axis_max(groups)
-    for ti in 0..=chart_axis_ticks {
+    for ti in 0..<=chart_axis_ticks {
       let x = px_ + ti * pw / chart_axis_ticks
       let label_val = mul_div(ti, x_max, chart_axis_ticks)
-      svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+      svg = svg +
+        "<text x=\"" +
+        int_to_str(x) +
+        "\" y=\"" +
         int_to_str(py + ph + 14) +
         "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
-        chart_axis_label_color + "\">" +
-        format_chart_val(label_val, "General") + "</text>"
+        chart_axis_label_color +
+        "\">" +
+        format_chart_val(label_val, "General") +
+        "</text>"
     }
   } else {
-    let cats = if not(groups.is_empty()) && not(groups[0].series.is_empty()) {
+    let cats = if !(groups.is_empty()) && !(groups[0].series.is_empty()) {
       get_cat_labels(groups[0].series[0].cat)
     } else {
       []
@@ -985,11 +1197,16 @@ fn render_axes(
         // Horizontal bar: category labels on left (Y axis)
         for ci in 0..<nc {
           let y = py + (ci * 2 + 1) * ph / (nc * 2)
-          svg = svg + "<text x=\"" + int_to_str(px_ - 4) + "\" y=\"" +
+          svg = svg +
+            "<text x=\"" +
+            int_to_str(px_ - 4) +
+            "\" y=\"" +
             int_to_str(y + 4) +
             "\" text-anchor=\"end\" font-size=\"10\" fill=\"" +
-            chart_axis_label_color + "\">" +
-            svg_escape(cats[ci]) + "</text>"
+            chart_axis_label_color +
+            "\">" +
+            svg_escape(cats[ci]) +
+            "</text>"
         }
       } else {
         // Vertical: category labels at bottom (X axis)
@@ -998,19 +1215,31 @@ fn render_axes(
         for ci in 0..<nc {
           let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
           if rotate {
-            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+            svg = svg +
+              "<text x=\"" +
+              int_to_str(x) +
+              "\" y=\"" +
               int_to_str(py + ph + 10) +
               "\" text-anchor=\"end\" font-size=\"8\" fill=\"" +
               chart_axis_label_color +
-              "\" transform=\"rotate(-45," + int_to_str(x) + "," +
-              int_to_str(py + ph + 10) + ")\">" +
-              svg_escape(cats[ci]) + "</text>"
+              "\" transform=\"rotate(-45," +
+              int_to_str(x) +
+              "," +
+              int_to_str(py + ph + 10) +
+              ")\">" +
+              svg_escape(cats[ci]) +
+              "</text>"
           } else {
-            svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+            svg = svg +
+              "<text x=\"" +
+              int_to_str(x) +
+              "\" y=\"" +
               int_to_str(py + ph + 14) +
               "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
-              chart_axis_label_color + "\">" +
-              svg_escape(cats[ci]) + "</text>"
+              chart_axis_label_color +
+              "\">" +
+              svg_escape(cats[ci]) +
+              "</text>"
           }
         }
       }
@@ -1019,7 +1248,7 @@ fn render_axes(
   // Value axis labels + gridlines
   for ai in 0..<axes.length() {
     let ax = axes[ai]
-    if ax.is_val && not(ax.delete) {
+    if ax.is_val && !(ax.delete) {
       let raw_max = get_value_axis_max(groups)
       let val_fmt = ax.num_fmt
       let max_val = compute_axis_max(raw_max, axes)
@@ -1031,43 +1260,73 @@ fn render_axes(
       }
       let n_ticks = if major_unit > 0 && max_val > 0 {
         let n = max_val / major_unit
-        if n > 20 { 20 } else if n < 1 { 1 } else { n }
+        if n > 20 {
+          20
+        } else if n < 1 {
+          1
+        } else {
+          n
+        }
       } else {
         chart_axis_ticks
       }
-      for ti in 0..=n_ticks {
+      for ti in 0..<=n_ticks {
         if h_bar {
           // Horizontal bar: value labels at bottom (X axis), vertical gridlines
           let x = px_ + ti * pw / n_ticks
           if ax.major_gridlines && ti > 0 && ti < n_ticks {
-            svg = svg + "<line x1=\"" + int_to_str(x) + "\" y1=\"" +
-              int_to_str(py) + "\" x2=\"" + int_to_str(x) +
-              "\" y2=\"" + int_to_str(py + ph) +
-              "\" stroke=\"" + chart_gridline_color +
+            svg = svg +
+              "<line x1=\"" +
+              int_to_str(x) +
+              "\" y1=\"" +
+              int_to_str(py) +
+              "\" x2=\"" +
+              int_to_str(x) +
+              "\" y2=\"" +
+              int_to_str(py + ph) +
+              "\" stroke=\"" +
+              chart_gridline_color +
               "\" stroke-width=\"0.5\"/>"
           }
           let label_val = mul_div(ti, max_val, n_ticks)
-          svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+          svg = svg +
+            "<text x=\"" +
+            int_to_str(x) +
+            "\" y=\"" +
             int_to_str(py + ph + 14) +
             "\" text-anchor=\"middle\" font-size=\"10\" fill=\"" +
-            chart_axis_label_color + "\">" +
-            format_chart_val(label_val, val_fmt) + "</text>"
+            chart_axis_label_color +
+            "\">" +
+            format_chart_val(label_val, val_fmt) +
+            "</text>"
         } else {
           // Vertical: value labels on left (Y axis), horizontal gridlines
           let y = py + ph - ti * ph / n_ticks
           if ax.major_gridlines && ti > 0 && ti < n_ticks {
-            svg = svg + "<line x1=\"" + int_to_str(px_) + "\" y1=\"" +
-              int_to_str(y) + "\" x2=\"" + int_to_str(px_ + pw) +
-              "\" y2=\"" + int_to_str(y) +
-              "\" stroke=\"" + chart_gridline_color +
+            svg = svg +
+              "<line x1=\"" +
+              int_to_str(px_) +
+              "\" y1=\"" +
+              int_to_str(y) +
+              "\" x2=\"" +
+              int_to_str(px_ + pw) +
+              "\" y2=\"" +
+              int_to_str(y) +
+              "\" stroke=\"" +
+              chart_gridline_color +
               "\" stroke-width=\"0.5\"/>"
           }
           let label_val = mul_div(ti, max_val, n_ticks)
-          svg = svg + "<text x=\"" + int_to_str(px_ - 4) + "\" y=\"" +
+          svg = svg +
+            "<text x=\"" +
+            int_to_str(px_ - 4) +
+            "\" y=\"" +
             int_to_str(y + 3) +
             "\" text-anchor=\"end\" font-size=\"10\" fill=\"" +
-            chart_axis_label_color + "\">" +
-            format_chart_val(label_val, val_fmt) + "</text>"
+            chart_axis_label_color +
+            "\">" +
+            format_chart_val(label_val, val_fmt) +
+            "</text>"
         }
       }
     }
@@ -1096,7 +1355,7 @@ fn render_legend(
     }
     if is_pie {
       // Show category labels with per-slice colors (respecting c:dPt overrides)
-      if not(group.series.is_empty()) {
+      if !(group.series.is_empty()) {
         let cats = get_cat_labels(group.series[0].cat)
         let dpts = group.series[0].data_points
         for ci in 0..<cats.length() {
@@ -1130,11 +1389,22 @@ fn render_legend_entry(
   color : String,
   label : String,
 ) -> String {
-  "<rect x=\"" + int_to_str(x) + "\" y=\"" + int_to_str(y) +
-  "\" width=\"10\" height=\"10\" fill=\"" + color + "\"/>" +
-  "<text x=\"" + int_to_str(x + 14) + "\" y=\"" + int_to_str(y + 9) +
-  "\" font-size=\"10\" fill=\"" + chart_title_color + "\">" +
-  svg_escape(label) + "</text>"
+  "<rect x=\"" +
+  int_to_str(x) +
+  "\" y=\"" +
+  int_to_str(y) +
+  "\" width=\"10\" height=\"10\" fill=\"" +
+  color +
+  "\"/>" +
+  "<text x=\"" +
+  int_to_str(x + 14) +
+  "\" y=\"" +
+  int_to_str(y + 9) +
+  "\" font-size=\"10\" fill=\"" +
+  chart_title_color +
+  "\">" +
+  svg_escape(label) +
+  "</text>"
 }
 
 // ── Helper functions ────────────────────────────────────────────────────────
@@ -1146,9 +1416,9 @@ fn series_color(
   idx : Int,
   colors : Array[String],
 ) -> String {
-  if not(ser.sp_pr.fill.is_none()) {
+  if !(ser.sp_pr.fill.is_none()) {
     ser.sp_pr.fill.to_css()
-  } else if not(ser.sp_pr.stroke.is_none()) {
+  } else if !(ser.sp_pr.stroke.is_none()) {
     // Line charts set color on a:ln (stroke), not fill
     ser.sp_pr.stroke.to_css()
   } else {
@@ -1166,7 +1436,7 @@ fn point_color(
   for i in 0..<ser.data_points.length() {
     if ser.data_points[i].idx == pt_idx {
       let sp = ser.data_points[i].sp_pr
-      if not(sp.fill.is_none()) {
+      if !(sp.fill.is_none()) {
         return sp.fill.to_css()
       }
     }
@@ -1184,7 +1454,7 @@ fn get_dpt_color(
   for i in 0..<data_points.length() {
     if data_points[i].idx == idx {
       let sp = data_points[i].sp_pr
-      if not(sp.fill.is_none()) {
+      if !(sp.fill.is_none()) {
         return sp.fill.to_css()
       }
     }
@@ -1227,7 +1497,7 @@ fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
 fn get_stacked_series_range(
   series : Array[@ooxml.ChartSeries],
 ) -> (Array[String], Int) {
-  let cats = if not(series.is_empty()) {
+  let cats = if !(series.is_empty()) {
     get_cat_labels(series[0].cat)
   } else {
     []
@@ -1244,18 +1514,19 @@ fn get_stacked_series_range(
   }
   let mut max_val = 0
   for ci in 0..<nc {
-    if totals[ci] > max_val { max_val = totals[ci] }
+    if totals[ci] > max_val {
+      max_val = totals[ci]
+    }
   }
-  if max_val == 0 { max_val = 1 }
+  if max_val == 0 {
+    max_val = 1
+  }
   (cats, max_val)
 }
 
 ///|
 /// Compute per-category totals for percentStacked normalization.
-fn compute_cat_totals(
-  group : @ooxml.ChartGroup,
-  nc : Int,
-) -> Array[Int] {
+fn compute_cat_totals(group : @ooxml.ChartGroup, nc : Int) -> Array[Int] {
   let totals : Array[Int] = Array::make(nc, 0)
   let ns = group.series.length()
   for si in 0..<ns {
@@ -1272,11 +1543,7 @@ fn compute_cat_totals(
 ///|
 /// Normalize a value for percentStacked: val * chart_val_scale / total.
 /// Returns the raw val if not percentStacked or total is 0.
-fn pct_stacked_val(
-  val : Int,
-  cat_total : Int,
-  is_pct_stacked : Bool,
-) -> Int {
+fn pct_stacked_val(val : Int, cat_total : Int, is_pct_stacked : Bool) -> Int {
   if is_pct_stacked && cat_total > 0 {
     mul_div(val, chart_val_scale, cat_total)
   } else {
@@ -1289,7 +1556,11 @@ fn pct_stacked_val(
 fn get_num_format(src : @ooxml.AxisDataSource) -> String {
   match src {
     @ooxml.AxisDataSource::NumSource(_, data) =>
-      if data.format_code.is_empty() { "General" } else { data.format_code }
+      if data.format_code.is_empty() {
+        "General"
+      } else {
+        data.format_code
+      }
     _ => "General"
   }
 }
@@ -1300,7 +1571,9 @@ fn get_max_points(series : Array[@ooxml.ChartSeries]) -> Int {
   let mut max_n = 0
   for i in 0..<series.length() {
     let n = get_num_values(series[i].val).length()
-    if n > max_n { max_n = n }
+    if n > max_n {
+      max_n = n
+    }
   }
   max_n
 }
@@ -1344,10 +1617,8 @@ fn round_up_nice(val : Int) -> Int {
 
 ///|
 /// Get category count and max value across all series.
-fn get_series_range(
-  series : Array[@ooxml.ChartSeries],
-) -> (Array[String], Int) {
-  let cats = if not(series.is_empty()) {
+fn get_series_range(series : Array[@ooxml.ChartSeries]) -> (Array[String], Int) {
+  let cats = if !(series.is_empty()) {
     get_cat_labels(series[0].cat)
   } else {
     []
@@ -1356,19 +1627,21 @@ fn get_series_range(
   for si in 0..<series.length() {
     let vals = get_num_values(series[si].val)
     for vi in 0..<vals.length() {
-      if vals[vi] > max_val { max_val = vals[vi] }
+      if vals[vi] > max_val {
+        max_val = vals[vi]
+      }
     }
   }
-  if max_val == 0 { max_val = 1 }
+  if max_val == 0 {
+    max_val = 1
+  }
   (cats, max_val)
 }
 
 ///|
 /// Get X/Y/bubble-size max values across all series (scatter/bubble charts).
 /// Returns (x_max, y_max, bub_max), each at least 1.
-fn get_xy_range(
-  series : Array[@ooxml.ChartSeries],
-) -> (Int, Int, Int) {
+fn get_xy_range(series : Array[@ooxml.ChartSeries]) -> (Int, Int, Int) {
   let mut x_max = 0
   let mut y_max = 0
   let mut bub_max = 0
@@ -1377,29 +1650,48 @@ fn get_xy_range(
     let yv = get_num_values(series[si].y_val)
     let bv = get_num_values(series[si].bubble_size)
     for j in 0..<xv.length() {
-      if xv[j] > x_max { x_max = xv[j] }
+      if xv[j] > x_max {
+        x_max = xv[j]
+      }
     }
     for j in 0..<yv.length() {
-      if yv[j] > y_max { y_max = yv[j] }
+      if yv[j] > y_max {
+        y_max = yv[j]
+      }
     }
     for j in 0..<bv.length() {
-      if bv[j] > bub_max { bub_max = bv[j] }
+      if bv[j] > bub_max {
+        bub_max = bv[j]
+      }
     }
   }
-  (if x_max == 0 { 1 } else { x_max }, if y_max == 0 { 1 } else { y_max }, if bub_max == 0 { 1 } else { bub_max })
+  (
+    if x_max == 0 {
+      1
+    } else {
+      x_max
+    },
+    if y_max == 0 {
+      1
+    } else {
+      y_max
+    },
+    if bub_max == 0 {
+      1
+    } else {
+      bub_max
+    },
+  )
 }
 
 ///|
 /// Compute effective axis max from raw data max, using majorUnit if available,
 /// otherwise round_up_nice.
-fn compute_axis_max(
-  raw_max : Int,
-  axes : Array[@ooxml.ChartAxis],
-) -> Int {
+fn compute_axis_max(raw_max : Int, axes : Array[@ooxml.ChartAxis]) -> Int {
   // Find the value axis majorUnit
   let mut major_unit = 0
   for ai in 0..<axes.length() {
-    if axes[ai].is_val && not(axes[ai].major_unit.is_empty()) {
+    if axes[ai].is_val && !(axes[ai].major_unit.is_empty()) {
       major_unit = parse_chart_num(axes[ai].major_unit)
     }
   }
@@ -1429,12 +1721,18 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
       for si in 0..<group.series.length() {
         let vals = get_num_values(group.series[si].val)
         for vi in 0..<vals.length() {
-          if vals[vi] > max_val { max_val = vals[vi] }
+          if vals[vi] > max_val {
+            max_val = vals[vi]
+          }
         }
       }
       // Add 10% headroom for stock charts
       max_val = max_val * 11 / 10
-      if max_val == 0 { 1 } else { max_val }
+      if max_val == 0 {
+        1
+      } else {
+        max_val
+      }
     }
     _ => {
       // Consider all groups for composite charts
@@ -1446,13 +1744,21 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int {
           max_val = chart_val_scale
         } else if g.grouping == "stacked" {
           let (_, gmax) = get_stacked_series_range(g.series)
-          if gmax > max_val { max_val = gmax }
+          if gmax > max_val {
+            max_val = gmax
+          }
         } else {
           let (_, gmax) = get_series_range(g.series)
-          if gmax > max_val { max_val = gmax }
+          if gmax > max_val {
+            max_val = gmax
+          }
         }
       }
-      if max_val == 0 { 1 } else { max_val }
+      if max_val == 0 {
+        1
+      } else {
+        max_val
+      }
     }
   }
 }
@@ -1504,7 +1810,9 @@ fn parse_chart_num(s : String) -> Int {
       } else if c >= '0' && c <= '9' && sig_digits < 8 {
         mantissa = mantissa * 10 + (Char::to_int(c) - 48)
         sig_digits = sig_digits + 1
-        if found_dot { mant_dec_digits = mant_dec_digits + 1 }
+        if found_dot {
+          mant_dec_digits = mant_dec_digits + 1
+        }
       }
       si = si + 1
     }
@@ -1514,8 +1822,12 @@ fn parse_chart_num(s : String) -> Int {
     si = e_pos + 1
     if si < len {
       let ec = s.get_char(si).unwrap()
-      if ec == '-' { exp_neg = true; si = si + 1 }
-      else if ec == '+' { si = si + 1 }
+      if ec == '-' {
+        exp_neg = true
+        si = si + 1
+      } else if ec == '+' {
+        si = si + 1
+      }
     }
     while si < len {
       let c = s.get_char(si).unwrap()
@@ -1524,7 +1836,9 @@ fn parse_chart_num(s : String) -> Int {
       }
       si = si + 1
     }
-    if exp_neg { exp = -exp }
+    if exp_neg {
+      exp = -exp
+    }
     // Net decimal shift: number of decimal places after applying exponent
     // E.g. 1.7738E-2: mantissa=17738, mant_dec_digits=4, exp=-2
     // Actual value = 17738 × 10^(-4-2) = 17738 × 10^-6 = 0.017738
@@ -1587,7 +1901,11 @@ fn parse_chart_num(s : String) -> Int {
     dec_digits = dec_digits + 1
   }
   let result = int_part * chart_val_scale + dec_part
-  if start == 1 { -result } else { result }
+  if start == 1 {
+    -result
+  } else {
+    result
+  }
 }
 
 ///|
@@ -1604,6 +1922,7 @@ fn gcd(a : Int, b : Int) -> Int {
   x
 }
 
+///|
 fn mul_div(a : Int, b : Int, c : Int) -> Int {
   if c == 0 {
     return 0
@@ -1627,10 +1946,11 @@ fn mul_div(a : Int, b : Int, c : Int) -> Int {
 /// Handles "0%", "0.0%", "0.00%", "General", etc.
 fn format_chart_val(val : Int, num_fmt : String) -> String {
   // Check if percentage format
-  let is_pct = num_fmt.length() > 0 && {
-    let last = num_fmt.get_char(num_fmt.length() - 1).unwrap()
-    last == '%'
-  }
+  let is_pct = num_fmt.length() > 0 &&
+    ({
+      let last = num_fmt.get_char(num_fmt.length() - 1).unwrap()
+      last == '%'
+    })
   if is_pct {
     // Percentage: multiply by 100 then format
     // val is scaled ×10000, so 0.381 = 3810.
@@ -1666,7 +1986,13 @@ fn format_chart_val(val : Int, num_fmt : String) -> String {
         10
       }
       let rounded = (pct_scaled + round_div / 2) / round_div
-      let pows = if dec_places == 1 { 10 } else if dec_places == 2 { 100 } else { 1000 }
+      let pows = if dec_places == 1 {
+        10
+      } else if dec_places == 2 {
+        100
+      } else {
+        1000
+      }
       let int_pct = rounded / pows
       let frac = if rounded >= 0 {
         rounded - int_pct * pows
@@ -1678,7 +2004,8 @@ fn format_chart_val(val : Int, num_fmt : String) -> String {
       } else if dec_places == 2 {
         (if frac < 10 { "0" } else { "" }) + int_to_str(frac)
       } else {
-        (if frac < 100 { "0" } else { "" }) + (if frac < 10 { "0" } else { "" }) +
+        (if frac < 100 { "0" } else { "" }) +
+        (if frac < 10 { "0" } else { "" }) +
         int_to_str(frac)
       }
       int_to_str(int_pct) + "." + frac_str + "%"
@@ -1706,7 +2033,7 @@ fn build_label_text(
   if dl.show_ser_name {
     parts.push(ser_name)
   }
-  if dl.show_cat_name && not(cat_name.is_empty()) {
+  if dl.show_cat_name && !(cat_name.is_empty()) {
     parts.push(cat_name)
   }
   if dl.show_val {
@@ -1738,7 +2065,13 @@ fn render_bar_data_labels(
   is_horizontal : Bool,
 ) -> String {
   let ns = group.series.length()
-  let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
+  let cats = get_cat_labels(
+    if ns > 0 {
+      group.series[0].cat
+    } else {
+      @ooxml.AxisDataSource::NoData
+    },
+  )
   let nc = cats.length()
   let group_dl = group.data_labels
   let cat_size = if is_horizontal { ph } else { pw }
@@ -1747,7 +2080,11 @@ fn render_bar_data_labels(
     group.grouping == "percentStacked"
   let is_pct_stacked = group.grouping == "percentStacked"
   let gap_pct = group.gap_width
-  let units_per_cat = if is_stacked { 100 + gap_pct } else { ns * 100 + gap_pct }
+  let units_per_cat = if is_stacked {
+    100 + gap_pct
+  } else {
+    ns * 100 + gap_pct
+  }
   let cat_totals = compute_cat_totals(group, nc)
   // Track stacked offset for label positioning
   let stack_offset : Array[Int] = Array::make(nc, 0)
@@ -1759,67 +2096,104 @@ fn render_bar_data_labels(
     } else {
       group_dl
     }
-    if not(dl.is_visible()) { continue }
+    if !(dl.is_visible()) {
+      continue
+    }
     let values = get_num_values(ser.val)
     let val_fmt = get_num_format(ser.val)
     let nv = values.length()
     for ci in 0..<nc {
       if ci < nv && values[ci] > 0 {
         let label = build_label_text(
-          dl, values[ci], 0, if ci < cats.length() { cats[ci] } else { "" },
-          ser.title, val_fmt,
+          dl,
+          values[ci],
+          0,
+          if ci < cats.length() {
+            cats[ci]
+          } else {
+            ""
+          },
+          ser.title,
+          val_fmt,
         )
-        if not(label.is_empty()) {
+        if !(label.is_empty()) {
           let draw_val = pct_stacked_val(
-            values[ci], cat_totals[ci], is_pct_stacked,
+            values[ci],
+            cat_totals[ci],
+            is_pct_stacked,
           )
           let bar_len = mul_div(draw_val, val_size, max_val)
           let cat_start = ci * cat_size / nc
           if is_stacked {
             let base_px = mul_div(stack_offset[ci], val_size, max_val)
-            let bar_off = cat_start + gap_pct / 2 * cat_size / nc /
-              units_per_cat
+            let bar_off = cat_start +
+              gap_pct / 2 * cat_size / nc / units_per_cat
             let bar_w = 100 * cat_size / nc / units_per_cat
             if is_horizontal {
               let x = px_ + base_px + bar_len / 2
               let y = py + bar_off + bar_w / 2 + 3
-              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              svg = svg +
+                "<text x=\"" +
+                int_to_str(x) +
+                "\" y=\"" +
                 int_to_str(y) +
                 "\" text-anchor=\"middle\" font-size=\"" +
                 int_to_str(chart_data_label_font_size) +
-                "\" fill=\"" + chart_title_color + "\">" +
-                svg_escape(label) + "</text>"
+                "\" fill=\"" +
+                chart_title_color +
+                "\">" +
+                svg_escape(label) +
+                "</text>"
             } else {
               let x = px_ + bar_off + bar_w / 2
               let y = py + ph - base_px - bar_len / 2 + 3
-              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              svg = svg +
+                "<text x=\"" +
+                int_to_str(x) +
+                "\" y=\"" +
                 int_to_str(y) +
                 "\" text-anchor=\"middle\" font-size=\"" +
                 int_to_str(chart_data_label_font_size) +
-                "\" fill=\"" + chart_title_color + "\">" +
-                svg_escape(label) + "</text>"
+                "\" fill=\"" +
+                chart_title_color +
+                "\">" +
+                svg_escape(label) +
+                "</text>"
             }
           } else {
-            let bar_off = cat_start + (gap_pct / 2 + si * 100) * cat_size /
-              nc / units_per_cat
+            let bar_off = cat_start +
+              (gap_pct / 2 + si * 100) * cat_size / nc / units_per_cat
             let bar_w = 100 * cat_size / nc / units_per_cat
             if is_horizontal {
               let x = px_ + bar_len + 3
               let y = py + bar_off + bar_w / 2 + 3
-              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
-                int_to_str(y) + "\" font-size=\"" +
+              svg = svg +
+                "<text x=\"" +
+                int_to_str(x) +
+                "\" y=\"" +
+                int_to_str(y) +
+                "\" font-size=\"" +
                 int_to_str(chart_data_label_font_size) +
-                "\" fill=\"" + chart_title_color + "\">" +
-                svg_escape(label) + "</text>"
+                "\" fill=\"" +
+                chart_title_color +
+                "\">" +
+                svg_escape(label) +
+                "</text>"
             } else {
               let x = px_ + bar_off + bar_w / 2
               let y = py + ph - bar_len - 3
-              svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+              svg = svg +
+                "<text x=\"" +
+                int_to_str(x) +
+                "\" y=\"" +
                 int_to_str(y) +
                 "\" text-anchor=\"middle\" font-size=\"" +
                 int_to_str(chart_data_label_font_size) +
-                "\" fill=\"" + chart_title_color + "\">" +
-                svg_escape(label) + "</text>"
+                "\" fill=\"" +
+                chart_title_color +
+                "\">" +
+                svg_escape(label) +
+                "</text>"
             }
           }
         }
@@ -1846,31 +2220,57 @@ fn render_xy_data_labels(
   nc : Int,
 ) -> String {
   let ns = group.series.length()
-  let cats = get_cat_labels(if ns > 0 { group.series[0].cat } else { @ooxml.AxisDataSource::NoData })
+  let cats = get_cat_labels(
+    if ns > 0 {
+      group.series[0].cat
+    } else {
+      @ooxml.AxisDataSource::NoData
+    },
+  )
   let group_dl = group.data_labels
   let mut svg = ""
   for si in 0..<ns {
     let ser = group.series[si]
-    let dl = if ser.data_labels.is_visible() { ser.data_labels } else { group_dl }
-    if not(dl.is_visible()) { continue }
+    let dl = if ser.data_labels.is_visible() {
+      ser.data_labels
+    } else {
+      group_dl
+    }
+    if !(dl.is_visible()) {
+      continue
+    }
     let values = get_num_values(ser.val)
     let val_fmt = get_num_format(ser.val)
     let nv = values.length()
     for ci in 0..<nc {
       if ci < nv {
         let label = build_label_text(
-          dl, values[ci], 0,
-          if ci < cats.length() { cats[ci] } else { "" }, ser.title, val_fmt,
+          dl,
+          values[ci],
+          0,
+          if ci < cats.length() {
+            cats[ci]
+          } else {
+            ""
+          },
+          ser.title,
+          val_fmt,
         )
-        if not(label.is_empty()) {
+        if !(label.is_empty()) {
           let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
           let y = py + ph - mul_div(values[ci], ph, max_val) - 6
-          svg = svg + "<text x=\"" + int_to_str(x) + "\" y=\"" +
+          svg = svg +
+            "<text x=\"" +
+            int_to_str(x) +
+            "\" y=\"" +
             int_to_str(y) +
             "\" text-anchor=\"middle\" font-size=\"" +
             int_to_str(chart_data_label_font_size) +
-            "\" fill=\"" + chart_title_color + "\">" +
-            svg_escape(label) + "</text>"
+            "\" fill=\"" +
+            chart_title_color +
+            "\">" +
+            svg_escape(label) +
+            "</text>"
         }
       }
     }
@@ -1897,7 +2297,11 @@ fn render_pie_data_labels(
   if total == 0 {
     return ""
   }
-  let dl = if ser.data_labels.is_visible() { ser.data_labels } else { group.data_labels }
+  let dl = if ser.data_labels.is_visible() {
+    ser.data_labels
+  } else {
+    group.data_labels
+  }
   let cats = get_cat_labels(ser.cat)
   let label_r = if inner_r > 0 { (r + inner_r) / 2 } else { r * 2 / 3 }
   let mut svg = ""
@@ -1909,17 +2313,30 @@ fn render_pie_data_labels(
       let lx = cx + label_r * cos1000(mid_angle) / 1000
       let ly = cy + label_r * sin1000(mid_angle) / 1000
       let label = build_label_text(
-        dl, values[i], total,
-        if i < cats.length() { cats[i] } else { "" }, ser.title,
+        dl,
+        values[i],
+        total,
+        if i < cats.length() {
+          cats[i]
+        } else {
+          ""
+        },
+        ser.title,
         get_num_format(ser.val),
       )
-      if not(label.is_empty()) {
-        svg = svg + "<text x=\"" + int_to_str(lx) + "\" y=\"" +
+      if !(label.is_empty()) {
+        svg = svg +
+          "<text x=\"" +
+          int_to_str(lx) +
+          "\" y=\"" +
           int_to_str(ly + 3) +
           "\" text-anchor=\"middle\" font-size=\"" +
           int_to_str(chart_data_label_font_size) +
-          "\" fill=\"" + chart_title_color + "\">" +
-          svg_escape(label) + "</text>"
+          "\" fill=\"" +
+          chart_title_color +
+          "\">" +
+          svg_escape(label) +
+          "</text>"
       }
       start_angle = start_angle + sweep
     }
@@ -1955,7 +2372,7 @@ fn render_trendlines(
     }
     for ti in 0..<ser.trendlines.length() {
       let tl = ser.trendlines[ti]
-      let color = if not(tl.sp_pr.stroke.is_none()) {
+      let color = if !(tl.sp_pr.stroke.is_none()) {
         tl.sp_pr.stroke.to_css()
       } else {
         series_color(ser, si, colors)
@@ -1990,10 +2407,17 @@ fn render_trendlines(
             let yn = m * (n - 1) + b
             let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
             let y_end = py + ph - mul_div(yn, ph, max_val)
-            svg = svg + "<line x1=\"" + int_to_str(x_start) + "\" y1=\"" +
-              int_to_str(y_start) + "\" x2=\"" + int_to_str(x_end) +
-              "\" y2=\"" + int_to_str(y_end) +
-              "\" stroke=\"" + color +
+            svg = svg +
+              "<line x1=\"" +
+              int_to_str(x_start) +
+              "\" y1=\"" +
+              int_to_str(y_start) +
+              "\" x2=\"" +
+              int_to_str(x_end) +
+              "\" y2=\"" +
+              int_to_str(y_end) +
+              "\" stroke=\"" +
+              color +
               "\" stroke-width=\"1.5\" stroke-dasharray=\"6,3\"/>"
           }
         }
@@ -2006,10 +2430,17 @@ fn render_trendlines(
             let y_start = py + ph - mul_div(values[0], ph, max_val)
             let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
             let y_end = py + ph - mul_div(values[n - 1], ph, max_val)
-            svg = svg + "<line x1=\"" + int_to_str(x_start) + "\" y1=\"" +
-              int_to_str(y_start) + "\" x2=\"" + int_to_str(x_end) +
-              "\" y2=\"" + int_to_str(y_end) +
-              "\" stroke=\"" + color +
+            svg = svg +
+              "<line x1=\"" +
+              int_to_str(x_start) +
+              "\" y1=\"" +
+              int_to_str(y_start) +
+              "\" x2=\"" +
+              int_to_str(x_end) +
+              "\" y2=\"" +
+              int_to_str(y_end) +
+              "\" stroke=\"" +
+              color +
               "\" stroke-width=\"1.5\" stroke-dasharray=\"6,3\"/>"
           }
         }
@@ -2072,23 +2503,47 @@ fn render_err_bars(
         y_center
       }
       // Vertical line
-      svg = svg + "<line x1=\"" + int_to_str(x) + "\" y1=\"" +
-        int_to_str(y_top) + "\" x2=\"" + int_to_str(x) + "\" y2=\"" +
+      svg = svg +
+        "<line x1=\"" +
+        int_to_str(x) +
+        "\" y1=\"" +
+        int_to_str(y_top) +
+        "\" x2=\"" +
+        int_to_str(x) +
+        "\" y2=\"" +
         int_to_str(y_bottom) +
-        "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+        "\" stroke=\"" +
+        color +
+        "\" stroke-width=\"1\"/>"
       // Top cap
       if show_plus {
-        svg = svg + "<line x1=\"" + int_to_str(x - chart_err_bar_cap_w) + "\" y1=\"" +
-          int_to_str(y_top) + "\" x2=\"" + int_to_str(x + chart_err_bar_cap_w) +
-          "\" y2=\"" + int_to_str(y_top) +
-          "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+        svg = svg +
+          "<line x1=\"" +
+          int_to_str(x - chart_err_bar_cap_w) +
+          "\" y1=\"" +
+          int_to_str(y_top) +
+          "\" x2=\"" +
+          int_to_str(x + chart_err_bar_cap_w) +
+          "\" y2=\"" +
+          int_to_str(y_top) +
+          "\" stroke=\"" +
+          color +
+          "\" stroke-width=\"1\"/>"
       }
       // Bottom cap
       if show_minus {
-        svg = svg + "<line x1=\"" + int_to_str(x - chart_err_bar_cap_w) + "\" y1=\"" +
-          int_to_str(y_bottom) + "\" x2=\"" + int_to_str(x + chart_err_bar_cap_w) +
-          "\" y2=\"" + int_to_str(y_bottom) +
-          "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+        svg = svg +
+          "<line x1=\"" +
+          int_to_str(x - chart_err_bar_cap_w) +
+          "\" y1=\"" +
+          int_to_str(y_bottom) +
+          "\" x2=\"" +
+          int_to_str(x + chart_err_bar_cap_w) +
+          "\" y2=\"" +
+          int_to_str(y_bottom) +
+          "\" stroke=\"" +
+          color +
+          "\" stroke-width=\"1\"/>"
       }
     }
   }
@@ -2098,25 +2553,26 @@ fn render_err_bars(
 // ── Trigonometry (integer, hundredths of degrees) ───────────────────────────
 
 // cos(0°..90°) × 1000, lookup table for accurate integer trig
+
 ///|
 let cos_table : Array[Int] = [
   1000, 1000, 999, 999, 998, 996, 995, 993, 990, 988, // 0-9
-  985, 982, 978, 974, 970, 966, 961, 956, 951, 946, // 10-19
-  940, 934, 927, 921, 914, 906, 899, 891, 883, 875, // 20-29
-  866, 857, 848, 839, 829, 819, 809, 799, 788, 777, // 30-39
-  766, 755, 743, 731, 719, 707, 695, 682, 669, 656, // 40-49
-  643, 629, 616, 602, 588, 574, 559, 545, 530, 515, // 50-59
-  500, 485, 469, 454, 438, 423, 407, 391, 375, 358, // 60-69
-  342, 326, 309, 292, 276, 259, 242, 225, 208, 191, // 70-79
-  174, 156, 139, 122, 105, 87, 70, 52, 35, 17, // 80-89
-  0, // 90
+   985, 982, 978, 974, 970, 966, 961, 956, 951, 946, // 10-19
+   940, 934, 927, 921, 914, 906, 899, 891, 883, 875, // 20-29
+   866, 857, 848, 839, 829, 819, 809, 799, 788, 777, // 30-39
+   766, 755, 743, 731, 719, 707, 695, 682, 669, 656, // 40-49
+   643, 629, 616, 602, 588, 574, 559, 545, 530, 515, // 50-59
+   500, 485, 469, 454, 438, 423, 407, 391, 375, 358, // 60-69
+   342, 326, 309, 292, 276, 259, 242, 225, 208, 191, // 70-79
+   174, 156, 139, 122, 105, 87, 70, 52, 35, 17, // 80-89
+   0, // 90
 ]
 
 ///|
 /// Cosine for angle in hundredths of degrees.
 /// Returns result × 1000 (integer approximation using lookup table).
 fn cos1000(angle_hundredths : Int) -> Int {
-  let deg = ((angle_hundredths / 100) % 360 + 360) % 360
+  let deg = (angle_hundredths / 100 % 360 + 360) % 360
   if deg <= 90 {
     cos_table[deg]
   } else if deg <= 180 {
@@ -2201,7 +2657,11 @@ fn render_waterfall_chart(
     }
   }
   let val_range = global_max - global_min
-  let max_val = if val_range == 0 { 1 } else { compute_axis_max(val_range, axes) }
+  let max_val = if val_range == 0 {
+    1
+  } else {
+    compute_axis_max(val_range, axes)
+  }
   // Gap between bars
   let gap_pct = chart_waterfall_gap_pct
   let total_units = nv * 100 + (nv + 1) * gap_pct
@@ -2209,11 +2669,19 @@ fn render_waterfall_chart(
   // Connector color
   let conn_color = chart_gridline_color
   for i in 0..<nv {
-    let bar_x = px_ + mul_div((i * 100 + (i + 1) * gap_pct), pw, total_units)
+    let bar_x = px_ + mul_div(i * 100 + (i + 1) * gap_pct, pw, total_units)
     let bar_w = mul_div(100, pw, total_units)
     // Y coordinates (inverted: higher values = lower Y)
-    let top_val = if bar_top[i] > bar_bottom[i] { bar_top[i] } else { bar_bottom[i] }
-    let bot_val = if bar_top[i] > bar_bottom[i] { bar_bottom[i] } else { bar_top[i] }
+    let top_val = if bar_top[i] > bar_bottom[i] {
+      bar_top[i]
+    } else {
+      bar_bottom[i]
+    }
+    let bot_val = if bar_top[i] > bar_bottom[i] {
+      bar_bottom[i]
+    } else {
+      bar_top[i]
+    }
     let top_y = py + ph - mul_div(top_val - global_min, ph, max_val)
     let bot_y = py + ph - mul_div(bot_val - global_min, ph, max_val)
     let bar_h = bot_y - top_y
@@ -2231,32 +2699,48 @@ fn render_waterfall_chart(
         colors[2 % colors.length()]
       }
     }
-    svg = svg + "<rect x=\"" + int_to_str(bar_x) + "\" y=\"" + int_to_str(
-        top_y,
-      ) + "\" width=\"" + int_to_str(bar_w) + "\" height=\"" + int_to_str(
-        bar_h_clamped,
-      ) + "\" fill=\"" + color + "\"/>"
+    svg = svg +
+      "<rect x=\"" +
+      int_to_str(bar_x) +
+      "\" y=\"" +
+      int_to_str(top_y) +
+      "\" width=\"" +
+      int_to_str(bar_w) +
+      "\" height=\"" +
+      int_to_str(bar_h_clamped) +
+      "\" fill=\"" +
+      color +
+      "\"/>"
     // Connector line from this bar's top to next bar's start
     if i < nv - 1 {
-      let next_bar_x = px_ + mul_div(
-          ((i + 1) * 100 + (i + 2) * gap_pct),
-          pw,
-          total_units,
-        )
+      let next_bar_x = px_ +
+        mul_div((i + 1) * 100 + (i + 2) * gap_pct, pw, total_units)
       let conn_y = py + ph - mul_div(cumulative[i] - global_min, ph, max_val)
-      svg = svg + "<line x1=\"" + int_to_str(bar_x + bar_w) + "\" y1=\"" + int_to_str(
-          conn_y,
-        ) + "\" x2=\"" + int_to_str(next_bar_x) + "\" y2=\"" + int_to_str(
-          conn_y,
-        ) + "\" stroke=\"" + conn_color + "\" stroke-width=\"1\" stroke-dasharray=\"3,2\"/>"
+      svg = svg +
+        "<line x1=\"" +
+        int_to_str(bar_x + bar_w) +
+        "\" y1=\"" +
+        int_to_str(conn_y) +
+        "\" x2=\"" +
+        int_to_str(next_bar_x) +
+        "\" y2=\"" +
+        int_to_str(conn_y) +
+        "\" stroke=\"" +
+        conn_color +
+        "\" stroke-width=\"1\" stroke-dasharray=\"3,2\"/>"
     }
     // Category label
     if i < cats.length() {
-      svg = svg + "<text x=\"" + int_to_str(bar_x + bar_w / 2) + "\" y=\"" + int_to_str(
-          py + ph + chart_label_offset_y,
-        ) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"" + chart_axis_label_color + "\">" + svg_escape(
-          cats[i],
-        ) + "</text>"
+      svg = svg +
+        "<text x=\"" +
+        int_to_str(bar_x + bar_w / 2) +
+        "\" y=\"" +
+        int_to_str(py + ph + chart_label_offset_y) +
+        "\" text-anchor=\"middle\" font-size=\"9\" fill=\"" +
+        chart_axis_label_color +
+        "\">" +
+        svg_escape(cats[i]) +
+        "</text>"
     }
   }
   svg
@@ -2337,16 +2821,28 @@ fn treemap_layout(
   if n == 1 {
     let idx = indices[0]
     let color = get_dpt_color([], idx, colors)
-    result = result + "<rect x=\"" + int_to_str(x) + "\" y=\"" + int_to_str(
-        y,
-      ) + "\" width=\"" + int_to_str(w) + "\" height=\"" + int_to_str(h) + "\" fill=\"" + color + "\" stroke=\"white\" stroke-width=\"1\"/>"
+    result = result +
+      "<rect x=\"" +
+      int_to_str(x) +
+      "\" y=\"" +
+      int_to_str(y) +
+      "\" width=\"" +
+      int_to_str(w) +
+      "\" height=\"" +
+      int_to_str(h) +
+      "\" fill=\"" +
+      color +
+      "\" stroke=\"white\" stroke-width=\"1\"/>"
     // Label if large enough
     if w > 30 && h > 14 && idx < cats.length() {
-      result = result + "<text x=\"" + int_to_str(x + 4) + "\" y=\"" + int_to_str(
-          y + 13,
-        ) + "\" font-size=\"10\" fill=\"white\" clip-path=\"inset(0)\">" + svg_escape(
-          cats[idx],
-        ) + "</text>"
+      result = result +
+        "<text x=\"" +
+        int_to_str(x + 4) +
+        "\" y=\"" +
+        int_to_str(y + 13) +
+        "\" font-size=\"10\" fill=\"white\" clip-path=\"inset(0)\">" +
+        svg_escape(cats[idx]) +
+        "</text>"
     }
     return result
   }
@@ -2382,23 +2878,59 @@ fn treemap_layout(
     let w1 = mul_div(first_total, w, total)
     let w2 = w - w1
     result = treemap_layout(
-      first, values, cats, colors, x, y, w1, h, first_total, not(horizontal),
+      first,
+      values,
+      cats,
+      colors,
+      x,
+      y,
+      w1,
+      h,
+      first_total,
+      !(horizontal),
       result,
     )
     result = treemap_layout(
-      second, values, cats, colors, x + w1, y, w2, h, second_total,
-      not(horizontal), result,
+      second,
+      values,
+      cats,
+      colors,
+      x + w1,
+      y,
+      w2,
+      h,
+      second_total,
+      !(horizontal),
+      result,
     )
   } else {
     let h1 = mul_div(first_total, h, total)
     let h2 = h - h1
     result = treemap_layout(
-      first, values, cats, colors, x, y, w, h1, first_total, not(horizontal),
+      first,
+      values,
+      cats,
+      colors,
+      x,
+      y,
+      w,
+      h1,
+      first_total,
+      !(horizontal),
       result,
     )
     result = treemap_layout(
-      second, values, cats, colors, x, y + h1, w, h2, second_total,
-      not(horizontal), result,
+      second,
+      values,
+      cats,
+      colors,
+      x,
+      y + h1,
+      w,
+      h2,
+      second_total,
+      !(horizontal),
+      result,
     )
   }
   result
@@ -2458,13 +2990,38 @@ fn render_sunburst_chart(
     let iey = cy + mul_div(inner_r, sin1000(end_angle), 1000)
     let r_str = int_to_str(r)
     let ir_str = int_to_str(inner_r)
-    svg = svg + "<path d=\"M" + int_to_str(sx) + " " + int_to_str(sy) + "A" + r_str + " " + r_str + " 0 " + large_arc + " 1 " + int_to_str(
-        ex,
-      ) + " " + int_to_str(ey) + "L" + int_to_str(iex) + " " + int_to_str(
-        iey,
-      ) + "A" + ir_str + " " + ir_str + " 0 " + large_arc + " 0 " + int_to_str(
-        isx,
-      ) + " " + int_to_str(isy) + "Z\" fill=\"" + color + "\" stroke=\"white\" stroke-width=\"1\"/>"
+    svg = svg +
+      "<path d=\"M" +
+      int_to_str(sx) +
+      " " +
+      int_to_str(sy) +
+      "A" +
+      r_str +
+      " " +
+      r_str +
+      " 0 " +
+      large_arc +
+      " 1 " +
+      int_to_str(ex) +
+      " " +
+      int_to_str(ey) +
+      "L" +
+      int_to_str(iex) +
+      " " +
+      int_to_str(iey) +
+      "A" +
+      ir_str +
+      " " +
+      ir_str +
+      " 0 " +
+      large_arc +
+      " 0 " +
+      int_to_str(isx) +
+      " " +
+      int_to_str(isy) +
+      "Z\" fill=\"" +
+      color +
+      "\" stroke=\"white\" stroke-width=\"1\"/>"
     start_angle = end_angle
   }
   svg
@@ -2509,18 +3066,28 @@ fn render_funnel_chart(
     let bar_x = cx - bar_w / 2
     let bar_y = py + i * (bar_h_final + gap)
     let color = get_dpt_color(ser.data_points, i, colors)
-    svg = svg + "<rect x=\"" + int_to_str(bar_x) + "\" y=\"" + int_to_str(
-        bar_y,
-      ) + "\" width=\"" + int_to_str(bar_w) + "\" height=\"" + int_to_str(
-        bar_h_final,
-      ) + "\" fill=\"" + color + "\" rx=\"2\"/>"
+    svg = svg +
+      "<rect x=\"" +
+      int_to_str(bar_x) +
+      "\" y=\"" +
+      int_to_str(bar_y) +
+      "\" width=\"" +
+      int_to_str(bar_w) +
+      "\" height=\"" +
+      int_to_str(bar_h_final) +
+      "\" fill=\"" +
+      color +
+      "\" rx=\"2\"/>"
     // Label
     if i < cats.length() {
-      svg = svg + "<text x=\"" + int_to_str(cx) + "\" y=\"" + int_to_str(
-          bar_y + bar_h_final / 2 + 4,
-        ) + "\" text-anchor=\"middle\" font-size=\"10\" fill=\"white\">" + svg_escape(
-          cats[i],
-        ) + "</text>"
+      svg = svg +
+        "<text x=\"" +
+        int_to_str(cx) +
+        "\" y=\"" +
+        int_to_str(bar_y + bar_h_final / 2 + 4) +
+        "\" text-anchor=\"middle\" font-size=\"10\" fill=\"white\">" +
+        svg_escape(cats[i]) +
+        "</text>"
     }
   }
   svg
@@ -2581,9 +3148,7 @@ fn render_box_whisker_chart(
   if max_val == 0 {
     return ""
   }
-  render_box_whisker_boxes(
-    [q], cats, 1, px_, py, pw, ph, max_val, colors,
-  )
+  render_box_whisker_boxes([q], cats, 1, px_, py, pw, ph, max_val, colors)
 }
 
 ///|
@@ -2612,7 +3177,7 @@ fn render_box_whisker_boxes(
     let med = q[2]
     let q3 = q[3]
     let max_v = q[4]
-    let box_x = px_ + mul_div((ci * 100 + (ci + 1) * gap_pct), pw, total_units)
+    let box_x = px_ + mul_div(ci * 100 + (ci + 1) * gap_pct, pw, total_units)
     let box_w = mul_div(100, pw, total_units)
     let cx = box_x + box_w / 2
     let color = colors[ci % colors.length()]
@@ -2623,45 +3188,98 @@ fn render_box_whisker_boxes(
     let q3_y = py + ph - mul_div(q3, ph, max_val)
     let max_y = py + ph - mul_div(max_v, ph, max_val)
     // Whisker: vertical line from min to max
-    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" + int_to_str(
-        max_y,
-      ) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" + int_to_str(q3_y) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
-    svg = svg + "<line x1=\"" + int_to_str(cx) + "\" y1=\"" + int_to_str(
-        q1_y,
-      ) + "\" x2=\"" + int_to_str(cx) + "\" y2=\"" + int_to_str(min_y) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx) +
+      "\" y1=\"" +
+      int_to_str(max_y) +
+      "\" x2=\"" +
+      int_to_str(cx) +
+      "\" y2=\"" +
+      int_to_str(q3_y) +
+      "\" stroke=\"" +
+      color +
+      "\" stroke-width=\"1\"/>"
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx) +
+      "\" y1=\"" +
+      int_to_str(q1_y) +
+      "\" x2=\"" +
+      int_to_str(cx) +
+      "\" y2=\"" +
+      int_to_str(min_y) +
+      "\" stroke=\"" +
+      color +
+      "\" stroke-width=\"1\"/>"
     // Whisker caps (horizontal lines at min and max)
     let cap_w = box_w / 3
-    svg = svg + "<line x1=\"" + int_to_str(cx - cap_w) + "\" y1=\"" + int_to_str(
-        max_y,
-      ) + "\" x2=\"" + int_to_str(cx + cap_w) + "\" y2=\"" + int_to_str(
-        max_y,
-      ) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
-    svg = svg + "<line x1=\"" + int_to_str(cx - cap_w) + "\" y1=\"" + int_to_str(
-        min_y,
-      ) + "\" x2=\"" + int_to_str(cx + cap_w) + "\" y2=\"" + int_to_str(
-        min_y,
-      ) + "\" stroke=\"" + color + "\" stroke-width=\"1\"/>"
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx - cap_w) +
+      "\" y1=\"" +
+      int_to_str(max_y) +
+      "\" x2=\"" +
+      int_to_str(cx + cap_w) +
+      "\" y2=\"" +
+      int_to_str(max_y) +
+      "\" stroke=\"" +
+      color +
+      "\" stroke-width=\"1\"/>"
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx - cap_w) +
+      "\" y1=\"" +
+      int_to_str(min_y) +
+      "\" x2=\"" +
+      int_to_str(cx + cap_w) +
+      "\" y2=\"" +
+      int_to_str(min_y) +
+      "\" stroke=\"" +
+      color +
+      "\" stroke-width=\"1\"/>"
     // Box: Q1 to Q3
     let box_h = q1_y - q3_y
     let box_h_clamped = if box_h < 1 { 1 } else { box_h }
-    svg = svg + "<rect x=\"" + int_to_str(box_x) + "\" y=\"" + int_to_str(
-        q3_y,
-      ) + "\" width=\"" + int_to_str(box_w) + "\" height=\"" + int_to_str(
-        box_h_clamped,
-      ) + "\" fill=\"" + color + "\" fill-opacity=\"0.3\" stroke=\"" + color + "\" stroke-width=\"1.5\"/>"
+    svg = svg +
+      "<rect x=\"" +
+      int_to_str(box_x) +
+      "\" y=\"" +
+      int_to_str(q3_y) +
+      "\" width=\"" +
+      int_to_str(box_w) +
+      "\" height=\"" +
+      int_to_str(box_h_clamped) +
+      "\" fill=\"" +
+      color +
+      "\" fill-opacity=\"0.3\" stroke=\"" +
+      color +
+      "\" stroke-width=\"1.5\"/>"
     // Median line
-    svg = svg + "<line x1=\"" + int_to_str(box_x) + "\" y1=\"" + int_to_str(
-        med_y,
-      ) + "\" x2=\"" + int_to_str(box_x + box_w) + "\" y2=\"" + int_to_str(
-        med_y,
-      ) + "\" stroke=\"" + color + "\" stroke-width=\"2\"/>"
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(box_x) +
+      "\" y1=\"" +
+      int_to_str(med_y) +
+      "\" x2=\"" +
+      int_to_str(box_x + box_w) +
+      "\" y2=\"" +
+      int_to_str(med_y) +
+      "\" stroke=\"" +
+      color +
+      "\" stroke-width=\"2\"/>"
     // Category label
     if ci < cats.length() {
-      svg = svg + "<text x=\"" + int_to_str(cx) + "\" y=\"" + int_to_str(
-          py + ph + chart_label_offset_y,
-        ) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"" + chart_axis_label_color + "\">" + svg_escape(
-          cats[ci],
-        ) + "</text>"
+      svg = svg +
+        "<text x=\"" +
+        int_to_str(cx) +
+        "\" y=\"" +
+        int_to_str(py + ph + chart_label_offset_y) +
+        "\" text-anchor=\"middle\" font-size=\"9\" fill=\"" +
+        chart_axis_label_color +
+        "\">" +
+        svg_escape(cats[ci]) +
+        "</text>"
     }
   }
   svg

@@ -436,10 +436,7 @@ fn extract_all_text(nodes : Array[@xml.XmlNode]) -> String {
             match p_ch[j] {
               @xml.XmlNode::Element(rtag, _, _) =>
                 if rtag == "a:r" {
-                  match @xml.find_child(
-                    @xml.get_children(p_ch[j]),
-                    "a:t",
-                  ) {
+                  match @xml.find_child(@xml.get_children(p_ch[j]), "a:t") {
                     None => ()
                     Some(t) => result = result + @xml.get_text_content(t)
                   }
@@ -501,19 +498,28 @@ fn parse_plot_area(
 }
 
 ///|
-fn parse_bar_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_bar_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   let bar_dir_raw = child_attr_val(ch, "c:barDir")
   let grouping_raw = child_attr_val(ch, "c:grouping")
   let gw = child_attr_int(ch, "c:gapWidth")
   {
     ..ChartGroup::default(BarChart),
-    bar_dir: if bar_dir_raw.is_empty() { "col" } else { bar_dir_raw },
-    grouping: if grouping_raw.is_empty() { "clustered" } else { grouping_raw },
+    bar_dir: if bar_dir_raw.is_empty() {
+      "col"
+    } else {
+      bar_dir_raw
+    },
+    grouping: if grouping_raw.is_empty() {
+      "clustered"
+    } else {
+      grouping_raw
+    },
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
-    gap_width: if gw == 0 { default_bar_gap_width } else { gw },
+    gap_width: if gw == 0 {
+      default_bar_gap_width
+    } else {
+      gw
+    },
     overlap: child_attr_int(ch, "c:overlap"),
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
@@ -522,14 +528,15 @@ fn parse_bar_chart(
 }
 
 ///|
-fn parse_line_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_line_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   let grouping_raw = child_attr_val(ch, "c:grouping")
   {
     ..ChartGroup::default(LineChart),
-    grouping: if grouping_raw.is_empty() { "standard" } else { grouping_raw },
+    grouping: if grouping_raw.is_empty() {
+      "standard"
+    } else {
+      grouping_raw
+    },
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
@@ -538,10 +545,7 @@ fn parse_line_chart(
 }
 
 ///|
-fn parse_pie_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_pie_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   {
     ..ChartGroup::default(PieChart),
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
@@ -551,15 +555,16 @@ fn parse_pie_chart(
 }
 
 ///|
-fn parse_donut_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_donut_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   let hs = child_attr_int(ch, "c:holeSize")
   {
     ..ChartGroup::default(DoughnutChart),
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
-    hole_size: if hs == 0 { default_donut_hole_size } else { hs },
+    hole_size: if hs == 0 {
+      default_donut_hole_size
+    } else {
+      hs
+    },
     series: parse_series_list(ch, theme),
     data_labels: parse_chart_data_labels(ch),
   }
@@ -581,14 +586,15 @@ fn parse_scatter_chart(
 }
 
 ///|
-fn parse_area_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_area_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   let grouping_raw = child_attr_val(ch, "c:grouping")
   {
     ..ChartGroup::default(AreaChart),
-    grouping: if grouping_raw.is_empty() { "standard" } else { grouping_raw },
+    grouping: if grouping_raw.is_empty() {
+      "standard"
+    } else {
+      grouping_raw
+    },
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
@@ -597,10 +603,7 @@ fn parse_area_chart(
 }
 
 ///|
-fn parse_radar_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_radar_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   {
     ..ChartGroup::default(RadarChart),
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
@@ -625,10 +628,7 @@ fn parse_bubble_chart(
 }
 
 ///|
-fn parse_stock_chart(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartGroup {
+fn parse_stock_chart(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartGroup {
   {
     ..ChartGroup::default(StockChart),
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
@@ -662,9 +662,17 @@ fn parse_of_pie_chart(
   let sp = child_attr_int(ch, "c:splitPos")
   {
     ..ChartGroup::default(OfPieChart),
-    of_pie_type: if of_pie_type.is_empty() { "pie" } else { of_pie_type },
+    of_pie_type: if of_pie_type.is_empty() {
+      "pie"
+    } else {
+      of_pie_type
+    },
     split_pos: sp,
-    gap_width: if gw == 0 { default_bar_gap_width } else { gw },
+    gap_width: if gw == 0 {
+      default_bar_gap_width
+    } else {
+      gw
+    },
     vary_colors: child_attr_val(ch, "c:varyColors") == "1",
     series: parse_series_list(ch, theme),
     ax_ids: parse_ax_ids(ch),
@@ -724,7 +732,11 @@ fn parse_chart_data_labels(ch : Array[@xml.XmlNode]) -> ChartDataLabels {
           None => ", "
           Some(sep) => {
             let t = @xml.get_text_content(sep)
-            if t.is_empty() { ", " } else { t }
+            if t.is_empty() {
+              ", "
+            } else {
+              t
+            }
           }
         },
       }
@@ -764,7 +776,7 @@ fn parse_trendlines(
   for i in 0..<nodes.length() {
     let tc = @xml.get_children(nodes[i])
     let ttype = child_attr_val(tc, "c:trendlineType")
-    if not(ttype.is_empty()) {
+    if !(ttype.is_empty()) {
       let name = match @xml.find_child(tc, "c:name") {
         None => ""
         Some(n) => @xml.get_text_content(n)
@@ -773,11 +785,19 @@ fn parse_trendlines(
         trendline_type: ttype,
         order: {
           let v = child_attr_int(tc, "c:order")
-          if v == 0 { 2 } else { v }
+          if v == 0 {
+            2
+          } else {
+            v
+          }
         },
         period: {
           let v = child_attr_int(tc, "c:period")
-          if v == 0 { 2 } else { v }
+          if v == 0 {
+            2
+          } else {
+            v
+          }
         },
         forward: child_attr_int(tc, "c:forward"),
         backward: child_attr_int(tc, "c:backward"),
@@ -793,10 +813,7 @@ fn parse_trendlines(
 
 ///|
 /// Parse c:errBars element from series children.
-fn parse_err_bars(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartErrBars {
+fn parse_err_bars(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartErrBars {
   match @xml.find_child(ch, "c:errBars") {
     None => ChartErrBars::none()
     Some(n) => {
@@ -806,8 +823,16 @@ fn parse_err_bars(
       let val_type = child_attr_val(ec, "c:errValType")
       let val = child_attr_int(ec, "c:val")
       {
-        err_dir: if dir.is_empty() { "y" } else { dir },
-        err_bar_type: if bar_type.is_empty() { "both" } else { bar_type },
+        err_dir: if dir.is_empty() {
+          "y"
+        } else {
+          dir
+        },
+        err_bar_type: if bar_type.is_empty() {
+          "both"
+        } else {
+          bar_type
+        },
         err_val_type: val_type,
         val,
         sp_pr: parse_chart_sp_pr(ec, theme),
@@ -834,10 +859,7 @@ fn parse_series_list(
 
 ///|
 /// Parse a single category-based series (bar/line/area/pie/donut).
-fn parse_cat_series(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartSeries {
+fn parse_cat_series(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartSeries {
   let idx = child_attr_int(ch, "c:idx")
   let order = child_attr_int(ch, "c:order")
   let title = parse_series_title(ch)
@@ -1036,10 +1058,7 @@ fn parse_pt_list(ch : Array[@xml.XmlNode]) -> Array[ChartPoint] {
 
 ///|
 /// Parse c:spPr from series/chart element children.
-fn parse_chart_sp_pr(
-  ch : Array[@xml.XmlNode],
-  theme : ThemeData,
-) -> ChartSpPr {
+fn parse_chart_sp_pr(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartSpPr {
   match @xml.find_child(ch, "c:spPr") {
     None => ChartSpPr::none()
     Some(sppr) => parse_chart_sp_pr_node(sppr, theme)
@@ -1047,10 +1066,7 @@ fn parse_chart_sp_pr(
 }
 
 ///|
-fn parse_chart_sp_pr_node(
-  sppr : @xml.XmlNode,
-  theme : ThemeData,
-) -> ChartSpPr {
+fn parse_chart_sp_pr_node(sppr : @xml.XmlNode, theme : ThemeData) -> ChartSpPr {
   let sppr_ch = @xml.get_children(sppr)
   let fill = parse_solid_fill(sppr_ch, theme)
   let grad_fill = parse_gradient_fill(sppr_ch, theme)
@@ -1088,7 +1104,11 @@ fn parse_chart_axis(
       let sc_ch = @xml.get_children(sc)
       let o = child_attr_val(sc_ch, "c:orientation")
       (
-        if o.is_empty() { "minMax" } else { o },
+        if o.is_empty() {
+          "minMax"
+        } else {
+          o
+        },
         child_attr_val(sc_ch, "c:min"),
         child_attr_val(sc_ch, "c:max"),
       )
@@ -1124,11 +1144,19 @@ fn parse_chart_axis(
     cross_ax: child_attr_int(ch, "c:crossAx"),
     delete: child_attr_val(ch, "c:delete") == "1",
     ax_pos: if ax_pos_raw.is_empty() {
-      if is_val { "l" } else { "b" }
+      if is_val {
+        "l"
+      } else {
+        "b"
+      }
     } else {
       ax_pos_raw
     },
-    tick_lbl_pos: if tick_raw.is_empty() { "nextTo" } else { tick_raw },
+    tick_lbl_pos: if tick_raw.is_empty() {
+      "nextTo"
+    } else {
+      tick_raw
+    },
     orientation,
     min_val,
     max_val,
@@ -1141,7 +1169,11 @@ fn parse_chart_axis(
       None => false
     },
     num_fmt,
-    cross_between: if cb_raw.is_empty() && is_val { "between" } else { cb_raw },
+    cross_between: if cb_raw.is_empty() && is_val {
+      "between"
+    } else {
+      cb_raw
+    },
     major_unit: mu,
     title,
     sp_pr: ChartSpPr::none(),
@@ -1166,11 +1198,27 @@ fn parse_view_3d(ch : Array[@xml.XmlNode]) -> ChartView3D {
   let dp_s = child_attr_val(ch, "c:depthPercent")
   let p_s = child_attr_val(ch, "c:perspective")
   {
-    rot_x: if rx_s.is_empty() { 15 } else { @xml.parse_int(rx_s) },
-    rot_y: if ry_s.is_empty() { 20 } else { @xml.parse_int(ry_s) },
-    depth_percent: if dp_s.is_empty() { 100 } else { @xml.parse_int(dp_s) },
+    rot_x: if rx_s.is_empty() {
+      15
+    } else {
+      @xml.parse_int(rx_s)
+    },
+    rot_y: if ry_s.is_empty() {
+      20
+    } else {
+      @xml.parse_int(ry_s)
+    },
+    depth_percent: if dp_s.is_empty() {
+      100
+    } else {
+      @xml.parse_int(dp_s)
+    },
     r_ang_ax: child_attr_val(ch, "c:rAngAx") != "0",
-    perspective: if p_s.is_empty() { 30 } else { @xml.parse_int(p_s) },
+    perspective: if p_s.is_empty() {
+      30
+    } else {
+      @xml.parse_int(p_s)
+    },
   }
 }
 
@@ -1181,7 +1229,7 @@ fn parse_view_3d(ch : Array[@xml.XmlNode]) -> ChartView3D {
 pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
   let nodes = @xml.parse_xml(chart_xml)
   let root = match @xml.find_child(nodes, "cx:chartSpace") {
-    None => return { ..ChartData::empty(), chart_xml }
+    None => return { ..ChartData::empty(), chart_xml, }
     Some(n) => n
   }
   let cs_ch = @xml.get_children(root)
@@ -1189,7 +1237,7 @@ pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
   let data_map = parse_cx_chart_data(cs_ch)
   // 2. Parse cx:chart
   let chart_node = match @xml.find_child(cs_ch, "cx:chart") {
-    None => return { ..ChartData::empty(), chart_xml }
+    None => return { ..ChartData::empty(), chart_xml, }
     Some(n) => n
   }
   let chart_ch = @xml.get_children(chart_node)
@@ -1211,7 +1259,15 @@ pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
       { position: pos, overlay: false, show: true }
     }
   }
-  { groups, axes, title, legend, style: 0, chart_xml, view_3d: ChartView3D::none() }
+  {
+    groups,
+    axes,
+    title,
+    legend,
+    style: 0,
+    chart_xml,
+    view_3d: ChartView3D::none(),
+  }
 }
 
 ///|
@@ -1548,7 +1604,11 @@ fn parse_cx_axis(node : @xml.XmlNode) -> ChartAxis {
   {
     ax_id: id,
     cross_ax: 0,
-    ax_pos: if is_val { "l" } else { "b" },
+    ax_pos: if is_val {
+      "l"
+    } else {
+      "b"
+    },
     delete: hidden,
     is_val,
     major_gridlines: match @xml.find_child(ch, "cx:majorGridlines") {

@@ -9,16 +9,26 @@
 
 ///|
 /// Serialize p:cNvPr with optional hyperlinks.
-fn serialize_cnvpr(id : String, link_rid : String, hover_rid : String) -> String {
+fn serialize_cnvpr(
+  id : String,
+  link_rid : String,
+  hover_rid : String,
+) -> String {
   if link_rid.is_empty() && hover_rid.is_empty() {
     "<p:cNvPr id=\"" + id + "\" name=\"\"/>"
   } else {
     let mut inner = ""
-    if not(link_rid.is_empty()) {
-      inner = inner + "<a:hlinkClick xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" + link_rid + "\"/>"
+    if !(link_rid.is_empty()) {
+      inner = inner +
+        "<a:hlinkClick xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" +
+        link_rid +
+        "\"/>"
     }
-    if not(hover_rid.is_empty()) {
-      inner = inner + "<a:hlinkHover xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" + hover_rid + "\"/>"
+    if !(hover_rid.is_empty()) {
+      inner = inner +
+        "<a:hlinkHover xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" +
+        hover_rid +
+        "\"/>"
     }
     "<p:cNvPr id=\"" + id + "\" name=\"\">" + inner + "</p:cNvPr>"
   }
@@ -43,10 +53,10 @@ fn serialize_arrow_end(
     return ""
   }
   let mut attrs = " type=\"" + type_ + "\""
-  if not(w.is_empty()) {
+  if !(w.is_empty()) {
     attrs = attrs + " w=\"" + w + "\""
   }
-  if not(len.is_empty()) {
+  if !(len.is_empty()) {
     attrs = attrs + " len=\"" + len + "\""
   }
   "<" + tag + attrs + "/>"
@@ -121,7 +131,7 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   if gf.angle >= 0 && gf.path_type.is_empty() {
     // Linear
     out = out + "<a:lin ang=\"" + int_to_str(gf.angle) + "\" scaled=\"1\"/>"
-  } else if not(gf.path_type.is_empty()) {
+  } else if !(gf.path_type.is_empty()) {
     // Path gradient
     out = out + "<a:path path=\"" + gf.path_type + "\">"
     if gf.fill_to_l >= 0 ||
@@ -156,7 +166,10 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
   // Build blip children (effects + SVG extension)
   let mut blip_inner = ""
   if bf.alpha > 0 && bf.alpha < @ooxml.pct_100 {
-    blip_inner = blip_inner + "<a:alphaModFix amt=\"" + int_to_str(bf.alpha) + "\"/>"
+    blip_inner = blip_inner +
+      "<a:alphaModFix amt=\"" +
+      int_to_str(bf.alpha) +
+      "\"/>"
   }
   if bf.bright != 0 || bf.contrast != 0 {
     blip_inner = blip_inner + "<a:lum"
@@ -168,23 +181,34 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
     }
     blip_inner = blip_inner + "/>"
   }
-  if not(bf.duotone_1.is_none()) && not(bf.duotone_2.is_none()) {
-    blip_inner = blip_inner + "<a:duotone>" +
-      "<a:srgbClr val=\"" + bf.duotone_1.to_hex_rgb() + "\"/>" +
-      "<a:srgbClr val=\"" + bf.duotone_2.to_hex_rgb() + "\"/>" +
+  if !(bf.duotone_1.is_none()) && !(bf.duotone_2.is_none()) {
+    blip_inner = blip_inner +
+      "<a:duotone>" +
+      "<a:srgbClr val=\"" +
+      bf.duotone_1.to_hex_rgb() +
+      "\"/>" +
+      "<a:srgbClr val=\"" +
+      bf.duotone_2.to_hex_rgb() +
+      "\"/>" +
       "</a:duotone>"
   }
-  if not(bf.clr_from.is_none()) && not(bf.clr_to.is_none()) {
-    blip_inner = blip_inner + "<a:clrChange>" +
-      "<a:clrFrom><a:srgbClr val=\"" + bf.clr_from.to_hex_rgb() + "\"/></a:clrFrom>" +
-      "<a:clrTo><a:srgbClr val=\"" + bf.clr_to.to_hex_rgb() + "\"/></a:clrTo>" +
+  if !(bf.clr_from.is_none()) && !(bf.clr_to.is_none()) {
+    blip_inner = blip_inner +
+      "<a:clrChange>" +
+      "<a:clrFrom><a:srgbClr val=\"" +
+      bf.clr_from.to_hex_rgb() +
+      "\"/></a:clrFrom>" +
+      "<a:clrTo><a:srgbClr val=\"" +
+      bf.clr_to.to_hex_rgb() +
+      "\"/></a:clrTo>" +
       "</a:clrChange>"
   }
-  if not(bf.svg_rid.is_empty()) {
+  if !(bf.svg_rid.is_empty()) {
     blip_inner = blip_inner +
       "<a:extLst><a:ext uri=\"{96DAC541-7B7A-43D3-8B79-37D633B846F1}\">" +
       "<asvg:svgBlip xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\" r:embed=\"" +
-      bf.svg_rid + "\"/></a:ext></a:extLst>"
+      bf.svg_rid +
+      "\"/></a:ext></a:extLst>"
   }
   if blip_inner.is_empty() {
     out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
@@ -223,10 +247,10 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
     if bf.tile_sy != 0 {
       out = out + " sy=\"" + int_to_str(bf.tile_sy) + "\""
     }
-    if not(bf.tile_flip.is_empty()) && bf.tile_flip != "none" {
+    if !(bf.tile_flip.is_empty()) && bf.tile_flip != "none" {
       out = out + " flip=\"" + bf.tile_flip + "\""
     }
-    if not(bf.tile_algn.is_empty()) {
+    if !(bf.tile_algn.is_empty()) {
       out = out + " algn=\"" + bf.tile_algn + "\""
     }
     out = out + "/>"
@@ -249,23 +273,23 @@ fn serialize_pattern_fill(pf : @ooxml.PatternFill) -> String {
 ///|
 /// Serialize a:bodyPr element.
 fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
-  let has_attrs = not(bp.anchor.is_empty()) ||
+  let has_attrs = !(bp.anchor.is_empty()) ||
     bp.l_ins >= 0 ||
     bp.t_ins >= 0 ||
     bp.r_ins >= 0 ||
     bp.b_ins >= 0 ||
     bp.wrap == "none" ||
     bp.rot != 0 ||
-    not(bp.vert.is_empty()) ||
+    !(bp.vert.is_empty()) ||
     bp.num_cols > 1 ||
     bp.col_spacing > 0
-  let has_warp = not(bp.warp_prst.is_empty())
+  let has_warp = !(bp.warp_prst.is_empty())
   let has_children = bp.auto_fit || bp.font_scale >= 0 || has_warp
-  if not(has_attrs) && not(has_children) {
+  if !(has_attrs) && !(has_children) {
     return "<a:bodyPr/>"
   }
   let mut out = "<a:bodyPr"
-  if not(bp.anchor.is_empty()) {
+  if !(bp.anchor.is_empty()) {
     out = out + " anchor=\"" + bp.anchor + "\""
   }
   if bp.wrap == "none" {
@@ -274,7 +298,7 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   if bp.rot != 0 {
     out = out + " rot=\"" + int_to_str(bp.rot) + "\""
   }
-  if not(bp.vert.is_empty()) {
+  if !(bp.vert.is_empty()) {
     out = out + " vert=\"" + bp.vert + "\""
   }
   if bp.num_cols > 1 {
@@ -295,7 +319,7 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
   if bp.b_ins >= 0 {
     out = out + " bIns=\"" + int_to_str(bp.b_ins) + "\""
   }
-  if not(has_children) {
+  if !(has_children) {
     return out + "/>"
   }
   out = out + ">"
@@ -371,19 +395,19 @@ fn serialize_text_body_inner(
     let para = paragraphs[pi]
     out = out + "<a:p>"
     // Paragraph properties
-    let has_align = not(para.align.is_empty())
+    let has_align = !(para.align.is_empty())
     let has_level = para.level > 0
     let has_mar_l = para.mar_l >= 0
     let has_indent = para.indent != 0
     let has_spc = para.spc_before != 0 || para.spc_after != 0
     let has_lnspc = para.line_spacing != 0
-    let has_bullet = not(para.bullet.is_empty()) ||
-      not(para.bullet_auto.is_empty()) ||
+    let has_bullet = !(para.bullet.is_empty()) ||
+      !(para.bullet_auto.is_empty()) ||
       para.bullet_none ||
-      not(para.bullet_font.is_empty()) ||
+      !(para.bullet_font.is_empty()) ||
       para.bullet_size != 0 ||
-      not(para.bullet_color.is_none()) ||
-      not(para.bullet_img_rid.is_empty())
+      !(para.bullet_color.is_none()) ||
+      !(para.bullet_img_rid.is_empty())
     let has_tabs = para.tab_stops.length() > 0
     let has_rtl = para.rtl
     let has_ppr = has_align ||
@@ -421,7 +445,7 @@ fn serialize_text_body_inner(
         ppr = ppr + serialize_spacing("a:spcBef", para.spc_before)
         ppr = ppr + serialize_spacing("a:spcAft", para.spc_after)
         // Bullet formatting
-        if not(para.bullet_font.is_empty()) {
+        if !(para.bullet_font.is_empty()) {
           ppr = ppr +
             "<a:buFont typeface=\"" +
             xml_escape(para.bullet_font) +
@@ -438,7 +462,7 @@ fn serialize_text_body_inner(
             int_to_str(-para.bullet_size) +
             "\"/>"
         }
-        if not(para.bullet_color.is_none()) {
+        if !(para.bullet_color.is_none()) {
           ppr = ppr +
             "<a:buClr>" +
             serialize_color_inner(para.bullet_color) +
@@ -446,11 +470,11 @@ fn serialize_text_body_inner(
         }
         if para.bullet_none {
           ppr = ppr + "<a:buNone/>"
-        } else if not(para.bullet.is_empty()) {
+        } else if !(para.bullet.is_empty()) {
           ppr = ppr + "<a:buChar char=\"" + xml_escape(para.bullet) + "\"/>"
-        } else if not(para.bullet_auto.is_empty()) {
+        } else if !(para.bullet_auto.is_empty()) {
           ppr = ppr + "<a:buAutoNum type=\"" + para.bullet_auto + "\"/>"
-        } else if not(para.bullet_img_rid.is_empty()) {
+        } else if !(para.bullet_img_rid.is_empty()) {
           ppr = ppr +
             "<a:buBlip><a:blip r:embed=\"" +
             para.bullet_img_rid +
@@ -464,7 +488,7 @@ fn serialize_text_body_inner(
           while ti < nt {
             let ts = para.tab_stops[ti]
             ppr = ppr + "<a:tab pos=\"" + int_to_str(ts.pos) + "\""
-            if not(ts.algn.is_empty()) {
+            if !(ts.algn.is_empty()) {
               ppr = ppr + " algn=\"" + ts.algn + "\""
             }
             ppr = ppr + "/>"
@@ -516,10 +540,10 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if run.font_size > 0 {
     rpr = rpr + " sz=\"" + int_to_str(run.font_size) + "\""
   }
-  if not(run.underline.is_empty()) {
+  if !(run.underline.is_empty()) {
     rpr = rpr + " u=\"" + run.underline + "\""
   }
-  if not(run.strike.is_empty()) {
+  if !(run.strike.is_empty()) {
     rpr = rpr + " strike=\"" + run.strike + "\""
   }
   if run.baseline != 0 {
@@ -528,61 +552,65 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
   if run.char_spacing != 0 {
     rpr = rpr + " spc=\"" + int_to_str(run.char_spacing) + "\""
   }
-  if not(run.cap.is_empty()) {
+  if !(run.cap.is_empty()) {
     rpr = rpr + " cap=\"" + run.cap + "\""
   }
   if run.kern > 0 {
     rpr = rpr + " kern=\"" + int_to_str(run.kern) + "\""
   }
-  let has_children = not(run.color.is_none()) ||
-    not(run.font_face.is_empty()) ||
-    not(run.ea_font.is_empty()) ||
-    not(run.cs_font.is_empty()) ||
-    not(run.sym_font.is_empty()) ||
-    not(run.hlink_rid.is_empty()) ||
-    not(run.hlink_mouse_over_rid.is_empty()) ||
-    not(run.outline_color.is_none()) ||
-    not(run.text_grad_fill.is_none()) ||
-    not(run.text_patt_fill.is_none())
+  let has_children = !(run.color.is_none()) ||
+    !(run.font_face.is_empty()) ||
+    !(run.ea_font.is_empty()) ||
+    !(run.cs_font.is_empty()) ||
+    !(run.sym_font.is_empty()) ||
+    !(run.hlink_rid.is_empty()) ||
+    !(run.hlink_mouse_over_rid.is_empty()) ||
+    !(run.outline_color.is_none()) ||
+    !(run.text_grad_fill.is_none()) ||
+    !(run.text_patt_fill.is_none())
   if has_children {
     rpr = rpr + ">"
     // Text outline: a:ln
-    if not(run.outline_color.is_none()) {
-      let ow = if run.outline_w > 0 { run.outline_w } else { @ooxml.default_outline_w }
+    if !(run.outline_color.is_none()) {
+      let ow = if run.outline_w > 0 {
+        run.outline_w
+      } else {
+        @ooxml.default_outline_w
+      }
       rpr = rpr + "<a:ln w=\"" + int_to_str(ow) + "\">"
       rpr = rpr + serialize_color(run.outline_color)
       rpr = rpr + "</a:ln>"
     }
-    if not(run.color.is_none()) {
+    if !(run.color.is_none()) {
       rpr = rpr + serialize_color(run.color)
     }
     // Text gradient fill: a:gradFill on a:rPr
-    if not(run.text_grad_fill.is_none()) {
+    if !(run.text_grad_fill.is_none()) {
       rpr = rpr + serialize_gradient_fill(run.text_grad_fill)
     }
     // Text pattern fill: a:pattFill on a:rPr
-    if not(run.text_patt_fill.is_none()) {
+    if !(run.text_patt_fill.is_none()) {
       rpr = rpr + serialize_pattern_fill(run.text_patt_fill)
     }
-    if not(run.font_face.is_empty()) {
+    if !(run.font_face.is_empty()) {
       rpr = rpr + "<a:latin typeface=\"" + xml_escape(run.font_face) + "\"/>"
     }
-    if not(run.ea_font.is_empty()) {
+    if !(run.ea_font.is_empty()) {
       rpr = rpr + "<a:ea typeface=\"" + xml_escape(run.ea_font) + "\"/>"
     }
-    if not(run.cs_font.is_empty()) {
+    if !(run.cs_font.is_empty()) {
       rpr = rpr + "<a:cs typeface=\"" + xml_escape(run.cs_font) + "\"/>"
     }
-    if not(run.sym_font.is_empty()) {
+    if !(run.sym_font.is_empty()) {
       rpr = rpr + "<a:sym typeface=\"" + xml_escape(run.sym_font) + "\"/>"
     }
-    if not(run.effects.is_none()) {
+    if !(run.effects.is_none()) {
       rpr = rpr + serialize_effect_lst(run.effects)
     }
-    if not(run.hlink_rid.is_empty()) {
+    if !(run.hlink_rid.is_empty()) {
       rpr = rpr + "<a:hlinkClick r:id=\"" + run.hlink_rid + "\"/>"
     }
-    if not(run.hlink_mouse_over_rid.is_empty()) {
+    if !(run.hlink_mouse_over_rid.is_empty()) {
       rpr = rpr + "<a:hlinkHover r:id=\"" + run.hlink_mouse_over_rid + "\"/>"
     }
     rpr + "</a:rPr>"
@@ -751,7 +779,7 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
   }
   out = out + "</a:pathLst>"
   // Serialize a:cxnLst if connection points are defined
-  if not(data.cxn_lst.is_empty()) {
+  if !(data.cxn_lst.is_empty()) {
     out = out + "<a:cxnLst>"
     // Parse "x,y,ang;x2,y2,ang2;..."
     let clen = data.cxn_lst.length()
@@ -799,9 +827,10 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
     out = out + "</a:cxnLst>"
   }
   // Serialize a:rect if text rect is defined
-  if not(data.rect_l.is_empty()) || not(data.rect_t.is_empty()) ||
-    not(data.rect_r.is_empty()) ||
-    not(data.rect_b.is_empty()) {
+  if !(data.rect_l.is_empty()) ||
+    !(data.rect_t.is_empty()) ||
+    !(data.rect_r.is_empty()) ||
+    !(data.rect_b.is_empty()) {
     let rl = if data.rect_l.is_empty() { "l" } else { data.rect_l }
     let rt = if data.rect_t.is_empty() { "t" } else { data.rect_t }
     let rr = if data.rect_r.is_empty() { "r" } else { data.rect_r }
@@ -899,7 +928,6 @@ fn serialize_path_segment(seg : String, path_w : Int, path_h : Int) -> String {
   out + "</a:path>"
 }
 
-
 ///|
 fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
   let mut out = "<p:sp>"
@@ -907,7 +935,7 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out = out + "<p:nvSpPr>"
   out = out + serialize_cnvpr("0", shape.sh_link_rid, shape.sh_link_hover_rid)
   out = out + "<p:cNvSpPr/>"
-  if not(shape.ph_type.is_empty()) {
+  if !(shape.ph_type.is_empty()) {
     let mut ph = "<p:nvPr><p:ph type=\"" + shape.ph_type + "\""
     if shape.ph_idx >= 0 {
       ph = ph + " idx=\"" + int_to_str(shape.ph_idx) + "\""
@@ -922,11 +950,11 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out = out + serialize_transform(shape.transform)
   out = out + serialize_prst_geom(geom)
   // Fill (priority: blipFill > pattFill > gradFill > solidFill)
-  if not(shape.blip_fill.is_none()) {
+  if !(shape.blip_fill.is_none()) {
     out = out + serialize_blip_fill(shape.blip_fill)
-  } else if not(shape.patt_fill.is_none()) {
+  } else if !(shape.patt_fill.is_none()) {
     out = out + serialize_pattern_fill(shape.patt_fill)
-  } else if not(shape.grad_fill.is_none()) {
+  } else if !(shape.grad_fill.is_none()) {
     out = out + serialize_gradient_fill(shape.grad_fill)
   } else if shape.fill.is_none() {
     out = out + "<a:noFill/>"
@@ -934,11 +962,11 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
     out = out + serialize_color(shape.fill)
   }
   // Stroke
-  let has_stroke = not(shape.stroke.is_none()) ||
+  let has_stroke = !(shape.stroke.is_none()) ||
     shape.stroke_no_fill ||
-    not(shape.stroke_dash.is_empty()) ||
-    not(shape.stroke_head_type.is_empty()) ||
-    not(shape.stroke_tail_type.is_empty())
+    !(shape.stroke_dash.is_empty()) ||
+    !(shape.stroke_head_type.is_empty()) ||
+    !(shape.stroke_tail_type.is_empty())
   if has_stroke {
     out = out + serialize_stroke(shape)
   }
@@ -954,13 +982,21 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
 ///|
 /// Conditionally emit an XML integer attribute (non-zero only).
 fn xml_int_attr(name : String, val : Int) -> String {
-  if val > 0 { " " + name + "=\"" + int_to_str(val) + "\"" } else { "" }
+  if val > 0 {
+    " " + name + "=\"" + int_to_str(val) + "\""
+  } else {
+    ""
+  }
 }
 
 ///|
 /// Conditionally emit an XML integer attribute when it differs from a default.
 fn xml_int_attr_ne(name : String, val : Int, default : Int) -> String {
-  if val != default { " " + name + "=\"" + int_to_str(val) + "\"" } else { "" }
+  if val != default {
+    " " + name + "=\"" + int_to_str(val) + "\""
+  } else {
+    ""
+  }
 }
 
 ///|
@@ -969,31 +1005,49 @@ fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
     return ""
   }
   let mut inner = ""
-  if not(eff.outer_shadow.is_none()) {
+  if !(eff.outer_shadow.is_none()) {
     let os = eff.outer_shadow
     let attrs = xml_int_attr("blurRad", os.blur_rad) +
       xml_int_attr("dist", os.dist) +
       xml_int_attr("dir", os.dir) +
       xml_int_attr_ne("sx", os.sx, 100000) +
       xml_int_attr_ne("sy", os.sy, 100000) +
-      (if not(os.algn.is_empty()) { " algn=\"" + os.algn + "\"" } else { "" }) +
-      (if not(os.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
-    inner = inner + "<a:outerShdw" + attrs + ">" + serialize_eff_color(os.color) + "</a:outerShdw>"
+      (if !(os.algn.is_empty()) { " algn=\"" + os.algn + "\"" } else { "" }) +
+      (if !(os.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
+    inner = inner +
+      "<a:outerShdw" +
+      attrs +
+      ">" +
+      serialize_eff_color(os.color) +
+      "</a:outerShdw>"
   }
-  if not(eff.inner_shadow.is_none()) {
+  if !(eff.inner_shadow.is_none()) {
     let ishdw = eff.inner_shadow
     let attrs = xml_int_attr("blurRad", ishdw.blur_rad) +
       xml_int_attr("dist", ishdw.dist) +
       xml_int_attr("dir", ishdw.dir)
-    inner = inner + "<a:innerShdw" + attrs + ">" + serialize_eff_color(ishdw.color) + "</a:innerShdw>"
+    inner = inner +
+      "<a:innerShdw" +
+      attrs +
+      ">" +
+      serialize_eff_color(ishdw.color) +
+      "</a:innerShdw>"
   }
-  if not(eff.glow.is_none()) {
-    inner = inner + "<a:glow" + xml_int_attr("rad", eff.glow.rad) + ">" + serialize_eff_color(eff.glow.color) + "</a:glow>"
+  if !(eff.glow.is_none()) {
+    inner = inner +
+      "<a:glow" +
+      xml_int_attr("rad", eff.glow.rad) +
+      ">" +
+      serialize_eff_color(eff.glow.color) +
+      "</a:glow>"
   }
-  if not(eff.soft_edge.is_none()) {
-    inner = inner + "<a:softEdge rad=\"" + int_to_str(eff.soft_edge.rad) + "\"/>"
+  if !(eff.soft_edge.is_none()) {
+    inner = inner +
+      "<a:softEdge rad=\"" +
+      int_to_str(eff.soft_edge.rad) +
+      "\"/>"
   }
-  if not(eff.reflection.is_none()) {
+  if !(eff.reflection.is_none()) {
     let r = eff.reflection
     let attrs = xml_int_attr("blurRad", r.blur_rad) +
       xml_int_attr("dist", r.dist) +
@@ -1003,40 +1057,60 @@ fn serialize_effect_lst(eff : @ooxml.EffectList) -> String {
       xml_int_attr("fadeDir", r.fade_dir) +
       xml_int_attr_ne("sx", r.sx, 100000) +
       xml_int_attr_ne("sy", r.sy, 100000) +
-      (if not(r.algn.is_empty()) { " algn=\"" + r.algn + "\"" } else { "" }) +
-      (if not(r.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
+      (if !(r.algn.is_empty()) { " algn=\"" + r.algn + "\"" } else { "" }) +
+      (if !(r.rot_with_shape) { " rotWithShape=\"0\"" } else { "" })
     inner = inner + "<a:reflection" + attrs + "/>"
   }
-  if not(eff.blur.is_none()) {
+  if !(eff.blur.is_none()) {
     inner = inner + "<a:blur" + xml_int_attr("rad", eff.blur.rad) + "/>"
   }
-  if not(eff.prst_shadow.is_none()) {
+  if !(eff.prst_shadow.is_none()) {
     let ps = eff.prst_shadow
-    let attrs = " prst=\"" + ps.prst + "\"" +
+    let attrs = " prst=\"" +
+      ps.prst +
+      "\"" +
       xml_int_attr("dist", ps.dist) +
       xml_int_attr("dir", ps.dir)
-    inner = inner + "<a:prstShdw" + attrs + ">" + serialize_eff_color(ps.color) + "</a:prstShdw>"
+    inner = inner +
+      "<a:prstShdw" +
+      attrs +
+      ">" +
+      serialize_eff_color(ps.color) +
+      "</a:prstShdw>"
   }
-  if not(eff.fill_overlay.is_none()) {
+  if !(eff.fill_overlay.is_none()) {
     let fo = eff.fill_overlay
     let blend_attr = if fo.blend.is_empty() || fo.blend == "over" {
       " blend=\"over\""
     } else {
       " blend=\"" + fo.blend + "\""
     }
-    inner = inner + "<a:fillOverlay" + blend_attr + "><a:solidFill>" + serialize_eff_color(fo.color) + "</a:solidFill></a:fillOverlay>"
+    inner = inner +
+      "<a:fillOverlay" +
+      blend_attr +
+      "><a:solidFill>" +
+      serialize_eff_color(fo.color) +
+      "</a:solidFill></a:fillOverlay>"
   }
   "<a:effectLst>" + inner + "</a:effectLst>"
 }
 
 ///|
 fn serialize_scene_3d(s : @ooxml.Scene3d) -> String {
-  if s.is_none() { return "" }
+  if s.is_none() {
+    return ""
+  }
   let cam = "<a:camera prst=\"" + s.camera_prst + "\"/>"
-  let lr = if not(s.light_rig.is_empty()) {
-    "<a:lightRig rig=\"" + s.light_rig + "\"" +
-      (if not(s.light_dir.is_empty()) { " dir=\"" + s.light_dir + "\"" } else { "" }) +
-      "/>"
+  let lr = if !(s.light_rig.is_empty()) {
+    "<a:lightRig rig=\"" +
+    s.light_rig +
+    "\"" +
+    (if !(s.light_dir.is_empty()) {
+      " dir=\"" + s.light_dir + "\""
+    } else {
+      ""
+    }) +
+    "/>"
   } else {
     ""
   }
@@ -1045,26 +1119,54 @@ fn serialize_scene_3d(s : @ooxml.Scene3d) -> String {
 
 ///|
 fn serialize_bevel(tag : String, b : @ooxml.Bevel) -> String {
-  if b.is_none() { return "" }
+  if b.is_none() {
+    return ""
+  }
   let mut attrs = ""
-  if b.w > 0 { attrs = attrs + " w=\"" + int_to_str(b.w) + "\"" }
-  if b.h > 0 { attrs = attrs + " h=\"" + int_to_str(b.h) + "\"" }
-  if not(b.prst.is_empty()) { attrs = attrs + " prst=\"" + b.prst + "\"" }
+  if b.w > 0 {
+    attrs = attrs + " w=\"" + int_to_str(b.w) + "\""
+  }
+  if b.h > 0 {
+    attrs = attrs + " h=\"" + int_to_str(b.h) + "\""
+  }
+  if !(b.prst.is_empty()) {
+    attrs = attrs + " prst=\"" + b.prst + "\""
+  }
   "<" + tag + attrs + "/>"
 }
 
 ///|
 fn serialize_sp_3d(s : @ooxml.Shape3d) -> String {
-  if s.is_none() { return "" }
+  if s.is_none() {
+    return ""
+  }
   let mut attrs = ""
-  if s.extrusion_h > 0 { attrs = attrs + " extrusionH=\"" + int_to_str(s.extrusion_h) + "\"" }
-  if s.contour_w > 0 { attrs = attrs + " contourW=\"" + int_to_str(s.contour_w) + "\"" }
-  if not(s.prst_material.is_empty()) { attrs = attrs + " prstMaterial=\"" + s.prst_material + "\"" }
-  if s.z != 0 { attrs = attrs + " z=\"" + int_to_str(s.z) + "\"" }
+  if s.extrusion_h > 0 {
+    attrs = attrs + " extrusionH=\"" + int_to_str(s.extrusion_h) + "\""
+  }
+  if s.contour_w > 0 {
+    attrs = attrs + " contourW=\"" + int_to_str(s.contour_w) + "\""
+  }
+  if !(s.prst_material.is_empty()) {
+    attrs = attrs + " prstMaterial=\"" + s.prst_material + "\""
+  }
+  if s.z != 0 {
+    attrs = attrs + " z=\"" + int_to_str(s.z) + "\""
+  }
   let inner = serialize_bevel("a:bevelT", s.bevel_t) +
     serialize_bevel("a:bevelB", s.bevel_b) +
-    (if not(s.extrusion_clr.is_none()) { "<a:extrusionClr>" + serialize_eff_color(s.extrusion_clr) + "</a:extrusionClr>" } else { "" }) +
-    (if not(s.contour_clr.is_none()) { "<a:contourClr>" + serialize_eff_color(s.contour_clr) + "</a:contourClr>" } else { "" })
+    (if !(s.extrusion_clr.is_none()) {
+      "<a:extrusionClr>" +
+      serialize_eff_color(s.extrusion_clr) +
+      "</a:extrusionClr>"
+    } else {
+      ""
+    }) +
+    (if !(s.contour_clr.is_none()) {
+      "<a:contourClr>" + serialize_eff_color(s.contour_clr) + "</a:contourClr>"
+    } else {
+      ""
+    })
   "<a:sp3d" + attrs + ">" + inner + "</a:sp3d>"
 }
 
@@ -1075,7 +1177,11 @@ fn serialize_eff_color(c : @ooxml.Color) -> String {
   } else {
     let hex = c.to_hex_rgb()
     if c.alpha < 255 {
-      "<a:srgbClr val=\"" + hex + "\"><a:alpha val=\"" + int_to_str(c.alpha * 100000 / 255) + "\"/></a:srgbClr>"
+      "<a:srgbClr val=\"" +
+      hex +
+      "\"><a:alpha val=\"" +
+      int_to_str(c.alpha * 100000 / 255) +
+      "\"/></a:srgbClr>"
     } else {
       "<a:srgbClr val=\"" + hex + "\"/>"
     }
@@ -1090,21 +1196,21 @@ fn serialize_stroke(shape : @ooxml.Shape) -> String {
     @ooxml.default_stroke_w
   }
   let mut ln_attrs = " w=\"" + int_to_str(w) + "\""
-  if not(shape.stroke_cap.is_empty()) {
+  if !(shape.stroke_cap.is_empty()) {
     ln_attrs = ln_attrs + " cap=\"" + shape.stroke_cap + "\""
   }
-  if not(shape.stroke_cmpd.is_empty()) {
+  if !(shape.stroke_cmpd.is_empty()) {
     ln_attrs = ln_attrs + " cmpd=\"" + shape.stroke_cmpd + "\""
   }
   let mut out = "<a:ln" + ln_attrs + ">"
   // Fill or noFill
   if shape.stroke_no_fill {
     out = out + "<a:noFill/>"
-  } else if not(shape.stroke_grad_fill.is_none()) {
+  } else if !(shape.stroke_grad_fill.is_none()) {
     out = out + serialize_gradient_fill(shape.stroke_grad_fill)
-  } else if not(shape.stroke_patt_fill.is_none()) {
+  } else if !(shape.stroke_patt_fill.is_none()) {
     out = out + serialize_pattern_fill(shape.stroke_patt_fill)
-  } else if not(shape.stroke.is_none()) {
+  } else if !(shape.stroke.is_none()) {
     out = out + serialize_color(shape.stroke)
   }
   // Preset dash or custom dash
@@ -1134,7 +1240,7 @@ fn serialize_stroke(shape : @ooxml.Shape) -> String {
       pos = sp_end + 1
     }
     out = out + "</a:custDash>"
-  } else if not(shape.stroke_dash.is_empty()) {
+  } else if !(shape.stroke_dash.is_empty()) {
     out = out + "<a:prstDash val=\"" + shape.stroke_dash + "\"/>"
   }
   // Line join
@@ -1208,7 +1314,7 @@ fn serialize_tc_border(tag : String, w : Int, color : @ooxml.Color) -> String {
     out = out + " w=\"" + int_to_str(w) + "\""
   }
   out = out + ">"
-  if not(color.is_none()) {
+  if !(color.is_none()) {
     out = out + serialize_color(color)
   }
   out + "</" + tag + ">"
@@ -1260,12 +1366,14 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   out = out + serialize_tc_border("a:lnR", cell.bdr_r_w, cell.bdr_r_color)
   out = out + serialize_tc_border("a:lnT", cell.bdr_t_w, cell.bdr_t_color)
   out = out + serialize_tc_border("a:lnB", cell.bdr_b_w, cell.bdr_b_color)
-  out = out + serialize_tc_border("a:lnTlToBr", cell.bdr_tl_br_w, cell.bdr_tl_br_color)
-  out = out + serialize_tc_border("a:lnBlToTr", cell.bdr_bl_tr_w, cell.bdr_bl_tr_color)
+  out = out +
+    serialize_tc_border("a:lnTlToBr", cell.bdr_tl_br_w, cell.bdr_tl_br_color)
+  out = out +
+    serialize_tc_border("a:lnBlToTr", cell.bdr_bl_tr_w, cell.bdr_bl_tr_color)
   // Fill
-  if not(cell.grad_fill.is_none()) {
+  if !(cell.grad_fill.is_none()) {
     out = out + serialize_gradient_fill(cell.grad_fill)
-  } else if not(cell.fill.is_none()) {
+  } else if !(cell.fill.is_none()) {
     out = out + serialize_color(cell.fill)
   }
   out = out + "</a:tcPr>"
@@ -1297,15 +1405,27 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   out = out + "<a:tbl>"
   // Table properties
   out = out + "<a:tblPr"
-  if not(table.style_id.is_empty()) {
+  if !(table.style_id.is_empty()) {
     out = out + " tblStyleId=\"" + table.style_id + "\""
   }
-  if table.first_row { out = out + " firstRow=\"1\"" }
-  if table.last_row { out = out + " lastRow=\"1\"" }
-  if table.first_col { out = out + " firstCol=\"1\"" }
-  if table.last_col { out = out + " lastCol=\"1\"" }
-  if table.band_row { out = out + " bandRow=\"1\"" }
-  if table.band_col { out = out + " bandCol=\"1\"" }
+  if table.first_row {
+    out = out + " firstRow=\"1\""
+  }
+  if table.last_row {
+    out = out + " lastRow=\"1\""
+  }
+  if table.first_col {
+    out = out + " firstCol=\"1\""
+  }
+  if table.last_col {
+    out = out + " lastCol=\"1\""
+  }
+  if table.band_row {
+    out = out + " bandRow=\"1\""
+  }
+  if table.band_col {
+    out = out + " bandCol=\"1\""
+  }
   out = out + "/>"
   // Grid columns
   out = out + "<a:tblGrid>"
@@ -1441,11 +1561,11 @@ fn serialize_connector(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out = out + serialize_transform(shape.transform)
   out = out + serialize_prst_geom(geom)
   // Stroke
-  let has_stroke = not(shape.stroke.is_none()) ||
+  let has_stroke = !(shape.stroke.is_none()) ||
     shape.stroke_no_fill ||
-    not(shape.stroke_dash.is_empty()) ||
-    not(shape.stroke_head_type.is_empty()) ||
-    not(shape.stroke_tail_type.is_empty())
+    !(shape.stroke_dash.is_empty()) ||
+    !(shape.stroke_head_type.is_empty()) ||
+    !(shape.stroke_tail_type.is_empty())
   if has_stroke {
     out = out + serialize_stroke(shape)
   }
@@ -1476,20 +1596,20 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out + ">"
   out = out + "<p:cSld>"
   // Background
-  if not(slide.bg_blip_fill.is_none()) {
+  if !(slide.bg_blip_fill.is_none()) {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_blip_fill(slide.bg_blip_fill)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"
-  } else if not(slide.bg_patt_fill.is_none()) {
+  } else if !(slide.bg_patt_fill.is_none()) {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_pattern_fill(slide.bg_patt_fill)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"
-  } else if not(slide.bg_grad.is_none()) {
+  } else if !(slide.bg_grad.is_none()) {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_gradient_fill(slide.bg_grad)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"
-  } else if not(slide.background.is_none()) &&
-    not(
+  } else if !(slide.background.is_none()) &&
+    !(
       slide.background.r == 255 &&
       slide.background.g == 255 &&
       slide.background.b == 255,

@@ -221,13 +221,18 @@ fn parse_stroke(
       }
       let ln_gf_early = parse_gradient_fill(ln_ch, theme)
       let ln_pf_early = parse_pattern_fill(ln_ch, theme)
-      let has_alt_fill = not(ln_gf_early.is_none()) || not(ln_pf_early.is_none())
+      let has_alt_fill = !(ln_gf_early.is_none()) ||
+        !(ln_pf_early.is_none())
       let color = if no_fill {
         Color::none()
       } else {
         let clr = parse_solid_fill(ln_ch, theme)
         if clr.is_none() {
-          if has_alt_fill { Color::none() } else { Color::black() }
+          if has_alt_fill {
+            Color::none()
+          } else {
+            Color::black()
+          }
         } else {
           clr
         }
@@ -359,6 +364,7 @@ fn parse_stroke(
 
 ///|
 /// Parse a:effectLst from shape property children.
+
 ///|
 fn parse_outer_shadow(node : @xml.XmlNode, theme : ThemeData) -> OuterShadow {
   let ch = @xml.get_children(node)
@@ -400,6 +406,7 @@ fn parse_glow(node : @xml.XmlNode, theme : ThemeData) -> Glow {
   { rad: attr_int(node, "rad"), color }
 }
 
+///|
 fn parse_effect_lst(
   sppr_ch : Array[@xml.XmlNode],
   theme : ThemeData,
@@ -950,7 +957,8 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   // Pattern fill
   let patt_fill = parse_pattern_fill(sppr_ch, theme)
   // Text
-  let (paras, body_props, txt_lst_style) = match @xml.find_child(ch, "p:txBody") {
+  let (paras, body_props, txt_lst_style) = match
+    @xml.find_child(ch, "p:txBody") {
     None => ([], BodyProps::default(), TextStyleGroup::empty())
     Some(txb) => parse_text_body(txb, theme)
   }
@@ -1031,7 +1039,7 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
             Some(_) => has_media = true
             None => ()
           }
-          if not(has_media) {
+          if !(has_media) {
             match @xml.find_child(nvpr_ch, "a:audioFile") {
               Some(_) => has_media = true
               None => ()
@@ -1041,7 +1049,11 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
       }
     }
   }
-  let mut s = Shape::default_with_blip(ShapeKind::Picture(bf.rid), transform, bf)
+  let mut s = Shape::default_with_blip(
+    ShapeKind::Picture(bf.rid),
+    transform,
+    bf,
+  )
   // Apply stroke properties
   s = {
     ..s,
@@ -1053,7 +1065,7 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     stroke_miter_limit: sp.miter_limit,
     stroke_no_fill: sp.no_fill,
   }
-  if not(sh_link_rid.is_empty()) || not(sh_link_hover_rid.is_empty()) {
+  if !(sh_link_rid.is_empty()) || !(sh_link_hover_rid.is_empty()) {
     s = { ..s, sh_link_rid, sh_link_hover_rid }
   }
   // For media shapes, preserve original XML for round-trip
@@ -1064,7 +1076,11 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
 }
 
 ///|
-fn parse_tc_border(tcpr_ch : Array[@xml.XmlNode], tag : String, theme : ThemeData) -> (Int, Color) {
+fn parse_tc_border(
+  tcpr_ch : Array[@xml.XmlNode],
+  tag : String,
+  theme : ThemeData,
+) -> (Int, Color) {
   match @xml.find_child(tcpr_ch, tag) {
     None => (0, Color::none())
     Some(ln_node) => {
@@ -1086,8 +1102,22 @@ fn parse_tc_border(tcpr_ch : Array[@xml.XmlNode], tag : String, theme : ThemeDat
 fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let ch = @xml.get_children(tc)
   // Parse cell merge attributes
-  let grid_span = { let v = attr_int(tc, "gridSpan"); if v > 0 { v } else { 1 } }
-  let row_span = { let v = attr_int(tc, "rowSpan"); if v > 0 { v } else { 1 } }
+  let grid_span = {
+    let v = attr_int(tc, "gridSpan")
+    if v > 0 {
+      v
+    } else {
+      1
+    }
+  }
+  let row_span = {
+    let v = attr_int(tc, "rowSpan")
+    if v > 0 {
+      v
+    } else {
+      1
+    }
+  }
   let v_merge = match @xml.get_attr(tc, "vMerge") {
     Some("1") => true
     _ => false
@@ -1127,7 +1157,7 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
       let tcpr_ch = @xml.get_children(tcpr)
       // Fill
       let gf = parse_gradient_fill(tcpr_ch, theme)
-      if not(gf.is_none()) {
+      if !(gf.is_none()) {
         grad_fill = gf
       } else {
         fill = parse_solid_fill(tcpr_ch, theme)
@@ -1137,10 +1167,18 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
       let mr = attr_int(tcpr, "marR")
       let mt = attr_int(tcpr, "marT")
       let mb = attr_int(tcpr, "marB")
-      if ml > 0 { mar_l = ml }
-      if mr > 0 { mar_r = mr }
-      if mt > 0 { mar_t = mt }
-      if mb > 0 { mar_b = mb }
+      if ml > 0 {
+        mar_l = ml
+      }
+      if mr > 0 {
+        mar_r = mr
+      }
+      if mt > 0 {
+        mar_t = mt
+      }
+      if mb > 0 {
+        mar_b = mb
+      }
       // Anchor
       anchor = match @xml.get_attr(tcpr, "anchor") {
         Some(v) => v
@@ -1169,12 +1207,30 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     }
   }
   {
-    paragraphs, fill, grad_fill,
-    grid_span, row_span, v_merge, h_merge,
-    bdr_l_w, bdr_r_w, bdr_t_w, bdr_b_w,
-    bdr_l_color, bdr_r_color, bdr_t_color, bdr_b_color,
-    bdr_tl_br_w, bdr_tl_br_color, bdr_bl_tr_w, bdr_bl_tr_color,
-    mar_l, mar_r, mar_t, mar_b, anchor,
+    paragraphs,
+    fill,
+    grad_fill,
+    grid_span,
+    row_span,
+    v_merge,
+    h_merge,
+    bdr_l_w,
+    bdr_r_w,
+    bdr_t_w,
+    bdr_b_w,
+    bdr_l_color,
+    bdr_r_color,
+    bdr_t_color,
+    bdr_b_color,
+    bdr_tl_br_w,
+    bdr_tl_br_color,
+    bdr_bl_tr_w,
+    bdr_bl_tr_color,
+    mar_l,
+    mar_r,
+    mar_t,
+    mar_b,
+    anchor,
   }
 }
 
@@ -1215,13 +1271,10 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         Some(v) => v
         None => ""
       }
-      if not(rid.is_empty()) {
+      if !(rid.is_empty()) {
         // Store rid in chart_xml field temporarily; main.mbt will resolve it.
         let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
-        return Shape::default_with(
-          ShapeKind::ChartShape(chart_data),
-          transform,
-        )
+        return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
       }
     }
     None => ()
@@ -1233,16 +1286,13 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         Some(v) => v
         None => ""
       }
-      if not(rid.is_empty()) {
+      if !(rid.is_empty()) {
         // Prefix "cx:" to distinguish from classic c:chart during resolution
         let chart_data : ChartData = {
           ..ChartData::empty(),
           chart_xml: "cx:" + rid,
         }
-        return Shape::default_with(
-          ShapeKind::ChartShape(chart_data),
-          transform,
-        )
+        return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
       }
     }
     None => ()
@@ -1274,7 +1324,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       }
       // Serialize entire graphicFrame as ole_xml for round-trip
       let ole_raw = @xml.serialize_node(gf)
-      if not(img_rid.is_empty()) {
+      if !(img_rid.is_empty()) {
         // Render as Picture with the fallback image
         return {
           ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
@@ -1282,7 +1332,10 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         }
       } else {
         // No fallback image available; preserve OLE data as empty shape
-        return { ..Shape::default_with(ShapeKind::Other, transform), ole_xml: ole_raw }
+        return {
+          ..Shape::default_with(ShapeKind::Other, transform),
+          ole_xml: ole_raw,
+        }
       }
     }
     None => ()
@@ -1350,8 +1403,15 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         tri = tri + 1
       }
       let table_data : TableData = {
-        col_widths, rows, style_id,
-        first_row, last_row, first_col, last_col, band_row, band_col,
+        col_widths,
+        rows,
+        style_id,
+        first_row,
+        last_row,
+        first_col,
+        last_col,
+        band_row,
+        band_col,
       }
       Shape::default_with(ShapeKind::TableShape(table_data), transform)
     }
@@ -1555,9 +1615,17 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       }
     }
   }
-  ShapeGeom::Custom(
-    { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b, cxn_lst },
-  )
+  ShapeGeom::Custom({
+    gdlst,
+    paths,
+    path_w,
+    path_h,
+    rect_l,
+    rect_t,
+    rect_r,
+    rect_b,
+    cxn_lst,
+  })
 }
 
 ///|
@@ -1823,7 +1891,7 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
           Some(v) => v
           None => ""
         }
-        if not(id.is_empty()) {
+        if !(id.is_empty()) {
           rels.push({ id, target, type_, target_mode })
         }
         i = i + 1
@@ -1943,7 +2011,12 @@ pub fn parse_slide(
       // Color::none() = no explicit bg (inherit from layout/master)
       let (bg, bg_grad, bg_bf, bg_pf) = match @xml.find_child(csld_ch, "p:bg") {
         None =>
-          (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
+          (
+            Color::none(),
+            GradientFill::none(),
+            BlipFill::none(),
+            PatternFill::none(),
+          )
         Some(bg_node) => {
           let bg_ch = @xml.get_children(bg_node)
           match @xml.find_child(bg_ch, "p:bgPr") {
@@ -2005,6 +2078,7 @@ pub fn parse_slide(
 
 ///|
 /// Parse background color from p:cSld children. Returns Color::none() if no bg.
+
 ///|
 /// Parse all background fills from p:cSld children.
 pub fn parse_bg_fills_from_csld(
@@ -2013,7 +2087,12 @@ pub fn parse_bg_fills_from_csld(
 ) -> (Color, GradientFill, BlipFill, PatternFill) {
   match @xml.find_child(csld_ch, "p:bg") {
     None =>
-      (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
+      (
+        Color::none(),
+        GradientFill::none(),
+        BlipFill::none(),
+        PatternFill::none(),
+      )
     Some(bg_node) => {
       let bg_ch = @xml.get_children(bg_node)
       match @xml.find_child(bg_ch, "p:bgPr") {
@@ -2084,9 +2163,7 @@ fn parse_shapes_from_children(
               )
               let mut k = 0
               while k < fb_shapes.length() {
-                shapes.push(
-                  { ..fb_shapes[k], mc_choice_xml: choice_xml },
-                )
+                shapes.push({ ..fb_shapes[k], mc_choice_xml: choice_xml })
                 k = k + 1
               }
             }
@@ -2112,7 +2189,10 @@ fn parse_shapes_from_tree(
 // ── Table style parsing ─────────────────────────────────────────────────────
 
 ///|
-fn parse_table_style_cell(node : @xml.XmlNode, theme : ThemeData) -> TableStyleCell {
+fn parse_table_style_cell(
+  node : @xml.XmlNode,
+  theme : ThemeData,
+) -> TableStyleCell {
   let ch = @xml.get_children(node)
   let mut fill = Color::none()
   let mut grad_fill = GradientFill::none()
@@ -2133,7 +2213,7 @@ fn parse_table_style_cell(node : @xml.XmlNode, theme : ThemeData) -> TableStyleC
     Some(tcpr) => {
       let tcpr_ch = @xml.get_children(tcpr)
       let gf = parse_gradient_fill(tcpr_ch, theme)
-      if not(gf.is_none()) {
+      if !(gf.is_none()) {
         grad_fill = gf
       } else {
         fill = parse_solid_fill(tcpr_ch, theme)
@@ -2165,7 +2245,7 @@ fn parse_table_style_cell(node : @xml.XmlNode, theme : ThemeData) -> TableStyleC
           // Check lvl1pPr
           match @xml.find_child(lst_ch, "a:lvl1pPr") {
             None => ()
-            Some(ppr) => {
+            Some(ppr) =>
               match @xml.find_child(@xml.get_children(ppr), "a:defRPr") {
                 None => ()
                 Some(rpr) => {
@@ -2174,22 +2254,33 @@ fn parse_table_style_cell(node : @xml.XmlNode, theme : ThemeData) -> TableStyleC
                   font_color = parse_solid_fill(@xml.get_children(rpr), theme)
                 }
               }
-            }
           }
         }
       }
     }
   }
   {
-    fill, grad_fill,
-    bdr_l_w, bdr_r_w, bdr_t_w, bdr_b_w,
-    bdr_l_color, bdr_r_color, bdr_t_color, bdr_b_color,
-    bold, italic, font_color,
+    fill,
+    grad_fill,
+    bdr_l_w,
+    bdr_r_w,
+    bdr_t_w,
+    bdr_b_w,
+    bdr_l_color,
+    bdr_r_color,
+    bdr_t_color,
+    bdr_b_color,
+    bold,
+    italic,
+    font_color,
   }
 }
 
 ///|
-pub fn parse_table_styles(xml_str : String, theme : ThemeData) -> Array[TableStyleDef] {
+pub fn parse_table_styles(
+  xml_str : String,
+  theme : ThemeData,
+) -> Array[TableStyleDef] {
   let styles : Array[TableStyleDef] = []
   let nodes = @xml.parse_xml(xml_str)
   // root = <a:tblStyleLst>
@@ -2197,7 +2288,10 @@ pub fn parse_table_styles(xml_str : String, theme : ThemeData) -> Array[TableSty
     Some(n) => n
     None => return styles // no table styles
   }
-  let style_nodes = @xml.find_children(@xml.get_children(lst_node), "a:tblStyle")
+  let style_nodes = @xml.find_children(
+    @xml.get_children(lst_node),
+    "a:tblStyle",
+  )
   let ns = style_nodes.length()
   let mut si = 0
   while si < ns {
