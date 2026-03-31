@@ -462,7 +462,12 @@ pub fn parse_slide_master(
   let csld = @xml.find_path(nodes, ["p:sldMaster", "p:cSld"])
   let (background, bg_grad, bg_blip_fill, bg_patt_fill) = match csld {
     None =>
-      (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
+      (
+        Color::none(),
+        GradientFill::none(),
+        BlipFill::none(),
+        PatternFill::none(),
+      )
     Some(csld_node) =>
       parse_bg_fills_from_csld(@xml.get_children(csld_node), effective_theme)
   }
@@ -487,7 +492,15 @@ pub fn parse_slide_master(
       }
     }
   }
-  { background, bg_grad, bg_blip_fill, bg_patt_fill, shapes, text_styles, clr_map }
+  {
+    background,
+    bg_grad,
+    bg_blip_fill,
+    bg_patt_fill,
+    shapes,
+    text_styles,
+    clr_map,
+  }
 }
 
 // ── Slide layout parser ──────────────────────────────────────────────────────
@@ -506,7 +519,12 @@ pub fn parse_slide_layout(
   let csld = @xml.find_child(root_ch, "p:cSld")
   let (background, bg_grad, bg_blip_fill, bg_patt_fill) = match csld {
     None =>
-      (Color::none(), GradientFill::none(), BlipFill::none(), PatternFill::none())
+      (
+        Color::none(),
+        GradientFill::none(),
+        BlipFill::none(),
+        PatternFill::none(),
+      )
     Some(csld_node) =>
       parse_bg_fills_from_csld(@xml.get_children(csld_node), theme)
   }

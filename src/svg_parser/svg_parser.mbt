@@ -22,7 +22,11 @@ fn parse_hex_color(s : String) -> @ooxml.Color {
 /// Parse a hex color from a data attribute, returning Color::none() if empty.
 fn color_or_none(node : @xml.XmlNode, attr : String) -> @ooxml.Color {
   let v = get_data_attr(node, attr)
-  if v.is_empty() { @ooxml.Color::none() } else { parse_hex_color(v) }
+  if v.is_empty() {
+    @ooxml.Color::none()
+  } else {
+    parse_hex_color(v)
+  }
 }
 
 // ── Attribute helpers ────────────────────────────────────────────────────────
@@ -130,7 +134,11 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       dir: get_dai(node, "eff-ps-dir"),
       color: {
         let clr = get_da(node, "eff-ps-clr")
-        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+        if clr.is_empty() {
+          @ooxml.Color::none()
+        } else {
+          parse_hex_color(clr)
+        }
       },
     }
   }
@@ -142,7 +150,11 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       blend: fo_blend,
       color: {
         let clr = get_da(node, "eff-fo-clr")
-        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+        if clr.is_empty() {
+          @ooxml.Color::none()
+        } else {
+          parse_hex_color(clr)
+        }
       },
     }
   }
@@ -207,14 +219,15 @@ fn parse_run_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
       dir: get_dai(node, "reff-ps-dir"),
       color: {
         let clr = get_da(node, "reff-ps-clr")
-        if clr.is_empty() { @ooxml.Color::none() } else { parse_hex_color(clr) }
+        if clr.is_empty() {
+          @ooxml.Color::none()
+        } else {
+          parse_hex_color(clr)
+        }
       },
     }
   }
-  if os.is_none() &&
-    gl.is_none() &&
-    bl.is_none() &&
-    ps.is_none() {
+  if os.is_none() && gl.is_none() && bl.is_none() && ps.is_none() {
     @ooxml.EffectList::none()
   } else {
     {
@@ -256,7 +269,12 @@ fn parse_sp_3d_from_da(node : @xml.XmlNode) -> @ooxml.Shape3d {
   let cnt_w = get_dai(node, "3d-cnt-w")
   let mat = get_data_attr(node, "3d-mat")
   let z_val = get_dai(node, "3d-z")
-  if bt_w == 0 && bt_h == 0 && bb_w == 0 && bb_h == 0 && ext_h == 0 && cnt_w == 0 {
+  if bt_w == 0 &&
+    bt_h == 0 &&
+    bb_w == 0 &&
+    bb_h == 0 &&
+    ext_h == 0 &&
+    cnt_w == 0 {
     @ooxml.Shape3d::none()
   } else {
     {
@@ -493,7 +511,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                 }
               @xml.XmlNode::Text(text) =>
                 // Direct text content (no run tspan wrapper)
-                if not(text.is_empty()) {
+                if !(text.is_empty()) {
                   runs.push({
                     text,
                     bold: false,
@@ -604,9 +622,15 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   } else if shape_type == "table" {
     // Table shapes carry no inline data in SVG for now — use empty table
     let table_data : @ooxml.TableData = {
-      col_widths: [], rows: [], style_id: "",
-      first_row: false, last_row: false, first_col: false,
-      last_col: false, band_row: false, band_col: false,
+      col_widths: [],
+      rows: [],
+      style_id: "",
+      first_row: false,
+      last_row: false,
+      first_col: false,
+      last_col: false,
+      band_row: false,
+      band_col: false,
     }
     @ooxml.ShapeKind::TableShape(table_data)
   } else if shape_type == "group" {
@@ -642,7 +666,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
       let adj_str = get_da(g_node, "cxn-adj")
       if is_connector_prst(geom_str) {
         parse_connector_geom_from_svg(geom_str, adj_str)
-      } else if not(adj_str.is_empty()) {
+      } else if !(adj_str.is_empty()) {
         let avs = parse_adj_string(adj_str)
         @ooxml.parse_geom(geom_str, avs)
       } else {
@@ -726,11 +750,19 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     warp_prst: get_da(g_node, "warp-prst"),
     warp_av1: {
       let v = get_dai(g_node, "warp-av1")
-      if v == 0 { -1 } else { v }
+      if v == 0 {
+        -1
+      } else {
+        v
+      }
     },
     warp_av2: {
       let v = get_dai(g_node, "warp-av2")
-      if v == 0 { -1 } else { v }
+      if v == 0 {
+        -1
+      } else {
+        v
+      }
     },
   }
   let ph_type = get_da(g_node, "ph-type")
@@ -849,7 +881,7 @@ fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
         if tag == "g" {
           // Look inside: could be the transform <g> or a child shape <g>
           let st = get_da(g_children[i], "shape-type")
-          if not(st.is_empty()) {
+          if !(st.is_empty()) {
             children.push(parse_shape_from_g(g_children[i]))
           } else {
             // This might be the inner transform <g> wrapping children
@@ -861,7 +893,7 @@ fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
                 @xml.XmlNode::Element(tag2, _, _) =>
                   if tag2 == "g" {
                     let st2 = get_da(inner_ch[j], "shape-type")
-                    if not(st2.is_empty()) {
+                    if !(st2.is_empty()) {
                       children.push(parse_shape_from_g(inner_ch[j]))
                     }
                   }
@@ -934,9 +966,13 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
       return {
         slide_size: @ooxml.SlideSize::default(),
         background: @ooxml.Color::white(),
-        bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(),
+        bg_grad: @ooxml.GradientFill::none(),
+        bg_blip_fill: @ooxml.BlipFill::none(),
+        bg_patt_fill: @ooxml.PatternFill::none(),
         shapes: [],
-        transition_xml: "", timing_xml: "", hidden: false,
+        transition_xml: "",
+        timing_xml: "",
+        hidden: false,
       }
   }
   // Read slide metadata from SVG root
@@ -969,7 +1005,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "g" {
           let st = get_da(svg_children[i], "shape-type")
-          if not(st.is_empty()) {
+          if !(st.is_empty()) {
             shapes.push(parse_shape_from_g(svg_children[i]))
           }
         }
@@ -978,5 +1014,15 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     i = i + 1
   }
 
-  { slide_size, background, bg_grad: @ooxml.GradientFill::none(), bg_blip_fill: @ooxml.BlipFill::none(), bg_patt_fill: @ooxml.PatternFill::none(), shapes, transition_xml, timing_xml, hidden }
+  {
+    slide_size,
+    background,
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes,
+    transition_xml,
+    timing_xml,
+    hidden,
+  }
 }

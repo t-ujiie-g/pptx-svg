@@ -118,7 +118,7 @@ fn flatten_warp_text(
   let mut pi = 0
   while pi < np {
     let para = paragraphs[pi]
-    if pi > 0 && not(text.is_empty()) {
+    if pi > 0 && !(text.is_empty()) {
       text = text + " "
     }
     let nr = para.runs.length()
@@ -132,11 +132,11 @@ fn flatten_warp_text(
           run.text
         }
         text = text + display
-        if not(found_style) && not(run.text.is_empty()) && run.text != "\n" {
+        if !(found_style) && !(run.text.is_empty()) && run.text != "\n" {
           first_font_size = run.font_size
-          first_ff = if not(run.font_face.is_empty()) {
+          first_ff = if !(run.font_face.is_empty()) {
             run.font_face
-          } else if not(run.ea_font.is_empty()) {
+          } else if !(run.ea_font.is_empty()) {
             run.ea_font
           } else {
             theme.minor_font
@@ -872,7 +872,7 @@ fn render_warp_text(
   let av1_d = av1.to_double()
   let av2_d = av2.to_double()
   // Build style attributes
-  let fill_attr = if not(color.is_none()) {
+  let fill_attr = if !(color.is_none()) {
     " fill=\"" + color.to_css() + "\""
   } else {
     " fill=\"" + default_text_fill + "\""

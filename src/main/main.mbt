@@ -170,7 +170,7 @@ fn load_master_theme(
       }
       let theme_path = resolve_rel_path(base_dir, rel.target)
       let theme_xml = @ffi.ffi_get_file(theme_path)
-      if not(theme_xml.is_empty()) {
+      if !(theme_xml.is_empty()) {
         @ffi.ffi_log("Loaded per-master theme: " + theme_path)
         return @ooxml.parse_theme(theme_xml)
       }
@@ -243,7 +243,7 @@ fn resolve_chart_shapes(
       @ooxml.ShapeKind::ChartShape(cd) =>
         // chart_xml field temporarily holds the relationship ID
         // (prefixed with "cx:" for ChartEx charts)
-        if not(cd.chart_xml.is_empty()) && cd.groups.is_empty() {
+        if !(cd.chart_xml.is_empty()) && cd.groups.is_empty() {
           let raw_rid = cd.chart_xml
           let is_chartex = @xml.str_starts_with(raw_rid, "cx:")
           let rid = if is_chartex {
@@ -252,10 +252,10 @@ fn resolve_chart_shapes(
             raw_rid
           }
           let target = @ooxml.find_rel_target(rels, rid)
-          if not(target.is_empty()) {
+          if !(target.is_empty()) {
             let chart_path = resolve_rel_path("ppt/slides", target)
             let chart_xml = @ffi.ffi_get_file(chart_path)
-            if not(chart_xml.is_empty()) {
+            if !(chart_xml.is_empty()) {
               let parsed = if is_chartex {
                 @ooxml.parse_chartex_xml(chart_xml, theme)
               } else {
@@ -500,12 +500,12 @@ pub fn initialize_pptx() -> String {
   g_slide_size.val = @ooxml.parse_slide_size(prs_xml)
   // Load theme from presentation rels
   let prs_rels_xml = @ffi.ffi_get_file("ppt/_rels/presentation.xml.rels")
-  if not(prs_rels_xml.is_empty()) {
+  if !(prs_rels_xml.is_empty()) {
     let prs_rels = @ooxml.parse_rels(prs_rels_xml)
     let theme_path = find_theme_path(prs_rels)
-    if not(theme_path.is_empty()) {
+    if !(theme_path.is_empty()) {
       let theme_xml = @ffi.ffi_get_file(theme_path)
-      if not(theme_xml.is_empty()) {
+      if !(theme_xml.is_empty()) {
         g_theme.val = @ooxml.parse_theme(theme_xml)
         @ffi.ffi_log("Theme loaded from " + theme_path)
       }
@@ -513,7 +513,7 @@ pub fn initialize_pptx() -> String {
   }
   // ── Parse table styles from ppt/tableStyles.xml ──
   let tbl_styles_xml = @ffi.ffi_get_file("ppt/tableStyles.xml")
-  if not(tbl_styles_xml.is_empty()) {
+  if !(tbl_styles_xml.is_empty()) {
     g_table_styles.val = @ooxml.parse_table_styles(tbl_styles_xml, g_theme.val)
     if g_table_styles.val.length() > 0 {
       @ffi.ffi_log(
@@ -546,8 +546,8 @@ pub fn initialize_pptx() -> String {
       }
     }
     slide_layout_paths.push(layout_path)
-    if not(layout_path.is_empty()) &&
-      not(array_contains(layout_paths, layout_path)) {
+    if !(layout_path.is_empty()) &&
+      !(array_contains(layout_paths, layout_path)) {
       layout_paths.push(layout_path)
     }
     si = si + 1
@@ -571,7 +571,7 @@ pub fn initialize_pptx() -> String {
       }
     }
     layout_to_master.push((lpath, mpath))
-    if not(mpath.is_empty()) && not(array_contains(master_paths, mpath)) {
+    if !(mpath.is_empty()) && !(array_contains(master_paths, mpath)) {
       master_paths.push(mpath)
     }
     li = li + 1
@@ -596,7 +596,7 @@ pub fn initialize_pptx() -> String {
     // Load per-master theme (falls back to g_theme)
     let m_theme = load_master_theme(mp, mrels)
     master_themes.push(m_theme)
-    if not(mxml.is_empty()) {
+    if !(mxml.is_empty()) {
       let mdata = @ooxml.parse_slide_master(mxml, m_theme)
       masters.push((mdata, mp))
       master_rels_arr.push(mrels)
@@ -632,7 +632,7 @@ pub fn initialize_pptx() -> String {
     } else {
       @ooxml.parse_rels(layout_rels_xml)
     }
-    if not(lxml.is_empty()) {
+    if !(lxml.is_empty()) {
       // Compute effective theme: layout's own clrMapOvr > master's clrMap
       let layout_effective_theme = {
         // Use the master's own theme (not g_theme) for color map application
@@ -786,24 +786,24 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   } else {
     ""
   }
-  let layout_opt = if not(layout_path.is_empty()) {
+  let layout_opt = if !(layout_path.is_empty()) {
     get_layout(layout_path)
   } else {
     None
   }
-  let master_path = if not(layout_path.is_empty()) {
+  let master_path = if !(layout_path.is_empty()) {
     find_master_for_layout(layout_path)
   } else {
     ""
   }
-  let master_opt = if not(master_path.is_empty()) {
+  let master_opt = if !(master_path.is_empty()) {
     get_master(master_path)
   } else {
     None
   }
   // ── Compute effective theme with color map overrides ──
   // Use the master's own theme (not g_theme) for correct per-master colors
-  let base_theme = if not(master_path.is_empty()) {
+  let base_theme = if !(master_path.is_empty()) {
     get_master_theme(master_path)
   } else {
     g_theme.val
@@ -869,24 +869,25 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     let mut bg_patt_fill = slide_data.bg_patt_fill
     let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
     // Check if slide has any explicit background
-    let slide_has_bg = not(bg.is_none()) || not(bg_grad.is_none()) ||
-      not(bg_blip_fill.is_none()) ||
-      not(bg_patt_fill.is_none())
-    if not(slide_has_bg) {
+    let slide_has_bg = !(bg.is_none()) ||
+      !(bg_grad.is_none()) ||
+      !(bg_blip_fill.is_none()) ||
+      !(bg_patt_fill.is_none())
+    if !(slide_has_bg) {
       // Try layout
       let mut inherited = false
       match layout_opt {
         Some(layout) => {
-          let layout_has_bg = not(layout.background.is_none()) ||
-            not(layout.bg_grad.is_none()) ||
-            not(layout.bg_blip_fill.is_none()) ||
-            not(layout.bg_patt_fill.is_none())
+          let layout_has_bg = !(layout.background.is_none()) ||
+            !(layout.bg_grad.is_none()) ||
+            !(layout.bg_blip_fill.is_none()) ||
+            !(layout.bg_patt_fill.is_none())
           if layout_has_bg {
             bg = layout.background
             bg_grad = layout.bg_grad
             bg_blip_fill = layout.bg_blip_fill
             bg_patt_fill = layout.bg_patt_fill
-            bg_fill_rels = if not(layout_path.is_empty()) {
+            bg_fill_rels = if !(layout_path.is_empty()) {
               get_layout_rels(layout_path)
             } else {
               rels
@@ -897,19 +898,19 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
         None => ()
       }
       // Try master
-      if not(inherited) {
+      if !(inherited) {
         match master_opt {
           Some(master) => {
-            let master_has_bg = not(master.background.is_none()) ||
-              not(master.bg_grad.is_none()) ||
-              not(master.bg_blip_fill.is_none()) ||
-              not(master.bg_patt_fill.is_none())
+            let master_has_bg = !(master.background.is_none()) ||
+              !(master.bg_grad.is_none()) ||
+              !(master.bg_blip_fill.is_none()) ||
+              !(master.bg_patt_fill.is_none())
             if master_has_bg {
               bg = master.background
               bg_grad = master.bg_grad
               bg_blip_fill = master.bg_blip_fill
               bg_patt_fill = master.bg_patt_fill
-              bg_fill_rels = if not(master_path.is_empty()) {
+              bg_fill_rels = if !(master_path.is_empty()) {
                 get_master_rels(master_path)
               } else {
                 rels
@@ -920,7 +921,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
           None => ()
         }
       }
-      if not(inherited) && bg.is_none() {
+      if !(inherited) && bg.is_none() {
         bg = @ooxml.Color::white()
       }
     }
@@ -976,10 +977,10 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   }
   // ── Resolve background fill rels for rendering ──
   let bg_fill_rels : Array[@ooxml.Relationship] = {
-    let slide_has_bg = not(resolved_slide.background.is_none()) ||
-      not(resolved_slide.bg_grad.is_none()) ||
-      not(resolved_slide.bg_blip_fill.is_none()) ||
-      not(resolved_slide.bg_patt_fill.is_none())
+    let slide_has_bg = !(resolved_slide.background.is_none()) ||
+      !(resolved_slide.bg_grad.is_none()) ||
+      !(resolved_slide.bg_blip_fill.is_none()) ||
+      !(resolved_slide.bg_patt_fill.is_none())
     if slide_has_bg {
       rels
     } else {
@@ -987,23 +988,33 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       let mut r = rels
       let mut found = false
       match layout_opt {
-        Some(layout) => {
-          if not(layout.background.is_none()) || not(layout.bg_grad.is_none()) ||
-            not(layout.bg_blip_fill.is_none()) || not(layout.bg_patt_fill.is_none()) {
-            r = if not(layout_path.is_empty()) { get_layout_rels(layout_path) } else { rels }
+        Some(layout) =>
+          if !(layout.background.is_none()) ||
+            !(layout.bg_grad.is_none()) ||
+            !(layout.bg_blip_fill.is_none()) ||
+            !(layout.bg_patt_fill.is_none()) {
+            r = if !(layout_path.is_empty()) {
+              get_layout_rels(layout_path)
+            } else {
+              rels
+            }
             found = true
           }
-        }
         None => ()
       }
-      if not(found) {
+      if !(found) {
         match master_opt {
-          Some(master) => {
-            if not(master.background.is_none()) || not(master.bg_grad.is_none()) ||
-              not(master.bg_blip_fill.is_none()) || not(master.bg_patt_fill.is_none()) {
-              r = if not(master_path.is_empty()) { get_master_rels(master_path) } else { rels }
+          Some(master) =>
+            if !(master.background.is_none()) ||
+              !(master.bg_grad.is_none()) ||
+              !(master.bg_blip_fill.is_none()) ||
+              !(master.bg_patt_fill.is_none()) {
+              r = if !(master_path.is_empty()) {
+                get_master_rels(master_path)
+              } else {
+                rels
+              }
             }
-          }
           None => ()
         }
       }
@@ -1013,7 +1024,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   // ── Collect master/layout background shapes (non-placeholder) ──
   let bg_shapes : Array[@ooxml.Shape] = []
   let bg_shapes_rels : Array[Array[@ooxml.Relationship]] = []
-  let m_rels = if not(master_path.is_empty()) {
+  let m_rels = if !(master_path.is_empty()) {
     get_master_rels(master_path)
   } else {
     ([] : Array[@ooxml.Relationship])
@@ -1033,7 +1044,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     }
     None => ()
   }
-  let l_rels = if not(layout_path.is_empty()) {
+  let l_rels = if !(layout_path.is_empty()) {
     get_layout_rels(layout_path)
   } else {
     ([] : Array[@ooxml.Relationship])
@@ -1055,8 +1066,14 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   }
   // Render to SVG
   @renderer.render_slide_svg(
-    resolved_slide, rels, slide_num, effective_theme, bg_shapes, g_table_styles.val,
-    bg_shapes_rels, bg_fill_rels,
+    resolved_slide,
+    rels,
+    slide_num,
+    effective_theme,
+    bg_shapes,
+    g_table_styles.val,
+    bg_shapes_rels,
+    bg_fill_rels,
   )
 }
 
@@ -1135,7 +1152,11 @@ pub fn get_modified_entries() -> String {
 fn get_scale() -> Int {
   let sw = g_slide_size.val.cx
   let w = 960 // svg_target_width
-  if sw > 0 { sw / w } else { 9525 }
+  if sw > 0 {
+    sw / w
+  } else {
+    9525
+  }
 }
 
 ///|
@@ -1197,15 +1218,31 @@ pub fn render_shape_svg(slide_idx : Int, shape_idx : Int) -> String {
       let scale = get_scale()
       let slide_num = slide_idx + 1
       // Load slide rels for image resolution
-      let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+      let rels_path = "ppt/slides/_rels/slide" +
+        int_to_str(slide_num) +
+        ".xml.rels"
       let rels_xml = @ffi.ffi_get_file(rels_path)
-      let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
+      let rels = if rels_xml.is_empty() {
+        []
+      } else {
+        @ooxml.parse_rels(rels_xml)
+      }
       // Generate defs for this shape
       let defs = @renderer.render_shape_defs(shape, slide_num, shape_idx, scale)
-      let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
+      let defs_section = if defs.is_empty() {
+        ""
+      } else {
+        "<defs>" + defs + "</defs>"
+      }
       // Render the shape
       let shape_svg = @renderer.render_shape(
-        shape, rels, slide_num, scale, shape_idx, g_theme.val, g_table_styles.val,
+        shape,
+        rels,
+        slide_num,
+        scale,
+        shape_idx,
+        g_theme.val,
+        g_table_styles.val,
       )
       defs_section + shape_svg
     }
@@ -1315,7 +1352,7 @@ pub fn update_shape_fill(
   match resolve_shape_location(slide, shape_idx) {
     None => "ERROR:shape index out of range"
     Some((arr, local_idx)) => {
-      let new_color : @ooxml.Color = { r, g: g, b, alpha: 255 }
+      let new_color : @ooxml.Color = { r, g, b, alpha: 255 }
       arr[local_idx] = { ..arr[local_idx], fill: new_color }
       g_modified.val[slide_idx] = true
       render_shape_svg(slide_idx, shape_idx)

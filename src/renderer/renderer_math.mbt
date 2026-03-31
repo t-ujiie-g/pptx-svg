@@ -32,42 +32,62 @@ priv struct MathBox {
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
+///|
 let math_empty_box : MathBox = { svg: "", w: 0.0, h: 0.0, baseline: 0.0 }
 
+///|
 let math_font_family : String = "Cambria Math, Cambria, serif"
 
+///|
 let math_frac_scale : Double = 0.85
 
+///|
 let math_script_scale : Double = 0.7
 
+///|
 let math_nary_scale : Double = 1.8
 
+///|
 let math_nary_limit_scale : Double = 0.65
 
+///|
 let math_frac_bar_thick : Double = 1.0
 
+///|
 let math_frac_gap : Double = 2.0
 
+///|
 let math_sup_shift_ratio : Double = 0.4
 
+///|
 let math_sub_shift_ratio : Double = 0.25
 
+///|
 let math_rad_gap : Double = 2.0
 
+///|
 let math_matrix_gap_ratio : Double = 0.4
 
+///|
 let math_delim_pad : Double = 2.0
 
+///|
 let math_text_height_ratio : Double = 1.2 // text height = font_size × this
 
+///|
 let math_text_baseline_ratio : Double = 0.85 // baseline = font_size × this
-
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 ///|
 fn math_g(x : Double, y : Double, content : String) -> String {
-  "<g transform=\"translate(" + dts(x) + "," + dts(y) + ")\">" + content + "</g>"
+  "<g transform=\"translate(" +
+  dts(x) +
+  "," +
+  dts(y) +
+  ")\">" +
+  content +
+  "</g>"
 }
 
 ///|
@@ -120,11 +140,7 @@ fn math_children(node : @xml.XmlNode, tag : String) -> Array[@xml.XmlNode] {
 ///|
 /// Get a property value from the element's properties child.
 /// e.g. math_prop(node, "m:fPr", "m:type") → value of m:val on m:type inside m:fPr.
-fn math_prop(
-  node : @xml.XmlNode,
-  pr_tag : String,
-  prop_tag : String,
-) -> String {
+fn math_prop(node : @xml.XmlNode, pr_tag : String, prop_tag : String) -> String {
   match math_child(node, pr_tag) {
     Some(pr) =>
       match math_child(pr, prop_tag) {
@@ -155,7 +171,7 @@ fn layout_math_children(
   while i < n {
     let child = children[i]
     let tag = @xml.get_tag(child)
-    if not(tag.is_empty()) && tag != "m:rPr" && tag != "m:ctrlPr" {
+    if !(tag.is_empty()) && tag != "m:rPr" && tag != "m:ctrlPr" {
       boxes.push(layout_math_node(child, fs, ff, color))
     }
     i = i + 1
@@ -247,8 +263,14 @@ fn layout_math_node(
   if tag == "m:bar" {
     return layout_math_bar(node, fs, ff, color)
   }
-  if tag == "m:oMath" || tag == "m:oMathPara" || tag == "m:e" || tag == "m:num" ||
-    tag == "m:den" || tag == "m:sup" || tag == "m:sub" || tag == "m:deg" {
+  if tag == "m:oMath" ||
+    tag == "m:oMathPara" ||
+    tag == "m:e" ||
+    tag == "m:num" ||
+    tag == "m:den" ||
+    tag == "m:sup" ||
+    tag == "m:sub" ||
+    tag == "m:deg" {
     return layout_math_children(node, fs, ff, color)
   }
   // Unknown element: try to lay out children
@@ -357,7 +379,8 @@ fn layout_math_sup(
   let sup_y_clamped = if sup_y < 0.0 { 0.0 } else { sup_y }
   let top_extra = if sup_y < 0.0 { -sup_y } else { 0.0 }
   let total_w = base_box.w + sup_box.w
-  let total_h = if base_box.h + top_extra > sup_y_clamped + sup_box.h + top_extra {
+  let total_h = if base_box.h + top_extra >
+    sup_y_clamped + sup_box.h + top_extra {
     base_box.h + top_extra
   } else {
     sup_y_clamped + sup_box.h + top_extra
@@ -385,7 +408,8 @@ fn layout_math_sub(
     Some(s) => layout_math_children(s, sub_fs, ff, color)
     None => math_empty_box
   }
-  let sub_y = base_box.baseline + base_box.baseline * math_sub_shift_ratio -
+  let sub_y = base_box.baseline +
+    base_box.baseline * math_sub_shift_ratio -
     sub_box.baseline * 0.5
   let total_w = base_box.w + sub_box.w
   let bottom = if sub_y + sub_box.h > base_box.h {
@@ -424,13 +448,16 @@ fn layout_math_subsup(
   let sup_y = base_box.baseline - sup_shift - sup_box.h + sup_box.baseline * 0.5
   let sup_y_clamped = if sup_y < 0.0 { 0.0 } else { sup_y }
   let top_extra = if sup_y < 0.0 { -sup_y } else { 0.0 }
-  let sub_y = base_box.baseline + base_box.baseline * math_sub_shift_ratio -
+  let sub_y = base_box.baseline +
+    base_box.baseline * math_sub_shift_ratio -
     sub_box.baseline * 0.5 +
     top_extra
   let script_w = if sup_box.w > sub_box.w { sup_box.w } else { sub_box.w }
   let total_w = base_box.w + script_w
   let bottom_candidates = [
-    base_box.h + top_extra, sub_y + sub_box.h, sup_y_clamped + sup_box.h,
+    base_box.h + top_extra,
+    sub_y + sub_box.h,
+    sup_y_clamped + sup_box.h,
   ]
   let mut total_h : Double = 0.0
   let mut ci = 0
@@ -465,7 +492,11 @@ fn layout_math_rad(
     match math_child(node, "m:deg") {
       Some(d) => {
         let db = layout_math_children(d, fs * 0.6, ff, color)
-        if db.w > 0.0 { db } else { math_empty_box }
+        if db.w > 0.0 {
+          db
+        } else {
+          math_empty_box
+        }
       }
       None => math_empty_box
     }
@@ -478,7 +509,11 @@ fn layout_math_rad(
   let rad_tail_w = fs * 0.15 // short tail
   let rad_body_w = fs * 0.35 // V-shape width
   let rad_w = rad_tail_w + rad_body_w
-  let deg_offset_x = if deg_box.w > rad_tail_w { deg_box.w - rad_tail_w } else { 0.0 }
+  let deg_offset_x = if deg_box.w > rad_tail_w {
+    deg_box.w - rad_tail_w
+  } else {
+    0.0
+  }
   let total_w = deg_offset_x + rad_w + content_box.w + 2.0
   let vinculum_y = gap
   let content_y = vinculum_y + vinculum_thick
@@ -516,15 +551,9 @@ fn layout_math_rad(
     dts(vinculum_thick) +
     "\"/>"
   // Degree (if present) positioned at top-left
-  let deg_svg = if deg_box.w > 0.0 {
-    math_g(0.0, 0.0, deg_box.svg)
-  } else {
-    ""
-  }
+  let deg_svg = if deg_box.w > 0.0 { math_g(0.0, 0.0, deg_box.svg) } else { "" }
   let content_x = deg_offset_x + rad_w + 1.0
-  let svg = deg_svg +
-    svg_path +
-    math_g(content_x, content_y, content_box.svg)
+  let svg = deg_svg + svg_path + math_g(content_x, content_y, content_box.svg)
   { svg, w: total_w, h: total_h, baseline: content_y + content_box.baseline }
 }
 
@@ -577,7 +606,14 @@ fn layout_math_nary(
     let sub_y = op_y + op_h + 1.0
     let total_h = sub_y + sub_box.h
     let baseline = op_y + op_bl
-    let op_svg = math_text_svg(op_char, (col_w - op_w) / 2.0, op_y + op_bl, op_fs, ff, color)
+    let op_svg = math_text_svg(
+      op_char,
+      (col_w - op_w) / 2.0,
+      op_y + op_bl,
+      op_fs,
+      ff,
+      color,
+    )
     let sup_svg = if sup_box.w > 0.0 {
       math_g((col_w - sup_box.w) / 2.0, sup_y, sup_box.svg)
     } else {
@@ -591,7 +627,10 @@ fn layout_math_nary(
     let content_x = col_w + 2.0
     let content_y = baseline - content_box.baseline
     let total_w = col_w + 2.0 + content_box.w
-    let svg = sup_svg + op_svg + sub_svg + math_g(content_x, content_y, content_box.svg)
+    let svg = sup_svg +
+      op_svg +
+      sub_svg +
+      math_g(content_x, content_y, content_box.svg)
     { svg, w: total_w, h: total_h, baseline }
   } else {
     // Sub/sup style (limits as sub/superscript of operator)
@@ -621,7 +660,15 @@ fn layout_math_nary(
     let svg = op_svg +
       sup_svg +
       sub_svg +
-      math_g(content_x, if content_y > 0.0 { content_y } else { 0.0 }, content_box.svg)
+      math_g(
+        content_x,
+        if content_y > 0.0 {
+          content_y
+        } else {
+          0.0
+        },
+        content_box.svg,
+      )
     { svg, w: total_w, h: total_h, baseline }
   }
 }
@@ -689,11 +736,14 @@ fn layout_math_delim(
   let total_w = beg_w + content.w + end_w
   let total_h = content.h
   let baseline = content.baseline
-  let beg_svg = math_text_svg(
-    beg_chr_val, 0.0, baseline, delim_fs, ff, color,
-  )
+  let beg_svg = math_text_svg(beg_chr_val, 0.0, baseline, delim_fs, ff, color)
   let end_svg = math_text_svg(
-    end_chr_val, beg_w + content.w, baseline, delim_fs, ff, color,
+    end_chr_val,
+    beg_w + content.w,
+    baseline,
+    delim_fs,
+    ff,
+    color,
   )
   let svg = beg_svg + math_g(beg_w, 0.0, content.svg) + end_svg
   { svg, w: total_w, h: total_h, baseline }
@@ -768,12 +818,7 @@ fn layout_math_acc(
       dts(line_thick) +
       "\"/>" +
       math_g(0.0, content_y, content_box.svg)
-    return {
-      svg,
-      w: content_box.w,
-      h: total_h,
-      baseline,
-    }
+    return { svg, w: content_box.w, h: total_h, baseline }
   }
   // Draw common accents as SVG paths for precise positioning.
   // SVG <text> y is the baseline, causing glyphs to float above — paths are more reliable.
@@ -792,11 +837,21 @@ fn layout_math_acc(
     let content_y = peak_h + acc_gap2
     let total_h = content_y + content_box.h
     let baseline = content_y + content_box.baseline
-    let svg = "<path d=\"M " + dts(cx - half_w) + " " + dts(peak_h) +
-      " L " + dts(cx) + " 0" +
-      " L " + dts(cx + half_w) + " " + dts(peak_h) +
-      "\" fill=\"none\" stroke=\"" + color +
-      "\" stroke-width=\"" + dts(acc_thick) +
+    let svg = "<path d=\"M " +
+      dts(cx - half_w) +
+      " " +
+      dts(peak_h) +
+      " L " +
+      dts(cx) +
+      " 0" +
+      " L " +
+      dts(cx + half_w) +
+      " " +
+      dts(peak_h) +
+      "\" fill=\"none\" stroke=\"" +
+      color +
+      "\" stroke-width=\"" +
+      dts(acc_thick) +
       "\" stroke-linejoin=\"miter\"/>" +
       math_g(0.0, content_y, content_box.svg)
     return { svg, w: cw, h: total_h, baseline }
@@ -809,13 +864,31 @@ fn layout_math_acc(
     let content_y = wave_h * 2.0 + acc_gap2
     let total_h = content_y + content_box.h
     let baseline = content_y + content_box.baseline
-    let svg = "<path d=\"M " + dts(cx - cw * 0.25) + " " + dts(wave_h * 1.5) +
-      " Q " + dts(cx - cw * 0.1) + " " + dts(wave_h * 0.3) +
-      " " + dts(cx) + " " + dts(wave_h) +
-      " Q " + dts(cx + cw * 0.1) + " " + dts(wave_h * 1.7) +
-      " " + dts(cx + cw * 0.25) + " " + dts(wave_h * 0.5) +
-      "\" fill=\"none\" stroke=\"" + color +
-      "\" stroke-width=\"" + dts(acc_thick) + "\"/>" +
+    let svg = "<path d=\"M " +
+      dts(cx - cw * 0.25) +
+      " " +
+      dts(wave_h * 1.5) +
+      " Q " +
+      dts(cx - cw * 0.1) +
+      " " +
+      dts(wave_h * 0.3) +
+      " " +
+      dts(cx) +
+      " " +
+      dts(wave_h) +
+      " Q " +
+      dts(cx + cw * 0.1) +
+      " " +
+      dts(wave_h * 1.7) +
+      " " +
+      dts(cx + cw * 0.25) +
+      " " +
+      dts(wave_h * 0.5) +
+      "\" fill=\"none\" stroke=\"" +
+      color +
+      "\" stroke-width=\"" +
+      dts(acc_thick) +
+      "\"/>" +
       math_g(0.0, content_y, content_box.svg)
     return { svg, w: cw, h: total_h, baseline }
   }
@@ -826,10 +899,15 @@ fn layout_math_acc(
     let content_y = dot_r * 2.0 + acc_gap2
     let total_h = content_y + content_box.h
     let baseline = content_y + content_box.baseline
-    let svg = "<circle cx=\"" + dts(cw / 2.0) +
-      "\" cy=\"" + dts(dot_r) +
-      "\" r=\"" + dts(dot_r) +
-      "\" fill=\"" + color + "\"/>" +
+    let svg = "<circle cx=\"" +
+      dts(cw / 2.0) +
+      "\" cy=\"" +
+      dts(dot_r) +
+      "\" r=\"" +
+      dts(dot_r) +
+      "\" fill=\"" +
+      color +
+      "\"/>" +
       math_g(0.0, content_y, content_box.svg)
     return { svg, w: cw, h: total_h, baseline }
   }
@@ -841,14 +919,24 @@ fn layout_math_acc(
     let content_y = dot_r * 2.0 + acc_gap2
     let total_h = content_y + content_box.h
     let baseline = content_y + content_box.baseline
-    let svg = "<circle cx=\"" + dts(cw / 2.0 - dot_spacing) +
-      "\" cy=\"" + dts(dot_r) +
-      "\" r=\"" + dts(dot_r) +
-      "\" fill=\"" + color + "\"/>" +
-      "<circle cx=\"" + dts(cw / 2.0 + dot_spacing) +
-      "\" cy=\"" + dts(dot_r) +
-      "\" r=\"" + dts(dot_r) +
-      "\" fill=\"" + color + "\"/>" +
+    let svg = "<circle cx=\"" +
+      dts(cw / 2.0 - dot_spacing) +
+      "\" cy=\"" +
+      dts(dot_r) +
+      "\" r=\"" +
+      dts(dot_r) +
+      "\" fill=\"" +
+      color +
+      "\"/>" +
+      "<circle cx=\"" +
+      dts(cw / 2.0 + dot_spacing) +
+      "\" cy=\"" +
+      dts(dot_r) +
+      "\" r=\"" +
+      dts(dot_r) +
+      "\" fill=\"" +
+      color +
+      "\"/>" +
       math_g(0.0, content_y, content_box.svg)
     return { svg, w: cw, h: total_h, baseline }
   }
@@ -859,9 +947,7 @@ fn layout_math_acc(
   let total_h = acc_region + content_box.h
   let baseline = acc_region + content_box.baseline
   let acc_x = (content_box.w - acc_w) / 2.0
-  let acc_svg = math_text_svg(
-    display_acc, acc_x, acc_region, acc_fs, ff, color,
-  )
+  let acc_svg = math_text_svg(display_acc, acc_x, acc_region, acc_fs, ff, color)
   let svg = acc_svg + math_g(0.0, acc_region, content_box.svg)
   { svg, w: content_box.w, h: total_h, baseline }
 }
@@ -1051,7 +1137,7 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
       let run = para.runs[j]
       if run.math_xml.length() > 0 {
         has_math = true
-      } else if not(run.text.is_empty()) {
+      } else if !(run.text.is_empty()) {
         // Non-empty text run without math → mixed content
         // Allow whitespace-only runs
         let mut all_ws = true
@@ -1067,7 +1153,7 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
           }
           k = k + 1
         }
-        if not(all_ws) {
+        if !(all_ws) {
           return false
         }
       }
@@ -1106,7 +1192,7 @@ fn render_math_text(
       let run = para.runs[j]
       if run.math_xml.length() > 0 {
         all_math_xml = run.math_xml
-        if not(found_first) {
+        if !(found_first) {
           first_run_color = run.color
           first_run_fs = run.font_size
           first_run_font = run.font_face
@@ -1134,7 +1220,7 @@ fn render_math_text(
     default_text_fill
   }
   // Font family
-  let ff = if not(first_run_font.is_empty()) {
+  let ff = if !(first_run_font.is_empty()) {
     first_run_font + ", " + math_font_family
   } else {
     math_font_family
@@ -1165,8 +1251,12 @@ fn render_math_text(
   let shape_y = px(t.y, scale).to_double()
   let shape_w = px(t.cx, scale).to_double()
   let shape_h = px(t.cy, scale).to_double()
-  let avail_w = shape_w - px(l_ins, scale).to_double() - px(r_ins, scale).to_double()
-  let avail_h = shape_h - px(t_ins, scale).to_double() - px(b_ins, scale).to_double()
+  let avail_w = shape_w -
+    px(l_ins, scale).to_double() -
+    px(r_ins, scale).to_double()
+  let avail_h = shape_h -
+    px(t_ins, scale).to_double() -
+    px(b_ins, scale).to_double()
   // Center horizontally within available area
   let math_x = shape_x +
     px(l_ins, scale).to_double() +

@@ -1457,7 +1457,9 @@ fn get_preset_text_rect(prst : String) -> String {
     "l t chx b"
   } else if prst == "star4" {
     "x1 y1 x2 y2"
-  } else if prst == "star5" || prst == "star6" || prst == "star8" ||
+  } else if prst == "star5" ||
+    prst == "star6" ||
+    prst == "star8" ||
     prst == "star10" ||
     prst == "star12" ||
     prst == "star16" ||
@@ -1636,7 +1638,9 @@ fn compute_custom_text_rect(
   cx_p : Int,
   cy_p : Int,
 ) -> (Int, Int, Int, Int) {
-  if data.rect_l.is_empty() && data.rect_t.is_empty() && data.rect_r.is_empty() &&
+  if data.rect_l.is_empty() &&
+    data.rect_t.is_empty() &&
+    data.rect_r.is_empty() &&
     data.rect_b.is_empty() {
     return (0, 0, cx_p, cy_p)
   }
