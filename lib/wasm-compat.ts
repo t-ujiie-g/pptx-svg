@@ -1,9 +1,10 @@
 /**
  * Wasm js-string builtins compatibility layer.
  *
- * Provides 3-tier fallback for instantiating MoonBit Wasm modules
+ * Provides 4-tier fallback for instantiating MoonBit Wasm modules
  * that use `use-js-builtin-string: true`:
  *   - Tier 1: Native `{ builtins: ['js-string'] }` (Chrome 117+, FF 120+, Safari 17+)
+ *   - Tier 1b: `{ builtins: ['js-string'] }` + manual '_' module as plain strings (Node.js 22+)
  *   - Tier 2: `{ importedStringConstants: '_' }` + manual wasm:js-string (Chrome 115-116)
  *   - Tier 3: Fully manual Global(externref) for '_' module (Chrome 111+)
  */
@@ -73,11 +74,25 @@ export function parseWasmStringConstants(buffer: ArrayBuffer): string[] {
 
 /**
  * Build the '_' import module as WebAssembly.Global(externref) objects.
+ * Used for Tier 3 fallback in browsers (Chrome 111+).
  */
 function makeUnderscoreModule(constants: string[]): Record<string, WebAssembly.Global> {
   const mod: Record<string, WebAssembly.Global> = {};
   for (const s of constants) {
     mod[s] = new WebAssembly.Global({ value: 'externref', mutable: false }, s);
+  }
+  return mod;
+}
+
+/**
+ * Build the '_' import module as plain string values.
+ * Used for Tier 1b fallback (Node.js 22+ where builtins works but
+ * importedStringConstants does not automatically resolve '_' module).
+ */
+function makeUnderscoreModulePlain(constants: string[]): Record<string, string> {
+  const mod: Record<string, string> = {};
+  for (const s of constants) {
+    mod[s] = s;
   }
   return mod;
 }
@@ -99,44 +114,57 @@ export async function instantiateWasmWithFallback(
   const stringConstants = parseWasmStringConstants(bytes);
   l.debug(`Parsed ${stringConstants.length} string constants from Wasm binary`);
 
-  // Tier 1: modern builtins
+  // Tier 1: modern builtins (browser with full js-string + importedStringConstants support)
   try {
     const r = await (WebAssembly as any).instantiate(bytes, importObject, { builtins: ['js-string'] });
     l.info('Wasm init: tier-1 (js-string builtins)');
     return r;
   } catch (e1: any) {
-    l.info('Tier-1 failed:', e1.message, '— trying tier-2');
+    l.info('Tier-1 failed:', e1.message, '— trying tier-1b');
 
-    // Tier 2: importedStringConstants + manual wasm:js-string
-    const imports2 = { ...importObject, 'wasm:js-string': JS_STRING_MODULE };
+    // Tier 1b: builtins + manual '_' module as plain strings (Node.js 22+)
+    // Node.js supports builtins:['js-string'] but does not auto-resolve '_' module,
+    // and requires plain string values instead of Global(externref).
+    const imports1b = { ...importObject, '_': makeUnderscoreModulePlain(stringConstants) };
     try {
-      const r = await (WebAssembly as any).instantiate(
-        bytes, imports2, { importedStringConstants: '_' },
-      );
-      l.info('Wasm init: tier-2 (importedStringConstants)');
+      const r = await (WebAssembly as any).instantiate(bytes, imports1b, { builtins: ['js-string'] });
+      l.info('Wasm init: tier-1b (js-string builtins + manual string constants)');
       return r;
-    } catch (e2: any) {
-      l.info('Tier-2 failed:', e2.message, '— trying tier-3');
+    } catch (e1b: any) {
+      l.info('Tier-1b failed:', e1b.message, '— trying tier-2');
 
-      // Tier 3: fully manual (any wasm-gc browser, Chrome 111+)
-      const imports3 = {
-        ...importObject,
-        'wasm:js-string': JS_STRING_MODULE,
-        '_': makeUnderscoreModule(stringConstants),
-      };
+      // Tier 2: importedStringConstants + manual wasm:js-string (Chrome 115-116)
+      const imports2 = { ...importObject, 'wasm:js-string': JS_STRING_MODULE };
       try {
-        const r = await WebAssembly.instantiate(bytes, imports3);
-        l.info('Wasm init: tier-3 (full manual)');
-        return r;
-      } catch (e3: any) {
-        l.error('All instantiation tiers failed.');
-        l.error('  Tier-1:', e1.message);
-        l.error('  Tier-2:', e2.message);
-        l.error('  Tier-3:', e3.message);
-        throw new Error(
-          `Wasm init failed — browser may not support WebAssembly GC (Chrome 111+). ` +
-          `Tier-3 error: ${e3.message}`,
+        const r = await (WebAssembly as any).instantiate(
+          bytes, imports2, { importedStringConstants: '_' },
         );
+        l.info('Wasm init: tier-2 (importedStringConstants)');
+        return r;
+      } catch (e2: any) {
+        l.info('Tier-2 failed:', e2.message, '— trying tier-3');
+
+        // Tier 3: fully manual (any wasm-gc browser, Chrome 111+)
+        const imports3 = {
+          ...importObject,
+          'wasm:js-string': JS_STRING_MODULE,
+          '_': makeUnderscoreModule(stringConstants),
+        };
+        try {
+          const r = await WebAssembly.instantiate(bytes, imports3);
+          l.info('Wasm init: tier-3 (full manual)');
+          return r;
+        } catch (e3: any) {
+          l.error('All instantiation tiers failed.');
+          l.error('  Tier-1:', e1.message);
+          l.error('  Tier-1b:', e1b.message);
+          l.error('  Tier-2:', e2.message);
+          l.error('  Tier-3:', e3.message);
+          throw new Error(
+            `Wasm init failed — requires WebAssembly GC support (Chrome 111+, Node.js 22+). ` +
+            `Tier-3 error: ${e3.message}`,
+          );
+        }
       }
     }
   }

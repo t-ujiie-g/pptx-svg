@@ -18,25 +18,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm ci
 
       - name: MoonBit unit tests
-        run: NODE_OPTIONS='--require ./test_fixtures/ffi_stub.js' moon test --target js
+        run: npm run test:moon
 
-      - name: Build Wasm
-        run: moon build --target wasm-gc --release
+      - name: Build
+        run: npm run build
 
-      - name: Build TypeScript
-        run: npx tsc
-
-      - name: Copy Wasm to dist
-        run: cp _build/wasm-gc/release/build/main/main.wasm dist/main.wasm
-
-      - name: Run Node.js tests
-        run: node test_fixtures/test_node.mjs
-
-      - name: Run editing helper tests
-        run: node test_fixtures/test_editing_helpers.mjs
+      - name: Node.js integration tests
+        run: npm run test:node
