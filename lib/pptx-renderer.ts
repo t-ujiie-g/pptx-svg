@@ -152,18 +152,33 @@ export class PptxRenderer {
    * automatically via `import.meta.url` resolution. This works with
    * Vite, webpack, Rollup, and CDN imports (unpkg, jsdelivr).
    *
-   * @param wasmSource - Optional URL string or ArrayBuffer of .wasm bytes.
+   * In Node.js, pass an ArrayBuffer (e.g. from `fs.readFileSync(path).buffer`)
+   * or a file:// URL / http(s):// URL string.
+   *
+   * @param wasmSource - Optional URL string, file path (Node.js), or ArrayBuffer of .wasm bytes.
    *                     If omitted, the bundled Wasm is used.
    */
-  async init(wasmSource?: string | ArrayBuffer): Promise<void> {
+  async init(wasmSource?: string | ArrayBuffer | Uint8Array): Promise<void> {
     let bytes: ArrayBuffer;
     if (wasmSource instanceof ArrayBuffer) {
       bytes = wasmSource;
+    } else if (wasmSource instanceof Uint8Array) {
+      // Accept Uint8Array (common in Node.js: fs.readFileSync returns Buffer which extends Uint8Array)
+      bytes = wasmSource.buffer.slice(wasmSource.byteOffset, wasmSource.byteOffset + wasmSource.byteLength) as ArrayBuffer;
     } else {
       const url = wasmSource ?? DEFAULT_WASM_URL;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
-      bytes = await response.arrayBuffer();
+      if (typeof globalThis.fetch === 'function') {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
+        bytes = await response.arrayBuffer();
+      } else {
+        // Node.js without global fetch (< 18) — dynamic import fs
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval
+        const fsModule = 'node:' + 'fs'; // prevent bundlers from resolving
+        const fs = await (Function('m', 'return import(m)')(fsModule)) as any;
+        const buf: Uint8Array = fs.readFileSync(url);
+        bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+      }
     }
 
     const result = await instantiateWasmWithFallback(bytes, this.buildImportObject(), this.log);

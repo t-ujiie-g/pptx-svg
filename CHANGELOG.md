@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+### Features
+
+- **Node.js 22+ support** — `PptxRenderer` now works on Node.js (server-side) in addition to browsers. WasmGC + js-string builtins are natively supported on Node.js 22+
+- `init()` now accepts `Uint8Array` / Node.js `Buffer` directly (in addition to `ArrayBuffer` and URL string)
+- 4-tier Wasm instantiation fallback in `wasm-compat.ts` (added tier-1b for Node.js)
+
+### Breaking Changes
+
+- Minimum Node.js version raised from 18 to 22 (required for WebAssembly GC support)
+
 ## 0.4.5
 
 ### Features

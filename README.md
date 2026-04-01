@@ -1,6 +1,6 @@
 # pptx-svg
 
-PPTX and SVG round-trip conversion library. Runs entirely in the browser with zero dependencies.
+PPTX and SVG round-trip conversion library. Runs in the browser and Node.js with zero dependencies.
 - [Demo Site for GitHub Pages](https://t-ujiie-g.github.io/pptx-svg/)
 
 [Japanese / 日本語](README.ja.md)
@@ -9,9 +9,9 @@ PPTX and SVG round-trip conversion library. Runs entirely in the browser with ze
 
 - **PPTX to SVG**: Convert PowerPoint slides to high-quality SVG
 - **SVG to PPTX**: Edit SVG and export back to a valid .pptx file (lossless round-trip)
-- **Browser-native**: No server required. ZIP, OOXML parsing, SVG generation all run client-side
+- **Browser & Node.js**: Runs client-side with no server, or server-side on Node.js 22+
 - **Zero dependencies**: About 230KB Wasm binary, no npm dependencies
-- **Framework-agnostic**: Works with React, Vue, Svelte, vanilla JS, or any framework
+- **Framework-agnostic**: Works with React, Vue, Svelte, vanilla JS, Express, or any framework
 
 ## Install
 
@@ -32,6 +32,25 @@ await renderer.loadPptx(await file.arrayBuffer());
 
 const svgString = renderer.renderSlideSvg(0); // Slide 1 as SVG
 document.getElementById('viewer').innerHTML = svgString;
+```
+
+### Node.js
+
+```ts
+import { readFileSync } from 'node:fs';
+import { PptxRenderer } from 'pptx-svg';
+
+const renderer = new PptxRenderer();
+const wasmBytes = readFileSync('node_modules/pptx-svg/dist/main.wasm');
+await renderer.init(wasmBytes);  // Accepts Buffer / Uint8Array directly
+
+const pptxBytes = readFileSync('presentation.pptx');
+const pptxBuffer = pptxBytes.buffer.slice(
+  pptxBytes.byteOffset, pptxBytes.byteOffset + pptxBytes.byteLength
+);
+await renderer.loadPptx(pptxBuffer);
+
+const svgString = renderer.renderSlideSvg(0);
 ```
 
 ### React
@@ -95,7 +114,7 @@ const renderer = new PptxRenderer(options?);
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `init(wasmSource?)` | `Promise<void>` | Load the Wasm module. No arguments needed (auto-resolved). Pass URL or ArrayBuffer to override. |
+| `init(wasmSource?)` | `Promise<void>` | Load the Wasm module. No arguments needed in browsers (auto-resolved). Pass URL, ArrayBuffer, or Uint8Array/Buffer (Node.js) to override. |
 | `loadPptx(buffer)` | `Promise<{ slideCount }>` | Load a PPTX file from ArrayBuffer. |
 | `getSlideCount()` | `number` | Number of slides. |
 | `isSlideHidden(idx)` | `boolean` | Check if a slide is hidden (`show="0"`). |
@@ -199,7 +218,7 @@ The generated SVG embeds `data-ooxml-*` attributes that preserve all OOXML metad
 ## Architecture
 
 ```
-[Browser]
+[Browser / Node.js 22+]
   PptxRenderer (TypeScript)
     ├── ZIP extraction (DecompressionStream)
     ├── ZIP building (CompressionStream + CRC-32)
@@ -216,7 +235,7 @@ The generated SVG embeds `data-ooxml-*` attributes that preserve all OOXML metad
 ### Prerequisites
 
 - [MoonBit toolchain](https://moonbitlang.com/download/)
-- Node.js 18+
+- Node.js 22+
 
 ### Build
 
