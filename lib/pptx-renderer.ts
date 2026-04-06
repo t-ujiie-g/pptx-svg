@@ -102,6 +102,27 @@ function createLogger(level: LogLevel): Logger {
 /** Default Wasm URL resolved relative to this module. */
 const DEFAULT_WASM_URL = new URL('./main.wasm', import.meta.url).href;
 
+// ── OOXML constants ──────────────────────────────────────────────────────────
+
+const RELS_XMLNS = 'http://schemas.openxmlformats.org/package/2006/relationships';
+const REL_TYPE_SLIDE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide';
+const REL_TYPE_SLIDE_LAYOUT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout';
+const CONTENT_TYPE_SLIDE = 'application/vnd.openxmlformats-officedocument.presentationml.slide+xml';
+const NS_DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const NS_RELS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const NS_PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+
+/** Default slide size: 10" x 7.5" (standard widescreen 16:9 not — this is 4:3) */
+const DEFAULT_SLIDE_CX = 9144000;
+const DEFAULT_SLIDE_CY = 5143500;
+
+/** First slide ID used in presentation.xml sldIdLst (OOXML convention). */
+const FIRST_SLIDE_ID = 256;
+
+/** Regex patterns for slide file paths. */
+const RE_SLIDE_FILE = /^ppt\/slides\/slide\d+\.xml$/;
+const RE_SLIDE_RELS_FILE = /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/;
+
 export class PptxRenderer {
   private wasm: WebAssembly.Instance | null = null;
 
@@ -113,6 +134,12 @@ export class PptxRenderer {
 
   /** Original PPTX bytes for export */
   private originalBuffer: ArrayBuffer | null = null;
+
+  /** Files added after loadPptx (not in original ZIP) */
+  private addedFiles = new Map<string, string>();
+
+  /** Files removed after loadPptx */
+  private removedFiles = new Set<string>();
 
   /** Canvas for text measurement (lazily created) */
   private canvas: HTMLCanvasElement | null = null;
@@ -194,6 +221,8 @@ export class PptxRenderer {
       throw new Error('Wasm not initialized — wait for init() to complete before loading files.');
     }
     this.originalBuffer = arrayBuffer.slice(0); // keep a copy for export
+    this.addedFiles.clear();
+    this.removedFiles.clear();
     this.log.debug('Parsing ZIP archive...');
     const { textFiles, binaryFiles } = await extractZip(arrayBuffer, this.log);
     this.files = textFiles;
@@ -278,8 +307,15 @@ export class PptxRenderer {
       }
     }
 
-    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries`);
-    return buildZip(this.originalBuffer, modifications);
+    // Merge in files added/modified by slide operations
+    for (const [path, content] of this.addedFiles) {
+      if (!modifications.has(path)) {
+        modifications.set(path, content);
+      }
+    }
+
+    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries, ${this.removedFiles.size} removals`);
+    return buildZip(this.originalBuffer, modifications, this.removedFiles.size > 0 ? this.removedFiles : undefined);
   }
 
   // ── Notes & Comments API ──────────────────────────────────────────────────
@@ -353,6 +389,471 @@ export class PptxRenderer {
   updateShapeFill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string {
     return this.exports.update_shape_fill(slideIdx, shapeIdx, r, g, b);
+  }
+
+  // ── Slide management API ────────────────────────────────────────────────────
+
+  /**
+   * Add a blank slide at the specified position (0-indexed).
+   * If `afterIdx` is omitted, the slide is appended at the end.
+   * If `sourceSlideIdx` is provided, the new slide copies that slide's layout.
+   *
+   * @param afterIdx - Insert after this slide index (0-indexed). Use -1 to insert at the beginning.
+   * @param sourceSlideIdx - Copy layout from this slide (0-indexed). Defaults to last slide.
+   * @returns Object with the new slide count and the index of the inserted slide.
+   */
+  async addSlide(afterIdx?: number, sourceSlideIdx?: number): Promise<{ slideCount: number; insertedIdx: number }> {
+    if (!this.wasm) throw new Error('Not initialized — call init() and loadPptx() first.');
+
+    const oldCount = this.exports.get_slide_count();
+    if (oldCount === 0) throw new Error('No presentation loaded.');
+
+    // Determine insert position
+    const insertIdx = afterIdx === undefined ? oldCount : afterIdx + 1;
+    if (insertIdx < 0 || insertIdx > oldCount) {
+      throw new Error(`Invalid insert position: ${insertIdx}`);
+    }
+
+    // Determine source layout info
+    const srcIdx = sourceSlideIdx ?? Math.max(0, oldCount - 1);
+    const srcRelsPath = `ppt/slides/_rels/slide${srcIdx + 1}.xml.rels`;
+    const srcRelsXml = this.files.get(srcRelsPath) ?? '';
+    const layoutTarget = this.extractRelTarget(srcRelsXml, '/slideLayout');
+
+    // Collect all current slide contents (path → xml) for renumbering
+    const slideContents: string[] = [];       // slide XML at index i
+    const slideRels: string[] = [];           // slide .rels at index i
+    for (let i = 0; i < oldCount; i++) {
+      slideContents.push(this.files.get(`ppt/slides/slide${i + 1}.xml`) ?? '');
+      slideRels.push(this.files.get(`ppt/slides/_rels/slide${i + 1}.xml.rels`) ?? '');
+    }
+
+    // Create blank slide XML
+    const slideSize = this.extractSlideSize();
+    const blankSlideXml = this.createBlankSlideXml(slideSize.cx, slideSize.cy);
+
+    // Create .rels for new slide pointing to its layout
+    const blankRels = layoutTarget
+      ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${RELS_XMLNS}"><Relationship Id="rId1" Type="${REL_TYPE_SLIDE_LAYOUT}" Target="${layoutTarget}"/></Relationships>`
+      : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${RELS_XMLNS}"></Relationships>`;
+
+    // Insert into arrays
+    slideContents.splice(insertIdx, 0, blankSlideXml);
+    slideRels.splice(insertIdx, 0, blankRels);
+
+    const newCount = oldCount + 1;
+
+    // Write back all slides with correct numbering
+    this.rewriteSlideFiles(slideContents, slideRels, newCount);
+
+    // Update presentation.xml
+    this.updatePresentationXmlForAdd(insertIdx, newCount);
+
+    // Update [Content_Types].xml if needed
+    this.ensureContentTypeForSlide(newCount);
+
+    // Re-initialize Wasm
+    this.reinitializeWasm();
+
+    return { slideCount: newCount, insertedIdx: insertIdx };
+  }
+
+  /**
+   * Delete a slide at the specified index (0-indexed).
+   * At least one slide must remain.
+   *
+   * @param slideIdx - The 0-indexed slide to delete.
+   * @returns Object with the new slide count.
+   */
+  async deleteSlide(slideIdx: number): Promise<{ slideCount: number }> {
+    if (!this.wasm) throw new Error('Not initialized — call init() and loadPptx() first.');
+
+    const oldCount = this.exports.get_slide_count();
+    if (oldCount <= 1) throw new Error('Cannot delete the last remaining slide.');
+    if (slideIdx < 0 || slideIdx >= oldCount) {
+      throw new Error(`Slide index out of range: ${slideIdx}`);
+    }
+
+    // Collect current slides
+    const slideContents: string[] = [];
+    const slideRels: string[] = [];
+    for (let i = 0; i < oldCount; i++) {
+      slideContents.push(this.files.get(`ppt/slides/slide${i + 1}.xml`) ?? '');
+      slideRels.push(this.files.get(`ppt/slides/_rels/slide${i + 1}.xml.rels`) ?? '');
+    }
+
+    // Remove the slide at slideIdx
+    slideContents.splice(slideIdx, 1);
+    slideRels.splice(slideIdx, 1);
+
+    const newCount = oldCount - 1;
+
+    // Mark old highest-numbered files for removal (in case they persist)
+    const oldPath = `ppt/slides/slide${oldCount}.xml`;
+    const oldRelsPath = `ppt/slides/_rels/slide${oldCount}.xml.rels`;
+    this.removedFiles.add(oldPath);
+    this.removedFiles.add(oldRelsPath);
+
+    // Write back all slides with correct numbering
+    this.rewriteSlideFiles(slideContents, slideRels, newCount);
+
+    // Update presentation.xml
+    this.updatePresentationXmlForDelete(slideIdx);
+
+    // Re-initialize Wasm
+    this.reinitializeWasm();
+
+    return { slideCount: newCount };
+  }
+
+  /**
+   * Reorder slides according to the given index mapping.
+   *
+   * @param newOrder - Array where newOrder[i] is the old index of the slide that should appear at position i.
+   *                   Must be a permutation of [0, 1, ..., slideCount-1].
+   * @returns Object with the slide count (unchanged).
+   */
+  async reorderSlides(newOrder: number[]): Promise<{ slideCount: number }> {
+    if (!this.wasm) throw new Error('Not initialized — call init() and loadPptx() first.');
+
+    const count = this.exports.get_slide_count();
+    if (newOrder.length !== count) {
+      throw new Error(`newOrder length (${newOrder.length}) must equal slide count (${count}).`);
+    }
+
+    // Validate permutation
+    const seen = new Set<number>();
+    for (const idx of newOrder) {
+      if (idx < 0 || idx >= count || seen.has(idx)) {
+        throw new Error(`Invalid permutation: ${JSON.stringify(newOrder)}`);
+      }
+      seen.add(idx);
+    }
+
+    // Collect current slides
+    const slideContents: string[] = [];
+    const slideRels: string[] = [];
+    for (let i = 0; i < count; i++) {
+      slideContents.push(this.files.get(`ppt/slides/slide${i + 1}.xml`) ?? '');
+      slideRels.push(this.files.get(`ppt/slides/_rels/slide${i + 1}.xml.rels`) ?? '');
+    }
+
+    // Reorder
+    const reordered: string[] = newOrder.map(i => slideContents[i]);
+    const reorderedRels: string[] = newOrder.map(i => slideRels[i]);
+
+    // Write back
+    this.rewriteSlideFiles(reordered, reorderedRels, count);
+
+    // Reorder sldId entries in presentation.xml
+    this.updatePresentationXmlForReorder(newOrder);
+
+    // Re-initialize Wasm
+    this.reinitializeWasm();
+
+    return { slideCount: count };
+  }
+
+  // ── Slide management helpers ─────────────────────────────────────────────
+
+  /** Rewrite slide files in the files map with correct 1..N numbering. */
+  private rewriteSlideFiles(contents: string[], rels: string[], count: number): void {
+    // Remove all old slide files first
+    for (const key of [...this.files.keys()]) {
+      if (RE_SLIDE_FILE.test(key) || RE_SLIDE_RELS_FILE.test(key)) {
+        this.files.delete(key);
+      }
+    }
+
+    // Write new files
+    for (let i = 0; i < count; i++) {
+      const num = i + 1;
+      this.persistFile(`ppt/slides/slide${num}.xml`, contents[i]);
+      this.persistFile(`ppt/slides/_rels/slide${num}.xml.rels`, rels[i]);
+    }
+  }
+
+  /** Extract a relationship target from .rels XML by type suffix. */
+  private extractRelTarget(relsXml: string, typeSuffix: string): string | null {
+    const re = new RegExp(`<Relationship[^>]+Type="[^"]*${typeSuffix}"[^>]+Target="([^"]+)"`);
+    const m = relsXml.match(re);
+    if (m) return m[1];
+    // Try reversed attr order
+    const re2 = new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Type="[^"]*${typeSuffix}"`);
+    const m2 = relsXml.match(re2);
+    return m2 ? m2[1] : null;
+  }
+
+  /** Extract slide size from presentation.xml. */
+  private extractSlideSize(): { cx: number; cy: number } {
+    const prsXml = this.files.get('ppt/presentation.xml') ?? '';
+    const m = prsXml.match(/<p:sldSz[^>]+cx="(\d+)"[^>]+cy="(\d+)"/);
+    if (m) return { cx: parseInt(m[1]), cy: parseInt(m[2]) };
+    return { cx: DEFAULT_SLIDE_CX, cy: DEFAULT_SLIDE_CY };
+  }
+
+  /** Create minimal blank slide XML. */
+  private createBlankSlideXml(cx: number, cy: number): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<p:sld xmlns:a="${NS_DRAWINGML}" xmlns:r="${NS_RELS}" xmlns:p="${NS_PRESENTATIONML}">` +
+      `<p:cSld><p:spTree>` +
+      `<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>` +
+      `<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm></p:grpSpPr>` +
+      `</p:spTree></p:cSld></p:sld>`;
+  }
+
+  /** Find the next available sldId in presentation.xml. */
+  private findNextSlideId(prsXml: string): number {
+    const ids: number[] = [];
+    const re = /id="(\d+)"/g;
+    // Only look inside sldIdLst
+    const sldListMatch = prsXml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/);
+    if (sldListMatch) {
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(sldListMatch[1])) !== null) {
+        ids.push(parseInt(m[1]));
+      }
+    }
+    return ids.length > 0 ? Math.max(...ids) + 1 : FIRST_SLIDE_ID;
+  }
+
+  /** Find the next available rId in presentation.xml.rels. */
+  private findNextRId(relsXml: string): string {
+    const ids: number[] = [];
+    const re = /Id="rId(\d+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(relsXml)) !== null) {
+      ids.push(parseInt(m[1]));
+    }
+    const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    return `rId${next}`;
+  }
+
+  /** Update presentation.xml and .rels for slide addition. */
+  private updatePresentationXmlForAdd(insertIdx: number, newCount: number): void {
+    let prsXml = this.files.get('ppt/presentation.xml') ?? '';
+    let prsRels = this.files.get('ppt/_rels/presentation.xml.rels') ?? '';
+
+    const newSlideNum = insertIdx + 1;
+    const newRId = this.findNextRId(prsRels);
+    const newSldId = this.findNextSlideId(prsXml);
+
+    // Add relationship for new slide
+    const newRelEntry = `<Relationship Id="${newRId}" Type="${REL_TYPE_SLIDE}" Target="slides/slide${newSlideNum}.xml"/>`;
+    prsRels = prsRels.replace('</Relationships>', newRelEntry + '</Relationships>');
+
+    // Update existing slide relationship targets (renumber slides after insertIdx)
+    // First, collect existing slide rId → target mappings
+    const slideRIdMap = this.parseSlideRelationships(prsRels);
+
+    // Renumber: slides after insertIdx shift by +1
+    for (const [rId, target] of slideRIdMap) {
+      const m = target.match(/^slides\/slide(\d+)\.xml$/);
+      if (m) {
+        const num = parseInt(m[1]);
+        if (num >= newSlideNum && rId !== newRId) {
+          const newTarget = `slides/slide${num + 1}.xml`;
+          prsRels = prsRels.replace(
+            new RegExp(`(<Relationship[^>]+Id="${rId}"[^>]+Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+            `$1${newTarget}"`
+          );
+          // Try reversed order too
+          prsRels = prsRels.replace(
+            new RegExp(`(<Relationship[^>]+Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"([^>]+Id="${rId}")`),
+            `$1${newTarget}"$2`
+          );
+        }
+      }
+    }
+
+    // Add sldId entry to presentation.xml
+    const newSldIdEntry = `<p:sldId id="${newSldId}" r:id="${newRId}"/>`;
+
+    if (insertIdx === 0) {
+      // Insert at the beginning of sldIdLst
+      prsXml = prsXml.replace('<p:sldIdLst>', `<p:sldIdLst>${newSldIdEntry}`);
+    } else {
+      // Insert after the insertIdx-1 th sldId entry
+      const sldIdEntries = this.parseSldIdEntries(prsXml);
+      if (insertIdx <= sldIdEntries.length) {
+        const afterEntry = sldIdEntries[insertIdx - 1];
+        prsXml = prsXml.replace(afterEntry, afterEntry + newSldIdEntry);
+      } else {
+        // Append at end
+        prsXml = prsXml.replace('</p:sldIdLst>', newSldIdEntry + '</p:sldIdLst>');
+      }
+    }
+
+    this.persistFile('ppt/presentation.xml', prsXml);
+    this.persistFile('ppt/_rels/presentation.xml.rels', prsRels);
+  }
+
+  /** Update presentation.xml and .rels for slide deletion. */
+  private updatePresentationXmlForDelete(deleteIdx: number): void {
+    let prsXml = this.files.get('ppt/presentation.xml') ?? '';
+    let prsRels = this.files.get('ppt/_rels/presentation.xml.rels') ?? '';
+
+    const deleteNum = deleteIdx + 1;
+
+    // Find the rId for the deleted slide
+    const slideRIdMap = this.parseSlideRelationships(prsRels);
+    let deleteRId = '';
+    for (const [rId, target] of slideRIdMap) {
+      if (target === `slides/slide${deleteNum}.xml`) {
+        deleteRId = rId;
+        break;
+      }
+    }
+
+    // Remove sldId entry from presentation.xml
+    if (deleteRId) {
+      const sldIdEntries = this.parseSldIdEntries(prsXml);
+      for (const entry of sldIdEntries) {
+        if (entry.includes(`r:id="${deleteRId}"`)) {
+          prsXml = prsXml.replace(entry, '');
+          break;
+        }
+      }
+    }
+
+    // Remove relationship entry
+    if (deleteRId) {
+      const relRe = new RegExp(`<Relationship[^>]+Id="${deleteRId}"[^>]*/?>`, 'g');
+      prsRels = prsRels.replace(relRe, '');
+    }
+
+    // Renumber remaining slide targets (shift down slides after deleteNum)
+    for (const [rId, target] of slideRIdMap) {
+      if (rId === deleteRId) continue;
+      const m = target.match(/^slides\/slide(\d+)\.xml$/);
+      if (m) {
+        const num = parseInt(m[1]);
+        if (num > deleteNum) {
+          const newTarget = `slides/slide${num - 1}.xml`;
+          prsRels = prsRels.replace(
+            new RegExp(`(Id="${rId}"[^>]*Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+            `$1${newTarget}"`
+          );
+          prsRels = prsRels.replace(
+            new RegExp(`(Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"([^>]*Id="${rId}")`),
+            `$1${newTarget}"$2`
+          );
+        }
+      }
+    }
+
+    this.persistFile('ppt/presentation.xml', prsXml);
+    this.persistFile('ppt/_rels/presentation.xml.rels', prsRels);
+  }
+
+  /** Update presentation.xml sldId order for reorder. */
+  private updatePresentationXmlForReorder(newOrder: number[]): void {
+    let prsXml = this.files.get('ppt/presentation.xml') ?? '';
+    const prsRels = this.files.get('ppt/_rels/presentation.xml.rels') ?? '';
+
+    const sldIdEntries = this.parseSldIdEntries(prsXml);
+    if (sldIdEntries.length !== newOrder.length) return;
+
+    // Build reordered sldId list
+    const reordered = newOrder.map(i => sldIdEntries[i]);
+
+    // Also need to update r:id → Target mappings for renumbered files
+    // Each sldId's r:id now points to a different slide file number
+    const slideRIdMap = this.parseSlideRelationships(prsRels);
+
+    // Extract rId from each sldId entry
+    const rIds = sldIdEntries.map(entry => {
+      const m = entry.match(/r:id="(rId\d+)"/);
+      return m ? m[1] : '';
+    });
+
+    // Reordered rIds: reordered[i] has rIds[newOrder[i]]
+    // We need rIds[newOrder[i]] to point to slides/slide{i+1}.xml
+    let updatedRels = prsRels;
+    for (let i = 0; i < newOrder.length; i++) {
+      const rId = rIds[newOrder[i]];
+      if (!rId) continue;
+      const oldTarget = slideRIdMap.get(rId);
+      const newTarget = `slides/slide${i + 1}.xml`;
+      if (oldTarget && oldTarget !== newTarget) {
+        // Use a unique placeholder to avoid conflicts during replacement
+        updatedRels = updatedRels.replace(
+          new RegExp(`(Id="${rId}"[^>]*Target=")${oldTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+          `$1${newTarget}"`
+        );
+        updatedRels = updatedRels.replace(
+          new RegExp(`(Target=")${oldTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"([^>]*Id="${rId}")`),
+          `$1${newTarget}"$2`
+        );
+      }
+    }
+
+    // Replace sldIdLst content
+    const sldIdListMatch = prsXml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/);
+    if (sldIdListMatch) {
+      prsXml = prsXml.replace(sldIdListMatch[1], reordered.join(''));
+    }
+
+    this.persistFile('ppt/presentation.xml', prsXml);
+    this.persistFile('ppt/_rels/presentation.xml.rels', updatedRels);
+  }
+
+  /** Parse all <p:sldId .../> entries from presentation.xml as raw strings. */
+  private parseSldIdEntries(prsXml: string): string[] {
+    const entries: string[] = [];
+    const re = /<p:sldId\s[^>]*?\/?>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(prsXml)) !== null) {
+      entries.push(m[0]);
+    }
+    return entries;
+  }
+
+  /** Parse slide relationships: rId → target path. */
+  private parseSlideRelationships(relsXml: string): Map<string, string> {
+    const map = new Map<string, string>();
+    const re = /<Relationship\s([^>]*)\/?>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(relsXml)) !== null) {
+      const attrs = m[1];
+      if (!attrs.includes(REL_TYPE_SLIDE + '"')) continue;
+      const idMatch = attrs.match(/Id="(rId\d+)"/);
+      const targetMatch = attrs.match(/Target="([^"]+)"/);
+      if (idMatch && targetMatch) {
+        map.set(idMatch[1], targetMatch[1]);
+      }
+    }
+    return map;
+  }
+
+  /** Ensure [Content_Types].xml has an Override for the given slide number. */
+  private ensureContentTypeForSlide(slideCount: number): void {
+    let ct = this.files.get('[Content_Types].xml');
+    if (!ct) return;
+
+    for (let i = 1; i <= slideCount; i++) {
+      const partName = `/ppt/slides/slide${i}.xml`;
+      if (!ct.includes(partName)) {
+        const override = `<Override PartName="${partName}" ContentType="${CONTENT_TYPE_SLIDE}"/>`;
+        ct = ct.replace('</Types>', override + '</Types>');
+      }
+    }
+
+    this.persistFile('[Content_Types].xml', ct);
+  }
+
+  /** Update a file in both the live files map and the export tracking map. */
+  private persistFile(path: string, content: string): void {
+    this.files.set(path, content);
+    this.addedFiles.set(path, content);
+  }
+
+  /** Re-initialize the Wasm engine after structural changes to the files map. */
+  private reinitializeWasm(): void {
+    const result = this.exports.initialize_pptx();
+    if (result.startsWith('ERROR:')) {
+      throw new Error(`Re-initialization failed: ${result.slice(6)}`);
+    }
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────

@@ -136,6 +136,16 @@ const renderer = new PptxRenderer(options?);
 
 `update*` メソッドはキャッシュされた SlideData を直接更新し、エクスポート用にスライドを変更済みとしてマークし、再描画されたシェイプSVGを返します。使用パターンは [`docs/editing-guide.md`](docs/editing-guide.md) を参照。
 
+**スライド管理:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `addSlide(afterIdx?, sourceSlideIdx?)` | `Promise<{ slideCount, insertedIdx }>` | ブランクスライドを追加。`afterIdx`: この位置の後に挿入（-1=先頭、省略=末尾）。`sourceSlideIdx`: レイアウトのコピー元（デフォルト: 最後のスライド）。 |
+| `deleteSlide(slideIdx)` | `Promise<{ slideCount }>` | スライドを削除（最低1枚は残す必要あり）。 |
+| `reorderSlides(newOrder)` | `Promise<{ slideCount }>` | スライド順序を変更。`newOrder[i]` = 新しい位置 `i` に置く旧インデックス。有効な順列が必要。 |
+
+スライド管理メソッドは `presentation.xml`・`.rels`・`[Content_Types].xml` を自動更新します。変更は `exportPptx()` に反映されます。
+
 **ノート・コメント:**
 
 | メソッド | 戻り値 | 説明 |

@@ -191,12 +191,14 @@ interface ZipEntry {
  * modified text entries with new content.
  *
  * @param originalBuffer - The original PPTX bytes
- * @param modifications - path → new XML content
+ * @param modifications - path → new XML content (replaces or adds entries)
+ * @param removals - set of paths to remove from the ZIP
  * @returns Rebuilt ZIP as ArrayBuffer
  */
 export async function buildZip(
   originalBuffer: ArrayBuffer,
   modifications: Map<string, string>,
+  removals?: Set<string>,
 ): Promise<ArrayBuffer> {
   const origBytes = new Uint8Array(originalBuffer);
   const origView = new DataView(originalBuffer);
@@ -231,7 +233,17 @@ export async function buildZip(
     });
   }
 
-  // Process modifications: replace entry data
+  // Remove entries marked for deletion
+  if (removals && removals.size > 0) {
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (removals.has(entries[i].name)) {
+        entries.splice(i, 1);
+      }
+    }
+  }
+
+  // Process modifications: replace existing entry data
+  const existingNames = new Set(entries.map(e => e.name));
   for (const entry of entries) {
     if (modifications.has(entry.name)) {
       const newContent = encoder.encode(modifications.get(entry.name)!);
@@ -242,6 +254,25 @@ export async function buildZip(
       entry.uncompressedSize = newContent.length;
       entry.crc32 = crc32(newContent);
       entry.extra = new Uint8Array(0);
+    }
+  }
+
+  // Add new entries (modifications not matching any existing entry)
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  for (const [name, content] of modifications) {
+    if (!existingNames.has(name)) {
+      const newContent = encoder.encode(content);
+      const compressed = await deflate(newContent);
+      entries.push({
+        name, method: 8, flags: 0, time: dosTime, date: dosDate,
+        crc32: crc32(newContent),
+        compressedSize: compressed.length,
+        uncompressedSize: newContent.length,
+        compressedData: compressed,
+        extra: new Uint8Array(0),
+      });
     }
   }
 
