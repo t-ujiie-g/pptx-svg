@@ -136,6 +136,16 @@ const renderer = new PptxRenderer(options?);
 
 All `update*` methods modify the cached SlideData in-place, mark the slide as modified for export, and return the re-rendered shape SVG. See [`docs/editing-guide.md`](docs/editing-guide.md) for usage patterns.
 
+**Slide Management:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addSlide(afterIdx?, sourceSlideIdx?)` | `Promise<{ slideCount, insertedIdx }>` | Add a blank slide. `afterIdx`: insert after this index (-1 = beginning, omit = end). `sourceSlideIdx`: copy layout from this slide (default: last). |
+| `deleteSlide(slideIdx)` | `Promise<{ slideCount }>` | Delete a slide (at least one must remain). |
+| `reorderSlides(newOrder)` | `Promise<{ slideCount }>` | Reorder slides. `newOrder[i]` = old index for new position `i`. Must be a valid permutation. |
+
+Slide management methods update `presentation.xml`, `.rels`, and `[Content_Types].xml` automatically. Changes are reflected in `exportPptx()`.
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

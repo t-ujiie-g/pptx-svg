@@ -13,10 +13,20 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | Update text content, returns re-rendered SVG |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | Update solid fill color, returns re-rendered SVG |
 
-All `update*` methods:
+All shape `update*` methods:
 - Modify the cached SlideData in-place (no XML re-parse)
 - Mark the slide as modified for export
 - Return the re-rendered shape SVG with its `<defs>`
+
+### Slide Management APIs
+
+| Method | Description |
+|--------|-------------|
+| `addSlide(afterIdx?, sourceSlideIdx?)` | Add a blank slide at the given position |
+| `deleteSlide(slideIdx)` | Remove a slide (minimum 1 must remain) |
+| `reorderSlides(newOrder)` | Reorder slides by permutation array |
+
+Slide management methods update package metadata (`presentation.xml`, `.rels`, `[Content_Types].xml`) and re-initialize the Wasm engine automatically.
 
 ### Unit Conversion Helpers
 
@@ -145,6 +155,49 @@ const newSvg = renderer.updateShapeFill(0, 0, 255, 0, 0);
 shapeElement.outerHTML = newSvg;
 ```
 
+## Slide Management
+
+Add, delete, and reorder slides programmatically. These methods update `presentation.xml`, `.rels`, and `[Content_Types].xml` automatically.
+
+### Add Slide
+
+```typescript
+// Append a blank slide at the end (layout copied from last slide)
+const { slideCount, insertedIdx } = await renderer.addSlide();
+
+// Insert after slide 0 (becomes new slide 1)
+await renderer.addSlide(0);
+
+// Insert at the beginning
+await renderer.addSlide(-1);
+
+// Copy layout from slide 2
+await renderer.addSlide(undefined, 2);
+```
+
+### Delete Slide
+
+```typescript
+// Delete slide at index 1
+const { slideCount } = await renderer.deleteSlide(1);
+// At least one slide must remain — throws if you try to delete the last one
+```
+
+### Reorder Slides
+
+```typescript
+// Reverse 2 slides: [1, 0]
+await renderer.reorderSlides([1, 0]);
+
+// Rotate 3 slides: slide 1 �� 0, slide 2 → 1, slide 0 → 2
+await renderer.reorderSlides([1, 2, 0]);
+
+// Swap slides 0 and 2 (keep 1 in place)
+await renderer.reorderSlides([2, 1, 0]);
+```
+
+The argument is a permutation array where `newOrder[i]` is the old index of the slide that should appear at position `i`.
+
 ## Export
 
 After editing, export the modified PPTX:
@@ -155,4 +208,4 @@ const pptxBuffer = await renderer.exportPptx();
 const blob = new Blob([pptxBuffer], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
 ```
 
-All shape-level edits are automatically included in the export — the `update*` methods mark slides as modified.
+All edits — shape-level updates and slide management operations — are automatically included in the export.
