@@ -89,6 +89,53 @@
       margin-top: 8px;
     }
     #shape-info.visible { display: block; }
+
+    /* ── Slide management toolbar ── */
+    #slide-mgmt {
+      display: none;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #0f1a33;
+      border: 1px solid #3a3a7a;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    #slide-mgmt.visible { display: flex; }
+    #slide-mgmt button {
+      padding: 5px 12px; font-size: 0.85em; border-radius: 4px; border: 1px solid #3a3a7a;
+      background: #16213e; color: #e0e0e0; cursor: pointer; white-space: nowrap;
+    }
+    #slide-mgmt button:hover { background: #1e2d50; border-color: #4a90d9; }
+    #slide-mgmt button.danger { border-color: #d9534f; }
+    #slide-mgmt button.danger:hover { background: #3a1520; border-color: #e74c3c; }
+    #slide-mgmt .sep {
+      width: 1px; height: 24px; background: #3a3a7a; margin: 0 4px;
+    }
+    #slide-mgmt label { color: #aaa; font-size: 0.85em; white-space: nowrap; }
+
+    /* ── Slide thumbnails ── */
+    #slide-thumbs {
+      display: none;
+      gap: 8px;
+      padding: 10px 0;
+      overflow-x: auto;
+      margin-bottom: 8px;
+    }
+    #slide-thumbs.visible { display: flex; }
+    .slide-thumb {
+      flex: 0 0 auto; width: 120px; height: 68px; border: 2px solid #2a2a4a;
+      border-radius: 4px; overflow: hidden; cursor: pointer; position: relative;
+      background: #0d1117;
+    }
+    .slide-thumb.active { border-color: #4a90d9; }
+    .slide-thumb svg { width: 100%; height: 100%; pointer-events: none; }
+    .slide-thumb .thumb-label {
+      position: absolute; bottom: 0; right: 0; background: rgba(0,0,0,0.7);
+      color: #ccc; font-size: 10px; padding: 1px 5px; border-top-left-radius: 4px;
+    }
+    .slide-thumb:hover { border-color: #6a8abf; }
   </style>
 </head>
 <body>
@@ -116,10 +163,26 @@
   <div class="card" id="slide-viewer-card">
     <h2>Interactive Editor</h2>
     <div class="slide-nav">
-      <button id="prev-btn" disabled>◀ Prev</button>
+      <button id="prev-btn" disabled>&#x25C0; Prev</button>
       <span id="slide-num">Slide 1 / 1</span>
-      <button id="next-btn" disabled>Next ▶</button>
+      <button id="next-btn" disabled>Next &#x25B6;</button>
     </div>
+
+    <!-- Slide management toolbar -->
+    <div id="slide-mgmt">
+      <button id="add-slide-btn" title="Add blank slide after current">+ Add Slide</button>
+      <button id="add-slide-begin-btn" title="Add blank slide at the beginning">+ At Start</button>
+      <div class="sep"></div>
+      <button id="dup-slide-btn" title="Duplicate current slide">Duplicate</button>
+      <div class="sep"></div>
+      <button id="move-left-btn" title="Move current slide left">&#x2190; Move Left</button>
+      <button id="move-right-btn" title="Move current slide right">Move Right &#x2192;</button>
+      <div class="sep"></div>
+      <button id="del-slide-btn" class="danger" title="Delete current slide">Delete Slide</button>
+    </div>
+
+    <!-- Slide thumbnails -->
+    <div id="slide-thumbs"></div>
 
     <!-- Editing toolbar (visible when shape selected) -->
     <div id="edit-toolbar">
@@ -240,7 +303,13 @@
       $('slide-num').textContent = `Slide ${idx + 1} / ${totalSlides}`;
       $('prev-btn').disabled = idx === 0;
       $('next-btn').disabled = idx >= totalSlides - 1;
+      $('del-slide-btn') && ($('del-slide-btn').disabled = totalSlides <= 1);
+      $('move-left-btn') && ($('move-left-btn').disabled = idx === 0);
+      $('move-right-btn') && ($('move-right-btn').disabled = idx >= totalSlides - 1);
       insertSvg(renderer.renderSlideSvg(idx));
+      // Update thumbnail selection
+      const thumbs = $('slide-thumbs').querySelectorAll('.slide-thumb');
+      thumbs.forEach((t, i) => t.classList.toggle('active', i === idx));
     }
     $('prev-btn').addEventListener('click', () => showSlide(currentSlide - 1));
     $('next-btn').addEventListener('click', () => showSlide(currentSlide + 1));
@@ -492,6 +561,121 @@
       $('svg-container').style.cursor = '';
     });
 
+    // ── Slide thumbnails ──
+    function renderThumbnails() {
+      const container = $('slide-thumbs');
+      container.innerHTML = '';
+      for (let i = 0; i < totalSlides; i++) {
+        const thumb = document.createElement('div');
+        thumb.className = 'slide-thumb' + (i === currentSlide ? ' active' : '');
+        const svg = renderer.renderSlideSvg(i);
+        if (svg.startsWith('<svg')) {
+          thumb.innerHTML = svg;
+          // Make SVG fit the thumbnail
+          const svgEl = thumb.querySelector('svg');
+          if (svgEl) {
+            const w = svgEl.getAttribute('width');
+            const h = svgEl.getAttribute('height');
+            if (w && h && !svgEl.getAttribute('viewBox')) {
+              svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            }
+            svgEl.removeAttribute('width');
+            svgEl.removeAttribute('height');
+          }
+        }
+        const label = document.createElement('span');
+        label.className = 'thumb-label';
+        label.textContent = `${i + 1}`;
+        thumb.appendChild(label);
+        thumb.addEventListener('click', () => showSlide(i));
+        container.appendChild(thumb);
+      }
+      container.classList.add('visible');
+    }
+
+    // ── Slide management ──
+    $('add-slide-btn').addEventListener('click', async () => {
+      try {
+        const { slideCount, insertedIdx } = await renderer.addSlide(currentSlide);
+        totalSlides = slideCount;
+        setStatus(`Added slide at position ${insertedIdx + 1}`, 'ok');
+        renderThumbnails();
+        showSlide(insertedIdx);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+      }
+    });
+
+    $('add-slide-begin-btn').addEventListener('click', async () => {
+      try {
+        const { slideCount, insertedIdx } = await renderer.addSlide(-1);
+        totalSlides = slideCount;
+        setStatus(`Added slide at the beginning`, 'ok');
+        renderThumbnails();
+        showSlide(0);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+      }
+    });
+
+    $('dup-slide-btn').addEventListener('click', async () => {
+      try {
+        // Add slide after current, copying its layout
+        const { slideCount, insertedIdx } = await renderer.addSlide(currentSlide, currentSlide);
+        totalSlides = slideCount;
+        setStatus(`Duplicated slide ${currentSlide + 1} → ${insertedIdx + 1}`, 'ok');
+        renderThumbnails();
+        showSlide(insertedIdx);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+      }
+    });
+
+    $('del-slide-btn').addEventListener('click', async () => {
+      if (totalSlides <= 1) return;
+      const idx = currentSlide;
+      try {
+        const { slideCount } = await renderer.deleteSlide(idx);
+        totalSlides = slideCount;
+        setStatus(`Deleted slide ${idx + 1}`, 'ok');
+        renderThumbnails();
+        showSlide(Math.min(idx, totalSlides - 1));
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+      }
+    });
+
+    $('move-left-btn').addEventListener('click', async () => {
+      if (currentSlide === 0) return;
+      const order = Array.from({ length: totalSlides }, (_, i) => i);
+      // Swap current with previous
+      [order[currentSlide - 1], order[currentSlide]] = [order[currentSlide], order[currentSlide - 1]];
+      try {
+        await renderer.reorderSlides(order);
+        setStatus(`Moved slide ${currentSlide + 1} left`, 'ok');
+        currentSlide--;
+        renderThumbnails();
+        showSlide(currentSlide);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+      }
+    });
+
+    $('move-right-btn').addEventListener('click', async () => {
+      if (currentSlide >= totalSlides - 1) return;
+      const order = Array.from({ length: totalSlides }, (_, i) => i);
+      [order[currentSlide], order[currentSlide + 1]] = [order[currentSlide + 1], order[currentSlide]];
+      try {
+        await renderer.reorderSlides(order);
+        setStatus(`Moved slide ${currentSlide + 1} right`, 'ok');
+        currentSlide++;
+        renderThumbnails();
+        showSlide(currentSlide);
+      } catch (err) {
+        setStatus(`Error: ${err.message}`, 'error');
+      }
+    });
+
     // ── Setup ──
     setupExportButton(renderer);
 
@@ -504,6 +688,8 @@
         if (slideCount > 0) {
           $('slide-viewer-card').style.display = 'block';
           $('export-card').style.display = 'block';
+          $('slide-mgmt').classList.add('visible');
+          renderThumbnails();
           showSlide(0);
         }
       } catch (err) {
