@@ -140,9 +140,9 @@ const renderer = new PptxRenderer(options?);
 
 | メソッド | 戻り値 | 説明 |
 |--------|---------|------|
-| `addSlide(afterIdx?, sourceSlideIdx?)` | `Promise<{ slideCount, insertedIdx }>` | ブランクスライドを追加。`afterIdx`: この位置の後に挿入（-1=先頭、省略=末尾）。`sourceSlideIdx`: レイアウトのコピ���元（デフォルト: 最後のスライド）。 |
+| `addSlide(afterIdx?, sourceSlideIdx?)` | `Promise<{ slideCount, insertedIdx }>` | ブランクスライドを追加。`afterIdx`: この位置の後に挿入（-1=先頭、省略=末尾）。`sourceSlideIdx`: レイアウトのコピー元（デフォルト: 最後のスライド）。 |
 | `deleteSlide(slideIdx)` | `Promise<{ slideCount }>` | スライドを削除（最低1枚は残す必要あり）。 |
-| `reorderSlides(newOrder)` | `Promise<{ slideCount }>` | スライド順序を変更。`newOrder[i]` = 新しい位置 `i` に置���旧インデックス。有効な順列が必要。 |
+| `reorderSlides(newOrder)` | `Promise<{ slideCount }>` | スライド順序を変更。`newOrder[i]` = 新しい位置 `i` に置く旧インデックス。有効な順列が必要。 |
 
 スライド管理メソッドは `presentation.xml`・`.rels`・`[Content_Types].xml` を自動更新します。変更は `exportPptx()` に反映されます。
 
