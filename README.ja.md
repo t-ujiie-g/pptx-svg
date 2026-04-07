@@ -140,6 +140,21 @@ const renderer = new PptxRenderer(options?);
 | `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | `string` | シェイプにテキスト段落を追加。`fontSize`: 1/100ポイント単位（例: 1800 = 18pt）。`OK:<paraIndex>` を返す。 |
 | `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | `string` | ストローク設定。color -1 = 削除。`dash`: `dash`/`dot` 等。 |
 
+**テキスト編集メソッド:**
+
+| メソッド | 返り値 | 説明 |
+|----------|--------|------|
+| `addParagraph(slideIdx, shapeIdx, text, align?)` | `string` | 段落追加。`align`: `l`/`ctr`/`r`/`just`/`""`。`OK:<paraIndex>` を返す。 |
+| `deleteParagraph(slideIdx, shapeIdx, paraIdx)` | `string` | 段落削除。`OK` を返す。 |
+| `addRun(slideIdx, shapeIdx, paraIdx, text)` | `string` | テキストラン追加。`OK:<runIndex>` を返す。 |
+| `deleteRun(slideIdx, shapeIdx, paraIdx, runIdx)` | `string` | テキストラン削除。`OK` を返す。 |
+| `updateTextRunStyle(slideIdx, shapeIdx, paraIdx, runIdx, bold?, italic?)` | `string` | 太字/斜体 (1=有効, 0=無効, -1=変更なし)。再描画SVGを返す。 |
+| `updateTextRunFontSize(slideIdx, shapeIdx, paraIdx, runIdx, fontSize)` | `string` | フォントサイズ (1/100pt単位、1800=18pt、0=継承)。再描画SVGを返す。 |
+| `updateTextRunColor(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b)` | `string` | テキスト色 (0-255、r=-1で継承)。再描画SVGを返す。 |
+| `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | `string` | フォントファミリ (""=変更なし)。再描画SVGを返す。 |
+| `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | `string` | 段落配置変更。再描画SVGを返す。 |
+| `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | `string` | 下線/取消線/上付き・下付き。再描画SVGを返す。 |
+
 `update*` メソッドはキャッシュされた SlideData を直接更新し、エクスポート用にスライドを変更済みとしてマークし、再描画されたシェイプSVGを返します。使用パターンは [`docs/editing-guide.md`](docs/editing-guide.md) を参照。
 
 **スライド管理:**

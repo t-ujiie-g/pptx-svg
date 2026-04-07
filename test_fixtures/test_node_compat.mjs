@@ -695,6 +695,180 @@ console.log('Test 28: Add text to invalid shape');
   console.log('  OK: Error handling for invalid indices');
 }
 
+// --- Test 29: Text editing E2.5 — paragraph and run CRUD ---
+console.log('Test 29: Text editing E2.5 — paragraph and run CRUD');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add a shape to work with
+  const addResult = renderer.addShape(0, 'rect', 914400, 914400, 3657600, 1828800, 200, 200, 200);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  // addParagraph
+  const p0 = renderer.addParagraph(0, shapeIdx, 'First paragraph', 'ctr');
+  assert(p0.startsWith('OK:'), `addParagraph should return OK, got ${p0}`);
+  assert(p0 === 'OK:0', `first paragraph index should be 0, got ${p0}`);
+
+  const p1 = renderer.addParagraph(0, shapeIdx, 'Second paragraph', 'r');
+  assert(p1 === 'OK:1', `second paragraph index should be 1, got ${p1}`);
+
+  // addRun
+  const r0 = renderer.addRun(0, shapeIdx, 0, ' extra run');
+  assert(r0.startsWith('OK:'), `addRun should return OK, got ${r0}`);
+  assert(r0 === 'OK:1', `second run index should be 1, got ${r0}`);
+
+  // deleteRun
+  const dr = renderer.deleteRun(0, shapeIdx, 0, 1);
+  assert(dr === 'OK', `deleteRun should return OK, got ${dr}`);
+
+  // deleteParagraph
+  const dp = renderer.deleteParagraph(0, shapeIdx, 1);
+  assert(dp === 'OK', `deleteParagraph should return OK, got ${dp}`);
+
+  // Error cases
+  assert(renderer.addParagraph(0, 999, 'x', '').startsWith('ERROR:'), 'addParagraph invalid shape');
+  assert(renderer.addRun(0, shapeIdx, 99, 'x').startsWith('ERROR:'), 'addRun invalid para');
+  assert(renderer.deleteRun(0, shapeIdx, 0, 99).startsWith('ERROR:'), 'deleteRun invalid run');
+  assert(renderer.deleteParagraph(0, shapeIdx, 99).startsWith('ERROR:'), 'deleteParagraph invalid para');
+
+  console.log('  OK: Paragraph and run CRUD');
+}
+
+// --- Test 30: Text editing E2.5 — style, font size, color ---
+console.log('Test 30: Text editing E2.5 — style, font size, color');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 3657600, 1828800, 240, 240, 240);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+  renderer.addParagraph(0, shapeIdx, 'Styled text', '');
+
+  // updateTextRunStyle (bold/italic)
+  const boldSvg = renderer.updateTextRunStyle(0, shapeIdx, 0, 0, 1, -1);
+  assert(!boldSvg.startsWith('ERROR:'), `updateTextRunStyle should not error, got ${boldSvg.slice(0,60)}`);
+  assert(boldSvg.includes('font-weight="bold"') || boldSvg.includes('data-ooxml-bold="true"'),
+    'SVG should reflect bold');
+
+  const italicSvg = renderer.updateTextRunStyle(0, shapeIdx, 0, 0, -1, 1);
+  assert(!italicSvg.startsWith('ERROR:'), 'updateTextRunStyle italic should not error');
+  assert(italicSvg.includes('font-style="italic"'), 'SVG should reflect italic');
+
+  // updateTextRunFontSize
+  const sizeSvg = renderer.updateTextRunFontSize(0, shapeIdx, 0, 0, 3600);
+  assert(!sizeSvg.startsWith('ERROR:'), `updateTextRunFontSize should not error`);
+
+  // updateTextRunColor
+  const colorSvg = renderer.updateTextRunColor(0, shapeIdx, 0, 0, 255, 0, 0);
+  assert(!colorSvg.startsWith('ERROR:'), `updateTextRunColor should not error`);
+  assert(colorSvg.includes('#ff0000') || colorSvg.includes('rgb(255'), 'SVG should contain red color');
+
+  // Error cases
+  assert(renderer.updateTextRunStyle(0, shapeIdx, 0, 99, 1, 0).startsWith('ERROR:'), 'invalid run idx');
+  assert(renderer.updateTextRunFontSize(0, shapeIdx, 99, 0, 1800).startsWith('ERROR:'), 'invalid para idx');
+
+  console.log('  OK: Style, font size, color updates');
+}
+
+// --- Test 31: Text editing E2.5 — font family, alignment, decoration ---
+console.log('Test 31: Text editing E2.5 — font family, alignment, decoration');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 3657600, 1828800, 240, 240, 240);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+  renderer.addParagraph(0, shapeIdx, 'Decorated text', 'l');
+
+  // updateTextRunFont
+  const fontSvg = renderer.updateTextRunFont(0, shapeIdx, 0, 0, 'Arial', 'MS Gothic', '');
+  assert(!fontSvg.startsWith('ERROR:'), `updateTextRunFont should not error`);
+  assert(fontSvg.includes('Arial'), 'SVG should contain font name');
+
+  // updateParagraphAlign
+  const alignSvg = renderer.updateParagraphAlign(0, shapeIdx, 0, 'ctr');
+  assert(!alignSvg.startsWith('ERROR:'), `updateParagraphAlign should not error`);
+  assert(alignSvg.includes('data-ooxml-para-align="ctr"'), 'SVG should have center alignment');
+
+  // updateTextRunDecoration — underline
+  const ulSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'sng', '', -1);
+  assert(!ulSvg.startsWith('ERROR:'), `updateTextRunDecoration should not error`);
+  assert(ulSvg.includes('text-decoration') || ulSvg.includes('data-ooxml-underline="sng"'),
+    'SVG should reflect underline');
+
+  // updateTextRunDecoration — strikethrough
+  const stSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', 'sngStrike', -1);
+  assert(!stSvg.startsWith('ERROR:'), 'strikethrough should not error');
+
+  // updateTextRunDecoration — superscript
+  const supSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', '', 30000);
+  assert(!supSvg.startsWith('ERROR:'), 'superscript should not error');
+
+  // updateTextRunDecoration — remove underline
+  const noUlSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'none', 'none', 0);
+  assert(!noUlSvg.startsWith('ERROR:'), 'remove decoration should not error');
+
+  // Error cases
+  assert(renderer.updateTextRunFont(0, shapeIdx, 0, 99, 'Arial', '', '').startsWith('ERROR:'), 'invalid run');
+  assert(renderer.updateParagraphAlign(0, shapeIdx, 99, 'l').startsWith('ERROR:'), 'invalid para');
+  assert(renderer.updateTextRunDecoration(0, shapeIdx, 0, 99, 'sng', '', -1).startsWith('ERROR:'), 'invalid run');
+
+  console.log('  OK: Font family, alignment, decoration updates');
+}
+
+// --- Test 32: Text editing E2.5 — round-trip export ---
+console.log('Test 32: Text editing E2.5 — round-trip export');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add shape + styled text
+  const addResult = renderer.addShape(0, 'rect', 914400, 914400, 3657600, 1828800, 200, 200, 200);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+  renderer.addParagraph(0, shapeIdx, 'Bold Red', 'ctr');
+  renderer.updateTextRunStyle(0, shapeIdx, 0, 0, 1, 1);
+  renderer.updateTextRunColor(0, shapeIdx, 0, 0, 255, 0, 0);
+  renderer.updateTextRunFontSize(0, shapeIdx, 0, 0, 2400);
+  renderer.updateTextRunFont(0, shapeIdx, 0, 0, 'Impact', '', '');
+
+  // Export and reload
+  const exported = await renderer.exportPptx();
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg = renderer2.renderSlideSvg(0);
+
+  // Text may be split by word wrapping, so check for fragments
+  assert(svg.includes('Bold') && svg.includes('Red'), 'exported text should survive round-trip');
+  assert(svg.includes('font-weight="bold"'), 'bold should survive round-trip');
+  assert(svg.includes('rgb(255,0,0)') || svg.includes('#ff0000') || svg.includes('ff0000'), 'red color should survive round-trip');
+  assert(svg.includes('Impact'), 'font should survive round-trip');
+  assert(svg.includes('data-ooxml-para-align="ctr"'), 'alignment should survive round-trip');
+
+  console.log('  OK: Text editing round-trip export verified');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

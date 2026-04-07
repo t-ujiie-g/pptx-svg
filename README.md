@@ -140,6 +140,21 @@ const renderer = new PptxRenderer(options?);
 | `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | `string` | Add a text paragraph to a shape. `fontSize` in hundredths of a point (e.g. 1800 = 18pt). Returns `OK:<paraIndex>`. |
 | `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | `string` | Set stroke. Color -1 = remove. `dash`: `dash`/`dot`/etc. |
 
+**Text Editing Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addParagraph(slideIdx, shapeIdx, text, align?)` | `string` | Add paragraph. `align`: `l`/`ctr`/`r`/`just`/`""`. Returns `OK:<paraIndex>`. |
+| `deleteParagraph(slideIdx, shapeIdx, paraIdx)` | `string` | Delete a paragraph. Returns `OK`. |
+| `addRun(slideIdx, shapeIdx, paraIdx, text)` | `string` | Add a text run. Returns `OK:<runIndex>`. |
+| `deleteRun(slideIdx, shapeIdx, paraIdx, runIdx)` | `string` | Delete a text run. Returns `OK`. |
+| `updateTextRunStyle(slideIdx, shapeIdx, paraIdx, runIdx, bold?, italic?)` | `string` | Bold/italic (1=on, 0=off, -1=no change). Returns re-rendered SVG. |
+| `updateTextRunFontSize(slideIdx, shapeIdx, paraIdx, runIdx, fontSize)` | `string` | Font size in hundredths of pt (1800=18pt, 0=inherit). Returns re-rendered SVG. |
+| `updateTextRunColor(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b)` | `string` | Text color (0-255, r=-1 to inherit). Returns re-rendered SVG. |
+| `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | `string` | Font family (""=no change). Returns re-rendered SVG. |
+| `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | `string` | Paragraph alignment. Returns re-rendered SVG. |
+| `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | `string` | Underline/strike/super-subscript. Returns re-rendered SVG. |
+
 All `update*` methods modify the cached SlideData in-place, mark the slide as modified for export, and return the re-rendered shape SVG. See [`docs/editing-guide.md`](docs/editing-guide.md) for usage patterns.
 
 **Slide Management:**

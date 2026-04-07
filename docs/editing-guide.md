@@ -18,6 +18,16 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | Apply linear gradient fill, returns re-rendered SVG |
 | `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | Add a text paragraph to a shape, returns `OK:<paraIndex>` |
 | `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | Set stroke color/width/dash, returns re-rendered SVG |
+| `addParagraph(slideIdx, shapeIdx, text, align?)` | Add paragraph with alignment, returns `OK:<paraIndex>` |
+| `deleteParagraph(slideIdx, shapeIdx, paraIdx)` | Delete a paragraph, returns `OK` |
+| `addRun(slideIdx, shapeIdx, paraIdx, text)` | Add a text run to a paragraph, returns `OK:<runIndex>` |
+| `deleteRun(slideIdx, shapeIdx, paraIdx, runIdx)` | Delete a text run, returns `OK` |
+| `updateTextRunStyle(slideIdx, shapeIdx, paraIdx, runIdx, bold?, italic?)` | Set bold/italic (1/0/-1), returns re-rendered SVG |
+| `updateTextRunFontSize(slideIdx, shapeIdx, paraIdx, runIdx, fontSize)` | Set font size (hundredths of pt), returns re-rendered SVG |
+| `updateTextRunColor(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b)` | Set text color (r=-1 to inherit), returns re-rendered SVG |
+| `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | Set font family, returns re-rendered SVG |
+| `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | Set paragraph alignment, returns re-rendered SVG |
+| `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | Set underline/strike/super-subscript, returns re-rendered SVG |
 
 All shape `update*` methods:
 - Modify the cached SlideData in-place (no XML re-parse)
@@ -162,6 +172,58 @@ renderer.addShapeText(0, 0, 'Red text', 1400, 255, 0, 0);
 const newSvg = renderer.updateShapeText(0, 0, 0, 0, 'New text content');
 // Replace the shape element in the DOM
 shapeElement.outerHTML = newSvg;
+```
+
+### Paragraph management
+
+```typescript
+// Add a centered paragraph with text
+const result = renderer.addParagraph(0, shapeIdx, 'New paragraph', 'ctr');
+// align: "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit)
+
+// Delete paragraph at index 1
+renderer.deleteParagraph(0, shapeIdx, 1);
+
+// Change alignment
+renderer.updateParagraphAlign(0, shapeIdx, 0, 'r');
+```
+
+### Run management
+
+```typescript
+// Add a run to paragraph 0
+const result = renderer.addRun(0, shapeIdx, 0, 'appended text');
+
+// Delete run at index 1 from paragraph 0
+renderer.deleteRun(0, shapeIdx, 0, 1);
+```
+
+### Text formatting
+
+```typescript
+// Bold and italic (1 = on, 0 = off, -1 = no change)
+renderer.updateTextRunStyle(0, shapeIdx, 0, 0, 1, -1);   // bold on
+renderer.updateTextRunStyle(0, shapeIdx, 0, 0, -1, 1);   // italic on
+
+// Font size (hundredths of a point: 1800 = 18pt, 0 = inherit)
+renderer.updateTextRunFontSize(0, shapeIdx, 0, 0, 2400);  // 24pt
+
+// Text color (RGB 0-255, r=-1 to inherit from theme)
+renderer.updateTextRunColor(0, shapeIdx, 0, 0, 255, 0, 0);  // red
+
+// Font family (empty string = no change)
+renderer.updateTextRunFont(0, shapeIdx, 0, 0, 'Arial', 'MS Gothic', '');
+// Arguments: fontFace (Latin), eaFont (East Asian), csFont (Complex Script)
+
+// Underline, strikethrough, superscript/subscript
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'sng', '', -1);       // single underline
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', 'sngStrike', -1); // strikethrough
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', '', 30000);       // superscript
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', '', -25000);      // subscript
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'none', 'none', 0);   // remove all
+// underline: "sng", "dbl", "" (no change), "none" (remove)
+// strike: "sngStrike", "dblStrike", "" (no change), "none" (remove)
+// baseline: 30000 (super), -25000 (sub), 0 (normal), -1 (no change)
 ```
 
 ## Fill Color Editing

@@ -64,21 +64,51 @@
       border: 1px solid #4a90d9;
       border-radius: 6px;
       margin-bottom: 12px;
-      max-height: 200px;
+      max-height: 400px;
       overflow-y: auto;
     }
     #text-runs-panel.visible { display: flex; }
-    #text-runs-panel .text-run-row { display: flex; gap: 8px; align-items: center; }
+    #text-runs-panel .text-run-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     #text-runs-panel .text-run-label {
       color: #6a8abf; font-size: 0.75em; font-family: monospace;
-      min-width: 50px; white-space: nowrap;
+      min-width: 40px; white-space: nowrap;
     }
-    #text-runs-panel input {
-      flex: 1; padding: 4px 8px; border: 1px solid #3a3a7a; border-radius: 4px;
+    #text-runs-panel input[type="text"] {
+      flex: 1; min-width: 80px; padding: 4px 8px; border: 1px solid #3a3a7a; border-radius: 4px;
       font-size: 13px; background: #16213e; color: #e0e0e0;
     }
-    #text-runs-panel input:focus { outline: 1px solid #4a90d9; border-color: #4a90d9; }
+    #text-runs-panel input[type="text"]:focus { outline: 1px solid #4a90d9; border-color: #4a90d9; }
+    #text-runs-panel input[type="number"] {
+      width: 50px; flex: 0 0 auto; padding: 4px 4px; border: 1px solid #3a3a7a; border-radius: 4px;
+      font-size: 12px; background: #16213e; color: #e0e0e0; text-align: center;
+    }
+    #text-runs-panel input[type="color"] {
+      width: 28px; height: 24px; flex: 0 0 auto; border: 1px solid #3a3a7a; border-radius: 4px;
+      background: transparent; cursor: pointer; padding: 0;
+    }
     #text-runs-panel button { padding: 4px 10px; font-size: 0.8em; }
+    #text-runs-panel .fmt-btn {
+      padding: 2px 7px; font-size: 0.85em; min-width: 26px; text-align: center;
+      border: 1px solid #3a3a7a; border-radius: 4px; background: #16213e; color: #e0e0e0;
+      cursor: pointer; font-family: serif;
+    }
+    #text-runs-panel .fmt-btn:hover { border-color: #4a90d9; }
+    #text-runs-panel .fmt-btn.active { background: #2a4a7a; border-color: #4a90d9; color: #fff; }
+    #text-runs-panel .para-header {
+      display: flex; gap: 6px; align-items: center; padding: 4px 0 2px;
+      border-top: 1px solid #1a2a4a; margin-top: 4px;
+    }
+    #text-runs-panel .para-header:first-child { border-top: none; margin-top: 0; }
+    #text-runs-panel .para-header .para-label {
+      color: #4a90d9; font-size: 0.8em; font-weight: bold; font-family: monospace;
+    }
+    #text-runs-panel select {
+      padding: 2px 6px; font-size: 0.8em; border-radius: 4px; border: 1px solid #3a3a7a;
+      background: #16213e; color: #e0e0e0; cursor: pointer;
+    }
+    #text-runs-panel .danger-btn { border-color: #d9534f; color: #d9534f; }
+    #text-runs-panel .danger-btn:hover { background: #3a1520; }
+    #text-runs-panel .add-btn { background: #1a3a5c; border-color: #4a90d9; }
 
     /* ── Shape info ── */
     #shape-info {
@@ -425,82 +455,316 @@
 
       const panel = $('text-runs-panel');
 
-      // Show existing text runs
-      const runTspans = shapeG.querySelectorAll('tspan[data-ooxml-run-idx]');
-      const seen = new Map();
-      const runs = [];
-      for (const ts of runTspans) {
-        const ri = ts.getAttribute('data-ooxml-run-idx');
-        const paraTspan = ts.closest('tspan[data-ooxml-para-idx]');
-        const pi = paraTspan ? paraTspan.getAttribute('data-ooxml-para-idx') : null;
-        if (pi === null || ri === null) continue;
-        const key = `${pi}:${ri}`;
-        if (seen.has(key)) {
-          runs[seen.get(key)].text += ts.textContent || '';
-        } else {
-          seen.set(key, runs.length);
-          runs.push({ pi: parseInt(pi), ri: parseInt(ri), text: ts.textContent || '' });
+      // Collect paragraphs and their runs from SVG data attributes
+      const paraTspans = shapeG.querySelectorAll('tspan[data-ooxml-para-idx]');
+      const parasMap = new Map(); // paraIdx -> { align, runs: [{ri, text, bold, italic, fontSize, color, font, ea, cs, underline, strike, baseline, tspan}] }
+      for (const pts of paraTspans) {
+        const pi = parseInt(pts.getAttribute('data-ooxml-para-idx'));
+        if (!parasMap.has(pi)) {
+          parasMap.set(pi, {
+            align: pts.getAttribute('data-ooxml-para-align') || 'l',
+            runs: [],
+          });
+        }
+        const runTspans = pts.querySelectorAll('tspan[data-ooxml-run-idx]');
+        const para = parasMap.get(pi);
+        for (const rts of runTspans) {
+          const ri = parseInt(rts.getAttribute('data-ooxml-run-idx'));
+          const existing = para.runs.find(r => r.ri === ri);
+          if (existing) {
+            existing.text += rts.textContent || '';
+          } else {
+            para.runs.push({
+              ri,
+              text: rts.textContent || '',
+              bold: rts.getAttribute('data-ooxml-bold') === 'true',
+              italic: rts.getAttribute('font-style') === 'italic',
+              fontSize: parseInt(rts.getAttribute('data-ooxml-font-size') || '0'),
+              color: rts.getAttribute('data-ooxml-color') || '',
+              font: rts.getAttribute('data-ooxml-run-font') || '',
+              ea: rts.getAttribute('data-ooxml-ea-font') || '',
+              cs: rts.getAttribute('data-ooxml-cs-font') || '',
+              underline: rts.getAttribute('data-ooxml-underline') || '',
+              strike: rts.getAttribute('data-ooxml-strike') || '',
+              baseline: parseInt(rts.getAttribute('data-ooxml-baseline') || '0'),
+            });
+          }
         }
       }
-      for (const run of runs) {
-        const row = document.createElement('div');
-        row.className = 'text-run-row';
-        const label = document.createElement('span');
-        label.className = 'text-run-label';
-        label.textContent = `P${run.pi}R${run.ri}`;
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = run.text;
-        const btn = document.createElement('button');
-        btn.textContent = 'Apply';
-        btn.addEventListener('click', () => {
-          const result = renderer.updateShapeText(currentSlide, selectedShapeIdx, run.pi, run.ri, input.value);
-          if (result.startsWith('ERROR:')) { setStatus(result, 'error'); }
-          else { setStatus(`Text updated: P${run.pi}R${run.ri}`, 'ok'); renderAndRefresh(); }
+
+      // Render each paragraph
+      for (const [pi, para] of parasMap) {
+        // ── Paragraph header ──
+        const header = document.createElement('div');
+        header.className = 'para-header';
+        const paraLabel = document.createElement('span');
+        paraLabel.className = 'para-label';
+        paraLabel.textContent = `P${pi}`;
+        header.appendChild(paraLabel);
+
+        // Alignment dropdown
+        const alignSel = document.createElement('select');
+        alignSel.title = 'Paragraph alignment';
+        for (const [val, label] of [['l','Left'],['ctr','Center'],['r','Right'],['just','Justify']]) {
+          const opt = document.createElement('option');
+          opt.value = val; opt.textContent = label;
+          if (para.align === val) opt.selected = true;
+          alignSel.appendChild(opt);
+        }
+        alignSel.addEventListener('change', () => {
+          const result = renderer.updateParagraphAlign(currentSlide, selectedShapeIdx, pi, alignSel.value);
+          if (result.startsWith('ERROR:')) setStatus(result, 'error');
+          else { setStatus(`P${pi} align → ${alignSel.value}`, 'ok'); renderAndRefresh(); }
         });
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') btn.click(); });
-        row.appendChild(label);
-        row.appendChild(input);
-        row.appendChild(btn);
-        panel.appendChild(row);
+        header.appendChild(alignSel);
+
+        // Add Run button
+        const addRunBtn = document.createElement('button');
+        addRunBtn.textContent = '+ Run';
+        addRunBtn.className = 'add-btn';
+        addRunBtn.title = 'Add a new text run to this paragraph';
+        addRunBtn.addEventListener('click', () => {
+          const text = prompt('Text for new run:', 'New text');
+          if (text === null) return;
+          const result = renderer.addRun(currentSlide, selectedShapeIdx, pi, text);
+          if (result.startsWith('ERROR:')) setStatus(result, 'error');
+          else { setStatus(`Run added to P${pi}`, 'ok'); renderAndRefresh(); }
+        });
+        header.appendChild(addRunBtn);
+
+        // Delete paragraph button
+        const delParaBtn = document.createElement('button');
+        delParaBtn.textContent = 'Del';
+        delParaBtn.className = 'fmt-btn danger-btn';
+        delParaBtn.title = 'Delete this paragraph';
+        delParaBtn.addEventListener('click', () => {
+          const result = renderer.deleteParagraph(currentSlide, selectedShapeIdx, pi);
+          if (result.startsWith('ERROR:')) setStatus(result, 'error');
+          else { setStatus(`P${pi} deleted`, 'ok'); renderAndRefresh(); }
+        });
+        header.appendChild(delParaBtn);
+        panel.appendChild(header);
+
+        // ── Runs ──
+        for (const run of para.runs) {
+          const row = document.createElement('div');
+          row.className = 'text-run-row';
+
+          // Label
+          const label = document.createElement('span');
+          label.className = 'text-run-label';
+          label.textContent = `R${run.ri}`;
+          row.appendChild(label);
+
+          // Text input
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = run.text;
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              const result = renderer.updateShapeText(currentSlide, selectedShapeIdx, pi, run.ri, input.value);
+              if (result.startsWith('ERROR:')) setStatus(result, 'error');
+              else { setStatus(`P${pi}R${run.ri} text updated`, 'ok'); renderAndRefresh(); }
+            }
+          });
+          row.appendChild(input);
+
+          // Bold toggle
+          const boldBtn = document.createElement('button');
+          boldBtn.className = 'fmt-btn' + (run.bold ? ' active' : '');
+          boldBtn.textContent = 'B';
+          boldBtn.style.fontWeight = 'bold';
+          boldBtn.title = 'Bold';
+          boldBtn.addEventListener('click', () => {
+            const newBold = run.bold ? 0 : 1;
+            const result = renderer.updateTextRunStyle(currentSlide, selectedShapeIdx, pi, run.ri, newBold, -1);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} bold=${!!newBold}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(boldBtn);
+
+          // Italic toggle
+          const italicBtn = document.createElement('button');
+          italicBtn.className = 'fmt-btn' + (run.italic ? ' active' : '');
+          italicBtn.textContent = 'I';
+          italicBtn.style.fontStyle = 'italic';
+          italicBtn.title = 'Italic';
+          italicBtn.addEventListener('click', () => {
+            const newItalic = run.italic ? 0 : 1;
+            const result = renderer.updateTextRunStyle(currentSlide, selectedShapeIdx, pi, run.ri, -1, newItalic);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} italic=${!!newItalic}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(italicBtn);
+
+          // Underline toggle
+          const ulBtn = document.createElement('button');
+          ulBtn.className = 'fmt-btn' + (run.underline ? ' active' : '');
+          ulBtn.textContent = 'U';
+          ulBtn.style.textDecoration = 'underline';
+          ulBtn.title = 'Underline';
+          ulBtn.addEventListener('click', () => {
+            const newUl = run.underline ? 'none' : 'sng';
+            const result = renderer.updateTextRunDecoration(currentSlide, selectedShapeIdx, pi, run.ri, newUl, '', -1);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} underline=${newUl==='none'?'off':'on'}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(ulBtn);
+
+          // Strikethrough toggle
+          const stBtn = document.createElement('button');
+          stBtn.className = 'fmt-btn' + (run.strike ? ' active' : '');
+          stBtn.textContent = 'S';
+          stBtn.style.textDecoration = 'line-through';
+          stBtn.title = 'Strikethrough';
+          stBtn.addEventListener('click', () => {
+            const newSt = run.strike ? 'none' : 'sngStrike';
+            const result = renderer.updateTextRunDecoration(currentSlide, selectedShapeIdx, pi, run.ri, '', newSt, -1);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} strike=${newSt==='none'?'off':'on'}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(stBtn);
+
+          // Superscript / Subscript
+          const supBtn = document.createElement('button');
+          supBtn.className = 'fmt-btn' + (run.baseline > 0 ? ' active' : '');
+          supBtn.innerHTML = 'x<sup style="font-size:0.6em">2</sup>';
+          supBtn.title = 'Superscript';
+          supBtn.addEventListener('click', () => {
+            const newBl = run.baseline > 0 ? 0 : 30000;
+            const result = renderer.updateTextRunDecoration(currentSlide, selectedShapeIdx, pi, run.ri, '', '', newBl);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} superscript=${newBl>0?'on':'off'}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(supBtn);
+
+          const subBtn = document.createElement('button');
+          subBtn.className = 'fmt-btn' + (run.baseline < 0 ? ' active' : '');
+          subBtn.innerHTML = 'x<sub style="font-size:0.6em">2</sub>';
+          subBtn.title = 'Subscript';
+          subBtn.addEventListener('click', () => {
+            const newBl = run.baseline < 0 ? 0 : -25000;
+            const result = renderer.updateTextRunDecoration(currentSlide, selectedShapeIdx, pi, run.ri, '', '', newBl);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} subscript=${newBl<0?'on':'off'}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(subBtn);
+
+          // Font size (pt)
+          const sizeInput = document.createElement('input');
+          sizeInput.type = 'number';
+          sizeInput.value = run.fontSize > 0 ? Math.round(run.fontSize / 100) : '';
+          sizeInput.placeholder = 'pt';
+          sizeInput.min = '1';
+          sizeInput.max = '400';
+          sizeInput.title = 'Font size (pt)';
+          sizeInput.addEventListener('change', () => {
+            const pt = parseInt(sizeInput.value) || 0;
+            const hpt = pt * 100;
+            const result = renderer.updateTextRunFontSize(currentSlide, selectedShapeIdx, pi, run.ri, hpt);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} size → ${pt}pt`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(sizeInput);
+
+          // Text color
+          const colorInput = document.createElement('input');
+          colorInput.type = 'color';
+          colorInput.title = 'Text color';
+          if (run.color && run.color.length === 6) colorInput.value = '#' + run.color;
+          colorInput.addEventListener('change', () => {
+            const hex = colorInput.value;
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            const result = renderer.updateTextRunColor(currentSlide, selectedShapeIdx, pi, run.ri, r, g, b);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} color → ${hex}`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(colorInput);
+
+          // Font family input
+          const fontInput = document.createElement('input');
+          fontInput.type = 'text';
+          fontInput.value = run.font;
+          fontInput.placeholder = 'Font';
+          fontInput.title = 'Font family (Latin)';
+          fontInput.style.width = '80px';
+          fontInput.style.minWidth = '60px';
+          fontInput.style.flex = '0 1 80px';
+          fontInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              const result = renderer.updateTextRunFont(currentSlide, selectedShapeIdx, pi, run.ri, fontInput.value);
+              if (result.startsWith('ERROR:')) setStatus(result, 'error');
+              else { setStatus(`P${pi}R${run.ri} font → ${fontInput.value}`, 'ok'); renderAndRefresh(); }
+            }
+          });
+          row.appendChild(fontInput);
+
+          // Apply text button
+          const applyBtn = document.createElement('button');
+          applyBtn.textContent = 'Apply';
+          applyBtn.title = 'Apply text change';
+          applyBtn.addEventListener('click', () => {
+            const result = renderer.updateShapeText(currentSlide, selectedShapeIdx, pi, run.ri, input.value);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} updated`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(applyBtn);
+
+          // Delete run button
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '×';
+          delBtn.className = 'fmt-btn danger-btn';
+          delBtn.title = 'Delete this run';
+          delBtn.addEventListener('click', () => {
+            const result = renderer.deleteRun(currentSlide, selectedShapeIdx, pi, run.ri);
+            if (result.startsWith('ERROR:')) setStatus(result, 'error');
+            else { setStatus(`P${pi}R${run.ri} deleted`, 'ok'); renderAndRefresh(); }
+          });
+          row.appendChild(delBtn);
+
+          panel.appendChild(row);
+        }
       }
 
-      // "Add Text" row — always shown for any selected shape
-      const addRow = document.createElement('div');
-      addRow.className = 'text-run-row';
-      const addLabel = document.createElement('span');
-      addLabel.className = 'text-run-label';
-      addLabel.textContent = '+ New';
-      addLabel.style.color = '#4a90d9';
-      const addInput = document.createElement('input');
-      addInput.type = 'text';
-      addInput.placeholder = 'Add text...';
-      const addSizeInput = document.createElement('input');
-      addSizeInput.type = 'number';
-      addSizeInput.value = '18';
-      addSizeInput.min = '1';
-      addSizeInput.max = '400';
-      addSizeInput.title = 'Font size (pt)';
-      addSizeInput.style.width = '50px';
-      addSizeInput.style.flex = '0 0 auto';
-      const addBtn = document.createElement('button');
-      addBtn.textContent = 'Add';
-      addBtn.style.background = '#1a3a5c';
-      const doAdd = () => {
-        if (!addInput.value) return;
-        const sizePt = parseInt(addSizeInput.value) || 18;
-        const sizeHpt = sizePt * 100; // hundredths of a point
-        const result = renderer.addShapeText(currentSlide, selectedShapeIdx, addInput.value, sizeHpt);
-        if (result.startsWith('ERROR:')) { setStatus(result, 'error'); }
-        else { setStatus(`Text added`, 'ok'); renderAndRefresh(); }
+      // ── Add Paragraph button ──
+      const addParaRow = document.createElement('div');
+      addParaRow.className = 'para-header';
+      addParaRow.style.borderTop = '1px solid #2a4a6a';
+      addParaRow.style.paddingTop = '8px';
+      const addParaInput = document.createElement('input');
+      addParaInput.type = 'text';
+      addParaInput.placeholder = 'New paragraph text...';
+      addParaInput.style.flex = '1';
+      addParaInput.style.padding = '4px 8px';
+      addParaInput.style.border = '1px solid #3a3a7a';
+      addParaInput.style.borderRadius = '4px';
+      addParaInput.style.fontSize = '13px';
+      addParaInput.style.background = '#16213e';
+      addParaInput.style.color = '#e0e0e0';
+      const addParaAlignSel = document.createElement('select');
+      addParaAlignSel.title = 'Alignment for new paragraph';
+      for (const [val, label] of [['','Inherit'],['l','Left'],['ctr','Center'],['r','Right'],['just','Justify']]) {
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = label;
+        addParaAlignSel.appendChild(opt);
+      }
+      const addParaBtn = document.createElement('button');
+      addParaBtn.textContent = '+ Paragraph';
+      addParaBtn.className = 'add-btn';
+      const doAddPara = () => {
+        const text = addParaInput.value || '';
+        const result = renderer.addParagraph(currentSlide, selectedShapeIdx, text, addParaAlignSel.value);
+        if (result.startsWith('ERROR:')) setStatus(result, 'error');
+        else { setStatus(`Paragraph added`, 'ok'); renderAndRefresh(); }
       };
-      addBtn.addEventListener('click', doAdd);
-      addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
-      addRow.appendChild(addLabel);
-      addRow.appendChild(addInput);
-      addRow.appendChild(addSizeInput);
-      addRow.appendChild(addBtn);
-      panel.appendChild(addRow);
+      addParaBtn.addEventListener('click', doAddPara);
+      addParaInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAddPara(); });
+      addParaRow.appendChild(addParaInput);
+      addParaRow.appendChild(addParaAlignSel);
+      addParaRow.appendChild(addParaBtn);
+      panel.appendChild(addParaRow);
 
       panel.classList.add('visible');
     }

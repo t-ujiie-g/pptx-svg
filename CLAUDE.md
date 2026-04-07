@@ -183,7 +183,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
-| `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), global state |
+| `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
+| `src/main/main_edit.mbt` | Shape/text editing API exports (E2/E2.5: CRUD, fill, stroke, text formatting) |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
 | `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
@@ -224,7 +225,8 @@ Follow the round-trip pipeline — update each relevant file:
 - `src/renderer/renderer_chart.mbt`: Chart SVG rendering (if chart-related)
 - `src/svg_parser/svg_parser.mbt`: `data-ooxml-*` → SlideData round-trip parsing
 - `src/serializer/serializer.mbt`: SlideData → OOXML XML serialization
-- `src/main/main.mbt`: Wasm exports, global state
+- `src/main/main.mbt`: Wasm exports (read-only), global state
+- `src/main/main_edit.mbt`: Shape/text editing API exports
 - `src/main/main_inherit.mbt`: Placeholder inheritance + text style defaults
 
 ### 2. MoonBit unit tests

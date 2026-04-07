@@ -43,6 +43,23 @@ interface PptxWasmExports {
     angle: number, stopsData: string): string;
   update_shape_stroke(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number, widthEmu: number, dash: string): string;
+  add_paragraph(slideIdx: number, shapeIdx: number,
+    text: string, align: string): string;
+  delete_paragraph(slideIdx: number, shapeIdx: number, paraIdx: number): string;
+  add_run(slideIdx: number, shapeIdx: number, paraIdx: number, text: string): string;
+  delete_run(slideIdx: number, shapeIdx: number, paraIdx: number, runIdx: number): string;
+  update_text_run_style(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, bold: number, italic: number): string;
+  update_text_run_font_size(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontSize: number): string;
+  update_text_run_color(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, r: number, g: number, b: number): string;
+  update_text_run_font(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontFace: string, eaFont: string, csFont: string): string;
+  update_paragraph_align(slideIdx: number, shapeIdx: number,
+    paraIdx: number, align: string): string;
+  update_text_run_decoration(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, underline: string, strike: string, baseline: number): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -465,6 +482,101 @@ export class PptxRenderer {
   updateShapeStroke(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number, widthEmu = 12700, dash = ''): string {
     return this.exports.update_shape_stroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash);
+  }
+
+  // ── Text editing API (E2.5) ─────────────────────────────────────────────────
+
+  /**
+   * Add a new paragraph to a shape with a single text run.
+   * @param align - "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
+   * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
+   */
+  addParagraph(slideIdx: number, shapeIdx: number, text: string, align = ''): string {
+    return this.exports.add_paragraph(slideIdx, shapeIdx, text, align);
+  }
+
+  /**
+   * Delete a paragraph from a shape.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteParagraph(slideIdx: number, shapeIdx: number, paraIdx: number): string {
+    return this.exports.delete_paragraph(slideIdx, shapeIdx, paraIdx);
+  }
+
+  /**
+   * Add a new text run to a paragraph.
+   * @returns "OK:<runIndex>" on success, "ERROR:..." on failure.
+   */
+  addRun(slideIdx: number, shapeIdx: number, paraIdx: number, text: string): string {
+    return this.exports.add_run(slideIdx, shapeIdx, paraIdx, text);
+  }
+
+  /**
+   * Delete a text run from a paragraph.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteRun(slideIdx: number, shapeIdx: number, paraIdx: number, runIdx: number): string {
+    return this.exports.delete_run(slideIdx, shapeIdx, paraIdx, runIdx);
+  }
+
+  /**
+   * Update a text run's bold/italic style. Returns re-rendered shape SVG.
+   * @param bold - 1 = set bold, 0 = unset bold, -1 = no change.
+   * @param italic - 1 = set italic, 0 = unset italic, -1 = no change.
+   */
+  updateTextRunStyle(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, bold = -1, italic = -1): string {
+    return this.exports.update_text_run_style(slideIdx, shapeIdx, paraIdx, runIdx, bold, italic);
+  }
+
+  /**
+   * Update a text run's font size. Returns re-rendered shape SVG.
+   * @param fontSize - In hundredths of a point (e.g. 1800 = 18pt). 0 = inherit.
+   */
+  updateTextRunFontSize(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontSize: number): string {
+    return this.exports.update_text_run_font_size(slideIdx, shapeIdx, paraIdx, runIdx, fontSize);
+  }
+
+  /**
+   * Update a text run's color (RGB 0-255). Returns re-rendered shape SVG.
+   * Pass r = -1 to clear (inherit from theme/master).
+   */
+  updateTextRunColor(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, r: number, g: number, b: number): string {
+    return this.exports.update_text_run_color(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b);
+  }
+
+  /**
+   * Update a text run's font family. Returns re-rendered shape SVG.
+   * @param fontFace - Latin font name. Empty string = no change.
+   * @param eaFont - East Asian font name. Empty string = no change.
+   * @param csFont - Complex Script font name. Empty string = no change.
+   */
+  updateTextRunFont(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontFace = '', eaFont = '', csFont = ''): string {
+    return this.exports.update_text_run_font(slideIdx, shapeIdx, paraIdx, runIdx, fontFace, eaFont, csFont);
+  }
+
+  /**
+   * Update a paragraph's alignment. Returns re-rendered shape SVG.
+   * @param align - "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
+   */
+  updateParagraphAlign(slideIdx: number, shapeIdx: number,
+    paraIdx: number, align: string): string {
+    return this.exports.update_paragraph_align(slideIdx, shapeIdx, paraIdx, align);
+  }
+
+  /**
+   * Update a text run's decoration (underline, strikethrough, baseline shift).
+   * Returns re-rendered shape SVG.
+   * @param underline - "sng" (single), "dbl" (double), "" (no change), "none" (remove).
+   * @param strike - "sngStrike", "dblStrike", "" (no change), "none" (remove).
+   * @param baseline - 30000 = superscript, -25000 = subscript, 0 = normal, -1 = no change.
+   */
+  updateTextRunDecoration(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, underline = '', strike = '', baseline = -1): string {
+    return this.exports.update_text_run_decoration(slideIdx, shapeIdx, paraIdx, runIdx, underline, strike, baseline);
   }
 
   // ── Slide management API ────────────────────────────────────────────────────
