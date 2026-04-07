@@ -1359,3 +1359,367 @@ pub fn update_shape_fill(
     }
   }
 }
+
+///|
+/// Delete a shape from a slide. Returns "OK" or "ERROR:<message>".
+pub fn delete_shape(slide_idx : Int, shape_idx : Int) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let new_arr : Array[@ooxml.Shape] = []
+      let len = arr.length()
+      let mut i = 0
+      while i < len {
+        if i != local_idx {
+          new_arr.push(arr[i])
+        }
+        i = i + 1
+      }
+      // Replace contents in-place (keeps group-child references intact)
+      while arr.length() > 0 {
+        let _ = arr.pop()
+
+      }
+      let mut j = 0
+      while j < new_arr.length() {
+        arr.push(new_arr[j])
+        j = j + 1
+      }
+      g_modified.val[slide_idx] = true
+      "OK"
+    }
+  }
+}
+
+///|
+/// Add a basic shape to a slide. Returns "OK:<shape_index>" or "ERROR:<message>".
+///
+/// `geom_type`: "rect", "ellipse", "roundRect", "line", etc.
+/// Position/size in EMU. fill_r/g/b: -1 = no fill.
+pub fn add_shape(
+  slide_idx : Int,
+  geom_type : String,
+  x : Int,
+  y : Int,
+  cx : Int,
+  cy : Int,
+  fill_r : Int,
+  fill_g : Int,
+  fill_b : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  let transform : @ooxml.ShapeTransform = {
+    x, y, cx, cy, rot: 0, flip_h: false, flip_v: false,
+  }
+  let geom = if geom_type == "ellipse" {
+    @ooxml.ShapeGeom::Ellipse
+  } else if geom_type == "roundRect" {
+    @ooxml.ShapeGeom::RoundRect
+  } else if geom_type == "line" {
+    @ooxml.ShapeGeom::Line
+  } else {
+    @ooxml.ShapeGeom::Rect
+  }
+  let kind = @ooxml.ShapeKind::AutoShape(geom)
+  let fill = if fill_r >= 0 && fill_g >= 0 && fill_b >= 0 {
+    ({ r: fill_r, g: fill_g, b: fill_b, alpha: 255 } : @ooxml.Color)
+  } else {
+    @ooxml.Color::none()
+  }
+  // Line shapes default to black 1pt stroke; others use no stroke
+  let stroke = if geom_type == "line" {
+    ({ r: 0, g: 0, b: 0, alpha: 255 } : @ooxml.Color)
+  } else {
+    @ooxml.Color::none()
+  }
+  let stroke_w = if geom_type == "line" { 12700 } else { 0 }
+  let shape = { ..@ooxml.Shape::default_with(kind, transform), fill, stroke, stroke_w, }
+  slide.shapes.push(shape)
+  let new_idx = slide.shapes.length() - 1
+  g_modified.val[slide_idx] = true
+  "OK:" + int_to_str(new_idx)
+}
+
+///|
+/// Add a text paragraph with a single run to a shape.
+/// If the shape has no paragraphs, this creates the first one.
+/// Returns "OK:<paraIndex>" or "ERROR:<message>".
+pub fn add_shape_text(
+  slide_idx : Int,
+  shape_idx : Int,
+  text : String,
+  font_size : Int,
+  color_r : Int,
+  color_g : Int,
+  color_b : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let shape = arr[local_idx]
+      let color : @ooxml.Color = if color_r >= 0 && color_g >= 0 && color_b >= 0 {
+        { r: color_r, g: color_g, b: color_b, alpha: 255 }
+      } else {
+        @ooxml.Color::none()
+      }
+      let run : @ooxml.TextRun = {
+        text,
+        bold: false,
+        bold_explicit: false,
+        italic: false,
+        font_size,
+        color,
+        font_face: "",
+        ea_font: "",
+        cs_font: "",
+        sym_font: "",
+        underline: "",
+        strike: "",
+        baseline: 0,
+        char_spacing: 0,
+        kern: 0,
+        cap: "",
+        hlink_rid: "",
+        hlink_mouse_over_rid: "",
+        effects: @ooxml.EffectList::none(),
+        outline_color: @ooxml.Color::none(),
+        outline_w: 0,
+        text_grad_fill: @ooxml.GradientFill::none(),
+        text_patt_fill: @ooxml.PatternFill::none(),
+        math_xml: "",
+      }
+      let para : @ooxml.TextParagraph = {
+        runs: [run],
+        align: "",
+        level: 0,
+        spc_before: 0,
+        spc_after: 0,
+        line_spacing: 0,
+        mar_l: -1,
+        indent: 0,
+        bullet: "",
+        bullet_auto: "",
+        bullet_none: false,
+        bullet_font: "",
+        bullet_size: 0,
+        bullet_color: @ooxml.Color::none(),
+        bullet_img_rid: "",
+        tab_stops: [],
+        rtl: false,
+      }
+      shape.paragraphs.push(para)
+      let para_idx = shape.paragraphs.length() - 1
+      g_modified.val[slide_idx] = true
+      "OK:" + int_to_str(para_idx)
+    }
+  }
+}
+
+///|
+/// Duplicate a shape on a slide, offset by (dx_emu, dy_emu).
+/// Returns "OK:<shape_index>" or "ERROR:<message>".
+pub fn duplicate_shape(
+  slide_idx : Int,
+  shape_idx : Int,
+  dx_emu : Int,
+  dy_emu : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let src = arr[local_idx]
+      let new_transform : @ooxml.ShapeTransform = {
+        x: src.transform.x + dx_emu,
+        y: src.transform.y + dy_emu,
+        cx: src.transform.cx,
+        cy: src.transform.cy,
+        rot: src.transform.rot,
+        flip_h: src.transform.flip_h,
+        flip_v: src.transform.flip_v,
+      }
+      let dup = { ..src, transform: new_transform }
+      arr.push(dup)
+      let new_idx = if shape_idx < 1000 {
+        slide.shapes.length() - 1
+      } else {
+        let parent_composite = shape_idx / 1000
+        parent_composite * 1000 + (arr.length() - 1)
+      }
+      g_modified.val[slide_idx] = true
+      "OK:" + int_to_str(new_idx)
+    }
+  }
+}
+
+///|
+/// Update a shape's gradient fill. Returns re-rendered SVG or "ERROR:<message>".
+///
+/// `angle`: gradient angle in 60000ths of a degree (e.g. 5400000 = 90deg)
+/// `stops_data`: "pos,r,g,b;pos,r,g,b;..." where pos is 0-100000
+pub fn update_shape_gradient_fill(
+  slide_idx : Int,
+  shape_idx : Int,
+  angle : Int,
+  stops_data : String,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let stops = parse_gradient_stops(stops_data)
+      if stops.is_empty() {
+        return "ERROR:invalid gradient stops"
+      }
+      let grad : @ooxml.GradientFill = {
+        stops,
+        angle,
+        path_type: "",
+        rot_with_shape: true,
+        fill_to_l: -1,
+        fill_to_t: -1,
+        fill_to_r: -1,
+        fill_to_b: -1,
+        tile_flip: "",
+      }
+      arr[local_idx] = {
+        ..arr[local_idx],
+        fill: @ooxml.Color::none(),
+        grad_fill: grad,
+        blip_fill: @ooxml.BlipFill::none(),
+        patt_fill: @ooxml.PatternFill::none(),
+      }
+      g_modified.val[slide_idx] = true
+      render_shape_svg(slide_idx, shape_idx)
+    }
+  }
+}
+
+///|
+fn parse_gradient_stops(s : String) -> Array[@ooxml.GradientStop] {
+  let stops : Array[@ooxml.GradientStop] = []
+  if s.is_empty() {
+    return stops
+  }
+  let parts = split_string(s, ';')
+  let np = parts.length()
+  let mut i = 0
+  while i < np {
+    let part = parts[i]
+    if !(part.is_empty()) {
+      let vals = split_string(part, ',')
+      if vals.length() >= 4 {
+        let pos = @xml.parse_int(vals[0])
+        let r = @xml.parse_int(vals[1])
+        let g = @xml.parse_int(vals[2])
+        let b = @xml.parse_int(vals[3])
+        stops.push(
+          {
+            pos,
+            color: ({ r, g, b, alpha: 255 } : @ooxml.Color),
+          },
+        )
+      }
+    }
+    i = i + 1
+  }
+  stops
+}
+
+///|
+fn split_string(s : String, sep : Char) -> Array[String] {
+  let result : Array[String] = []
+  let len = s.length()
+  let mut start = 0
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == sep {
+      result.push(substring(s, start, i))
+      start = i + 1
+    }
+    i = i + 1
+  }
+  if start <= len {
+    result.push(substring(s, start, len))
+  }
+  result
+}
+
+///|
+/// Update a shape's stroke color, width, and dash. Returns re-rendered SVG.
+///
+/// r/g/b: -1 = remove stroke. width_emu: 0 = default. dash: "" = solid.
+pub fn update_shape_stroke(
+  slide_idx : Int,
+  shape_idx : Int,
+  r : Int,
+  g : Int,
+  b : Int,
+  width_emu : Int,
+  dash : String,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  match resolve_shape_location(slide, shape_idx) {
+    None => "ERROR:shape index out of range"
+    Some((arr, local_idx)) => {
+      let stroke_color = if r >= 0 && g >= 0 && b >= 0 {
+        ({ r, g, b, alpha: 255 } : @ooxml.Color)
+      } else {
+        @ooxml.Color::none()
+      }
+      arr[local_idx] = {
+        ..arr[local_idx],
+        stroke: stroke_color,
+        stroke_w: width_emu,
+        stroke_dash: dash,
+        stroke_no_fill: r < 0,
+      }
+      g_modified.val[slide_idx] = true
+      render_shape_svg(slide_idx, shape_idx)
+    }
+  }
+}

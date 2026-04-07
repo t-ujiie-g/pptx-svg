@@ -30,6 +30,19 @@ interface PptxWasmExports {
     paraIdx: number, runIdx: number, text: string): string;
   update_shape_fill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string;
+  delete_shape(slideIdx: number, shapeIdx: number): string;
+  add_shape(slideIdx: number, geomType: string,
+    x: number, y: number, cx: number, cy: number,
+    fillR: number, fillG: number, fillB: number): string;
+  add_shape_text(slideIdx: number, shapeIdx: number,
+    text: string, fontSize: number,
+    colorR: number, colorG: number, colorB: number): string;
+  duplicate_shape(slideIdx: number, shapeIdx: number,
+    dxEmu: number, dyEmu: number): string;
+  update_shape_gradient_fill(slideIdx: number, shapeIdx: number,
+    angle: number, stopsData: string): string;
+  update_shape_stroke(slideIdx: number, shapeIdx: number,
+    r: number, g: number, b: number, widthEmu: number, dash: string): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -112,7 +125,7 @@ const NS_DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_RELS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const NS_PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 
-/** Default slide size: 10" x 7.5" (standard widescreen 16:9 not — this is 4:3) */
+/** Default slide size: 10" x 5.625" (standard widescreen 16:9) */
 const DEFAULT_SLIDE_CX = 9144000;
 const DEFAULT_SLIDE_CY = 5143500;
 
@@ -389,6 +402,69 @@ export class PptxRenderer {
   updateShapeFill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string {
     return this.exports.update_shape_fill(slideIdx, shapeIdx, r, g, b);
+  }
+
+  /**
+   * Delete a shape from a slide.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteShape(slideIdx: number, shapeIdx: number): string {
+    return this.exports.delete_shape(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Add a basic AutoShape to a slide.
+   * @param geomType - Preset geometry: "rect", "ellipse", "roundRect", "line", etc.
+   * @param x, y, cx, cy - Position and size in EMU.
+   * @param fillR, fillG, fillB - Fill color (0-255). Pass -1 for no fill.
+   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   */
+  addShape(slideIdx: number, geomType: string,
+    x: number, y: number, cx: number, cy: number,
+    fillR = -1, fillG = -1, fillB = -1): string {
+    return this.exports.add_shape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB);
+  }
+
+  /**
+   * Add a text paragraph to a shape. Creates a single run with the given text.
+   * @param fontSize - Font size in hundredths of a point (e.g. 1800 = 18pt). 0 = inherit.
+   * @param colorR, colorG, colorB - Text color (0-255). Pass -1 for default/inherit.
+   * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
+   */
+  addShapeText(slideIdx: number, shapeIdx: number, text: string,
+    fontSize = 0, colorR = -1, colorG = -1, colorB = -1): string {
+    return this.exports.add_shape_text(slideIdx, shapeIdx, text, fontSize, colorR, colorG, colorB);
+  }
+
+  /**
+   * Duplicate a shape, offset by (dxEmu, dyEmu) from the original.
+   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   */
+  duplicateShape(slideIdx: number, shapeIdx: number,
+    dxEmu = 457200, dyEmu = 457200): string {
+    return this.exports.duplicate_shape(slideIdx, shapeIdx, dxEmu, dyEmu);
+  }
+
+  /**
+   * Update a shape's fill to a linear gradient. Returns re-rendered SVG.
+   * @param angle - Gradient angle in 60000ths of a degree (e.g. 5400000 = 90deg).
+   * @param stops - Array of { pos, r, g, b } where pos is 0-100000.
+   */
+  updateShapeGradientFill(slideIdx: number, shapeIdx: number,
+    angle: number, stops: Array<{ pos: number; r: number; g: number; b: number }>): string {
+    const stopsData = stops.map(s => `${s.pos},${s.r},${s.g},${s.b}`).join(';');
+    return this.exports.update_shape_gradient_fill(slideIdx, shapeIdx, angle, stopsData);
+  }
+
+  /**
+   * Update a shape's stroke (outline). Returns re-rendered SVG.
+   * @param r, g, b - Stroke color (0-255). Pass -1 to remove stroke.
+   * @param widthEmu - Stroke width in EMU (default 12700 = 1pt).
+   * @param dash - Dash preset: "dash", "dot", "dashDot", "lgDash", etc. "" = solid.
+   */
+  updateShapeStroke(slideIdx: number, shapeIdx: number,
+    r: number, g: number, b: number, widthEmu = 12700, dash = ''): string {
+    return this.exports.update_shape_stroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash);
   }
 
   // ── Slide management API ────────────────────────────────────────────────────

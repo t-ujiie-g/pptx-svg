@@ -133,6 +133,12 @@ const renderer = new PptxRenderer(options?);
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | 位置/サイズ/回転を更新（EMU単位）。再描画SVGを返す。 |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | テキスト内容を更新。再描画SVGを返す。 |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | 塗りつぶし色を更新（0-255）。再描画SVGを返す。 |
+| `deleteShape(slideIdx, shapeIdx)` | `string` | シェイプを削除。グループ内シェイプは composite index で指定。 |
+| `addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB)` | `string` | シェイプを追加（`rect`/`ellipse`/`roundRect`/`line`）。`OK:<index>` を返す。fill -1 = 塗りなし。 |
+| `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | `string` | シェイプをオフセット付きで複製。`OK:<index>` を返す。 |
+| `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | `string` | 線形グラデーション適用。`angle`: 6万分の1度単位。`stops`: `[{pos,r,g,b}]`。 |
+| `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | `string` | シェイプにテキスト段落を追加。`fontSize`: 1/100ポイント単位（例: 1800 = 18pt）。`OK:<paraIndex>` を返す。 |
+| `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | `string` | ストローク設定。color -1 = 削除。`dash`: `dash`/`dot` 等。 |
 
 `update*` メソッドはキャッシュされた SlideData を直接更新し、エクスポート用にスライドを変更済みとしてマークし、再描画されたシェイプSVGを返します。使用パターンは [`docs/editing-guide.md`](docs/editing-guide.md) を参照。
 

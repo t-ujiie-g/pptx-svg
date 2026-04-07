@@ -133,6 +133,12 @@ const renderer = new PptxRenderer(options?);
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | Update position/size/rotation (EMU). Returns re-rendered SVG. |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | Update text content. Returns re-rendered SVG. |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | Update solid fill color (0-255). Returns re-rendered SVG. |
+| `deleteShape(slideIdx, shapeIdx)` | `string` | Delete a shape. Supports group children via composite index. |
+| `addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB)` | `string` | Add a shape (`rect`/`ellipse`/`roundRect`/`line`). Returns `OK:<index>`. Fill -1 = none. |
+| `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | `string` | Duplicate a shape with offset. Returns `OK:<index>`. |
+| `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | `string` | Apply linear gradient. `angle` in 60000ths of degree. `stops`: `[{pos,r,g,b}]`. |
+| `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | `string` | Add a text paragraph to a shape. `fontSize` in hundredths of a point (e.g. 1800 = 18pt). Returns `OK:<paraIndex>`. |
+| `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | `string` | Set stroke. Color -1 = remove. `dash`: `dash`/`dot`/etc. |
 
 All `update*` methods modify the cached SlideData in-place, mark the slide as modified for export, and return the re-rendered shape SVG. See [`docs/editing-guide.md`](docs/editing-guide.md) for usage patterns.
 
