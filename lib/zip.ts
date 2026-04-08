@@ -199,6 +199,7 @@ export async function buildZip(
   originalBuffer: ArrayBuffer,
   modifications: Map<string, string>,
   removals?: Set<string>,
+  binaryModifications?: Map<string, Uint8Array>,
 ): Promise<ArrayBuffer> {
   const origBytes = new Uint8Array(originalBuffer);
   const origView = new DataView(originalBuffer);
@@ -254,6 +255,15 @@ export async function buildZip(
       entry.uncompressedSize = newContent.length;
       entry.crc32 = crc32(newContent);
       entry.extra = new Uint8Array(0);
+    } else if (binaryModifications?.has(entry.name)) {
+      const newContent = binaryModifications.get(entry.name)!;
+      const compressed = await deflate(newContent);
+      entry.method = 8;
+      entry.compressedData = compressed;
+      entry.compressedSize = compressed.length;
+      entry.uncompressedSize = newContent.length;
+      entry.crc32 = crc32(newContent);
+      entry.extra = new Uint8Array(0);
     }
   }
 
@@ -273,6 +283,22 @@ export async function buildZip(
         compressedData: compressed,
         extra: new Uint8Array(0),
       });
+    }
+  }
+  // Add new binary entries
+  if (binaryModifications) {
+    for (const [name, content] of binaryModifications) {
+      if (!existingNames.has(name)) {
+        const compressed = await deflate(content);
+        entries.push({
+          name, method: 8, flags: 0, time: dosTime, date: dosDate,
+          crc32: crc32(content),
+          compressedSize: compressed.length,
+          uncompressedSize: content.length,
+          compressedData: compressed,
+          extra: new Uint8Array(0),
+        });
+      }
     }
   }
 

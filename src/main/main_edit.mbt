@@ -370,6 +370,85 @@ pub fn add_shape(
 }
 
 ///|
+/// Add a Picture shape to a slide. The image binary must already be in the ZIP
+/// and referenced via the given relationship ID in the slide's .rels file.
+/// Returns "OK:<shape_index>" or "ERROR:<message>".
+pub fn add_picture_shape(
+  slide_idx : Int,
+  rid : String,
+  x : Int,
+  y : Int,
+  cx : Int,
+  cy : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  let slide = g_slides.val[slide_idx]
+  let transform : @ooxml.ShapeTransform = {
+    x, y, cx, cy, rot: 0, flip_h: false, flip_v: false,
+  }
+  let kind = @ooxml.ShapeKind::Picture(rid)
+  let blip_fill : @ooxml.BlipFill = {
+    rid,
+    stretch: true,
+    src_l: 0,
+    src_t: 0,
+    src_r: 0,
+    src_b: 0,
+    tile_tx: 0,
+    tile_ty: 0,
+    tile_sx: 0,
+    tile_sy: 0,
+    tile_flip: "",
+    tile_algn: "",
+    alpha: 100000,
+    svg_rid: "",
+    bright: 0,
+    contrast: 0,
+    duotone_1: @ooxml.Color::none(),
+    duotone_2: @ooxml.Color::none(),
+    clr_from: @ooxml.Color::none(),
+    clr_to: @ooxml.Color::none(),
+  }
+  let shape = @ooxml.Shape::default_with_blip(kind, transform, blip_fill)
+  slide.shapes.push(shape)
+  let new_idx = slide.shapes.length() - 1
+  g_modified.val[slide_idx] = true
+  "OK:" + int_to_str(new_idx)
+}
+
+///|
+/// Replace the image reference of a Picture shape.
+/// Updates the blip_fill rid and ShapeKind::Picture(rid).
+/// Returns "OK" or "ERROR:<message>".
+pub fn replace_picture_rid(
+  slide_idx : Int,
+  shape_idx : Int,
+  new_rid : String,
+) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let shape = arr[local_idx]
+    match shape.kind {
+      Picture(_) => {
+        arr[local_idx] = {
+          ..shape,
+          kind: @ooxml.ShapeKind::Picture(new_rid),
+          blip_fill: { ..shape.blip_fill, rid: new_rid },
+        }
+        g_modified.val[slide_idx] = true
+        "OK"
+      }
+      _ => "ERROR:shape is not a picture"
+    }
+  })
+}
+
+///|
 /// Add a text paragraph with a single run to a shape.
 /// Returns "OK:<paraIndex>" or "ERROR:<message>".
 pub fn add_shape_text(

@@ -167,6 +167,16 @@ All `update*` methods modify the cached SlideData in-place, mark the slide as mo
 
 Slide management methods update `presentation.xml`, `.rels`, and `[Content_Types].xml` automatically. Changes are reflected in `exportPptx()`.
 
+**Image Operations:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `addImage(slideIdx, imageData, mimeType, x, y, cx, cy)` | `string` | Add picture shape. Handles media/rels/content-types. Returns `OK:<shapeIdx>`. |
+| `replaceImage(slideIdx, shapeIdx, imageData, mimeType)` | `string` | Replace image of existing picture shape. Returns re-rendered SVG. |
+| `deleteImage(slideIdx, shapeIdx)` | `string` | Delete picture shape and clean up orphaned media. Returns `OK`. |
+
+Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

@@ -40,6 +40,8 @@ options(
         "update_text_run_font",
         "update_paragraph_align",
         "update_text_run_decoration",
+        "add_picture_shape",
+        "replace_picture_rid",
       ],
       "use-js-builtin-string": true,
     },

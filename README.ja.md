@@ -167,6 +167,16 @@ const renderer = new PptxRenderer(options?);
 
 スライド管理メソッドは `presentation.xml`・`.rels`・`[Content_Types].xml` を自動更新します。変更は `exportPptx()` に反映されます。
 
+**画像操作:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `addImage(slideIdx, imageData, mimeType, x, y, cx, cy)` | `string` | 画像シェイプを追加。メディア/rels/Content-Types を自動管理。`OK:<shapeIdx>` を返す。 |
+| `replaceImage(slideIdx, shapeIdx, imageData, mimeType)` | `string` | 既存画像シェイプの画像を差し替え。再レンダリング SVG を返す。 |
+| `deleteImage(slideIdx, shapeIdx)` | `string` | 画像シェイプを削除し、孤立メディアをクリーンアップ。`OK` を返す。 |
+
+対応 MIME タイプ: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`。
+
 **ノート・コメント:**
 
 | メソッド | 戻り値 | 説明 |

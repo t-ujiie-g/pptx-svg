@@ -110,6 +110,35 @@
     #text-runs-panel .danger-btn:hover { background: #3a1520; }
     #text-runs-panel .add-btn { background: #1a3a5c; border-color: #4a90d9; }
 
+    /* ── Image toolbar ── */
+    #image-toolbar {
+      display: none;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #0f1a33;
+      border: 1px solid #3a3a7a;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    #image-toolbar.visible { display: flex; }
+    #image-toolbar label { color: #aaa; font-size: 0.85em; white-space: nowrap; }
+    #image-toolbar button {
+      padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #3a3a7a;
+      background: #16213e; color: #e0e0e0; cursor: pointer;
+    }
+    #image-toolbar button:hover { border-color: #4a90d9; }
+    #image-toolbar input[type="file"] { display: none; }
+    #image-toolbar .file-label {
+      display: inline-block; padding: 4px 10px; font-size: 0.85em; border-radius: 4px;
+      border: 1px dashed #4a90d9; background: #16213e; color: #8ab4f8; cursor: pointer;
+    }
+    #image-toolbar .file-label:hover { background: #1e2d50; }
+    #image-toolbar .file-name {
+      color: #6a8abf; font-size: 0.8em; font-family: monospace; max-width: 200px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
     /* ── Shape info ── */
     #shape-info {
       display: none;
@@ -248,6 +277,17 @@
       </select>
       <input type="color" id="add-shape-fill" value="#4a90d9">
       <button id="add-shape-btn">+ Add</button>
+    </div>
+
+    <!-- Image toolbar -->
+    <div id="image-toolbar">
+      <label>Add Image:</label>
+      <label class="file-label" for="image-file-input">Choose Image...</label>
+      <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/gif,image/bmp,image/svg+xml,image/tiff">
+      <span id="image-file-name" class="file-name"></span>
+      <button id="add-image-btn" disabled>+ Add Image</button>
+      <div class="sep" style="width:1px;height:24px;background:#3a3a7a;margin:0 4px"></div>
+      <button id="replace-image-btn" disabled title="Replace image of selected picture shape">Replace Image</button>
     </div>
 
     <!-- Editing toolbar (visible when shape selected) -->
@@ -429,15 +469,21 @@
     }
 
     function updateToolbar() {
-      if (selectedShapeIdx < 0) { $('edit-toolbar').classList.remove('visible'); return; }
+      if (selectedShapeIdx < 0) {
+        $('edit-toolbar').classList.remove('visible');
+        $('replace-image-btn').disabled = true;
+        return;
+      }
       $('edit-toolbar').classList.add('visible');
       const svgEl = getSvgEl();
       const g = svgEl ? findShapeElement(svgEl, selectedShapeIdx) : null;
-      if (!g) { $('shape-label').textContent = `Shape #${selectedShapeIdx}`; return; }
+      if (!g) { $('shape-label').textContent = `Shape #${selectedShapeIdx}`; $('replace-image-btn').disabled = true; return; }
       const t = getShapeTransform(g);
       const shapeType = g.getAttribute('data-ooxml-shape-type') || '?';
       const geom = g.getAttribute('data-ooxml-geom') || '';
       $('shape-label').textContent = `Shape #${selectedShapeIdx} (${shapeType}${geom ? '/' + geom : ''})`;
+      // Enable replace-image only for picture shapes
+      $('replace-image-btn').disabled = shapeType !== 'picture';
       const info = $('shape-info');
       info.classList.add('visible');
       info.textContent = `x=${emuToPx(t.x)}px y=${emuToPx(t.y)}px w=${emuToPx(t.cx)}px h=${emuToPx(t.cy)}px rot=${t.rot}`;
@@ -828,11 +874,18 @@
     // ── Delete shape ──
     $('del-shape-btn').addEventListener('click', () => {
       if (selectedShapeIdx < 0) return;
-      const result = renderer.deleteShape(currentSlide, selectedShapeIdx);
+      // Use deleteImage for picture shapes (handles media cleanup)
+      const svgEl = getSvgEl();
+      const g = svgEl ? findShapeElement(svgEl, selectedShapeIdx) : null;
+      const isPic = g && g.getAttribute('data-ooxml-shape-type') === 'picture';
+      const result = isPic
+        ? renderer.deleteImage(currentSlide, selectedShapeIdx)
+        : renderer.deleteShape(currentSlide, selectedShapeIdx);
       if (result.startsWith('ERROR:')) { setStatus(result, 'error'); return; }
-      setStatus(`Deleted shape #${selectedShapeIdx}`, 'ok');
+      setStatus(`Deleted ${isPic ? 'image' : 'shape'} #${selectedShapeIdx}`, 'ok');
       deselect();
       renderAndRefresh();
+      renderThumbnails();
     });
 
     // ── Duplicate shape ──
@@ -872,6 +925,65 @@
         const sg = findShapeElement(svgEl, newIdx);
         if (sg) selectShape(sg);
       }
+    });
+
+    // ── Image operations ──
+    let pendingImageFile = null;
+    $('image-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) { pendingImageFile = null; $('image-file-name').textContent = ''; $('add-image-btn').disabled = true; return; }
+      pendingImageFile = file;
+      $('image-file-name').textContent = file.name;
+      $('add-image-btn').disabled = false;
+    });
+
+    $('add-image-btn').addEventListener('click', async () => {
+      if (!pendingImageFile) return;
+      try {
+        const data = new Uint8Array(await pendingImageFile.arrayBuffer());
+        const mime = pendingImageFile.type || 'image/png';
+        // Place at center, 3x2 inch
+        const cx = 2743200, cy = 1828800;
+        const x = Math.round((9144000 - cx) / 2);
+        const y = Math.round((6858000 - cy) / 2);
+        const result = renderer.addImage(currentSlide, data, mime, x, y, cx, cy);
+        if (result.startsWith('ERROR:')) { setStatus(result, 'error'); return; }
+        const newIdx = parseInt(result.split(':')[1]);
+        setStatus(`Added image "${pendingImageFile.name}" → shape #${newIdx}`, 'ok');
+        pendingImageFile = null;
+        $('image-file-input').value = '';
+        $('image-file-name').textContent = '';
+        $('add-image-btn').disabled = true;
+        renderAndRefresh();
+        renderThumbnails();
+        const svgEl = getSvgEl();
+        if (svgEl) { const g = findShapeElement(svgEl, newIdx); if (g) selectShape(g); }
+      } catch (err) {
+        setStatus(`Image error: ${err.message}`, 'error');
+      }
+    });
+
+    $('replace-image-btn').addEventListener('click', () => {
+      if (selectedShapeIdx < 0) return;
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/jpeg,image/gif,image/bmp,image/svg+xml,image/tiff';
+      input.addEventListener('change', async () => {
+        const file = input.files[0];
+        if (!file) return;
+        try {
+          const data = new Uint8Array(await file.arrayBuffer());
+          const mime = file.type || 'image/png';
+          const result = renderer.replaceImage(currentSlide, selectedShapeIdx, data, mime);
+          if (result.startsWith('ERROR:')) { setStatus(result, 'error'); return; }
+          setStatus(`Replaced image on shape #${selectedShapeIdx}`, 'ok');
+          renderAndRefresh();
+          renderThumbnails();
+        } catch (err) {
+          setStatus(`Replace error: ${err.message}`, 'error');
+        }
+      });
+      input.click();
     });
 
     // ── Drag (move) and Resize ──
@@ -1133,6 +1245,7 @@
           $('export-card').style.display = 'block';
           $('slide-mgmt').classList.add('visible');
           $('shape-add-toolbar').classList.add('visible');
+          $('image-toolbar').classList.add('visible');
           renderThumbnails();
           showSlide(0);
         }

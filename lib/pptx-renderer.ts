@@ -60,6 +60,9 @@ interface PptxWasmExports {
     paraIdx: number, align: string): string;
   update_text_run_decoration(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, underline: string, strike: string, baseline: number): string;
+  add_picture_shape(slideIdx: number, rid: string,
+    x: number, y: number, cx: number, cy: number): string;
+  replace_picture_rid(slideIdx: number, shapeIdx: number, newRid: string): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -145,6 +148,17 @@ const NS_PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006
 /** Default slide size: 10" x 5.625" (standard widescreen 16:9) */
 const DEFAULT_SLIDE_CX = 9144000;
 const DEFAULT_SLIDE_CY = 5143500;
+const REL_TYPE_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+
+/** Map MIME type to file extension. Returns null for unsupported types. */
+function mimeToExt(mime: string): string | null {
+  const map: Record<string, string> = {
+    'image/png': 'png', 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg',
+    'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/webp': 'webp',
+    'image/bmp': 'bmp', 'image/tiff': 'tiff',
+  };
+  return map[mime] ?? null;
+}
 
 /** First slide ID used in presentation.xml sldIdLst (OOXML convention). */
 const FIRST_SLIDE_ID = 256;
@@ -170,6 +184,9 @@ export class PptxRenderer {
 
   /** Files removed after loadPptx */
   private removedFiles = new Set<string>();
+
+  /** Binary files added/replaced after loadPptx (e.g. images) */
+  private addedBinaryFiles = new Map<string, Uint8Array>();
 
   /** Canvas for text measurement (lazily created) */
   private canvas: HTMLCanvasElement | null = null;
@@ -252,6 +269,7 @@ export class PptxRenderer {
     }
     this.originalBuffer = arrayBuffer.slice(0); // keep a copy for export
     this.addedFiles.clear();
+    this.addedBinaryFiles.clear();
     this.removedFiles.clear();
     this.log.debug('Parsing ZIP archive...');
     const { textFiles, binaryFiles } = await extractZip(arrayBuffer, this.log);
@@ -344,8 +362,12 @@ export class PptxRenderer {
       }
     }
 
-    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries, ${this.removedFiles.size} removals`);
-    return buildZip(this.originalBuffer, modifications, this.removedFiles.size > 0 ? this.removedFiles : undefined);
+    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries, ${this.addedBinaryFiles.size} binary entries, ${this.removedFiles.size} removals`);
+    return buildZip(
+      this.originalBuffer, modifications,
+      this.removedFiles.size > 0 ? this.removedFiles : undefined,
+      this.addedBinaryFiles.size > 0 ? this.addedBinaryFiles : undefined,
+    );
   }
 
   // ── Notes & Comments API ──────────────────────────────────────────────────
@@ -805,16 +827,16 @@ export class PptxRenderer {
     return ids.length > 0 ? Math.max(...ids) + 1 : FIRST_SLIDE_ID;
   }
 
-  /** Find the next available rId in presentation.xml.rels. */
-  private findNextRId(relsXml: string): string {
-    const ids: number[] = [];
+  /** Find the next available rId in a .rels XML string. */
+  private nextRid(relsXml: string): string {
+    let maxId = 0;
     const re = /Id="rId(\d+)"/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(relsXml)) !== null) {
-      ids.push(parseInt(m[1]));
+      const id = parseInt(m[1]);
+      if (id > maxId) maxId = id;
     }
-    const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
-    return `rId${next}`;
+    return `rId${maxId + 1}`;
   }
 
   /** Update presentation.xml and .rels for slide addition. */
@@ -823,7 +845,7 @@ export class PptxRenderer {
     let prsRels = this.files.get('ppt/_rels/presentation.xml.rels') ?? '';
 
     const newSlideNum = insertIdx + 1;
-    const newRId = this.findNextRId(prsRels);
+    const newRId = this.nextRid(prsRels);
     const newSldId = this.findNextSlideId(prsXml);
 
     // Add relationship for new slide
@@ -1028,6 +1050,183 @@ export class PptxRenderer {
     }
 
     this.persistFile('[Content_Types].xml', ct);
+  }
+
+  // ── Image management API ───────────────────────────────────────────────────
+
+  /**
+   * Add an image to a slide as a Picture shape.
+   * @param slideIdx - Slide index (0-based).
+   * @param imageData - Raw image bytes (PNG, JPEG, GIF, etc.).
+   * @param mimeType - MIME type (e.g. "image/png", "image/jpeg").
+   * @param x, y, cx, cy - Position and size in EMU.
+   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   */
+  addImage(slideIdx: number, imageData: Uint8Array, mimeType: string,
+    x: number, y: number, cx: number, cy: number): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+
+    // Determine file extension from MIME type
+    const ext = mimeToExt(mimeType);
+    if (!ext) return 'ERROR:unsupported image type';
+
+    // Generate unique media filename
+    const mediaPath = this.nextMediaPath(ext);
+
+    // Store binary in rawFiles (for Wasm FFI) and addedBinaryFiles (for export)
+    this.rawFiles.set(mediaPath, imageData);
+    this.addedBinaryFiles.set(mediaPath, imageData);
+
+    // Add relationship to slide's .rels
+    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+    let relsXml = this.files.get(relsPath) ?? '';
+    const rid = this.nextRid(relsXml);
+    const relEntry = `<Relationship Id="${rid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
+    if (relsXml.includes('</Relationships>')) {
+      relsXml = relsXml.replace('</Relationships>', relEntry + '</Relationships>');
+    } else {
+      relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relEntry}</Relationships>`;
+    }
+    this.persistFile(relsPath, relsXml);
+
+    // Ensure content type for this extension
+    this.ensureContentTypeForExtension(ext, mimeType);
+
+    // Add Picture shape via Wasm
+    this.renderSlideSvg(slideIdx); // ensure slide is parsed
+    return this.exports.add_picture_shape(slideIdx, rid, x, y, cx, cy);
+  }
+
+  /**
+   * Replace the image data of an existing Picture shape.
+   * @param slideIdx - Slide index (0-based).
+   * @param shapeIdx - Shape index (composite index for groups).
+   * @param imageData - New image bytes.
+   * @param mimeType - MIME type of the new image.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  replaceImage(slideIdx: number, shapeIdx: number,
+    imageData: Uint8Array, mimeType: string): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+
+    const ext = mimeToExt(mimeType);
+    if (!ext) return 'ERROR:unsupported image type';
+
+    // Find the shape's current rid from SVG data attributes
+    this.renderSlideSvg(slideIdx); // ensure slide is parsed
+    const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
+    if (svg.startsWith('ERROR:')) return svg;
+
+    const ridMatch = svg.match(/data-ooxml-blip-rid="([^"]+)"/);
+    if (!ridMatch) return 'ERROR:shape has no image reference';
+    const currentRid = ridMatch[1];
+
+    // Resolve current image path from rels
+    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+    const relsXml = this.files.get(relsPath) ?? '';
+    const oldTarget = this.resolveRidTarget(relsXml, currentRid);
+
+    if (oldTarget) {
+      // Replace existing file at the same path
+      const oldPath = this.resolveRelPath('ppt/slides/', oldTarget);
+
+      if (mimeToExt(mimeType) === oldPath.split('.').pop()) {
+        // Same extension — replace in place
+        this.rawFiles.set(oldPath, imageData);
+        this.addedBinaryFiles.set(oldPath, imageData);
+        return 'OK';
+      }
+    }
+
+    // Different extension or couldn't resolve — create new file and update rid
+    const mediaPath = this.nextMediaPath(ext);
+    this.rawFiles.set(mediaPath, imageData);
+    this.addedBinaryFiles.set(mediaPath, imageData);
+
+    const newRid = this.nextRid(relsXml);
+    const relEntry = `<Relationship Id="${newRid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
+    const updatedRels = relsXml.replace('</Relationships>', relEntry + '</Relationships>');
+    this.persistFile(relsPath, updatedRels);
+    this.ensureContentTypeForExtension(ext, mimeType);
+
+    return this.exports.replace_picture_rid(slideIdx, shapeIdx, newRid);
+  }
+
+  /**
+   * Delete a Picture shape and mark its media file for removal.
+   * @param slideIdx - Slide index (0-based).
+   * @param shapeIdx - Shape index.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteImage(slideIdx: number, shapeIdx: number): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+
+    // Find the shape's rid before deleting
+    this.renderSlideSvg(slideIdx);
+    const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
+    let mediaPath: string | null = null;
+    if (!svg.startsWith('ERROR:')) {
+      const ridMatch = svg.match(/data-ooxml-blip-rid="([^"]+)"/);
+      if (ridMatch) {
+        const rid = ridMatch[1];
+        const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+        const relsXml = this.files.get(relsPath) ?? '';
+        const target = this.resolveRidTarget(relsXml, rid);
+        if (target) {
+          mediaPath = this.resolveRelPath('ppt/slides/', target);
+        }
+      }
+    }
+
+    // Delete the shape
+    const result = this.exports.delete_shape(slideIdx, shapeIdx);
+    if (result.startsWith('ERROR:')) return result;
+
+    // Mark media file for removal (if not referenced by other slides)
+    if (mediaPath && !this.isMediaReferencedElsewhere(mediaPath, slideIdx)) {
+      this.removedFiles.add(mediaPath);
+      this.rawFiles.delete(mediaPath);
+    }
+
+    return 'OK';
+  }
+
+  /** Resolve a relationship ID to its Target attribute in a .rels XML string. */
+  private resolveRidTarget(relsXml: string, rid: string): string | null {
+    const m = relsXml.match(new RegExp(`<Relationship[^>]+Id="${rid}"[^>]+Target="([^"]+)"`))
+           ?? relsXml.match(new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Id="${rid}"`));
+    return m ? m[1] : null;
+  }
+
+  /** Generate the next available media file path. */
+  private nextMediaPath(ext: string): string {
+    let n = 1;
+    const allPaths = new Set([...this.rawFiles.keys(), ...this.addedBinaryFiles.keys()]);
+    while (allPaths.has(`ppt/media/image${n}.${ext}`)) n++;
+    return `ppt/media/image${n}.${ext}`;
+  }
+
+  /** Ensure [Content_Types].xml has a Default entry for the given extension. */
+  private ensureContentTypeForExtension(ext: string, mimeType: string): void {
+    let ct = this.files.get('[Content_Types].xml');
+    if (!ct) return;
+    if (ct.includes(`Extension="${ext}"`)) return;
+    const entry = `<Default Extension="${ext}" ContentType="${mimeType}"/>`;
+    ct = ct.replace('</Types>', entry + '</Types>');
+    this.persistFile('[Content_Types].xml', ct);
+  }
+
+  /** Check if a media file is referenced by any slide other than the given one. */
+  private isMediaReferencedElsewhere(mediaPath: string, excludeSlideIdx: number): boolean {
+    const filename = mediaPath.split('/').pop() ?? '';
+    const slideCount = this.exports.get_slide_count();
+    for (let i = 0; i < slideCount; i++) {
+      if (i === excludeSlideIdx) continue;
+      const relsPath = `ppt/slides/_rels/slide${i + 1}.xml.rels`;
+      const relsXml = this.files.get(relsPath) ?? '';
+      if (relsXml.includes(filename)) return true;
+    }
+    return false;
   }
 
   /** Update a file in both the live files map and the export tracking map. */

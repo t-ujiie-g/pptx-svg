@@ -44,6 +44,18 @@ All shape `update*` methods:
 
 Slide management methods update package metadata (`presentation.xml`, `.rels`, `[Content_Types].xml`) and re-initialize the Wasm engine automatically.
 
+### Image APIs
+
+| Method | Description |
+|--------|-------------|
+| `addImage(slideIdx, imageData, mimeType, x, y, cx, cy)` | Add a picture shape with the given image data (Uint8Array). Handles media file, `.rels`, and `[Content_Types].xml` updates. Returns `"OK:<shapeIdx>"` |
+| `replaceImage(slideIdx, shapeIdx, imageData, mimeType)` | Replace the image of an existing picture shape. Returns re-rendered SVG |
+| `deleteImage(slideIdx, shapeIdx)` | Delete a picture shape and clean up orphaned media files. Returns `"OK"` |
+
+Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+Coordinates (`x`, `y`, `cx`, `cy`) are in EMU (English Metric Units). Use `pxToEmu()` for conversion.
+
 ### Unit Conversion Helpers
 
 ```typescript
@@ -332,6 +344,25 @@ renderer.updateShapeStroke(0, shapeIdx, -1, -1, -1, 0);
 ```
 
 Dash presets: `dash`, `dot`, `dashDot`, `lgDash`, `lgDashDot`, `lgDashDotDot`, `sysDash`, `sysDot`, `sysDashDot`, `sysDashDotDot`.
+
+## Image Operations
+
+```typescript
+// Add a picture shape from image data
+const imageData = new Uint8Array(await fetch('photo.png').then(r => r.arrayBuffer()));
+const result = renderer.addImage(0, imageData, 'image/png',
+  914400, 914400, 3657600, 2743200);  // x, y, width, height in EMU
+const shapeIdx = parseInt(result.split(':')[1]);
+
+// Replace the image of an existing picture shape
+const newImage = new Uint8Array(await fetch('new-photo.jpg').then(r => r.arrayBuffer()));
+renderer.replaceImage(0, shapeIdx, newImage, 'image/jpeg');
+
+// Delete a picture shape (cleans up orphaned media files)
+renderer.deleteImage(0, shapeIdx);
+```
+
+Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
 
 ## Export
 

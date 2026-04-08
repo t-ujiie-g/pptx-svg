@@ -869,6 +869,138 @@ console.log('Test 32: Text editing E2.5 — round-trip export');
   console.log('  OK: Text editing round-trip export verified');
 }
 
+// --- Test 33: Image API — addImage ---
+console.log('Test 33: Image API — addImage');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Minimal 1x1 red PNG (valid PNG file)
+  const pngData = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, // IEND chunk
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  const result = renderer.addImage(0, pngData, 'image/png',
+    914400, 914400, 1828800, 1828800);
+  assert(result.startsWith('OK:'), `addImage should return OK, got ${result}`);
+  const shapeIdx = parseInt(result.split(':')[1]);
+  assert(shapeIdx >= 0, `shape index should be non-negative, got ${shapeIdx}`);
+
+  // Render should include the picture shape
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.includes('data-ooxml-shape-type="picture"'), 'SVG should contain picture shape');
+
+  // Export and verify the image file exists
+  const exported = await renderer.exportPptx();
+  assert(exported.byteLength > pptxAb.byteLength, 'exported PPTX should be larger with image');
+
+  // Reload and verify
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg2 = renderer2.renderSlideSvg(0);
+  assert(svg2.includes('data-ooxml-shape-type="picture"'), 'reloaded SVG should contain picture shape');
+
+  console.log('  OK: addImage with round-trip export');
+}
+
+// --- Test 34: Image API — replaceImage ---
+console.log('Test 34: Image API — replaceImage');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add an image first
+  const pngData = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  const addResult = renderer.addImage(0, pngData, 'image/png',
+    914400, 914400, 1828800, 1828800);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  // Replace with a different (same-format) image
+  const pngData2 = new Uint8Array([...pngData]); // same structure, different identity
+  pngData2[pngData2.length - 5] = 0x01; // slightly different
+  const replaceResult = renderer.replaceImage(0, shapeIdx, pngData2, 'image/png');
+  assert(replaceResult === 'OK', `replaceImage should return OK, got ${replaceResult}`);
+
+  // Error cases
+  assert(renderer.replaceImage(0, 999, pngData, 'image/png').startsWith('ERROR:'), 'invalid shape');
+  assert(renderer.addImage(0, pngData, 'image/bla', 0, 0, 100, 100).startsWith('ERROR:'), 'invalid mime');
+
+  console.log('  OK: replaceImage');
+}
+
+// --- Test 35: Image API — deleteImage ---
+console.log('Test 35: Image API — deleteImage');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add then delete
+  const pngData = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  const addResult = renderer.addImage(0, pngData, 'image/png',
+    914400, 914400, 1828800, 1828800);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  const svg1 = renderer.renderSlideSvg(0);
+  assert(svg1.includes('data-ooxml-shape-type="picture"'), 'should have picture before delete');
+
+  const delResult = renderer.deleteImage(0, shapeIdx);
+  assert(delResult === 'OK', `deleteImage should return OK, got ${delResult}`);
+
+  const svg2 = renderer.renderSlideSvg(0);
+  assert(!svg2.includes(`data-ooxml-shape-idx="${shapeIdx}"`), 'deleted shape should not be in SVG');
+
+  // Error case
+  assert(renderer.deleteImage(0, 999).startsWith('ERROR:'), 'delete invalid shape');
+
+  console.log('  OK: deleteImage');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);
