@@ -133,6 +133,27 @@ const renderer = new PptxRenderer(options?);
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | 位置/サイズ/回転を更新（EMU単位）。再描画SVGを返す。 |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | テキスト内容を更新。再描画SVGを返す。 |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | 塗りつぶし色を更新（0-255）。再描画SVGを返す。 |
+| `deleteShape(slideIdx, shapeIdx)` | `string` | シェイプを削除。グループ内シェイプは composite index で指定。 |
+| `addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB)` | `string` | シェイプを追加（`rect`/`ellipse`/`roundRect`/`line`）。`OK:<index>` を返す。fill -1 = 塗りなし。 |
+| `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | `string` | シェイプをオフセット付きで複製。`OK:<index>` を返す。 |
+| `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | `string` | 線形グラデーション適用。`angle`: 6万分の1度単位。`stops`: `[{pos,r,g,b}]`。 |
+| `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | `string` | シェイプにテキスト段落を追加。`fontSize`: 1/100ポイント単位（例: 1800 = 18pt）。`OK:<paraIndex>` を返す。 |
+| `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | `string` | ストローク設定。color -1 = 削除。`dash`: `dash`/`dot` 等。 |
+
+**テキスト編集メソッド:**
+
+| メソッド | 返り値 | 説明 |
+|----------|--------|------|
+| `addParagraph(slideIdx, shapeIdx, text, align?)` | `string` | 段落追加。`align`: `l`/`ctr`/`r`/`just`/`""`。`OK:<paraIndex>` を返す。 |
+| `deleteParagraph(slideIdx, shapeIdx, paraIdx)` | `string` | 段落削除。`OK` を返す。 |
+| `addRun(slideIdx, shapeIdx, paraIdx, text)` | `string` | テキストラン追加。`OK:<runIndex>` を返す。 |
+| `deleteRun(slideIdx, shapeIdx, paraIdx, runIdx)` | `string` | テキストラン削除。`OK` を返す。 |
+| `updateTextRunStyle(slideIdx, shapeIdx, paraIdx, runIdx, bold?, italic?)` | `string` | 太字/斜体 (1=有効, 0=無効, -1=変更なし)。再描画SVGを返す。 |
+| `updateTextRunFontSize(slideIdx, shapeIdx, paraIdx, runIdx, fontSize)` | `string` | フォントサイズ (1/100pt単位、1800=18pt、0=継承)。再描画SVGを返す。 |
+| `updateTextRunColor(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b)` | `string` | テキスト色 (0-255、r=-1で継承)。再描画SVGを返す。 |
+| `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | `string` | フォントファミリ (""=変更なし)。再描画SVGを返す。 |
+| `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | `string` | 段落配置変更。再描画SVGを返す。 |
+| `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | `string` | 下線/取消線/上付き・下付き。再描画SVGを返す。 |
 
 `update*` メソッドはキャッシュされた SlideData を直接更新し、エクスポート用にスライドを変更済みとしてマークし、再描画されたシェイプSVGを返します。使用パターンは [`docs/editing-guide.md`](docs/editing-guide.md) を参照。
 
@@ -145,6 +166,16 @@ const renderer = new PptxRenderer(options?);
 | `reorderSlides(newOrder)` | `Promise<{ slideCount }>` | スライド順序を変更。`newOrder[i]` = 新しい位置 `i` に置く旧インデックス。有効な順列が必要。 |
 
 スライド管理メソッドは `presentation.xml`・`.rels`・`[Content_Types].xml` を自動更新します。変更は `exportPptx()` に反映されます。
+
+**画像操作:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `addImage(slideIdx, imageData, mimeType, x, y, cx, cy)` | `string` | 画像シェイプを追加。メディア/rels/Content-Types を自動管理。`OK:<shapeIdx>` を返す。 |
+| `replaceImage(slideIdx, shapeIdx, imageData, mimeType)` | `string` | 既存画像シェイプの画像を差し替え。再レンダリング SVG を返す。 |
+| `deleteImage(slideIdx, shapeIdx)` | `string` | 画像シェイプを削除し、孤立メディアをクリーンアップ。`OK` を返す。 |
+
+対応 MIME タイプ: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`。
 
 **ノート・コメント:**
 

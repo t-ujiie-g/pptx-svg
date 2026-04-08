@@ -38,7 +38,9 @@ python3 -m http.server 8765 --directory .
 **FFI boundary:**
 - JS pre-decompresses all ZIP entries → stores in `Map<path, string>` and `Map<path, Uint8Array>`
 - MoonBit calls `ffi_get_file(path)` to pull individual files on demand
-- MoonBit exports: `initialize_pptx`, `get_slide_count`, `is_slide_hidden`, `get_slide_xml_raw`, `get_entry_list`, `render_slide_svg`, `update_slide_from_svg`, `get_slide_ooxml`, `get_modified_entries`
+- MoonBit exports (read-only): `initialize_pptx`, `get_slide_count`, `is_slide_hidden`, `get_slide_xml_raw`, `get_entry_list`, `render_slide_svg`, `update_slide_from_svg`, `get_slide_ooxml`, `get_modified_entries`
+- MoonBit exports (editing): `render_shape_svg`, `update_shape_transform`, `update_shape_text`, `update_shape_fill`, `delete_shape`, `add_shape`, `add_shape_text`, `duplicate_shape`, `update_shape_gradient_fill`, `update_shape_stroke`, `add_paragraph`, `delete_paragraph`, `add_run`, `delete_run`, `update_text_run_style`, `update_text_run_font_size`, `update_text_run_color`, `update_text_run_font`, `update_paragraph_align`, `update_text_run_decoration`, `add_picture_shape`, `replace_picture_rid`
+- Full export list: see `src/main/moon.pkg`
 
 **Module dependency (no cycles):**
 ```
@@ -183,7 +185,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
-| `src/main/main.mbt` | Wasm exports, slide cache (`g_slides`), global state |
+| `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
+| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes) |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
 | `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
@@ -206,6 +209,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |
 | `test_fixtures/gen_test_features.py` | Python script to regenerate test_features.pptx |
 | `test_fixtures/test_node.mjs` | Node.js test suite (ZIP + XML structure assertions) |
+| `test_fixtures/test_node_compat.mjs` | Node.js editing API test suite (shape/text/image CRUD, round-trip export) |
 
 ## Adding new OOXML features — required workflow
 
@@ -224,7 +228,8 @@ Follow the round-trip pipeline — update each relevant file:
 - `src/renderer/renderer_chart.mbt`: Chart SVG rendering (if chart-related)
 - `src/svg_parser/svg_parser.mbt`: `data-ooxml-*` → SlideData round-trip parsing
 - `src/serializer/serializer.mbt`: SlideData → OOXML XML serialization
-- `src/main/main.mbt`: Wasm exports, global state
+- `src/main/main.mbt`: Wasm exports (read-only), global state
+- `src/main/main_edit.mbt`: Shape/text/image editing API exports
 - `src/main/main_inherit.mbt`: Placeholder inheritance + text style defaults
 
 ### 2. MoonBit unit tests

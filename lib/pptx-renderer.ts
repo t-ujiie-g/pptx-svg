@@ -30,6 +30,39 @@ interface PptxWasmExports {
     paraIdx: number, runIdx: number, text: string): string;
   update_shape_fill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string;
+  delete_shape(slideIdx: number, shapeIdx: number): string;
+  add_shape(slideIdx: number, geomType: string,
+    x: number, y: number, cx: number, cy: number,
+    fillR: number, fillG: number, fillB: number): string;
+  add_shape_text(slideIdx: number, shapeIdx: number,
+    text: string, fontSize: number,
+    colorR: number, colorG: number, colorB: number): string;
+  duplicate_shape(slideIdx: number, shapeIdx: number,
+    dxEmu: number, dyEmu: number): string;
+  update_shape_gradient_fill(slideIdx: number, shapeIdx: number,
+    angle: number, stopsData: string): string;
+  update_shape_stroke(slideIdx: number, shapeIdx: number,
+    r: number, g: number, b: number, widthEmu: number, dash: string): string;
+  add_paragraph(slideIdx: number, shapeIdx: number,
+    text: string, align: string): string;
+  delete_paragraph(slideIdx: number, shapeIdx: number, paraIdx: number): string;
+  add_run(slideIdx: number, shapeIdx: number, paraIdx: number, text: string): string;
+  delete_run(slideIdx: number, shapeIdx: number, paraIdx: number, runIdx: number): string;
+  update_text_run_style(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, bold: number, italic: number): string;
+  update_text_run_font_size(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontSize: number): string;
+  update_text_run_color(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, r: number, g: number, b: number): string;
+  update_text_run_font(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontFace: string, eaFont: string, csFont: string): string;
+  update_paragraph_align(slideIdx: number, shapeIdx: number,
+    paraIdx: number, align: string): string;
+  update_text_run_decoration(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, underline: string, strike: string, baseline: number): string;
+  add_picture_shape(slideIdx: number, rid: string,
+    x: number, y: number, cx: number, cy: number): string;
+  replace_picture_rid(slideIdx: number, shapeIdx: number, newRid: string): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -112,9 +145,20 @@ const NS_DRAWINGML = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_RELS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const NS_PRESENTATIONML = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 
-/** Default slide size: 10" x 7.5" (standard widescreen 16:9 not — this is 4:3) */
+/** Default slide size: 10" x 5.625" (standard widescreen 16:9) */
 const DEFAULT_SLIDE_CX = 9144000;
 const DEFAULT_SLIDE_CY = 5143500;
+const REL_TYPE_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+
+/** Map MIME type to file extension. Returns null for unsupported types. */
+function mimeToExt(mime: string): string | null {
+  const map: Record<string, string> = {
+    'image/png': 'png', 'image/jpeg': 'jpeg', 'image/jpg': 'jpeg',
+    'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/webp': 'webp',
+    'image/bmp': 'bmp', 'image/tiff': 'tiff',
+  };
+  return map[mime] ?? null;
+}
 
 /** First slide ID used in presentation.xml sldIdLst (OOXML convention). */
 const FIRST_SLIDE_ID = 256;
@@ -140,6 +184,9 @@ export class PptxRenderer {
 
   /** Files removed after loadPptx */
   private removedFiles = new Set<string>();
+
+  /** Binary files added/replaced after loadPptx (e.g. images) */
+  private addedBinaryFiles = new Map<string, Uint8Array>();
 
   /** Canvas for text measurement (lazily created) */
   private canvas: HTMLCanvasElement | null = null;
@@ -222,6 +269,7 @@ export class PptxRenderer {
     }
     this.originalBuffer = arrayBuffer.slice(0); // keep a copy for export
     this.addedFiles.clear();
+    this.addedBinaryFiles.clear();
     this.removedFiles.clear();
     this.log.debug('Parsing ZIP archive...');
     const { textFiles, binaryFiles } = await extractZip(arrayBuffer, this.log);
@@ -314,8 +362,12 @@ export class PptxRenderer {
       }
     }
 
-    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries, ${this.removedFiles.size} removals`);
-    return buildZip(this.originalBuffer, modifications, this.removedFiles.size > 0 ? this.removedFiles : undefined);
+    this.log.debug(`Exporting PPTX with ${modifications.size} modified entries, ${this.addedBinaryFiles.size} binary entries, ${this.removedFiles.size} removals`);
+    return buildZip(
+      this.originalBuffer, modifications,
+      this.removedFiles.size > 0 ? this.removedFiles : undefined,
+      this.addedBinaryFiles.size > 0 ? this.addedBinaryFiles : undefined,
+    );
   }
 
   // ── Notes & Comments API ──────────────────────────────────────────────────
@@ -389,6 +441,164 @@ export class PptxRenderer {
   updateShapeFill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string {
     return this.exports.update_shape_fill(slideIdx, shapeIdx, r, g, b);
+  }
+
+  /**
+   * Delete a shape from a slide.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteShape(slideIdx: number, shapeIdx: number): string {
+    return this.exports.delete_shape(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Add a basic AutoShape to a slide.
+   * @param geomType - Preset geometry: "rect", "ellipse", "roundRect", "line", etc.
+   * @param x, y, cx, cy - Position and size in EMU.
+   * @param fillR, fillG, fillB - Fill color (0-255). Pass -1 for no fill.
+   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   */
+  addShape(slideIdx: number, geomType: string,
+    x: number, y: number, cx: number, cy: number,
+    fillR = -1, fillG = -1, fillB = -1): string {
+    return this.exports.add_shape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB);
+  }
+
+  /**
+   * Add a text paragraph to a shape. Creates a single run with the given text.
+   * @param fontSize - Font size in hundredths of a point (e.g. 1800 = 18pt). 0 = inherit.
+   * @param colorR, colorG, colorB - Text color (0-255). Pass -1 for default/inherit.
+   * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
+   */
+  addShapeText(slideIdx: number, shapeIdx: number, text: string,
+    fontSize = 0, colorR = -1, colorG = -1, colorB = -1): string {
+    return this.exports.add_shape_text(slideIdx, shapeIdx, text, fontSize, colorR, colorG, colorB);
+  }
+
+  /**
+   * Duplicate a shape, offset by (dxEmu, dyEmu) from the original.
+   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   */
+  duplicateShape(slideIdx: number, shapeIdx: number,
+    dxEmu = 457200, dyEmu = 457200): string {
+    return this.exports.duplicate_shape(slideIdx, shapeIdx, dxEmu, dyEmu);
+  }
+
+  /**
+   * Update a shape's fill to a linear gradient. Returns re-rendered SVG.
+   * @param angle - Gradient angle in 60000ths of a degree (e.g. 5400000 = 90deg).
+   * @param stops - Array of { pos, r, g, b } where pos is 0-100000.
+   */
+  updateShapeGradientFill(slideIdx: number, shapeIdx: number,
+    angle: number, stops: Array<{ pos: number; r: number; g: number; b: number }>): string {
+    const stopsData = stops.map(s => `${s.pos},${s.r},${s.g},${s.b}`).join(';');
+    return this.exports.update_shape_gradient_fill(slideIdx, shapeIdx, angle, stopsData);
+  }
+
+  /**
+   * Update a shape's stroke (outline). Returns re-rendered SVG.
+   * @param r, g, b - Stroke color (0-255). Pass -1 to remove stroke.
+   * @param widthEmu - Stroke width in EMU (default 12700 = 1pt).
+   * @param dash - Dash preset: "dash", "dot", "dashDot", "lgDash", etc. "" = solid.
+   */
+  updateShapeStroke(slideIdx: number, shapeIdx: number,
+    r: number, g: number, b: number, widthEmu = 12700, dash = ''): string {
+    return this.exports.update_shape_stroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash);
+  }
+
+  // ── Text editing API (E2.5) ─────────────────────────────────────────────────
+
+  /**
+   * Add a new paragraph to a shape with a single text run.
+   * @param align - "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
+   * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
+   */
+  addParagraph(slideIdx: number, shapeIdx: number, text: string, align = ''): string {
+    return this.exports.add_paragraph(slideIdx, shapeIdx, text, align);
+  }
+
+  /**
+   * Delete a paragraph from a shape.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteParagraph(slideIdx: number, shapeIdx: number, paraIdx: number): string {
+    return this.exports.delete_paragraph(slideIdx, shapeIdx, paraIdx);
+  }
+
+  /**
+   * Add a new text run to a paragraph.
+   * @returns "OK:<runIndex>" on success, "ERROR:..." on failure.
+   */
+  addRun(slideIdx: number, shapeIdx: number, paraIdx: number, text: string): string {
+    return this.exports.add_run(slideIdx, shapeIdx, paraIdx, text);
+  }
+
+  /**
+   * Delete a text run from a paragraph.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteRun(slideIdx: number, shapeIdx: number, paraIdx: number, runIdx: number): string {
+    return this.exports.delete_run(slideIdx, shapeIdx, paraIdx, runIdx);
+  }
+
+  /**
+   * Update a text run's bold/italic style. Returns re-rendered shape SVG.
+   * @param bold - 1 = set bold, 0 = unset bold, -1 = no change.
+   * @param italic - 1 = set italic, 0 = unset italic, -1 = no change.
+   */
+  updateTextRunStyle(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, bold = -1, italic = -1): string {
+    return this.exports.update_text_run_style(slideIdx, shapeIdx, paraIdx, runIdx, bold, italic);
+  }
+
+  /**
+   * Update a text run's font size. Returns re-rendered shape SVG.
+   * @param fontSize - In hundredths of a point (e.g. 1800 = 18pt). 0 = inherit.
+   */
+  updateTextRunFontSize(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontSize: number): string {
+    return this.exports.update_text_run_font_size(slideIdx, shapeIdx, paraIdx, runIdx, fontSize);
+  }
+
+  /**
+   * Update a text run's color (RGB 0-255). Returns re-rendered shape SVG.
+   * Pass r = -1 to clear (inherit from theme/master).
+   */
+  updateTextRunColor(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, r: number, g: number, b: number): string {
+    return this.exports.update_text_run_color(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b);
+  }
+
+  /**
+   * Update a text run's font family. Returns re-rendered shape SVG.
+   * @param fontFace - Latin font name. Empty string = no change.
+   * @param eaFont - East Asian font name. Empty string = no change.
+   * @param csFont - Complex Script font name. Empty string = no change.
+   */
+  updateTextRunFont(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, fontFace = '', eaFont = '', csFont = ''): string {
+    return this.exports.update_text_run_font(slideIdx, shapeIdx, paraIdx, runIdx, fontFace, eaFont, csFont);
+  }
+
+  /**
+   * Update a paragraph's alignment. Returns re-rendered shape SVG.
+   * @param align - "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
+   */
+  updateParagraphAlign(slideIdx: number, shapeIdx: number,
+    paraIdx: number, align: string): string {
+    return this.exports.update_paragraph_align(slideIdx, shapeIdx, paraIdx, align);
+  }
+
+  /**
+   * Update a text run's decoration (underline, strikethrough, baseline shift).
+   * Returns re-rendered shape SVG.
+   * @param underline - "sng" (single), "dbl" (double), "" (no change), "none" (remove).
+   * @param strike - "sngStrike", "dblStrike", "" (no change), "none" (remove).
+   * @param baseline - 30000 = superscript, -25000 = subscript, 0 = normal, -1 = no change.
+   */
+  updateTextRunDecoration(slideIdx: number, shapeIdx: number,
+    paraIdx: number, runIdx: number, underline = '', strike = '', baseline = -1): string {
+    return this.exports.update_text_run_decoration(slideIdx, shapeIdx, paraIdx, runIdx, underline, strike, baseline);
   }
 
   // ── Slide management API ────────────────────────────────────────────────────
@@ -617,16 +827,16 @@ export class PptxRenderer {
     return ids.length > 0 ? Math.max(...ids) + 1 : FIRST_SLIDE_ID;
   }
 
-  /** Find the next available rId in presentation.xml.rels. */
-  private findNextRId(relsXml: string): string {
-    const ids: number[] = [];
+  /** Find the next available rId in a .rels XML string. */
+  private nextRid(relsXml: string): string {
+    let maxId = 0;
     const re = /Id="rId(\d+)"/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(relsXml)) !== null) {
-      ids.push(parseInt(m[1]));
+      const id = parseInt(m[1]);
+      if (id > maxId) maxId = id;
     }
-    const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
-    return `rId${next}`;
+    return `rId${maxId + 1}`;
   }
 
   /** Update presentation.xml and .rels for slide addition. */
@@ -635,7 +845,7 @@ export class PptxRenderer {
     let prsRels = this.files.get('ppt/_rels/presentation.xml.rels') ?? '';
 
     const newSlideNum = insertIdx + 1;
-    const newRId = this.findNextRId(prsRels);
+    const newRId = this.nextRid(prsRels);
     const newSldId = this.findNextSlideId(prsXml);
 
     // Add relationship for new slide
@@ -840,6 +1050,183 @@ export class PptxRenderer {
     }
 
     this.persistFile('[Content_Types].xml', ct);
+  }
+
+  // ── Image management API ───────────────────────────────────────────────────
+
+  /**
+   * Add an image to a slide as a Picture shape.
+   * @param slideIdx - Slide index (0-based).
+   * @param imageData - Raw image bytes (PNG, JPEG, GIF, etc.).
+   * @param mimeType - MIME type (e.g. "image/png", "image/jpeg").
+   * @param x, y, cx, cy - Position and size in EMU.
+   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   */
+  addImage(slideIdx: number, imageData: Uint8Array, mimeType: string,
+    x: number, y: number, cx: number, cy: number): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+
+    // Determine file extension from MIME type
+    const ext = mimeToExt(mimeType);
+    if (!ext) return 'ERROR:unsupported image type';
+
+    // Generate unique media filename
+    const mediaPath = this.nextMediaPath(ext);
+
+    // Store binary in rawFiles (for Wasm FFI) and addedBinaryFiles (for export)
+    this.rawFiles.set(mediaPath, imageData);
+    this.addedBinaryFiles.set(mediaPath, imageData);
+
+    // Add relationship to slide's .rels
+    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+    let relsXml = this.files.get(relsPath) ?? '';
+    const rid = this.nextRid(relsXml);
+    const relEntry = `<Relationship Id="${rid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
+    if (relsXml.includes('</Relationships>')) {
+      relsXml = relsXml.replace('</Relationships>', relEntry + '</Relationships>');
+    } else {
+      relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relEntry}</Relationships>`;
+    }
+    this.persistFile(relsPath, relsXml);
+
+    // Ensure content type for this extension
+    this.ensureContentTypeForExtension(ext, mimeType);
+
+    // Add Picture shape via Wasm
+    this.renderSlideSvg(slideIdx); // ensure slide is parsed
+    return this.exports.add_picture_shape(slideIdx, rid, x, y, cx, cy);
+  }
+
+  /**
+   * Replace the image data of an existing Picture shape.
+   * @param slideIdx - Slide index (0-based).
+   * @param shapeIdx - Shape index (composite index for groups).
+   * @param imageData - New image bytes.
+   * @param mimeType - MIME type of the new image.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  replaceImage(slideIdx: number, shapeIdx: number,
+    imageData: Uint8Array, mimeType: string): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+
+    const ext = mimeToExt(mimeType);
+    if (!ext) return 'ERROR:unsupported image type';
+
+    // Find the shape's current rid from SVG data attributes
+    this.renderSlideSvg(slideIdx); // ensure slide is parsed
+    const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
+    if (svg.startsWith('ERROR:')) return svg;
+
+    const ridMatch = svg.match(/data-ooxml-blip-rid="([^"]+)"/);
+    if (!ridMatch) return 'ERROR:shape has no image reference';
+    const currentRid = ridMatch[1];
+
+    // Resolve current image path from rels
+    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+    const relsXml = this.files.get(relsPath) ?? '';
+    const oldTarget = this.resolveRidTarget(relsXml, currentRid);
+
+    if (oldTarget) {
+      // Replace existing file at the same path
+      const oldPath = this.resolveRelPath('ppt/slides/', oldTarget);
+
+      if (mimeToExt(mimeType) === oldPath.split('.').pop()) {
+        // Same extension — replace in place
+        this.rawFiles.set(oldPath, imageData);
+        this.addedBinaryFiles.set(oldPath, imageData);
+        return 'OK';
+      }
+    }
+
+    // Different extension or couldn't resolve — create new file and update rid
+    const mediaPath = this.nextMediaPath(ext);
+    this.rawFiles.set(mediaPath, imageData);
+    this.addedBinaryFiles.set(mediaPath, imageData);
+
+    const newRid = this.nextRid(relsXml);
+    const relEntry = `<Relationship Id="${newRid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
+    const updatedRels = relsXml.replace('</Relationships>', relEntry + '</Relationships>');
+    this.persistFile(relsPath, updatedRels);
+    this.ensureContentTypeForExtension(ext, mimeType);
+
+    return this.exports.replace_picture_rid(slideIdx, shapeIdx, newRid);
+  }
+
+  /**
+   * Delete a Picture shape and mark its media file for removal.
+   * @param slideIdx - Slide index (0-based).
+   * @param shapeIdx - Shape index.
+   * @returns "OK" on success, "ERROR:..." on failure.
+   */
+  deleteImage(slideIdx: number, shapeIdx: number): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+
+    // Find the shape's rid before deleting
+    this.renderSlideSvg(slideIdx);
+    const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
+    let mediaPath: string | null = null;
+    if (!svg.startsWith('ERROR:')) {
+      const ridMatch = svg.match(/data-ooxml-blip-rid="([^"]+)"/);
+      if (ridMatch) {
+        const rid = ridMatch[1];
+        const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+        const relsXml = this.files.get(relsPath) ?? '';
+        const target = this.resolveRidTarget(relsXml, rid);
+        if (target) {
+          mediaPath = this.resolveRelPath('ppt/slides/', target);
+        }
+      }
+    }
+
+    // Delete the shape
+    const result = this.exports.delete_shape(slideIdx, shapeIdx);
+    if (result.startsWith('ERROR:')) return result;
+
+    // Mark media file for removal (if not referenced by other slides)
+    if (mediaPath && !this.isMediaReferencedElsewhere(mediaPath, slideIdx)) {
+      this.removedFiles.add(mediaPath);
+      this.rawFiles.delete(mediaPath);
+    }
+
+    return 'OK';
+  }
+
+  /** Resolve a relationship ID to its Target attribute in a .rels XML string. */
+  private resolveRidTarget(relsXml: string, rid: string): string | null {
+    const m = relsXml.match(new RegExp(`<Relationship[^>]+Id="${rid}"[^>]+Target="([^"]+)"`))
+           ?? relsXml.match(new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Id="${rid}"`));
+    return m ? m[1] : null;
+  }
+
+  /** Generate the next available media file path. */
+  private nextMediaPath(ext: string): string {
+    let n = 1;
+    const allPaths = new Set([...this.rawFiles.keys(), ...this.addedBinaryFiles.keys()]);
+    while (allPaths.has(`ppt/media/image${n}.${ext}`)) n++;
+    return `ppt/media/image${n}.${ext}`;
+  }
+
+  /** Ensure [Content_Types].xml has a Default entry for the given extension. */
+  private ensureContentTypeForExtension(ext: string, mimeType: string): void {
+    let ct = this.files.get('[Content_Types].xml');
+    if (!ct) return;
+    if (ct.includes(`Extension="${ext}"`)) return;
+    const entry = `<Default Extension="${ext}" ContentType="${mimeType}"/>`;
+    ct = ct.replace('</Types>', entry + '</Types>');
+    this.persistFile('[Content_Types].xml', ct);
+  }
+
+  /** Check if a media file is referenced by any slide other than the given one. */
+  private isMediaReferencedElsewhere(mediaPath: string, excludeSlideIdx: number): boolean {
+    const filename = mediaPath.split('/').pop() ?? '';
+    const slideCount = this.exports.get_slide_count();
+    for (let i = 0; i < slideCount; i++) {
+      if (i === excludeSlideIdx) continue;
+      const relsPath = `ppt/slides/_rels/slide${i + 1}.xml.rels`;
+      const relsXml = this.files.get(relsPath) ?? '';
+      if (relsXml.includes(filename)) return true;
+    }
+    return false;
   }
 
   /** Update a file in both the live files map and the export tracking map. */

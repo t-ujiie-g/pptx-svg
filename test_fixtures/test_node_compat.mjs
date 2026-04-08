@@ -435,6 +435,572 @@ console.log('Test 18: Delete then add');
   console.log('  OK: Delete then add works');
 }
 
+// --- Test 19: Add shape ---
+console.log('Test 19: Add shape');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  // Add a red rectangle
+  const result = renderer.addShape(0, 'rect', 914400, 914400, 1828800, 914400, 255, 0, 0);
+  assert(result.startsWith('OK:'), `addShape should return OK, got ${result}`);
+  const shapeIdx = parseInt(result.split(':')[1]);
+  assert(shapeIdx >= 0, 'shape index should be >= 0');
+
+  // Slide should render with the new shape
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.includes('ff0000') || svg.includes('FF0000'), 'SVG should contain red fill');
+
+  // Export and reload
+  const exported = await renderer.exportPptx();
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg2 = renderer2.renderSlideSvg(0);
+  assert(svg2.includes('ff0000') || svg2.includes('FF0000'), 'exported slide should contain red shape');
+  console.log(`  OK: Added shape at idx=${shapeIdx}, round-trip verified`);
+}
+
+// --- Test 20: Add shape with no fill ---
+console.log('Test 20: Add shape with no fill');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  const result = renderer.addShape(0, 'ellipse', 0, 0, 914400, 914400);
+  assert(result.startsWith('OK:'), `addShape (no fill) should return OK, got ${result}`);
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.startsWith('<svg'), 'slide should render');
+  console.log('  OK: Added ellipse with no fill');
+}
+
+// --- Test 21: Delete shape ---
+console.log('Test 21: Delete shape');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  // Render first to populate cache
+  renderer.renderSlideSvg(0);
+
+  // Delete shape 0
+  const result = renderer.deleteShape(0, 0);
+  assert(result === 'OK', `deleteShape should return OK, got ${result}`);
+
+  // Should still render
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.startsWith('<svg'), 'slide should render after deletion');
+
+  // Invalid index should error
+  const err = renderer.deleteShape(0, 999);
+  assert(err.startsWith('ERROR:'), 'deleting invalid index should error');
+  console.log('  OK: Deleted shape');
+}
+
+// --- Test 22: Duplicate shape ---
+console.log('Test 22: Duplicate shape');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  // Render first to parse slide data, then add a shape and duplicate it
+  renderer.renderSlideSvg(0);
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 914400, 914400, 0, 0, 255);
+  const addedIdx = parseInt(addResult.split(':')[1]);
+
+  const result = renderer.duplicateShape(0, addedIdx);
+  assert(result.startsWith('OK:'), `duplicateShape should return OK, got ${result}`);
+  const newIdx = parseInt(result.split(':')[1]);
+
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.startsWith('<svg'), 'slide should render with duplicated shape');
+
+  // Export and verify
+  const exported = await renderer.exportPptx();
+  assert(exported.byteLength > 0, 'export should work');
+  console.log(`  OK: Duplicated shape to idx=${newIdx}`);
+}
+
+// --- Test 23: Update gradient fill ---
+console.log('Test 23: Update gradient fill');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  // Render first to parse slide data, then add a shape and apply gradient
+  renderer.renderSlideSvg(0);
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 914400, 914400, 128, 128, 128);
+  const addedIdx = parseInt(addResult.split(':')[1]);
+
+  const stops = [
+    { pos: 0, r: 255, g: 0, b: 0 },
+    { pos: 100000, r: 0, g: 0, b: 255 },
+  ];
+  const svg = renderer.updateShapeGradientFill(0, addedIdx, 5400000, stops);
+  assert(!svg.startsWith('ERROR:'), `gradient fill should succeed, got ${svg}`);
+  assert(svg.includes('linearGradient') || svg.includes('radialGradient'),
+    'SVG should contain gradient definition');
+  console.log('  OK: Applied gradient fill');
+}
+
+// --- Test 24: Update stroke ---
+console.log('Test 24: Update stroke');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  renderer.renderSlideSvg(0);
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 914400, 914400, 200, 200, 200);
+  const addedIdx = parseInt(addResult.split(':')[1]);
+
+  // Apply red stroke with dash
+  const svg = renderer.updateShapeStroke(0, addedIdx, 255, 0, 0, 25400, 'dash');
+  assert(!svg.startsWith('ERROR:'), `stroke update should succeed, got ${svg}`);
+  assert(svg.includes('ff0000') || svg.includes('FF0000'), 'SVG should show red stroke');
+  console.log('  OK: Applied stroke');
+}
+
+// --- Test 25: Remove stroke ---
+console.log('Test 25: Remove stroke');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  renderer.renderSlideSvg(0);
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 914400, 914400, 200, 200, 200);
+  const addedIdx = parseInt(addResult.split(':')[1]);
+
+  // Set stroke, then remove it
+  renderer.updateShapeStroke(0, addedIdx, 255, 0, 0, 25400);
+  const svg = renderer.updateShapeStroke(0, addedIdx, -1, -1, -1, 0);
+  assert(!svg.startsWith('ERROR:'), `remove stroke should succeed, got ${svg}`);
+  console.log('  OK: Removed stroke');
+}
+
+// --- Test 26: Add line shape (should have default stroke) ---
+console.log('Test 26: Add line shape with default stroke');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  const result = renderer.addShape(0, 'line', 914400, 2000000, 3657600, 0);
+  assert(result.startsWith('OK:'), `addShape(line) should return OK, got ${result}`);
+
+  // The line should be visible (default black 1pt stroke)
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.includes('stroke'), 'line shape SVG should contain stroke attribute');
+
+  // Export and verify the line persists
+  const exported = await renderer.exportPptx();
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg2 = renderer2.renderSlideSvg(0);
+  assert(svg2.includes('stroke'), 'exported line should have stroke');
+  console.log('  OK: Line shape has default stroke');
+}
+
+// --- Test 27: Add text to shape ---
+console.log('Test 27: Add text to shape');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  // Add a shape, then add text to it
+  renderer.renderSlideSvg(0);
+  const addResult = renderer.addShape(0, 'rect', 914400, 914400, 3657600, 1828800, 200, 200, 200);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  const textResult = renderer.addShapeText(0, shapeIdx, 'Hello World', 1800);
+  assert(textResult.startsWith('OK:'), `addShapeText should return OK, got ${textResult}`);
+  const paraIdx = parseInt(textResult.split(':')[1]);
+  assert(paraIdx === 0, `first paragraph index should be 0, got ${paraIdx}`);
+
+  // Render and verify text appears in SVG (word-wrapped into separate tspans)
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.includes('>Hello ') || svg.includes('>Hello<'), 'SVG should contain the added text');
+
+  // Add a second paragraph
+  const textResult2 = renderer.addShapeText(0, shapeIdx, 'SecondLine', 1400, 255, 0, 0);
+  assert(textResult2.startsWith('OK:'), `second addShapeText should return OK, got ${textResult2}`);
+  const paraIdx2 = parseInt(textResult2.split(':')[1]);
+  assert(paraIdx2 === 1, `second paragraph index should be 1, got ${paraIdx2}`);
+
+  const svg2 = renderer.renderSlideSvg(0);
+  assert(svg2.includes('SecondLine'), 'SVG should contain the second paragraph text');
+
+  // Export and reload to verify round-trip
+  const exported = await renderer.exportPptx();
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg3 = renderer2.renderSlideSvg(0);
+  assert(svg3.includes('>Hello ') || svg3.includes('>Hello<'), 'exported slide should contain text');
+  console.log(`  OK: Added text paragraphs to shape, round-trip verified`);
+}
+
+// --- Test 28: Add text to invalid shape ---
+console.log('Test 28: Add text to invalid shape');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  renderer.renderSlideSvg(0);
+
+  const result = renderer.addShapeText(0, 999, 'text', 1800);
+  assert(result.startsWith('ERROR:'), `invalid shape index should error, got ${result}`);
+
+  const result2 = renderer.addShapeText(99, 0, 'text', 1800);
+  assert(result2.startsWith('ERROR:'), `invalid slide index should error, got ${result2}`);
+  console.log('  OK: Error handling for invalid indices');
+}
+
+// --- Test 29: Text editing E2.5 — paragraph and run CRUD ---
+console.log('Test 29: Text editing E2.5 — paragraph and run CRUD');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add a shape to work with
+  const addResult = renderer.addShape(0, 'rect', 914400, 914400, 3657600, 1828800, 200, 200, 200);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  // addParagraph
+  const p0 = renderer.addParagraph(0, shapeIdx, 'First paragraph', 'ctr');
+  assert(p0.startsWith('OK:'), `addParagraph should return OK, got ${p0}`);
+  assert(p0 === 'OK:0', `first paragraph index should be 0, got ${p0}`);
+
+  const p1 = renderer.addParagraph(0, shapeIdx, 'Second paragraph', 'r');
+  assert(p1 === 'OK:1', `second paragraph index should be 1, got ${p1}`);
+
+  // addRun
+  const r0 = renderer.addRun(0, shapeIdx, 0, ' extra run');
+  assert(r0.startsWith('OK:'), `addRun should return OK, got ${r0}`);
+  assert(r0 === 'OK:1', `second run index should be 1, got ${r0}`);
+
+  // deleteRun
+  const dr = renderer.deleteRun(0, shapeIdx, 0, 1);
+  assert(dr === 'OK', `deleteRun should return OK, got ${dr}`);
+
+  // deleteParagraph
+  const dp = renderer.deleteParagraph(0, shapeIdx, 1);
+  assert(dp === 'OK', `deleteParagraph should return OK, got ${dp}`);
+
+  // Error cases
+  assert(renderer.addParagraph(0, 999, 'x', '').startsWith('ERROR:'), 'addParagraph invalid shape');
+  assert(renderer.addRun(0, shapeIdx, 99, 'x').startsWith('ERROR:'), 'addRun invalid para');
+  assert(renderer.deleteRun(0, shapeIdx, 0, 99).startsWith('ERROR:'), 'deleteRun invalid run');
+  assert(renderer.deleteParagraph(0, shapeIdx, 99).startsWith('ERROR:'), 'deleteParagraph invalid para');
+
+  console.log('  OK: Paragraph and run CRUD');
+}
+
+// --- Test 30: Text editing E2.5 — style, font size, color ---
+console.log('Test 30: Text editing E2.5 — style, font size, color');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 3657600, 1828800, 240, 240, 240);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+  renderer.addParagraph(0, shapeIdx, 'Styled text', '');
+
+  // updateTextRunStyle (bold/italic)
+  const boldSvg = renderer.updateTextRunStyle(0, shapeIdx, 0, 0, 1, -1);
+  assert(!boldSvg.startsWith('ERROR:'), `updateTextRunStyle should not error, got ${boldSvg.slice(0,60)}`);
+  assert(boldSvg.includes('font-weight="bold"') || boldSvg.includes('data-ooxml-bold="true"'),
+    'SVG should reflect bold');
+
+  const italicSvg = renderer.updateTextRunStyle(0, shapeIdx, 0, 0, -1, 1);
+  assert(!italicSvg.startsWith('ERROR:'), 'updateTextRunStyle italic should not error');
+  assert(italicSvg.includes('font-style="italic"'), 'SVG should reflect italic');
+
+  // updateTextRunFontSize
+  const sizeSvg = renderer.updateTextRunFontSize(0, shapeIdx, 0, 0, 3600);
+  assert(!sizeSvg.startsWith('ERROR:'), `updateTextRunFontSize should not error`);
+
+  // updateTextRunColor
+  const colorSvg = renderer.updateTextRunColor(0, shapeIdx, 0, 0, 255, 0, 0);
+  assert(!colorSvg.startsWith('ERROR:'), `updateTextRunColor should not error`);
+  assert(colorSvg.includes('#ff0000') || colorSvg.includes('rgb(255'), 'SVG should contain red color');
+
+  // Error cases
+  assert(renderer.updateTextRunStyle(0, shapeIdx, 0, 99, 1, 0).startsWith('ERROR:'), 'invalid run idx');
+  assert(renderer.updateTextRunFontSize(0, shapeIdx, 99, 0, 1800).startsWith('ERROR:'), 'invalid para idx');
+
+  console.log('  OK: Style, font size, color updates');
+}
+
+// --- Test 31: Text editing E2.5 — font family, alignment, decoration ---
+console.log('Test 31: Text editing E2.5 — font family, alignment, decoration');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  const addResult = renderer.addShape(0, 'rect', 0, 0, 3657600, 1828800, 240, 240, 240);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+  renderer.addParagraph(0, shapeIdx, 'Decorated text', 'l');
+
+  // updateTextRunFont
+  const fontSvg = renderer.updateTextRunFont(0, shapeIdx, 0, 0, 'Arial', 'MS Gothic', '');
+  assert(!fontSvg.startsWith('ERROR:'), `updateTextRunFont should not error`);
+  assert(fontSvg.includes('Arial'), 'SVG should contain font name');
+
+  // updateParagraphAlign
+  const alignSvg = renderer.updateParagraphAlign(0, shapeIdx, 0, 'ctr');
+  assert(!alignSvg.startsWith('ERROR:'), `updateParagraphAlign should not error`);
+  assert(alignSvg.includes('data-ooxml-para-align="ctr"'), 'SVG should have center alignment');
+
+  // updateTextRunDecoration — underline
+  const ulSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'sng', '', -1);
+  assert(!ulSvg.startsWith('ERROR:'), `updateTextRunDecoration should not error`);
+  assert(ulSvg.includes('text-decoration') || ulSvg.includes('data-ooxml-underline="sng"'),
+    'SVG should reflect underline');
+
+  // updateTextRunDecoration — strikethrough
+  const stSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', 'sngStrike', -1);
+  assert(!stSvg.startsWith('ERROR:'), 'strikethrough should not error');
+
+  // updateTextRunDecoration — superscript
+  const supSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', '', 30000);
+  assert(!supSvg.startsWith('ERROR:'), 'superscript should not error');
+
+  // updateTextRunDecoration — remove underline
+  const noUlSvg = renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'none', 'none', 0);
+  assert(!noUlSvg.startsWith('ERROR:'), 'remove decoration should not error');
+
+  // Error cases
+  assert(renderer.updateTextRunFont(0, shapeIdx, 0, 99, 'Arial', '', '').startsWith('ERROR:'), 'invalid run');
+  assert(renderer.updateParagraphAlign(0, shapeIdx, 99, 'l').startsWith('ERROR:'), 'invalid para');
+  assert(renderer.updateTextRunDecoration(0, shapeIdx, 0, 99, 'sng', '', -1).startsWith('ERROR:'), 'invalid run');
+
+  console.log('  OK: Font family, alignment, decoration updates');
+}
+
+// --- Test 32: Text editing E2.5 — round-trip export ---
+console.log('Test 32: Text editing E2.5 — round-trip export');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add shape + styled text
+  const addResult = renderer.addShape(0, 'rect', 914400, 914400, 3657600, 1828800, 200, 200, 200);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+  renderer.addParagraph(0, shapeIdx, 'Bold Red', 'ctr');
+  renderer.updateTextRunStyle(0, shapeIdx, 0, 0, 1, 1);
+  renderer.updateTextRunColor(0, shapeIdx, 0, 0, 255, 0, 0);
+  renderer.updateTextRunFontSize(0, shapeIdx, 0, 0, 2400);
+  renderer.updateTextRunFont(0, shapeIdx, 0, 0, 'Impact', '', '');
+
+  // Export and reload
+  const exported = await renderer.exportPptx();
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg = renderer2.renderSlideSvg(0);
+
+  // Text may be split by word wrapping, so check for fragments
+  assert(svg.includes('Bold') && svg.includes('Red'), 'exported text should survive round-trip');
+  assert(svg.includes('font-weight="bold"'), 'bold should survive round-trip');
+  assert(svg.includes('rgb(255,0,0)') || svg.includes('#ff0000') || svg.includes('ff0000'), 'red color should survive round-trip');
+  assert(svg.includes('Impact'), 'font should survive round-trip');
+  assert(svg.includes('data-ooxml-para-align="ctr"'), 'alignment should survive round-trip');
+
+  console.log('  OK: Text editing round-trip export verified');
+}
+
+// --- Test 33: Image API — addImage ---
+console.log('Test 33: Image API — addImage');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Minimal 1x1 red PNG (valid PNG file)
+  const pngData = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, // IEND chunk
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  const result = renderer.addImage(0, pngData, 'image/png',
+    914400, 914400, 1828800, 1828800);
+  assert(result.startsWith('OK:'), `addImage should return OK, got ${result}`);
+  const shapeIdx = parseInt(result.split(':')[1]);
+  assert(shapeIdx >= 0, `shape index should be non-negative, got ${shapeIdx}`);
+
+  // Render should include the picture shape
+  const svg = renderer.renderSlideSvg(0);
+  assert(svg.includes('data-ooxml-shape-type="picture"'), 'SVG should contain picture shape');
+
+  // Export and verify the image file exists
+  const exported = await renderer.exportPptx();
+  assert(exported.byteLength > pptxAb.byteLength, 'exported PPTX should be larger with image');
+
+  // Reload and verify
+  const renderer2 = new PptxRenderer({ logLevel: 'silent' });
+  await renderer2.init(wasmBuf);
+  await renderer2.loadPptx(exported);
+  const svg2 = renderer2.renderSlideSvg(0);
+  assert(svg2.includes('data-ooxml-shape-type="picture"'), 'reloaded SVG should contain picture shape');
+
+  console.log('  OK: addImage with round-trip export');
+}
+
+// --- Test 34: Image API — replaceImage ---
+console.log('Test 34: Image API — replaceImage');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add an image first
+  const pngData = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  const addResult = renderer.addImage(0, pngData, 'image/png',
+    914400, 914400, 1828800, 1828800);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  // Replace with a different (same-format) image
+  const pngData2 = new Uint8Array([...pngData]); // same structure, different identity
+  pngData2[pngData2.length - 5] = 0x01; // slightly different
+  const replaceResult = renderer.replaceImage(0, shapeIdx, pngData2, 'image/png');
+  assert(replaceResult === 'OK', `replaceImage should return OK, got ${replaceResult}`);
+
+  // Error cases
+  assert(renderer.replaceImage(0, 999, pngData, 'image/png').startsWith('ERROR:'), 'invalid shape');
+  assert(renderer.addImage(0, pngData, 'image/bla', 0, 0, 100, 100).startsWith('ERROR:'), 'invalid mime');
+
+  console.log('  OK: replaceImage');
+}
+
+// --- Test 35: Image API — deleteImage ---
+console.log('Test 35: Image API — deleteImage');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  renderer.renderSlideSvg(0);
+
+  // Add then delete
+  const pngData = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+    0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+    0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+    0x44, 0xAE, 0x42, 0x60, 0x82,
+  ]);
+
+  const addResult = renderer.addImage(0, pngData, 'image/png',
+    914400, 914400, 1828800, 1828800);
+  const shapeIdx = parseInt(addResult.split(':')[1]);
+
+  const svg1 = renderer.renderSlideSvg(0);
+  assert(svg1.includes('data-ooxml-shape-type="picture"'), 'should have picture before delete');
+
+  const delResult = renderer.deleteImage(0, shapeIdx);
+  assert(delResult === 'OK', `deleteImage should return OK, got ${delResult}`);
+
+  const svg2 = renderer.renderSlideSvg(0);
+  assert(!svg2.includes(`data-ooxml-shape-idx="${shapeIdx}"`), 'deleted shape should not be in SVG');
+
+  // Error case
+  assert(renderer.deleteImage(0, 999).startsWith('ERROR:'), 'delete invalid shape');
+
+  console.log('  OK: deleteImage');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

@@ -12,6 +12,22 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | Update position/size/rotation (EMU), returns re-rendered SVG |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | Update text content, returns re-rendered SVG |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | Update solid fill color, returns re-rendered SVG |
+| `deleteShape(slideIdx, shapeIdx)` | Delete a shape by index (supports group children via composite index) |
+| `addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB)` | Add a basic shape (rect/ellipse/roundRect/line), returns `OK:<index>` |
+| `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | Duplicate a shape with offset, returns `OK:<index>` |
+| `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | Apply linear gradient fill, returns re-rendered SVG |
+| `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | Add a text paragraph to a shape, returns `OK:<paraIndex>` |
+| `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | Set stroke color/width/dash, returns re-rendered SVG |
+| `addParagraph(slideIdx, shapeIdx, text, align?)` | Add paragraph with alignment, returns `OK:<paraIndex>` |
+| `deleteParagraph(slideIdx, shapeIdx, paraIdx)` | Delete a paragraph, returns `OK` |
+| `addRun(slideIdx, shapeIdx, paraIdx, text)` | Add a text run to a paragraph, returns `OK:<runIndex>` |
+| `deleteRun(slideIdx, shapeIdx, paraIdx, runIdx)` | Delete a text run, returns `OK` |
+| `updateTextRunStyle(slideIdx, shapeIdx, paraIdx, runIdx, bold?, italic?)` | Set bold/italic (1/0/-1), returns re-rendered SVG |
+| `updateTextRunFontSize(slideIdx, shapeIdx, paraIdx, runIdx, fontSize)` | Set font size (hundredths of pt), returns re-rendered SVG |
+| `updateTextRunColor(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b)` | Set text color (r=-1 to inherit), returns re-rendered SVG |
+| `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | Set font family, returns re-rendered SVG |
+| `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | Set paragraph alignment, returns re-rendered SVG |
+| `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | Set underline/strike/super-subscript, returns re-rendered SVG |
 
 All shape `update*` methods:
 - Modify the cached SlideData in-place (no XML re-parse)
@@ -27,6 +43,18 @@ All shape `update*` methods:
 | `reorderSlides(newOrder)` | Reorder slides by permutation array |
 
 Slide management methods update package metadata (`presentation.xml`, `.rels`, `[Content_Types].xml`) and re-initialize the Wasm engine automatically.
+
+### Image APIs
+
+| Method | Description |
+|--------|-------------|
+| `addImage(slideIdx, imageData, mimeType, x, y, cx, cy)` | Add a picture shape with the given image data (Uint8Array). Handles media file, `.rels`, and `[Content_Types].xml` updates. Returns `"OK:<shapeIdx>"` |
+| `replaceImage(slideIdx, shapeIdx, imageData, mimeType)` | Replace the image of an existing picture shape. Returns re-rendered SVG |
+| `deleteImage(slideIdx, shapeIdx)` | Delete a picture shape and clean up orphaned media files. Returns `"OK"` |
+
+Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+Coordinates (`x`, `y`, `cx`, `cy`) are in EMU (English Metric Units). Use `pxToEmu()` for conversion.
 
 ### Unit Conversion Helpers
 
@@ -140,11 +168,74 @@ svg.addEventListener('mouseup', (e) => {
 
 ## Text Editing
 
+### Add text to a shape
+
+```typescript
+// Add a paragraph with 18pt text to shape 0
+const result = renderer.addShapeText(0, 0, 'Hello World', 1800);
+// fontSize: hundredths of a point (1800 = 18pt), optional color (0-255)
+renderer.addShapeText(0, 0, 'Red text', 1400, 255, 0, 0);
+```
+
+### Update existing text
+
 ```typescript
 // Update the first run of the first paragraph in shape 0
 const newSvg = renderer.updateShapeText(0, 0, 0, 0, 'New text content');
 // Replace the shape element in the DOM
 shapeElement.outerHTML = newSvg;
+```
+
+### Paragraph management
+
+```typescript
+// Add a centered paragraph with text
+const result = renderer.addParagraph(0, shapeIdx, 'New paragraph', 'ctr');
+// align: "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit)
+
+// Delete paragraph at index 1
+renderer.deleteParagraph(0, shapeIdx, 1);
+
+// Change alignment
+renderer.updateParagraphAlign(0, shapeIdx, 0, 'r');
+```
+
+### Run management
+
+```typescript
+// Add a run to paragraph 0
+const result = renderer.addRun(0, shapeIdx, 0, 'appended text');
+
+// Delete run at index 1 from paragraph 0
+renderer.deleteRun(0, shapeIdx, 0, 1);
+```
+
+### Text formatting
+
+```typescript
+// Bold and italic (1 = on, 0 = off, -1 = no change)
+renderer.updateTextRunStyle(0, shapeIdx, 0, 0, 1, -1);   // bold on
+renderer.updateTextRunStyle(0, shapeIdx, 0, 0, -1, 1);   // italic on
+
+// Font size (hundredths of a point: 1800 = 18pt, 0 = inherit)
+renderer.updateTextRunFontSize(0, shapeIdx, 0, 0, 2400);  // 24pt
+
+// Text color (RGB 0-255, r=-1 to inherit from theme)
+renderer.updateTextRunColor(0, shapeIdx, 0, 0, 255, 0, 0);  // red
+
+// Font family (empty string = no change)
+renderer.updateTextRunFont(0, shapeIdx, 0, 0, 'Arial', 'MS Gothic', '');
+// Arguments: fontFace (Latin), eaFont (East Asian), csFont (Complex Script)
+
+// Underline, strikethrough, superscript/subscript
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'sng', '', -1);       // single underline
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', 'sngStrike', -1); // strikethrough
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', '', 30000);       // superscript
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, '', '', -25000);      // subscript
+renderer.updateTextRunDecoration(0, shapeIdx, 0, 0, 'none', 'none', 0);   // remove all
+// underline: "sng", "dbl", "" (no change), "none" (remove)
+// strike: "sngStrike", "dblStrike", "" (no change), "none" (remove)
+// baseline: 30000 (super), -25000 (sub), 0 (normal), -1 (no change)
 ```
 
 ## Fill Color Editing
@@ -197,6 +288,81 @@ await renderer.reorderSlides([2, 1, 0]);
 ```
 
 The argument is a permutation array where `newOrder[i]` is the old index of the slide that should appear at position `i`.
+
+## Shape Management
+
+### Add Shape
+
+```typescript
+// Add a red rectangle (position and size in EMU)
+const result = renderer.addShape(0, 'rect', 914400, 914400, 1828800, 914400, 255, 0, 0);
+const shapeIdx = parseInt(result.split(':')[1]);
+
+// Add an ellipse with no fill (pass -1 for fill values)
+renderer.addShape(0, 'ellipse', 0, 0, 914400, 914400);
+```
+
+Supported geometry types: `rect`, `ellipse`, `roundRect`, `line`.
+
+### Delete Shape
+
+```typescript
+renderer.deleteShape(0, shapeIdx);
+```
+
+### Duplicate Shape
+
+```typescript
+// Duplicate shape with default offset (457200 EMU = 0.5 inch)
+const result = renderer.duplicateShape(0, shapeIdx);
+const newIdx = parseInt(result.split(':')[1]);
+
+// Duplicate with custom offset
+renderer.duplicateShape(0, shapeIdx, 914400, 914400);
+```
+
+## Gradient Fill
+
+```typescript
+const stops = [
+  { pos: 0,      r: 255, g: 0,   b: 0 },   // Red at start
+  { pos: 100000, r: 0,   g: 0,   b: 255 },  // Blue at end
+];
+// angle: 5400000 = 90 degrees (in 60000ths of a degree)
+const svg = renderer.updateShapeGradientFill(0, shapeIdx, 5400000, stops);
+shapeElement.outerHTML = svg;
+```
+
+## Stroke Editing
+
+```typescript
+// Set red stroke, 2pt width, dashed
+const svg = renderer.updateShapeStroke(0, shapeIdx, 255, 0, 0, 25400, 'dash');
+
+// Remove stroke (pass -1 for color)
+renderer.updateShapeStroke(0, shapeIdx, -1, -1, -1, 0);
+```
+
+Dash presets: `dash`, `dot`, `dashDot`, `lgDash`, `lgDashDot`, `lgDashDotDot`, `sysDash`, `sysDot`, `sysDashDot`, `sysDashDotDot`.
+
+## Image Operations
+
+```typescript
+// Add a picture shape from image data
+const imageData = new Uint8Array(await fetch('photo.png').then(r => r.arrayBuffer()));
+const result = renderer.addImage(0, imageData, 'image/png',
+  914400, 914400, 3657600, 2743200);  // x, y, width, height in EMU
+const shapeIdx = parseInt(result.split(':')[1]);
+
+// Replace the image of an existing picture shape
+const newImage = new Uint8Array(await fetch('new-photo.jpg').then(r => r.arrayBuffer()));
+renderer.replaceImage(0, shapeIdx, newImage, 'image/jpeg');
+
+// Delete a picture shape (cleans up orphaned media files)
+renderer.deleteImage(0, shapeIdx);
+```
+
+Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
 
 ## Export
 
