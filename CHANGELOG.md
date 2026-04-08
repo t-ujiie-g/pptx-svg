@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.5.1
+
+### Features
+
+- **Text editing API** — full paragraph and text run CRUD operations:
+  - `addParagraph()` / `deleteParagraph()` — add/remove paragraphs with alignment control
+  - `addRun()` / `deleteRun()` — add/remove text runs within paragraphs
+  - `updateTextRunStyle()` — set bold/italic (tri-state: on/off/no-change)
+  - `updateTextRunFontSize()` — set font size in hundredths of a point
+  - `updateTextRunColor()` — set text color (RGB) or clear to inherit
+  - `updateTextRunFont()` — set Latin, East Asian, and Complex Script font families
+  - `updateParagraphAlign()` — set paragraph alignment (left/center/right/justify/inherit)
+  - `updateTextRunDecoration()` — set underline, strikethrough, superscript/subscript
+- **Image operations API** — add, replace, and delete picture shapes:
+  - `addImage()` — add a picture shape with image data (PNG, JPEG, GIF, BMP, TIFF, SVG). Handles media file storage, `.rels` updates, and `[Content_Types].xml` management automatically
+  - `replaceImage()` — swap the image of an existing picture shape (same or different format)
+  - `deleteImage()` — remove a picture shape and clean up orphaned media files
+- **Shape management enhancements**:
+  - `addShapeText()` — add text paragraphs to existing shapes
+  - `duplicateShape()` — duplicate a shape with configurable offset
+  - `updateShapeGradientFill()` — set gradient fill with angle and color stops
+  - `updateShapeStroke()` — set stroke color, width, and dash pattern (or remove stroke)
+
+### Improvements
+
+- **Code refactoring**: split `main.mbt` (2229 lines) into `main.mbt` (1161, read-only APIs) + `main_edit.mbt` (810, editing APIs) with shared `with_shape()`/`with_run()` validation helpers
+- **ZIP binary support**: `buildZip()` now accepts `binaryModifications` parameter for adding/replacing binary entries (images)
+- **Deduplicated helpers** in `pptx-renderer.ts`: consolidated `findNextRId()`/`nextRid()`, extracted `resolveRidTarget()` for relationship ID resolution
+
+### Tests
+
+- 35 Node.js editing API tests (`test_node_compat.mjs`): shape CRUD, text editing, image operations, round-trip export verification
+
+### Documentation
+
+- Add text editing and image API tables to README.md / README.ja.md
+- Add image operations section and usage examples to `docs/editing-guide.md`
+- Update CLAUDE.md with editing exports list and `test_node_compat.mjs` in key files
+- Interactive editing demo (`web/editing.html`) updated with text formatting controls and image upload UI
+
 ## 0.5.0
 
 ### Features
