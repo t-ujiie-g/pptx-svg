@@ -135,7 +135,7 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   // Primary 6 accent colors
   let accents = [accent1, accent2, accent3, accent4, accent5, accent6]
   for i in 0..<6 {
-    if !(accents[i].is_none()) {
+    if !accents[i].is_none() {
       colors.push(accents[i].to_css())
     } else {
       colors.push(chart_colors_fallback[i])
@@ -143,7 +143,7 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   }
   // Darker variants (lumMod=75000 approximation: multiply RGB by 0.75)
   for i in 0..<6 {
-    if !(accents[i].is_none()) {
+    if !accents[i].is_none() {
       let c = accents[i]
       let dr = c.r * 3 / 4
       let dg = c.g * 3 / 4
@@ -221,7 +221,7 @@ fn render_chart(
     "\" stroke-width=\"1\"/>"
   // Title
   let title_h = if chart.title.is_empty() { 0 } else { chart_title_h }
-  if !(chart.title.is_empty()) {
+  if !chart.title.is_empty() {
     svg = svg +
       "<text x=\"" +
       int_to_str(w / 2) +
@@ -250,10 +250,10 @@ fn render_chart(
     chart_pad + chart_axis_label_w
   }
   // Detect if X-axis labels need rotation (many categories)
-  let has_many_cats = if !(no_axes) &&
-    !(h_bar) &&
-    !(chart.groups.is_empty()) &&
-    !(chart.groups[0].series.is_empty()) {
+  let has_many_cats = if !no_axes &&
+    !h_bar &&
+    !chart.groups.is_empty() &&
+    !chart.groups[0].series.is_empty() {
     let nc = get_cat_labels(chart.groups[0].series[0].cat).length()
     nc > 8
   } else {
@@ -509,7 +509,7 @@ fn render_bar_chart(
       render_bar_data_labels(group, px_, py, pw, ph, max_val, is_horizontal)
   }
   // Trendlines + error bars (vertical column charts only)
-  if !(is_horizontal) {
+  if !is_horizontal {
     svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
     svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   }
@@ -550,12 +550,12 @@ fn render_line_chart(
     for ci in 0..<n_pts {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y = py + ph - mul_div(values[ci], ph, max_val)
-      if !(points.is_empty()) {
+      if !points.is_empty() {
         points = points + " "
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
     }
-    if !(points.is_empty()) {
+    if !points.is_empty() {
       svg = svg +
         "<polyline points=\"" +
         points +
@@ -864,7 +864,7 @@ fn render_area_chart(
     for ci in 0..<actual {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
       let y = py + ph - mul_div(values[ci], ph, max_val)
-      if !(points.is_empty()) {
+      if !points.is_empty() {
         points = points + " "
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
@@ -1160,7 +1160,7 @@ fn render_axes(
     chart_border_color +
     "\" stroke-width=\"0.5\"/>"
   // Category / X-axis labels
-  let is_xy = if !(groups.is_empty()) {
+  let is_xy = if !groups.is_empty() {
     match groups[0].chart_type {
       @ooxml.ChartKind::ScatterChart | @ooxml.ChartKind::BubbleChart => true
       _ => false
@@ -1186,7 +1186,7 @@ fn render_axes(
         "</text>"
     }
   } else {
-    let cats = if !(groups.is_empty()) && !(groups[0].series.is_empty()) {
+    let cats = if !groups.is_empty() && !groups[0].series.is_empty() {
       get_cat_labels(groups[0].series[0].cat)
     } else {
       []
@@ -1248,7 +1248,7 @@ fn render_axes(
   // Value axis labels + gridlines
   for ai in 0..<axes.length() {
     let ax = axes[ai]
-    if ax.is_val && !(ax.delete) {
+    if ax.is_val && !ax.delete {
       let raw_max = get_value_axis_max(groups)
       let val_fmt = ax.num_fmt
       let max_val = compute_axis_max(raw_max, axes)
@@ -1355,7 +1355,7 @@ fn render_legend(
     }
     if is_pie {
       // Show category labels with per-slice colors (respecting c:dPt overrides)
-      if !(group.series.is_empty()) {
+      if !group.series.is_empty() {
         let cats = get_cat_labels(group.series[0].cat)
         let dpts = group.series[0].data_points
         for ci in 0..<cats.length() {
@@ -1416,9 +1416,9 @@ fn series_color(
   idx : Int,
   colors : Array[String],
 ) -> String {
-  if !(ser.sp_pr.fill.is_none()) {
+  if !ser.sp_pr.fill.is_none() {
     ser.sp_pr.fill.to_css()
-  } else if !(ser.sp_pr.stroke.is_none()) {
+  } else if !ser.sp_pr.stroke.is_none() {
     // Line charts set color on a:ln (stroke), not fill
     ser.sp_pr.stroke.to_css()
   } else {
@@ -1436,7 +1436,7 @@ fn point_color(
   for i in 0..<ser.data_points.length() {
     if ser.data_points[i].idx == pt_idx {
       let sp = ser.data_points[i].sp_pr
-      if !(sp.fill.is_none()) {
+      if !sp.fill.is_none() {
         return sp.fill.to_css()
       }
     }
@@ -1454,7 +1454,7 @@ fn get_dpt_color(
   for i in 0..<data_points.length() {
     if data_points[i].idx == idx {
       let sp = data_points[i].sp_pr
-      if !(sp.fill.is_none()) {
+      if !sp.fill.is_none() {
         return sp.fill.to_css()
       }
     }
@@ -1497,11 +1497,7 @@ fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
 fn get_stacked_series_range(
   series : Array[@ooxml.ChartSeries],
 ) -> (Array[String], Int) {
-  let cats = if !(series.is_empty()) {
-    get_cat_labels(series[0].cat)
-  } else {
-    []
-  }
+  let cats = if !series.is_empty() { get_cat_labels(series[0].cat) } else { [] }
   let nc = cats.length()
   let totals : Array[Int] = Array::make(nc, 0)
   for si in 0..<series.length() {
@@ -1618,11 +1614,7 @@ fn round_up_nice(val : Int) -> Int {
 ///|
 /// Get category count and max value across all series.
 fn get_series_range(series : Array[@ooxml.ChartSeries]) -> (Array[String], Int) {
-  let cats = if !(series.is_empty()) {
-    get_cat_labels(series[0].cat)
-  } else {
-    []
-  }
+  let cats = if !series.is_empty() { get_cat_labels(series[0].cat) } else { [] }
   let mut max_val = 0
   for si in 0..<series.length() {
     let vals = get_num_values(series[si].val)
@@ -1691,7 +1683,7 @@ fn compute_axis_max(raw_max : Int, axes : Array[@ooxml.ChartAxis]) -> Int {
   // Find the value axis majorUnit
   let mut major_unit = 0
   for ai in 0..<axes.length() {
-    if axes[ai].is_val && !(axes[ai].major_unit.is_empty()) {
+    if axes[ai].is_val && !axes[ai].major_unit.is_empty() {
       major_unit = parse_chart_num(axes[ai].major_unit)
     }
   }
@@ -2033,7 +2025,7 @@ fn build_label_text(
   if dl.show_ser_name {
     parts.push(ser_name)
   }
-  if dl.show_cat_name && !(cat_name.is_empty()) {
+  if dl.show_cat_name && !cat_name.is_empty() {
     parts.push(cat_name)
   }
   if dl.show_val {
@@ -2096,7 +2088,7 @@ fn render_bar_data_labels(
     } else {
       group_dl
     }
-    if !(dl.is_visible()) {
+    if !dl.is_visible() {
       continue
     }
     let values = get_num_values(ser.val)
@@ -2116,7 +2108,7 @@ fn render_bar_data_labels(
           ser.title,
           val_fmt,
         )
-        if !(label.is_empty()) {
+        if !label.is_empty() {
           let draw_val = pct_stacked_val(
             values[ci],
             cat_totals[ci],
@@ -2236,7 +2228,7 @@ fn render_xy_data_labels(
     } else {
       group_dl
     }
-    if !(dl.is_visible()) {
+    if !dl.is_visible() {
       continue
     }
     let values = get_num_values(ser.val)
@@ -2256,7 +2248,7 @@ fn render_xy_data_labels(
           ser.title,
           val_fmt,
         )
-        if !(label.is_empty()) {
+        if !label.is_empty() {
           let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
           let y = py + ph - mul_div(values[ci], ph, max_val) - 6
           svg = svg +
@@ -2324,7 +2316,7 @@ fn render_pie_data_labels(
         ser.title,
         get_num_format(ser.val),
       )
-      if !(label.is_empty()) {
+      if !label.is_empty() {
         svg = svg +
           "<text x=\"" +
           int_to_str(lx) +
@@ -2372,7 +2364,7 @@ fn render_trendlines(
     }
     for ti in 0..<ser.trendlines.length() {
       let tl = ser.trendlines[ti]
-      let color = if !(tl.sp_pr.stroke.is_none()) {
+      let color = if !tl.sp_pr.stroke.is_none() {
         tl.sp_pr.stroke.to_css()
       } else {
         series_color(ser, si, colors)
@@ -2887,7 +2879,7 @@ fn treemap_layout(
       w1,
       h,
       first_total,
-      !(horizontal),
+      !horizontal,
       result,
     )
     result = treemap_layout(
@@ -2900,7 +2892,7 @@ fn treemap_layout(
       w2,
       h,
       second_total,
-      !(horizontal),
+      !horizontal,
       result,
     )
   } else {
@@ -2916,7 +2908,7 @@ fn treemap_layout(
       w,
       h1,
       first_total,
-      !(horizontal),
+      !horizontal,
       result,
     )
     result = treemap_layout(
@@ -2929,7 +2921,7 @@ fn treemap_layout(
       w,
       h2,
       second_total,
-      !(horizontal),
+      !horizontal,
       result,
     )
   }

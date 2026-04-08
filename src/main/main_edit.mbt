@@ -89,8 +89,8 @@ fn with_run(
 /// Create a default TextRun with the given text and optional settings.
 fn make_default_run(
   text : String,
-  font_size~ : Int = 0,
-  color~ : @ooxml.Color = @ooxml.Color::none(),
+  font_size? : Int = 0,
+  color? : @ooxml.Color = @ooxml.Color::none(),
 ) -> @ooxml.TextRun {
   {
     text,
@@ -124,7 +124,7 @@ fn make_default_run(
 /// Create a default TextParagraph with a single run.
 fn make_default_paragraph(
   run : @ooxml.TextRun,
-  align~ : String = "",
+  align? : String = "",
 ) -> @ooxml.TextParagraph {
   {
     runs: [run],
@@ -161,7 +161,6 @@ fn[T] array_remove_at(arr : Array[T], idx : Int) -> Unit {
   }
   while arr.length() > 0 {
     let _ = arr.pop()
-
   }
   let mut j = 0
   while j < new_arr.length() {
@@ -181,16 +180,14 @@ fn parse_gradient_stops(s : String) -> Array[@ooxml.GradientStop] {
   let mut i = 0
   while i < np {
     let part = parts[i]
-    if !(part.is_empty()) {
+    if !part.is_empty() {
       let vals = split_string(part, ',')
       if vals.length() >= 4 {
         let pos = @xml.parse_int(vals[0])
         let r = @xml.parse_int(vals[1])
         let g = @xml.parse_int(vals[2])
         let b = @xml.parse_int(vals[3])
-        stops.push(
-          { pos, color: ({ r, g, b, alpha: 255 } : @ooxml.Color) },
-        )
+        stops.push({ pos, color: ({ r, g, b, alpha: 255 } : @ooxml.Color) })
       }
     }
     i = i + 1
@@ -231,11 +228,25 @@ pub fn render_shape_svg(slide_idx : Int, shape_idx : Int) -> String {
       int_to_str(slide_num) +
       ".xml.rels"
     let rels_xml = @ffi.ffi_get_file(rels_path)
-    let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
+    let rels = if rels_xml.is_empty() {
+      []
+    } else {
+      @ooxml.parse_rels(rels_xml)
+    }
     let defs = @renderer.render_shape_defs(shape, slide_num, shape_idx, scale)
-    let defs_section = if defs.is_empty() { "" } else { "<defs>" + defs + "</defs>" }
+    let defs_section = if defs.is_empty() {
+      ""
+    } else {
+      "<defs>" + defs + "</defs>"
+    }
     let shape_svg = @renderer.render_shape(
-      shape, rels, slide_num, scale, shape_idx, g_theme.val, g_table_styles.val,
+      shape,
+      rels,
+      slide_num,
+      scale,
+      shape_idx,
+      g_theme.val,
+      g_table_styles.val,
     )
     defs_section + shape_svg
   })
@@ -258,7 +269,11 @@ pub fn update_shape_transform(
     arr[local_idx] = {
       ..shape,
       transform: {
-        x, y, cx, cy, rot,
+        x,
+        y,
+        cx,
+        cy,
+        rot,
         flip_h: shape.transform.flip_h,
         flip_v: shape.transform.flip_v,
       },
@@ -278,7 +293,7 @@ pub fn update_shape_text(
   text : String,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
-    para.runs[run_idx] = { ..run, text }
+    para.runs[run_idx] = { ..run, text, }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
@@ -339,7 +354,13 @@ pub fn add_shape(
   }
   let slide = g_slides.val[slide_idx]
   let transform : @ooxml.ShapeTransform = {
-    x, y, cx, cy, rot: 0, flip_h: false, flip_v: false,
+    x,
+    y,
+    cx,
+    cy,
+    rot: 0,
+    flip_h: false,
+    flip_v: false,
   }
   let geom = if geom_type == "ellipse" {
     @ooxml.ShapeGeom::Ellipse
@@ -362,7 +383,12 @@ pub fn add_shape(
     @ooxml.Color::none()
   }
   let stroke_w = if geom_type == "line" { 12700 } else { 0 }
-  let shape = { ..@ooxml.Shape::default_with(kind, transform), fill, stroke, stroke_w }
+  let shape = {
+    ..@ooxml.Shape::default_with(kind, transform),
+    fill,
+    stroke,
+    stroke_w,
+  }
   slide.shapes.push(shape)
   let new_idx = slide.shapes.length() - 1
   g_modified.val[slide_idx] = true
@@ -390,7 +416,13 @@ pub fn add_picture_shape(
   }
   let slide = g_slides.val[slide_idx]
   let transform : @ooxml.ShapeTransform = {
-    x, y, cx, cy, rot: 0, flip_h: false, flip_v: false,
+    x,
+    y,
+    cx,
+    cy,
+    rot: 0,
+    flip_h: false,
+    flip_v: false,
   }
   let kind = @ooxml.ShapeKind::Picture(rid)
   let blip_fill : @ooxml.BlipFill = {
@@ -467,7 +499,7 @@ pub fn add_shape_text(
     } else {
       @ooxml.Color::none()
     }
-    let run = make_default_run(text, font_size=font_size, color=color)
+    let run = make_default_run(text, font_size~, color~)
     let para = make_default_paragraph(run)
     shape.paragraphs.push(para)
     let para_idx = shape.paragraphs.length() - 1
@@ -595,7 +627,7 @@ pub fn add_paragraph(
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
     let run = make_default_run(text)
-    let para = make_default_paragraph(run, align=align)
+    let para = make_default_paragraph(run, align~)
     shape.paragraphs.push(para)
     let para_idx = shape.paragraphs.length() - 1
     g_modified.val[slide_idx] = true
@@ -673,9 +705,21 @@ pub fn update_text_run_style(
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     para.runs[run_idx] = {
       ..run,
-      bold: if bold >= 0 { bold != 0 } else { run.bold },
-      bold_explicit: if bold >= 0 { true } else { run.bold_explicit },
-      italic: if italic >= 0 { italic != 0 } else { run.italic },
+      bold: if bold >= 0 {
+        bold != 0
+      } else {
+        run.bold
+      },
+      bold_explicit: if bold >= 0 {
+        true
+      } else {
+        run.bold_explicit
+      },
+      italic: if italic >= 0 {
+        italic != 0
+      } else {
+        run.italic
+      },
     }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
@@ -693,7 +737,7 @@ pub fn update_text_run_font_size(
   font_size : Int,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
-    para.runs[run_idx] = { ..run, font_size }
+    para.runs[run_idx] = { ..run, font_size, }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
@@ -717,7 +761,7 @@ pub fn update_text_run_color(
     } else {
       @ooxml.Color::none()
     }
-    para.runs[run_idx] = { ..run, color }
+    para.runs[run_idx] = { ..run, color, }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
@@ -738,9 +782,21 @@ pub fn update_text_run_font(
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     para.runs[run_idx] = {
       ..run,
-      font_face: if font_face != "" { font_face } else { run.font_face },
-      ea_font: if ea_font != "" { ea_font } else { run.ea_font },
-      cs_font: if cs_font != "" { cs_font } else { run.cs_font },
+      font_face: if font_face != "" {
+        font_face
+      } else {
+        run.font_face
+      },
+      ea_font: if ea_font != "" {
+        ea_font
+      } else {
+        run.ea_font
+      },
+      cs_font: if cs_font != "" {
+        cs_font
+      } else {
+        run.cs_font
+      },
     }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
@@ -762,7 +818,7 @@ pub fn update_paragraph_align(
     if para_idx < 0 || para_idx >= shape.paragraphs.length() {
       return "ERROR:paragraph index out of range"
     }
-    shape.paragraphs[para_idx] = { ..shape.paragraphs[para_idx], align }
+    shape.paragraphs[para_idx] = { ..shape.paragraphs[para_idx], align, }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
@@ -802,7 +858,11 @@ pub fn update_text_run_decoration(
       ..run,
       underline: new_underline,
       strike: new_strike,
-      baseline: if baseline == -1 { run.baseline } else { baseline },
+      baseline: if baseline == -1 {
+        run.baseline
+      } else {
+        baseline
+      },
     }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)

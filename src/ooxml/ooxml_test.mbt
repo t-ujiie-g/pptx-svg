@@ -248,7 +248,7 @@ test "OuterShadow::none and is_none" {
     algn: "ctr",
     rot_with_shape: false,
   }
-  assert_true(!(os2.is_none()))
+  assert_true(!os2.is_none())
   assert_eq(os2.blur_rad, 152400)
   assert_eq(os2.dir, 5400000)
 }
@@ -263,7 +263,7 @@ test "InnerShadow::none and is_none" {
     dir: 2700000,
     color: parse_hex_color("000000"),
   }
-  assert_true(!(ishdw2.is_none()))
+  assert_true(!ishdw2.is_none())
 }
 
 ///|
@@ -273,7 +273,7 @@ test "Glow::none and is_none" {
   assert_eq(gl.rad, 0)
   assert_true(gl.color.is_none())
   let gl2 : Glow = { rad: 228600, color: parse_hex_color("FFC000") }
-  assert_true(!(gl2.is_none()))
+  assert_true(!gl2.is_none())
   assert_eq(gl2.rad, 228600)
 }
 
@@ -283,7 +283,7 @@ test "SoftEdge::none and is_none" {
   assert_true(se.is_none())
   assert_eq(se.rad, 0)
   let se2 : SoftEdge = { rad: 63500 }
-  assert_true(!(se2.is_none()))
+  assert_true(!se2.is_none())
 }
 
 ///|
@@ -304,7 +304,7 @@ test "Reflection::none and is_none" {
     algn: "bl",
     rot_with_shape: false,
   }
-  assert_true(!(r2.is_none()))
+  assert_true(!r2.is_none())
 }
 
 ///|
@@ -313,7 +313,7 @@ test "Blur::none and is_none" {
   assert_true(b.is_none())
   assert_eq(b.rad, 0)
   let b2 : Blur = { rad: 50800 }
-  assert_true(!(b2.is_none()))
+  assert_true(!b2.is_none())
   assert_eq(b2.rad, 50800)
 }
 
@@ -333,22 +333,22 @@ test "EffectList with single effect is not none" {
       rot_with_shape: true,
     },
   }
-  assert_true(!(e1.is_none()))
+  assert_true(!e1.is_none())
   // Only glow set
   let e2 : EffectList = {
     ..EffectList::none(),
     glow: { rad: 100, color: parse_hex_color("FF0000") },
   }
-  assert_true(!(e2.is_none()))
+  assert_true(!e2.is_none())
   // Only soft edge set
   let e3 : EffectList = { ..EffectList::none(), soft_edge: { rad: 100 } }
-  assert_true(!(e3.is_none()))
+  assert_true(!e3.is_none())
 }
 
 ///|
 test "EffectList with blur is not none" {
   let e : EffectList = { ..EffectList::none(), blur: { rad: 76200 } }
-  assert_true(!(e.is_none()))
+  assert_true(!e.is_none())
   assert_eq(e.blur.rad, 76200)
 }
 
@@ -363,7 +363,7 @@ test "PresetShadow::none and is_none" {
     dir: 2700000,
     color: parse_hex_color("000000"),
   }
-  assert_true(!(ps2.is_none()))
+  assert_true(!ps2.is_none())
   assert_eq(ps2.prst, "shdw1")
 }
 
@@ -403,7 +403,7 @@ test "EffectList with prst_shadow is not none" {
       color: parse_hex_color("333333"),
     },
   }
-  assert_true(!(e.is_none()))
+  assert_true(!e.is_none())
   assert_eq(e.prst_shadow.prst, "shdw2")
 }
 
@@ -417,7 +417,7 @@ test "FillOverlay::none is none" {
 ///|
 test "FillOverlay with blend and color is not none" {
   let fo : FillOverlay = { blend: "mult", color: parse_hex_color("FF0000") }
-  assert_true(!(fo.is_none()))
+  assert_true(!fo.is_none())
   assert_eq(fo.blend, "mult")
   assert_eq(fo.color.r, 255)
 }
@@ -425,7 +425,7 @@ test "FillOverlay with blend and color is not none" {
 ///|
 test "FillOverlay with over blend (default)" {
   let fo : FillOverlay = { blend: "over", color: parse_hex_color("0000FF") }
-  assert_true(!(fo.is_none()))
+  assert_true(!fo.is_none())
   assert_eq(fo.blend, "over")
   assert_eq(fo.color.b, 255)
 }
@@ -436,7 +436,7 @@ test "EffectList with fill_overlay is not none" {
     ..EffectList::none(),
     fill_overlay: { blend: "screen", color: parse_hex_color("00FF00") },
   }
-  assert_true(!(e.is_none()))
+  assert_true(!e.is_none())
   assert_eq(e.fill_overlay.blend, "screen")
 }
 
@@ -726,7 +726,7 @@ test "parse_chartex_xml empty chartSpace" {
     #|</cx:chartSpace>
   let chart = parse_chartex_xml(xml, ThemeData::default())
   assert_eq(chart.groups.length(), 0)
-  assert_true(!(chart.chart_xml.is_empty()))
+  assert_true(!chart.chart_xml.is_empty())
 }
 
 ///|

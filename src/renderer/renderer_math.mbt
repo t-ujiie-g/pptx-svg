@@ -171,7 +171,7 @@ fn layout_math_children(
   while i < n {
     let child = children[i]
     let tag = @xml.get_tag(child)
-    if !(tag.is_empty()) && tag != "m:rPr" && tag != "m:ctrlPr" {
+    if !tag.is_empty() && tag != "m:rPr" && tag != "m:ctrlPr" {
       boxes.push(layout_math_node(child, fs, ff, color))
     }
     i = i + 1
@@ -1137,7 +1137,7 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
       let run = para.runs[j]
       if run.math_xml.length() > 0 {
         has_math = true
-      } else if !(run.text.is_empty()) {
+      } else if !run.text.is_empty() {
         // Non-empty text run without math → mixed content
         // Allow whitespace-only runs
         let mut all_ws = true
@@ -1153,7 +1153,7 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
           }
           k = k + 1
         }
-        if !(all_ws) {
+        if !all_ws {
           return false
         }
       }
@@ -1192,7 +1192,7 @@ fn render_math_text(
       let run = para.runs[j]
       if run.math_xml.length() > 0 {
         all_math_xml = run.math_xml
-        if !(found_first) {
+        if !found_first {
           first_run_color = run.color
           first_run_fs = run.font_size
           first_run_font = run.font_face
@@ -1220,7 +1220,7 @@ fn render_math_text(
     default_text_fill
   }
   // Font family
-  let ff = if !(first_run_font.is_empty()) {
+  let ff = if !first_run_font.is_empty() {
     first_run_font + ", " + math_font_family
   } else {
     math_font_family

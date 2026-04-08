@@ -704,19 +704,18 @@ fn parse_text_body(
     } else {
       def_font_size
     }
-    let def_color = if def_color.is_none() && !(lst_def.color.is_none()) {
+    let def_color = if def_color.is_none() && !lst_def.color.is_none() {
       lst_def.color
     } else {
       def_color
     }
     let def_font_face = if def_font_face.is_empty() &&
-      !(lst_def.font_face.is_empty()) {
+      !lst_def.font_face.is_empty() {
       lst_def.font_face
     } else {
       def_font_face
     }
-    let def_ea_font = if def_ea_font.is_empty() &&
-      !(lst_def.ea_font.is_empty()) {
+    let def_ea_font = if def_ea_font.is_empty() && !lst_def.ea_font.is_empty() {
       lst_def.ea_font
     } else {
       def_ea_font
@@ -739,13 +738,13 @@ fn parse_text_body(
         if epr_sz > 0 {
           prev_epr_font_size = epr_sz
         }
-        if !(epr_clr.is_none()) {
+        if !epr_clr.is_none() {
           prev_epr_color = epr_clr
         }
-        if !(epr_ff.is_empty()) {
+        if !epr_ff.is_empty() {
           prev_epr_font_face = epr_ff
         }
-        if !(epr_ea.is_empty()) {
+        if !epr_ea.is_empty() {
           prev_epr_ea_font = epr_ea
         }
       }
@@ -757,17 +756,17 @@ fn parse_text_body(
     } else {
       prev_epr_font_size
     }
-    let def_color = if !(def_color.is_none()) {
+    let def_color = if !def_color.is_none() {
       def_color
     } else {
       prev_epr_color
     }
-    let def_font_face = if !(def_font_face.is_empty()) {
+    let def_font_face = if !def_font_face.is_empty() {
       def_font_face
     } else {
       prev_epr_font_face
     }
-    let def_ea_font = if !(def_ea_font.is_empty()) {
+    let def_ea_font = if !def_ea_font.is_empty() {
       def_ea_font
     } else {
       prev_epr_ea_font
@@ -786,7 +785,7 @@ fn parse_text_body(
           None => ""
           Some(t_node) => @xml.get_text_content(t_node)
         }
-        if !(text.is_empty()) {
+        if !text.is_empty() {
           let run = match @xml.find_child(r_ch, "a:rPr") {
             None =>
               default_text_run(
@@ -860,31 +859,31 @@ fn parse_text_body(
     let mut changed = false
     let mut new_para = para
     // Alignment fallback
-    if para.align.is_empty() && !(lst_def.align.is_empty()) {
+    if para.align.is_empty() && !lst_def.align.is_empty() {
       new_para = { ..new_para, align: lst_def.align }
       changed = true
     }
     // Bullet fallback: inherit buChar from lstStyle if paragraph has no explicit bullet
     if para.bullet.is_empty() &&
       para.bullet_auto.is_empty() &&
-      !(para.bullet_none) &&
+      !para.bullet_none &&
       para.bullet_img_rid.is_empty() &&
-      !(lst_def.bullet.is_empty()) {
+      !lst_def.bullet.is_empty() {
       new_para = { ..new_para, bullet: lst_def.bullet }
       changed = true
       // Also inherit bullet_font/size/color from lstStyle if not set on paragraph
-      if new_para.bullet_font.is_empty() && !(lst_def.bullet_font.is_empty()) {
+      if new_para.bullet_font.is_empty() && !lst_def.bullet_font.is_empty() {
         new_para = { ..new_para, bullet_font: lst_def.bullet_font }
       }
       if new_para.bullet_size == 0 && lst_def.bullet_size != 0 {
         new_para = { ..new_para, bullet_size: lst_def.bullet_size }
       }
-      if new_para.bullet_color.is_none() && !(lst_def.bullet_color.is_none()) {
+      if new_para.bullet_color.is_none() && !lst_def.bullet_color.is_none() {
         new_para = { ..new_para, bullet_color: lst_def.bullet_color }
       }
-    } else if !(para.bullet.is_empty()) || !(para.bullet_auto.is_empty()) {
+    } else if !para.bullet.is_empty() || !para.bullet_auto.is_empty() {
       // Paragraph has explicit bullet, but may still need font/size/color from lstStyle
-      if para.bullet_font.is_empty() && !(lst_def.bullet_font.is_empty()) {
+      if para.bullet_font.is_empty() && !lst_def.bullet_font.is_empty() {
         new_para = { ..new_para, bullet_font: lst_def.bullet_font }
         changed = true
       }
@@ -892,13 +891,13 @@ fn parse_text_body(
         new_para = { ..new_para, bullet_size: lst_def.bullet_size }
         changed = true
       }
-      if para.bullet_color.is_none() && !(lst_def.bullet_color.is_none()) {
+      if para.bullet_color.is_none() && !lst_def.bullet_color.is_none() {
         new_para = { ..new_para, bullet_color: lst_def.bullet_color }
         changed = true
       }
     }
     // buNone fallback
-    if !(para.bullet_none) &&
+    if !para.bullet_none &&
       lst_def.bullet_none &&
       para.bullet.is_empty() &&
       para.bullet_auto.is_empty() &&

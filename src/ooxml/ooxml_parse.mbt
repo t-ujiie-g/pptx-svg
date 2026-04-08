@@ -221,8 +221,7 @@ fn parse_stroke(
       }
       let ln_gf_early = parse_gradient_fill(ln_ch, theme)
       let ln_pf_early = parse_pattern_fill(ln_ch, theme)
-      let has_alt_fill = !(ln_gf_early.is_none()) ||
-        !(ln_pf_early.is_none())
+      let has_alt_fill = !ln_gf_early.is_none() || !ln_pf_early.is_none()
       let color = if no_fill {
         Color::none()
       } else {
@@ -1039,7 +1038,7 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
             Some(_) => has_media = true
             None => ()
           }
-          if !(has_media) {
+          if !has_media {
             match @xml.find_child(nvpr_ch, "a:audioFile") {
               Some(_) => has_media = true
               None => ()
@@ -1065,7 +1064,7 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     stroke_miter_limit: sp.miter_limit,
     stroke_no_fill: sp.no_fill,
   }
-  if !(sh_link_rid.is_empty()) || !(sh_link_hover_rid.is_empty()) {
+  if !sh_link_rid.is_empty() || !sh_link_hover_rid.is_empty() {
     s = { ..s, sh_link_rid, sh_link_hover_rid }
   }
   // For media shapes, preserve original XML for round-trip
@@ -1157,7 +1156,7 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
       let tcpr_ch = @xml.get_children(tcpr)
       // Fill
       let gf = parse_gradient_fill(tcpr_ch, theme)
-      if !(gf.is_none()) {
+      if !gf.is_none() {
         grad_fill = gf
       } else {
         fill = parse_solid_fill(tcpr_ch, theme)
@@ -1271,7 +1270,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         Some(v) => v
         None => ""
       }
-      if !(rid.is_empty()) {
+      if !rid.is_empty() {
         // Store rid in chart_xml field temporarily; main.mbt will resolve it.
         let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
         return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
@@ -1286,7 +1285,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         Some(v) => v
         None => ""
       }
-      if !(rid.is_empty()) {
+      if !rid.is_empty() {
         // Prefix "cx:" to distinguish from classic c:chart during resolution
         let chart_data : ChartData = {
           ..ChartData::empty(),
@@ -1324,7 +1323,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       }
       // Serialize entire graphicFrame as ole_xml for round-trip
       let ole_raw = @xml.serialize_node(gf)
-      if !(img_rid.is_empty()) {
+      if !img_rid.is_empty() {
         // Render as Picture with the fallback image
         return {
           ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
@@ -1891,7 +1890,7 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
           Some(v) => v
           None => ""
         }
-        if !(id.is_empty()) {
+        if !id.is_empty() {
           rels.push({ id, target, type_, target_mode })
         }
         i = i + 1
@@ -2213,7 +2212,7 @@ fn parse_table_style_cell(
     Some(tcpr) => {
       let tcpr_ch = @xml.get_children(tcpr)
       let gf = parse_gradient_fill(tcpr_ch, theme)
-      if !(gf.is_none()) {
+      if !gf.is_none() {
         grad_fill = gf
       } else {
         fill = parse_solid_fill(tcpr_ch, theme)

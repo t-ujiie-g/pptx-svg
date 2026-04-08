@@ -511,7 +511,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                 }
               @xml.XmlNode::Text(text) =>
                 // Direct text content (no run tspan wrapper)
-                if !(text.is_empty()) {
+                if !text.is_empty() {
                   runs.push({
                     text,
                     bold: false,
@@ -666,7 +666,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
       let adj_str = get_da(g_node, "cxn-adj")
       if is_connector_prst(geom_str) {
         parse_connector_geom_from_svg(geom_str, adj_str)
-      } else if !(adj_str.is_empty()) {
+      } else if !adj_str.is_empty() {
         let avs = parse_adj_string(adj_str)
         @ooxml.parse_geom(geom_str, avs)
       } else {
@@ -881,7 +881,7 @@ fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
         if tag == "g" {
           // Look inside: could be the transform <g> or a child shape <g>
           let st = get_da(g_children[i], "shape-type")
-          if !(st.is_empty()) {
+          if !st.is_empty() {
             children.push(parse_shape_from_g(g_children[i]))
           } else {
             // This might be the inner transform <g> wrapping children
@@ -893,7 +893,7 @@ fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
                 @xml.XmlNode::Element(tag2, _, _) =>
                   if tag2 == "g" {
                     let st2 = get_da(inner_ch[j], "shape-type")
-                    if !(st2.is_empty()) {
+                    if !st2.is_empty() {
                       children.push(parse_shape_from_g(inner_ch[j]))
                     }
                   }
@@ -1005,7 +1005,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "g" {
           let st = get_da(svg_children[i], "shape-type")
-          if !(st.is_empty()) {
+          if !st.is_empty() {
             shapes.push(parse_shape_from_g(svg_children[i]))
           }
         }

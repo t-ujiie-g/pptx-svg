@@ -288,7 +288,7 @@ test "roundtrip shape with blur effect" {
   let parsed = @svg_parser.parse_svg_to_slide(svg)
   assert_eq(parsed.shapes.length(), 1)
   assert_eq(parsed.shapes[0].effects.blur.rad, 76200)
-  assert_true(!(parsed.shapes[0].effects.blur.is_none()))
+  assert_true(!parsed.shapes[0].effects.blur.is_none())
 }
 
 ///|
