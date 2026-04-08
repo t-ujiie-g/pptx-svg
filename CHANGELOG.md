@@ -13,6 +13,11 @@
   - `updateTextRunFont()` — set Latin, East Asian, and Complex Script font families
   - `updateParagraphAlign()` — set paragraph alignment (left/center/right/justify/inherit)
   - `updateTextRunDecoration()` — set underline, strikethrough, superscript/subscript
+- **Slide management API** — programmatic slide operations:
+  - `addSlide()` — add a blank slide at any position, with optional layout copy from an existing slide
+  - `deleteSlide()` — remove a slide (minimum 1 must remain)
+  - `reorderSlides()` — reorder slides by permutation array
+  - Automatically updates `presentation.xml`, `.rels`, and `[Content_Types].xml`
 - **Image operations API** — add, replace, and delete picture shapes:
   - `addImage()` — add a picture shape with image data (PNG, JPEG, GIF, BMP, TIFF, SVG). Handles media file storage, `.rels` updates, and `[Content_Types].xml` management automatically
   - `replaceImage()` — swap the image of an existing picture shape (same or different format)
@@ -33,12 +38,16 @@
 
 - 35 Node.js editing API tests (`test_node_compat.mjs`): shape CRUD, text editing, image operations, round-trip export verification
 
+### Bug Fixes
+
+- Fix garbled characters in README.ja.md
+
 ### Documentation
 
-- Add text editing and image API tables to README.md / README.ja.md
-- Add image operations section and usage examples to `docs/editing-guide.md`
+- Add slide management, text editing, and image API tables to README.md / README.ja.md
+- Add slide management and image operations sections with usage examples to `docs/editing-guide.md`
 - Update CLAUDE.md with editing exports list and `test_node_compat.mjs` in key files
-- Interactive editing demo (`web/editing.html`) updated with text formatting controls and image upload UI
+- Interactive editing demo (`web/editing.html`) updated with slide management controls, text formatting panel, and image upload UI
 
 ## 0.5.0
 
