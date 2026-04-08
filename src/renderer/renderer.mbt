@@ -243,7 +243,7 @@ fn stroke_dasharray(dash : String, sw : Int) -> String {
         // val is in percentage * 100 (e.g. 300000 = 300%). Scale: val * sw / ooxml_pct_denom
         let px_val = val * sw / ooxml_pct_denom
         let clamped = if px_val < 1 { 1 } else { px_val }
-        if !(result.is_empty()) {
+        if !result.is_empty() {
           result = result + ","
         }
         result = result + int_to_str(clamped)
@@ -300,7 +300,7 @@ fn stroke_linejoin(join : String, miter_limit : Int) -> String {
 ///|
 /// Check if an arrow type string represents an active arrow.
 fn has_arrow(arrow_type : String) -> Bool {
-  !(arrow_type.is_empty()) && arrow_type != "none"
+  !arrow_type.is_empty() && arrow_type != "none"
 }
 
 ///|
@@ -629,9 +629,9 @@ fn resolve_blip_href(
   bf : @ooxml.BlipFill,
 ) -> String {
   // Prefer SVG image if available
-  if !(bf.svg_rid.is_empty()) {
+  if !bf.svg_rid.is_empty() {
     let svg_href = resolve_image_href(rels, bf.svg_rid)
-    if !(svg_href.is_empty()) {
+    if !svg_href.is_empty() {
       return svg_href
     }
   }
@@ -643,7 +643,7 @@ fn resolve_blip_href(
 fn blip_has_effects(bf : @ooxml.BlipFill) -> Bool {
   // Note: clrChange is NOT included — it can't be rendered via SVG filters
   // (requires exact pixel color matching). Data is preserved in round-trip only.
-  bf.bright != 0 || bf.contrast != 0 || !(bf.duotone_1.is_none())
+  bf.bright != 0 || bf.contrast != 0 || !bf.duotone_1.is_none()
 }
 
 ///|
@@ -653,7 +653,7 @@ fn render_blip_filter(
   bf : @ooxml.BlipFill,
   filter_id : String,
 ) -> (String, String) {
-  if !(blip_has_effects(bf)) {
+  if !blip_has_effects(bf) {
     return ("", "")
   }
   let mut filters = ""
@@ -695,7 +695,7 @@ fn render_blip_filter(
     result_name = "lum"
   }
   // Duotone (a:duotone)
-  if !(bf.duotone_1.is_none()) && !(bf.duotone_2.is_none()) {
+  if !bf.duotone_1.is_none() && !bf.duotone_2.is_none() {
     let c1 = bf.duotone_1
     let c2 = bf.duotone_2
     // Step 1: Convert to grayscale
@@ -1296,7 +1296,7 @@ pub fn render_shape(
   // Apply autoFit: expand shape height if text overflows (never shrink)
   // Also auto-size when cy is 0 and shape has text (common in generated PPTXs)
   // Skip lines/connectors — cy=0 means horizontal line, not "auto-size"
-  if !(is_line) &&
+  if !is_line &&
     (shape.body_props.auto_fit || t.cy == 0) &&
     shape.paragraphs.length() > 0 {
     let text_h = estimate_text_height(shape.paragraphs, scale, shape.body_props)
@@ -1304,10 +1304,10 @@ pub fn render_shape(
       cy_p = text_h
     }
   }
-  if cx_p <= 0 && !(is_line) {
+  if cx_p <= 0 && !is_line {
     return ""
   }
-  if cy_p <= 0 && !(is_line) {
+  if cy_p <= 0 && !is_line {
     return ""
   }
   let rot = rotation_attr(t, scale)
@@ -1357,10 +1357,10 @@ pub fn render_shape(
       ""
     }) +
     // Effect data attributes for round-trip
-    (if !(shape.effects.is_none()) {
+    (if !shape.effects.is_none() {
       let eff = shape.effects
       let mut ea = ""
-      if !(eff.outer_shadow.is_none()) {
+      if !eff.outer_shadow.is_none() {
         let os = eff.outer_shadow
         ea = ea +
           dai("eff-os-blur", os.blur_rad) +
@@ -1372,7 +1372,7 @@ pub fn render_shape(
           da("eff-os-algn", os.algn) +
           da("eff-os-rot", if os.rot_with_shape { "1" } else { "0" })
       }
-      if !(eff.inner_shadow.is_none()) {
+      if !eff.inner_shadow.is_none() {
         let ishdw = eff.inner_shadow
         ea = ea +
           dai("eff-is-blur", ishdw.blur_rad) +
@@ -1380,15 +1380,15 @@ pub fn render_shape(
           dai("eff-is-dir", ishdw.dir) +
           da("eff-is-clr", ishdw.color.to_hex())
       }
-      if !(eff.glow.is_none()) {
+      if !eff.glow.is_none() {
         ea = ea +
           dai("eff-gl-rad", eff.glow.rad) +
           da("eff-gl-clr", eff.glow.color.to_hex())
       }
-      if !(eff.soft_edge.is_none()) {
+      if !eff.soft_edge.is_none() {
         ea = ea + dai("eff-se-rad", eff.soft_edge.rad)
       }
-      if !(eff.reflection.is_none()) {
+      if !eff.reflection.is_none() {
         let r = eff.reflection
         ea = ea +
           dai("eff-refl-blur", r.blur_rad) +
@@ -1402,10 +1402,10 @@ pub fn render_shape(
           da("eff-refl-algn", r.algn) +
           da("eff-refl-rot", if r.rot_with_shape { "1" } else { "0" })
       }
-      if !(eff.blur.is_none()) {
+      if !eff.blur.is_none() {
         ea = ea + dai("eff-blur-rad", eff.blur.rad)
       }
-      if !(eff.prst_shadow.is_none()) {
+      if !eff.prst_shadow.is_none() {
         let ps = eff.prst_shadow
         ea = ea +
           da("eff-ps-prst", ps.prst) +
@@ -1413,7 +1413,7 @@ pub fn render_shape(
           dai("eff-ps-dir", ps.dir) +
           da("eff-ps-clr", ps.color.to_hex())
       }
-      if !(eff.fill_overlay.is_none()) {
+      if !eff.fill_overlay.is_none() {
         let fo = eff.fill_overlay
         ea = ea +
           da("eff-fo-blend", fo.blend) +
@@ -1424,23 +1424,23 @@ pub fn render_shape(
       ""
     }) +
     // 3D data attributes for round-trip
-    (if !(shape.scene_3d.is_none()) {
+    (if !shape.scene_3d.is_none() {
       da("3d-cam", shape.scene_3d.camera_prst) +
       da("3d-rig", shape.scene_3d.light_rig) +
       da("3d-rig-dir", shape.scene_3d.light_dir)
     } else {
       ""
     }) +
-    (if !(shape.sp_3d.is_none()) {
+    (if !shape.sp_3d.is_none() {
       let s3 = shape.sp_3d
       let mut a3 = ""
-      if !(s3.bevel_t.is_none()) {
+      if !s3.bevel_t.is_none() {
         a3 = a3 +
           dai("3d-bt-w", s3.bevel_t.w) +
           dai("3d-bt-h", s3.bevel_t.h) +
           da("3d-bt-prst", s3.bevel_t.prst)
       }
-      if !(s3.bevel_b.is_none()) {
+      if !s3.bevel_b.is_none() {
         a3 = a3 +
           dai("3d-bb-w", s3.bevel_b.w) +
           dai("3d-bb-h", s3.bevel_b.h) +
@@ -1487,7 +1487,7 @@ pub fn render_shape(
       },
     ) +
     // Gradient fill attributes
-    (if !(shape.grad_fill.is_none()) {
+    (if !shape.grad_fill.is_none() {
       da("grad-stops", grad_stops_attr(shape.grad_fill)) +
       dai("grad-angle", shape.grad_fill.angle) +
       da("grad-path", shape.grad_fill.path_type) +
@@ -1501,7 +1501,7 @@ pub fn render_shape(
       ""
     }) +
     // Blip fill attributes
-    (if !(shape.blip_fill.is_none()) {
+    (if !shape.blip_fill.is_none() {
       da("blip-rid", shape.blip_fill.rid) +
       da("blip-stretch", if shape.blip_fill.stretch { "1" } else { "0" }) +
       dai("blip-src-l", shape.blip_fill.src_l) +
@@ -1518,13 +1518,13 @@ pub fn render_shape(
       da("blip-svg-rid", shape.blip_fill.svg_rid) +
       dai("blip-bright", shape.blip_fill.bright) +
       dai("blip-contrast", shape.blip_fill.contrast) +
-      (if !(shape.blip_fill.duotone_1.is_none()) {
+      (if !shape.blip_fill.duotone_1.is_none() {
         da("blip-duotone1", shape.blip_fill.duotone_1.to_hex()) +
         da("blip-duotone2", shape.blip_fill.duotone_2.to_hex())
       } else {
         ""
       }) +
-      (if !(shape.blip_fill.clr_from.is_none()) {
+      (if !shape.blip_fill.clr_from.is_none() {
         da("blip-clr-from", shape.blip_fill.clr_from.to_hex()) +
         da("blip-clr-to", shape.blip_fill.clr_to.to_hex())
       } else {
@@ -1534,7 +1534,7 @@ pub fn render_shape(
       ""
     }) +
     // Pattern fill attributes
-    (if !(shape.patt_fill.is_none()) {
+    (if !shape.patt_fill.is_none() {
       da("patt-prst", shape.patt_fill.prst) +
       da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
       da("patt-bg", shape.patt_fill.bg_color.to_hex())
@@ -1576,17 +1576,17 @@ pub fn render_shape(
   let inner = match shape.kind {
     @ooxml.ShapeKind::AutoShape(geom) => {
       let blip_tile_id = blip_clip_id("bliptile", slide_num, shape_idx)
-      let fill = if !(shape.blip_fill.is_none()) &&
-        !(shape.blip_fill.stretch) &&
+      let fill = if !shape.blip_fill.is_none() &&
+        !shape.blip_fill.stretch &&
         shape.blip_fill.tile_sx > 0 {
         // BlipFill tile: filled via <pattern> defined in defs
         " fill=\"url(#" + blip_tile_id + ")\""
-      } else if !(shape.blip_fill.is_none()) {
+      } else if !shape.blip_fill.is_none() {
         // BlipFill stretch: image fill rendered as separate <image> below
         a("fill", "none")
-      } else if !(shape.patt_fill.is_none()) {
+      } else if !shape.patt_fill.is_none() {
         " fill=\"url(#" + patt_id(slide_num, shape_idx) + ")\""
-      } else if !(shape.grad_fill.is_none()) {
+      } else if !shape.grad_fill.is_none() {
         " fill=\"url(#" + grad_id(slide_num, shape_idx) + ")\""
       } else {
         let fill_base = if shape.fill.is_none() {
@@ -1594,7 +1594,7 @@ pub fn render_shape(
         } else {
           a("fill", shape.fill.to_css())
         }
-        if shape.fill.alpha < 255 && !(shape.fill.is_none()) {
+        if shape.fill.alpha < 255 && !shape.fill.is_none() {
           fill_base +
           " fill-opacity=\"" +
           @ooxml.alpha_to_css_str(shape.fill.alpha) +
@@ -1604,7 +1604,7 @@ pub fn render_shape(
         }
       }
       let stroke = if shape.stroke.is_none() &&
-        !(shape.stroke_no_fill) &&
+        !shape.stroke_no_fill &&
         shape.stroke_grad_fill.is_none() &&
         shape.stroke_patt_fill.is_none() {
         " stroke=\"none\""
@@ -1619,9 +1619,9 @@ pub fn render_shape(
         let sw_str = px_frac(stroke_emu, scale)
         let sw = px(stroke_emu, scale)
         let sw_for_dash = if sw <= 0 { 1 } else { sw }
-        let stroke_color = if !(shape.stroke_grad_fill.is_none()) {
+        let stroke_color = if !shape.stroke_grad_fill.is_none() {
           "url(#" + stroke_grad_id(slide_num, shape_idx) + ")"
-        } else if !(shape.stroke_patt_fill.is_none()) {
+        } else if !shape.stroke_patt_fill.is_none() {
           "url(#" + stroke_patt_id(slide_num, shape_idx) + ")"
         } else {
           shape.stroke.to_css()
@@ -1698,7 +1698,7 @@ pub fn render_shape(
         }
       }
       // BlipFill: render image inside shape
-      let blip_svg = if !(shape.blip_fill.is_none()) {
+      let blip_svg = if !shape.blip_fill.is_none() {
         let bf = shape.blip_fill
         let href = resolve_blip_href(rels, bf)
         if href.is_empty() {
@@ -1707,7 +1707,7 @@ pub fn render_shape(
           let opacity = blip_opacity_attr(bf)
           let filter_id = blip_filter_id(slide_num, shape_idx)
           let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
-          if !(bf.stretch) && bf.tile_sx > 0 {
+          if !bf.stretch && bf.tile_sx > 0 {
             // Tile mode: create <pattern> definition
             let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
             let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
@@ -1835,7 +1835,7 @@ pub fn render_shape(
           "/>"
         }
         // Render border if picture has a stroke (a:ln)
-        let border = if !(shape.stroke.is_none()) && !(shape.stroke_no_fill) {
+        let border = if !shape.stroke.is_none() && !shape.stroke_no_fill {
           let stroke_emu = if shape.stroke_w > 0 {
             shape.stroke_w
           } else {
@@ -1871,7 +1871,7 @@ pub fn render_shape(
   if inner.is_empty() {
     ""
   } else {
-    let eff_attr = if !(shape.effects.is_none()) {
+    let eff_attr = if !shape.effects.is_none() {
       let (_, fa) = render_effect_filter(
         shape.effects,
         effect_filter_id(slide_num, shape_idx),
@@ -1881,8 +1881,8 @@ pub fn render_shape(
     } else {
       ""
     }
-    let has_refl = !(shape.effects.is_none()) &&
-      !(shape.effects.reflection.is_none())
+    let has_refl = !shape.effects.is_none() &&
+      !shape.effects.reflection.is_none()
     let shape_id_attr = if has_refl {
       " id=\"" + refl_shape_id(slide_num, shape_idx) + "\""
     } else {
@@ -1980,11 +1980,11 @@ fn render_group(
   while ci < nc {
     let child = grp.children[ci]
     let child_idx = shape_idx * group_child_idx_multiplier + ci
-    if !(child.grad_fill.is_none()) {
+    if !child.grad_fill.is_none() {
       defs = defs +
         render_gradient_def(child.grad_fill, grad_id(slide_num, child_idx))
     }
-    if !(child.patt_fill.is_none()) {
+    if !child.patt_fill.is_none() {
       defs = defs +
         render_pattern_def(child.patt_fill, patt_id(slide_num, child_idx))
     }
@@ -2039,22 +2039,22 @@ pub fn render_shape_defs(
   scale : Int,
 ) -> String {
   let mut defs = ""
-  if !(shape.grad_fill.is_none()) {
+  if !shape.grad_fill.is_none() {
     defs = defs +
       render_gradient_def(shape.grad_fill, grad_id(slide_num, shape_idx))
   }
-  if !(shape.patt_fill.is_none()) {
+  if !shape.patt_fill.is_none() {
     defs = defs +
       render_pattern_def(shape.patt_fill, patt_id(slide_num, shape_idx))
   }
-  if !(shape.stroke_grad_fill.is_none()) {
+  if !shape.stroke_grad_fill.is_none() {
     defs = defs +
       render_gradient_def(
         shape.stroke_grad_fill,
         stroke_grad_id(slide_num, shape_idx),
       )
   }
-  if !(shape.stroke_patt_fill.is_none()) {
+  if !shape.stroke_patt_fill.is_none() {
     defs = defs +
       render_pattern_def(
         shape.stroke_patt_fill,
@@ -2081,14 +2081,14 @@ pub fn render_shape_defs(
         shape.stroke,
       )
   }
-  if !(shape.effects.is_none()) {
+  if !shape.effects.is_none() {
     let (eff_def, _) = render_effect_filter(
       shape.effects,
       effect_filter_id(slide_num, shape_idx),
       scale,
     )
     defs = defs + eff_def
-    if !(shape.effects.reflection.is_none()) {
+    if !shape.effects.reflection.is_none() {
       defs = defs +
         render_reflection_mask_def(
           shape.effects.reflection,
@@ -2148,12 +2148,12 @@ pub fn render_slide_svg(
   // Collect all <defs> in a single pass per shape set
   let mut defs = ""
   // Background gradient
-  if !(slide.bg_grad.is_none()) {
+  if !slide.bg_grad.is_none() {
     defs = defs +
       render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
   }
   // Background pattern
-  if !(slide.bg_patt_fill.is_none()) {
+  if !slide.bg_patt_fill.is_none() {
     defs = defs +
       render_pattern_def(
         slide.bg_patt_fill,
@@ -2161,7 +2161,7 @@ pub fn render_slide_svg(
       )
   }
   // Background blip fill filter
-  if !(slide.bg_blip_fill.is_none()) && blip_has_effects(slide.bg_blip_fill) {
+  if !slide.bg_blip_fill.is_none() && blip_has_effects(slide.bg_blip_fill) {
     let (fd, _) = render_blip_filter(
       slide.bg_blip_fill,
       "bfilt-bg-s" + int_to_str(slide_num),
@@ -2174,7 +2174,7 @@ pub fn render_slide_svg(
   while bdi < nbg {
     let bs = bg_shapes[bdi]
     let bs_idx = -(bdi + 1)
-    if !(bs.grad_fill.is_none()) {
+    if !bs.grad_fill.is_none() {
       defs = defs +
         render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
     }
@@ -2185,18 +2185,18 @@ pub fn render_slide_svg(
   let mut di = 0
   while di < n {
     let sh = slide.shapes[di]
-    if !(sh.grad_fill.is_none()) {
+    if !sh.grad_fill.is_none() {
       defs = defs + render_gradient_def(sh.grad_fill, grad_id(slide_num, di))
     }
-    if !(sh.patt_fill.is_none()) {
+    if !sh.patt_fill.is_none() {
       defs = defs + render_pattern_def(sh.patt_fill, patt_id(slide_num, di))
     }
     // Stroke gradient/pattern defs
-    if !(sh.stroke_grad_fill.is_none()) {
+    if !sh.stroke_grad_fill.is_none() {
       defs = defs +
         render_gradient_def(sh.stroke_grad_fill, stroke_grad_id(slide_num, di))
     }
-    if !(sh.stroke_patt_fill.is_none()) {
+    if !sh.stroke_patt_fill.is_none() {
       defs = defs +
         render_pattern_def(sh.stroke_patt_fill, stroke_patt_id(slide_num, di))
     }
@@ -2221,7 +2221,7 @@ pub fn render_slide_svg(
         )
     }
     // Effect filter defs
-    if !(sh.effects.is_none()) {
+    if !sh.effects.is_none() {
       let (eff_def, _) = render_effect_filter(
         sh.effects,
         effect_filter_id(slide_num, di),
@@ -2229,7 +2229,7 @@ pub fn render_slide_svg(
       )
       defs = defs + eff_def
       // Reflection mask gradient
-      if !(sh.effects.reflection.is_none()) {
+      if !sh.effects.reflection.is_none() {
         defs = defs +
           render_reflection_mask_def(
             sh.effects.reflection,
@@ -2245,9 +2245,9 @@ pub fn render_slide_svg(
     "<defs>" + defs + "</defs>"
   }
 
-  let bg_fill = if !(slide.bg_grad.is_none()) {
+  let bg_fill = if !slide.bg_grad.is_none() {
     "url(#grad-bg-s" + int_to_str(slide_num) + ")"
-  } else if !(slide.bg_patt_fill.is_none()) {
+  } else if !slide.bg_patt_fill.is_none() {
     "url(#patt-bg-s" + int_to_str(slide_num) + ")"
   } else {
     slide.background.to_css()
@@ -2258,7 +2258,7 @@ pub fn render_slide_svg(
     a("fill", bg_fill) +
     "/>"
   // Background blip fill (image)
-  let bg_blip_svg = if !(slide.bg_blip_fill.is_none()) {
+  let bg_blip_svg = if !slide.bg_blip_fill.is_none() {
     let bf = slide.bg_blip_fill
     let bg_resolve_rels = if bg_fill_rels.length() > 0 {
       bg_fill_rels

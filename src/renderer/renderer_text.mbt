@@ -18,26 +18,26 @@ fn build_font_family(
   latin : String,
 ) -> String {
   let mut ff = ""
-  if !(sym.is_empty()) {
+  if !sym.is_empty() {
     ff = sym
   }
-  if !(cs.is_empty()) {
+  if !cs.is_empty() {
     ff = if ff.is_empty() { cs } else { ff + ", " + cs }
   }
-  if !(ea.is_empty()) {
+  if !ea.is_empty() {
     ff = if ff.is_empty() { ea } else { ff + ", " + ea }
     // Append platform fallbacks for EA font
     let fb = @ffi.ffi_get_font_fallback(ea)
-    if !(fb.is_empty()) {
+    if !fb.is_empty() {
       ff = ff + ", " + fb
     }
   }
-  if !(latin.is_empty()) {
+  if !latin.is_empty() {
     ff = if ff.is_empty() { latin } else { ff + ", " + latin }
     // Append platform fallbacks for Latin font (if different from EA)
     if latin != ea {
       let fb = @ffi.ffi_get_font_fallback(latin)
-      if !(fb.is_empty()) {
+      if !fb.is_empty() {
         ff = ff + ", " + fb
       }
     }
@@ -199,9 +199,9 @@ fn measure_line_width(
       apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
       scale,
     ).to_double()
-    let ff = if !(run.ea_font.is_empty()) {
+    let ff = if !run.ea_font.is_empty() {
       run.ea_font
-    } else if !(run.font_face.is_empty()) {
+    } else if !run.font_face.is_empty() {
       run.font_face
     } else {
       theme.minor_font
@@ -216,7 +216,7 @@ fn measure_line_width(
     if ff == accum_ff && fs_px == accum_fs {
       accum = accum + text
     } else {
-      if !(accum.is_empty()) {
+      if !accum.is_empty() {
         total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
       }
       accum = text
@@ -225,7 +225,7 @@ fn measure_line_width(
     }
     fi = fi + 1
   }
-  if !(accum.is_empty()) {
+  if !accum.is_empty() {
     total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
   }
   (total_w, total_spaces)
@@ -265,9 +265,9 @@ fn wrap_paragraph(
       apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
       scale,
     ).to_double()
-    let ff = if !(run.ea_font.is_empty()) {
+    let ff = if !run.ea_font.is_empty() {
       run.ea_font
-    } else if !(run.font_face.is_empty()) {
+    } else if !run.font_face.is_empty() {
       run.font_face
     } else {
       theme.minor_font
@@ -292,7 +292,7 @@ fn wrap_paragraph(
     }
     // When font changes, lock in the accumulated width and reset
     if ff != run_ff || fs_px != run_fs {
-      if !(run_accum.is_empty()) {
+      if !run_accum.is_empty() {
         cur_width = cur_width + @ffi.ffi_measure_text(run_accum, run_ff, run_fs)
         run_accum = ""
       }
@@ -527,7 +527,7 @@ fn para_baseline_shift_extra(
     }
     i = i + 1
   }
-  if !(has_super) && !(has_sub) {
+  if !has_super && !has_sub {
     return (0, 0)
   }
   let font_emu = para_max_font_emu(para)
@@ -622,25 +622,25 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
   }
   let mut filters = ""
   // Outer shadow → CSS drop-shadow(dx dy blur color)
-  if !(eff.outer_shadow.is_none()) {
+  if !eff.outer_shadow.is_none() {
     let os = eff.outer_shadow
     filters = filters +
       render_css_drop_shadow(os.blur_rad, os.dist, os.dir, os.color, scale)
   }
   // Preset shadow → CSS drop-shadow (same as outer shadow, using preset blur)
-  if !(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
+  if !eff.prst_shadow.is_none() && eff.outer_shadow.is_none() {
     let ps = eff.prst_shadow
-    if !(filters.is_empty()) {
+    if !filters.is_empty() {
       filters = filters + " "
     }
     filters = filters +
       render_css_drop_shadow(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
   // Glow → approximation as drop-shadow with no offset
-  if !(eff.glow.is_none()) {
+  if !eff.glow.is_none() {
     let rad = emu_to_filter_px(eff.glow.rad, scale)
     let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
-    if !(filters.is_empty()) {
+    if !filters.is_empty() {
       filters = filters + " "
     }
     filters = filters +
@@ -651,10 +651,10 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
       ")"
   }
   // Blur
-  if !(eff.blur.is_none()) {
+  if !eff.blur.is_none() {
     let rad = emu_to_filter_px(eff.blur.rad, scale)
     let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
-    if !(filters.is_empty()) {
+    if !filters.is_empty() {
       filters = filters + " "
     }
     filters = filters + "blur(" + int_to_str(std_dev) + "px)"
@@ -702,20 +702,20 @@ fn render_run_tspan(
     run.ea_font,
     run.font_face,
   )
-  if !(ff.is_empty()) {
+  if !ff.is_empty() {
     span = span + a("font-family", ff + ", sans-serif")
   }
   // Color: explicit color, or theme hlink/folHlink color for hyperlinks
   // For text gradient fill, use the first stop color as fallback display
-  if !(run.text_grad_fill.is_none()) && run.text_grad_fill.stops.length() > 0 {
+  if !run.text_grad_fill.is_none() && run.text_grad_fill.stops.length() > 0 {
     span = span + a("fill", run.text_grad_fill.stops[0].color.to_css())
-  } else if !(run.color.is_none()) {
+  } else if !run.color.is_none() {
     span = span + a("fill", run.color.to_css())
-  } else if !(run.hlink_rid.is_empty()) && !(theme.hlink.is_none()) {
+  } else if !run.hlink_rid.is_empty() && !theme.hlink.is_none() {
     span = span + a("fill", theme.hlink.to_css())
   }
   // Text outline: render as SVG stroke on text
-  if !(run.outline_color.is_none()) && run.outline_w > 0 {
+  if !run.outline_color.is_none() && run.outline_w > 0 {
     span = span + a("stroke", run.outline_color.to_css())
     let ow_px = px(run.outline_w, scale)
     if ow_px > 0 {
@@ -736,7 +736,7 @@ fn render_run_tspan(
   }
   // Text decorations
   let mut deco = ""
-  if !(run.underline.is_empty()) && run.underline != "none" {
+  if !run.underline.is_empty() && run.underline != "none" {
     deco = "underline"
   }
   if run.strike == "sngStrike" || run.strike == "dblStrike" {
@@ -746,7 +746,7 @@ fn render_run_tspan(
       deco = deco + " line-through"
     }
   }
-  if !(deco.is_empty()) {
+  if !deco.is_empty() {
     span = span + a("text-decoration", deco)
   }
   // Superscript / subscript via baseline-shift
@@ -790,7 +790,7 @@ fn render_run_tspan(
     ) +
     dai("outline-w", run.outline_w) +
     // Text gradient fill round-trip
-    (if !(run.text_grad_fill.is_none()) {
+    (if !run.text_grad_fill.is_none() {
       da("tgrad-stops", grad_stops_attr(run.text_grad_fill)) +
       dai("tgrad-angle", run.text_grad_fill.angle) +
       da("tgrad-path", run.text_grad_fill.path_type) +
@@ -799,7 +799,7 @@ fn render_run_tspan(
       ""
     }) +
     // Text pattern fill round-trip
-    (if !(run.text_patt_fill.is_none()) {
+    (if !run.text_patt_fill.is_none() {
       da("tpatt-prst", run.text_patt_fill.prst) +
       da("tpatt-fg", run.text_patt_fill.fg_color.to_hex()) +
       da("tpatt-bg", run.text_patt_fill.bg_color.to_hex())
@@ -807,10 +807,10 @@ fn render_run_tspan(
       ""
     }) +
     // Text-level effect data attributes (round-trip only)
-    (if !(run.effects.is_none()) {
+    (if !run.effects.is_none() {
       let eff = run.effects
       let mut ea = ""
-      if !(eff.outer_shadow.is_none()) {
+      if !eff.outer_shadow.is_none() {
         let os = eff.outer_shadow
         ea = ea +
           dai("reff-os-blur", os.blur_rad) +
@@ -818,15 +818,15 @@ fn render_run_tspan(
           dai("reff-os-dir", os.dir) +
           da("reff-os-clr", os.color.to_hex())
       }
-      if !(eff.glow.is_none()) {
+      if !eff.glow.is_none() {
         ea = ea +
           dai("reff-gl-rad", eff.glow.rad) +
           da("reff-gl-clr", eff.glow.color.to_hex())
       }
-      if !(eff.blur.is_none()) {
+      if !eff.blur.is_none() {
         ea = ea + dai("reff-blur-rad", eff.blur.rad)
       }
-      if !(eff.prst_shadow.is_none()) {
+      if !eff.prst_shadow.is_none() {
         let ps = eff.prst_shadow
         ea = ea +
           da("reff-ps-prst", ps.prst) +
@@ -848,9 +848,9 @@ fn render_run_tspan(
     render_text_effect_style(run.effects, scale)
   // Wrap in hyperlink if present
   let inner = svg_escape(display_text)
-  if !(run.hlink_rid.is_empty()) {
+  if !run.hlink_rid.is_empty() {
     let url = @ooxml.find_rel_target(rels, run.hlink_rid)
-    if !(url.is_empty()) {
+    if !url.is_empty() {
       span + "><a href=\"" + svg_escape(url) + "\">" + inner + "</a></tspan>"
     } else {
       span + ">" + inner + "</tspan>"
@@ -876,7 +876,7 @@ fn render_text(
   }
   // Warp text: delegate to warp renderer for non-trivial presets
   let wp = body_props.warp_prst
-  if !(wp.is_empty()) && wp != "textNoShape" && wp != "textPlain" {
+  if !wp.is_empty() && wp != "textNoShape" && wp != "textPlain" {
     return render_warp_text(
       paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
     )
@@ -1196,13 +1196,13 @@ fn render_text(
           " text-anchor=\"middle\"",
         )
       } else if effective_align == "r" ||
-        (para.rtl && effective_align != "l" && !(is_justify)) {
+        (para.rtl && effective_align != "l" && !is_justify) {
         if para.rtl {
           (text_x + text_w, text_x + text_w, " text-anchor=\"start\"")
         } else {
           (text_x + text_w, text_x + text_w, " text-anchor=\"end\"")
         }
-      } else if para.rtl && !(is_justify) {
+      } else if para.rtl && !is_justify {
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"end\"")
       } else {
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"start\"")
@@ -1223,9 +1223,9 @@ fn render_text(
       // Determine bullet text
       let bullet_text = if para.bullet_none {
         ""
-      } else if !(para.bullet.is_empty()) {
+      } else if !para.bullet.is_empty() {
         para.bullet
-      } else if !(para.bullet_auto.is_empty()) {
+      } else if !para.bullet_auto.is_empty() {
         let auto_idx = auto_num_counters[cur_level]
         auto_num_counters[cur_level] = auto_idx + 1
         auto_number_text(para.bullet_auto, auto_idx)
@@ -1233,12 +1233,12 @@ fn render_text(
         ""
       }
       // Image bullet: render <image> element before text
-      if !(para.bullet_img_rid.is_empty()) {
+      if !para.bullet_img_rid.is_empty() {
         let bu_target = @ooxml.find_rel_target(rels, para.bullet_img_rid)
-        if !(bu_target.is_empty()) {
+        if !bu_target.is_empty() {
           let bu_img_path = resolve_image_path(bu_target)
           let bu_b64 = @ffi.ffi_get_file_base64(bu_img_path)
-          if !(bu_b64.is_empty()) {
+          if !bu_b64.is_empty() {
             let bu_mime = mime_from_ext(bu_img_path)
             let bu_img_sz = p_font_sz // size bullet image to font size
             let bu_img_x = if para.rtl {
@@ -1275,9 +1275,9 @@ fn render_text(
         da("rtl", bool_str(para.rtl)) +
         ">"
       // Render bullet if present
-      if !(bullet_text.is_empty()) {
+      if !bullet_text.is_empty() {
         let mut bu_span = "<tspan"
-        if !(para.bullet_font.is_empty()) {
+        if !para.bullet_font.is_empty() {
           bu_span = bu_span +
             a("font-family", para.bullet_font + ", sans-serif")
         }
@@ -1292,7 +1292,7 @@ fn render_text(
           bu_span = bu_span +
             ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
         }
-        if !(para.bullet_color.is_none()) {
+        if !para.bullet_color.is_none() {
           bu_span = bu_span + a("fill", para.bullet_color.to_css())
         }
         out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
@@ -1354,7 +1354,7 @@ fn render_text(
           }
           // On first line with bullet, reposition to cont_anchor_x (= marL)
           // so text aligns with continuation lines (OOXML text starts at marL)
-          if vli == 0 && !(bullet_text.is_empty()) {
+          if vli == 0 && !bullet_text.is_empty() {
             out = out +
               "</tspan><tspan" +
               ai("x", cont_anchor_x) +
@@ -1433,7 +1433,7 @@ fn render_text(
             ""
           }
           // Apply justify spacing to current line's tspan if needed
-          if !(justify_ws_attr.is_empty()) {
+          if !justify_ws_attr.is_empty() {
             // Re-emit the current tspan with word-spacing
             // Close and reopen with the spacing attribute
             out = out +

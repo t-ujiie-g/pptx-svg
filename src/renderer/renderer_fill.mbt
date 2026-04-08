@@ -64,7 +64,7 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     ">" +
     stops_svg +
     "</linearGradient>"
-  } else if !(gf.path_type.is_empty()) {
+  } else if !gf.path_type.is_empty() {
     // Radial / path gradient
     let cx_s = if gf.fill_to_l >= 0 && gf.fill_to_r >= 0 {
       int_to_str((gf.fill_to_l + (100000 - gf.fill_to_r)) / ooxml_fill_to_pct)
@@ -462,7 +462,7 @@ fn render_pattern_def(pf : @ooxml.PatternFill, id : String) -> String {
 ///|
 /// Return CSS opacity string for an effect color, with a fallback default.
 fn eff_alpha_str(clr : @ooxml.Color, fallback : String) -> String {
-  if clr.alpha < 255 && !(clr.is_none()) {
+  if clr.alpha < 255 && !clr.is_none() {
     @ooxml.alpha_to_css_str(clr.alpha)
   } else {
     fallback
@@ -521,19 +521,19 @@ fn render_effect_filter(
   }
   let mut filters = ""
   // Outer shadow: SVG feDropShadow
-  if !(eff.outer_shadow.is_none()) {
+  if !eff.outer_shadow.is_none() {
     let os = eff.outer_shadow
     filters = filters +
       render_drop_shadow_filter(os.blur_rad, os.dist, os.dir, os.color, scale)
   }
   // Preset shadow: render as equivalent outer shadow using preset blur radius
-  if !(eff.prst_shadow.is_none()) && eff.outer_shadow.is_none() {
+  if !eff.prst_shadow.is_none() && eff.outer_shadow.is_none() {
     let ps = eff.prst_shadow
     filters = filters +
       render_drop_shadow_filter(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
   // Glow: feGaussianBlur + feFlood + feComposite + feMerge
-  if !(eff.glow.is_none()) {
+  if !eff.glow.is_none() {
     let rad = emu_to_filter_px(eff.glow.rad, scale)
     let std_dev = rad / 2
     let clr = eff.glow.color
@@ -552,7 +552,7 @@ fn render_effect_filter(
     ()
   }
   // Soft edge: feGaussianBlur on alpha, composite with source
-  if !(eff.soft_edge.is_none()) {
+  if !eff.soft_edge.is_none() {
     let rad = emu_to_filter_px(eff.soft_edge.rad, scale)
     let std_dev = rad / 2
     filters = filters +
@@ -563,7 +563,7 @@ fn render_effect_filter(
     ()
   }
   // Inner shadow: feGaussianBlur+feOffset on inverted alpha, flood+composite, merge
-  if !(eff.inner_shadow.is_none()) {
+  if !eff.inner_shadow.is_none() {
     let ishdw = eff.inner_shadow
     let blur = emu_to_filter_px(ishdw.blur_rad, scale)
     let dist = emu_to_filter_px(ishdw.dist, scale)
@@ -597,7 +597,7 @@ fn render_effect_filter(
     ()
   }
   // Blur: simple feGaussianBlur on SourceGraphic
-  if !(eff.blur.is_none()) {
+  if !eff.blur.is_none() {
     let rad = emu_to_filter_px(eff.blur.rad, scale)
     let std_dev = rad / 2
     filters = filters +
@@ -607,7 +607,7 @@ fn render_effect_filter(
     ()
   }
   // Fill overlay: feFlood + feBlend with blend mode
-  if !(eff.fill_overlay.is_none()) {
+  if !eff.fill_overlay.is_none() {
     let fo = eff.fill_overlay
     let clr = fo.color
     let alpha_str = eff_alpha_str(clr, "1.0")

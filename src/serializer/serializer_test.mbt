@@ -329,7 +329,7 @@ test "serialize_slide fill overlay with alpha" {
   // val must be RRGGBB (not AARRGGBB), alpha as child element
   assert_true(xml.contains("val=\"FF0000\""))
   assert_true(xml.contains("<a:alpha val="))
-  assert_true(!(xml.contains("val=\"80FF0000\"")))
+  assert_true(!xml.contains("val=\"80FF0000\""))
 }
 
 ///|
@@ -351,5 +351,5 @@ test "serialize_slide no effectLst when none" {
   }
   let xml = serialize_slide(slide)
   // No effects → no a:effectLst in output
-  assert_true(!(xml.contains("<a:effectLst>")))
+  assert_true(!xml.contains("<a:effectLst>"))
 }

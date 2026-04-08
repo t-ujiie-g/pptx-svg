@@ -85,7 +85,7 @@ fn resolve_placeholder_inheritance(
       shape.body_props.r_ins < 0 &&
       shape.body_props.b_ins < 0 &&
       shape.body_props.anchor.is_empty()
-    if !(needs_transform) && !(needs_body_props) {
+    if !needs_transform && !needs_body_props {
       i = i + 1
       continue
     }
@@ -173,12 +173,11 @@ fn apply_text_style_to_runs(
     while ri < nr {
       let run = para.runs[ri]
       let need_font_size = run.font_size == 0 && defaults.font_size > 0
-      let need_color = run.color.is_none() && !(defaults.color.is_none())
+      let need_color = run.color.is_none() && !defaults.color.is_none()
       let need_font_face = run.font_face.is_empty() &&
-        !(defaults.font_face.is_empty())
-      let need_ea_font = run.ea_font.is_empty() &&
-        !(defaults.ea_font.is_empty())
-      let need_bold = !(run.bold_explicit) && !(run.bold) && defaults.bold
+        !defaults.font_face.is_empty()
+      let need_ea_font = run.ea_font.is_empty() && !defaults.ea_font.is_empty()
+      let need_bold = !run.bold_explicit && !run.bold && defaults.bold
       if need_font_size ||
         need_color ||
         need_font_face ||
@@ -272,7 +271,7 @@ fn apply_para_alignment_from_style(
         0
       }
       let align = style.levels[lvl_idx].align
-      if !(align.is_empty()) {
+      if !align.is_empty() {
         paragraphs[pi] = { ..para, align, }
       }
     }
@@ -327,15 +326,15 @@ fn apply_para_spacing_from_style(
     }
     // Bullet: inherit from style only when the paragraph has no bullet specification at all.
     // If bullet, bullet_auto, or bullet_none is set, the paragraph controls its own bullets.
-    let has_any_bullet_spec = !(para.bullet.is_empty()) ||
-      !(para.bullet_auto.is_empty()) ||
+    let has_any_bullet_spec = !para.bullet.is_empty() ||
+      !para.bullet_auto.is_empty() ||
       para.bullet_none
-    if !(has_any_bullet_spec) {
+    if !has_any_bullet_spec {
       if defaults.bullet_none {
         // Style explicitly disables bullets (a:buNone)
         new_para = { ..new_para, bullet_none: true }
         changed = true
-      } else if !(defaults.bullet.is_empty()) {
+      } else if !defaults.bullet.is_empty() {
         // Style provides a default bullet character
         new_para = {
           ..new_para,
@@ -416,7 +415,7 @@ fn has_no_text(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
     let nr = paragraphs[i].runs.length()
     let mut j = 0
     while j < nr {
-      if !(paragraphs[i].runs[j].text.is_empty()) {
+      if !paragraphs[i].runs[j].text.is_empty() {
         return false
       }
       j = j + 1
@@ -440,7 +439,7 @@ fn inject_placeholder_auto_content(
   while i < ns {
     let shape = shapes[i]
     let ph = shape.ph_type
-    if ph.is_empty() || !(has_no_text(shape.paragraphs)) {
+    if ph.is_empty() || !has_no_text(shape.paragraphs) {
       i = i + 1
       continue
     }
@@ -457,7 +456,7 @@ fn inject_placeholder_auto_content(
     } else {
       ""
     }
-    if !(auto_text.is_empty()) {
+    if !auto_text.is_empty() {
       // Create a single paragraph with the auto text
       let run : @ooxml.TextRun = {
         text: auto_text,
@@ -524,7 +523,7 @@ fn find_ph_text(
       match find_placeholder(layout.shapes, ph_type, ph_idx) {
         Some(ph) => {
           let text = extract_text(ph.paragraphs)
-          if !(text.is_empty()) {
+          if !text.is_empty() {
             return text
           }
         }

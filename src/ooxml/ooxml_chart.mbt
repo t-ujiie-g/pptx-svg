@@ -776,7 +776,7 @@ fn parse_trendlines(
   for i in 0..<nodes.length() {
     let tc = @xml.get_children(nodes[i])
     let ttype = child_attr_val(tc, "c:trendlineType")
-    if !(ttype.is_empty()) {
+    if !ttype.is_empty() {
       let name = match @xml.find_child(tc, "c:name") {
         None => ""
         Some(n) => @xml.get_text_content(n)

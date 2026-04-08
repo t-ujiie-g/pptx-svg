@@ -1075,8 +1075,8 @@ pub fn TableStyleCell::none() -> TableStyleCell {
 pub fn TableStyleCell::is_none(self : TableStyleCell) -> Bool {
   self.fill.is_none() &&
   self.font_color.is_none() &&
-  !(self.bold) &&
-  !(self.italic) &&
+  !self.bold &&
+  !self.italic &&
   self.bdr_l_w == 0 &&
   self.bdr_r_w == 0 &&
   self.bdr_t_w == 0 &&

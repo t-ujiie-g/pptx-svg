@@ -116,9 +116,9 @@ fn render_table_cell_text(
   }
   let y_offset = if y_raw < pad_t { pad_t } else { y_raw }
   // Default text color: style > auto-contrast > black
-  let style_fill = if !(style_cell.font_color.is_none()) {
+  let style_fill = if !style_cell.font_color.is_none() {
     style_cell.font_color.to_css()
-  } else if !(cell_fill.is_none()) {
+  } else if !cell_fill.is_none() {
     let lum = cell_fill.r * 299 + cell_fill.g * 587 + cell_fill.b * 114
     if lum < auto_contrast_lum_threshold {
       "#FFFFFF"
@@ -185,7 +185,7 @@ fn render_table_cell_text(
         (text_x, "start")
       }
       // Render bullet on first line only
-      if li == 0 && !(para.bullet.is_empty()) && algn != "ctr" && algn != "r" {
+      if li == 0 && !para.bullet.is_empty() && algn != "ctr" && algn != "r" {
         let bul_x = cell_x + pad_l + bul_mar + bul_indent
         out = out +
           "<tspan" +
@@ -279,7 +279,7 @@ fn eff_bdr_w(cell_w : Int, style_w : Int) -> Int {
 
 ///|
 fn eff_bdr_c(cell_c : @ooxml.Color, style_c : @ooxml.Color) -> @ooxml.Color {
-  if !(cell_c.is_none()) {
+  if !cell_c.is_none() {
     cell_c
   } else {
     style_c
@@ -319,22 +319,22 @@ fn resolve_table_style_cell(
   // Priority: firstRow/lastRow/firstCol/lastCol > band > wholeTbl
   // Check special row/column positions first
   if table.first_row && row_idx == 0 {
-    if !(style.first_row.is_none()) {
+    if !style.first_row.is_none() {
       return style.first_row
     }
   }
   if table.last_row && row_idx == nrows - 1 {
-    if !(style.last_row.is_none()) {
+    if !style.last_row.is_none() {
       return style.last_row
     }
   }
   if table.first_col && col_idx == 0 {
-    if !(style.first_col.is_none()) {
+    if !style.first_col.is_none() {
       return style.first_col
     }
   }
   if table.last_col && col_idx == ncols - 1 {
-    if !(style.last_col.is_none()) {
+    if !style.last_col.is_none() {
       return style.last_col
     }
   }
@@ -343,10 +343,10 @@ fn resolve_table_style_cell(
     let effective_row = if table.first_row { row_idx - 1 } else { row_idx }
     if effective_row >= 0 {
       if effective_row % 2 == 0 {
-        if !(style.band1_h.is_none()) {
+        if !style.band1_h.is_none() {
           return style.band1_h
         }
-      } else if !(style.band2_h.is_none()) {
+      } else if !style.band2_h.is_none() {
         return style.band2_h
       }
     }
@@ -356,10 +356,10 @@ fn resolve_table_style_cell(
     let effective_col = if table.first_col { col_idx - 1 } else { col_idx }
     if effective_col >= 0 {
       if effective_col % 2 == 0 {
-        if !(style.band1_v.is_none()) {
+        if !style.band1_v.is_none() {
           return style.band1_v
         }
-      } else if !(style.band2_v.is_none()) {
+      } else if !style.band2_v.is_none() {
         return style.band2_v
       }
     }
@@ -414,7 +414,7 @@ fn render_table(
       let mut col2 = 0
       while ci2 < nc {
         let cell = row.cells[ci2]
-        if !(cell.h_merge) && !(cell.v_merge) {
+        if !cell.h_merge && !cell.v_merge {
           let mar_t_emu = if cell.mar_t >= 0 {
             cell.mar_t
           } else {
@@ -575,9 +575,9 @@ fn render_table(
         style, table, ri, col_idx, nrows, ncols,
       )
       // Cell background: explicit fill > style fill > none
-      let cell_fill = if !(cell.fill.is_none()) {
+      let cell_fill = if !cell.fill.is_none() {
         cell.fill.to_css()
-      } else if !(style_cell.fill.is_none()) {
+      } else if !style_cell.fill.is_none() {
         style_cell.fill.to_css()
       } else {
         "none"
@@ -691,9 +691,9 @@ fn render_table(
         scale,
       )
       // Resolve effective cell fill for auto-contrast text color
-      let eff_fill = if !(cell.fill.is_none()) {
+      let eff_fill = if !cell.fill.is_none() {
         cell.fill
-      } else if !(style_cell.fill.is_none()) {
+      } else if !style_cell.fill.is_none() {
         style_cell.fill
       } else {
         @ooxml.Color::none()
