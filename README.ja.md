@@ -1,7 +1,8 @@
 # pptx-svg
 
 PPTX と SVG の双方向変換ライブラリ。外部依存なし、ブラウザと Node.js で動作します。
-- [デモサイト(GitHub Pages)](https://t-ujiie-g.github.io/pptx-svg/)
+- [ビューアーデモ (Vanilla JS)](https://t-ujiie-g.github.io/pptx-svg/)
+- [エディターデモ (React)](https://t-ujiie-g.github.io/pptx-svg/react/)
 
 [English](README.md)
 
@@ -90,7 +91,8 @@ function SlideViewer({ pptxBuffer }: { pptxBuffer: ArrayBuffer }) {
 ```
 
 完全なサンプルは [`examples/`](examples/) を参照してください。  
-- [デモサイト(GitHub Pages)](https://t-ujiie-g.github.io/pptx-svg/)
+- [ビューアーデモ (Vanilla JS)](https://t-ujiie-g.github.io/pptx-svg/)
+- [エディターデモ (React)](https://t-ujiie-g.github.io/pptx-svg/react/)
 
 ## API リファレンス
 

@@ -1,7 +1,8 @@
 # pptx-svg
 
 PPTX and SVG round-trip conversion library. Runs in the browser and Node.js with zero dependencies.
-- [Demo Site for GitHub Pages](https://t-ujiie-g.github.io/pptx-svg/)
+- [Viewer Demo (Vanilla JS)](https://t-ujiie-g.github.io/pptx-svg/)
+- [Editor Demo (React)](https://t-ujiie-g.github.io/pptx-svg/react/)
 
 [Japanese / 日本語](README.ja.md)
 
@@ -90,7 +91,8 @@ function SlideViewer({ pptxBuffer }: { pptxBuffer: ArrayBuffer }) {
 ```
 
 See [`examples/`](examples/) for complete working examples.
-- [Demo Site for GitHub Pages](https://t-ujiie-g.github.io/pptx-svg/)
+- [Vanilla JS Demo](https://t-ujiie-g.github.io/pptx-svg/)
+- [React Demo](https://t-ujiie-g.github.io/pptx-svg/react/)
 
 ## API Reference
 
