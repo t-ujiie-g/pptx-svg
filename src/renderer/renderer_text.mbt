@@ -1339,6 +1339,8 @@ fn render_text(
                 ai("y", cur_y) +
                 anchor_attr +
                 rtl_attr +
+                da("para-idx", int_to_str(pi)) +
+                da("para-align", para_align) +
                 ">"
             } else {
               // Switch to continuation indent (marL) for wrapped lines
@@ -1349,6 +1351,8 @@ fn render_text(
                 ai("y", cur_y) +
                 anchor_attr +
                 rtl_attr +
+                da("para-idx", int_to_str(pi)) +
+                da("para-align", para_align) +
                 ">"
             }
           }
@@ -1361,6 +1365,8 @@ fn render_text(
               ai("y", cur_y) +
               anchor_attr +
               rtl_attr +
+              da("para-idx", int_to_str(pi)) +
+              da("para-align", para_align) +
               ">"
           }
           // Justify: calculate word-spacing for non-last lines
@@ -1443,6 +1449,8 @@ fn render_text(
               anchor_attr +
               rtl_attr +
               justify_ws_attr +
+              da("para-idx", int_to_str(pi)) +
+              da("para-align", para_align) +
               ">"
           }
           // Render fragments in this visual line
@@ -1490,6 +1498,8 @@ fn render_text(
               ai("y", cur_y) +
               anchor_attr +
               rtl_attr +
+              da("para-idx", int_to_str(pi)) +
+              da("para-align", para_align) +
               ">"
             ri = ri + 1
             continue
