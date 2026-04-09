@@ -1,10 +1,22 @@
 /**
  * SVG DOM utilities for the pptx-svg React example.
  *
- * Handles SVG insertion, selection overlay, and text run extraction.
+ * Handles SVG insertion, selection overlay, and text run extraction
+ * including formatting attributes (bold, italic, font size, color, etc).
  */
 
 import { getShapeTransform, emuToPx } from 'pptx-svg';
+
+// ── Color ──
+
+/** Parse '#rrggbb' hex string to [r, g, b] tuple. */
+export function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
 
 // ── Types ──
 
@@ -12,6 +24,22 @@ export interface TextRun {
   pi: number;
   ri: number;
   text: string;
+  bold: boolean;
+  italic: boolean;
+  fontSize: number;    // hundredths of a point (0 = inherit)
+  color: string;       // hex 6-char (no #), '' = inherit
+  font: string;        // Latin font name
+  eaFont: string;      // East Asian font name
+  csFont: string;      // Complex Script font name
+  underline: string;   // 'sng', 'dbl', '' = none
+  strike: string;      // 'sngStrike', 'dblStrike', '' = none
+  baseline: number;    // 30000 = super, -25000 = sub, 0 = normal
+}
+
+export interface ParagraphInfo {
+  pi: number;
+  align: string;
+  runs: TextRun[];
 }
 
 export interface ShapeInfo {
@@ -19,7 +47,8 @@ export interface ShapeInfo {
   label: string;
   detail: string;
   fillHex: string;
-  textRuns: TextRun[];
+  shapeType: string;
+  paragraphs: ParagraphInfo[];
 }
 
 // ── Constants ──
@@ -29,10 +58,6 @@ export type HandlePos = typeof HANDLE_POSITIONS[number];
 
 // ── SVG insertion ──
 
-/**
- * Insert an SVG string into a container element.
- * Sets up viewBox for responsive sizing and removes fixed width/height.
- */
 export function insertSvgInto(container: HTMLElement, svgString: string) {
   container.querySelector('.selection-overlay')?.remove();
 
@@ -56,12 +81,10 @@ export function insertSvgInto(container: HTMLElement, svgString: string) {
 
 // ── Selection overlay ──
 
-/** Remove the selection overlay from a container. */
 export function removeOverlay(container: HTMLElement) {
   container.querySelector('.selection-overlay')?.remove();
 }
 
-/** Show a selection overlay with resize handles over a shape element. */
 export function showOverlay(container: HTMLElement, shapeG: SVGGElement) {
   removeOverlay(container);
 
@@ -88,7 +111,6 @@ export function showOverlay(container: HTMLElement, shapeG: SVGGElement) {
 
 // ── EMU-per-CSS-pixel ──
 
-/** Calculate the EMU-per-CSS-pixel ratio from the SVG element. */
 export function getEmuPerCssPx(svgEl: SVGSVGElement | null): number {
   if (!svgEl) return 9525;
   const rect = svgEl.getBoundingClientRect();
@@ -98,46 +120,65 @@ export function getEmuPerCssPx(svgEl: SVGSVGElement | null): number {
 
 // ── Shape info extraction ──
 
-/** Extract shape info (label, detail, fill, text runs) from a shape `<g>` element. */
 export function extractShapeInfo(shapeG: SVGGElement): ShapeInfo {
   const idx = parseInt(shapeG.getAttribute('data-ooxml-shape-idx') ?? '-1', 10);
   const fillHex = shapeG.getAttribute('data-ooxml-fill') || '';
-
-  const t = getShapeTransform(shapeG);
   const shapeType = shapeG.getAttribute('data-ooxml-shape-type') || '?';
   const geom = shapeG.getAttribute('data-ooxml-geom') || '';
+
+  const t = getShapeTransform(shapeG);
 
   return {
     idx,
     label: `Shape #${idx} (${shapeType}${geom ? '/' + geom : ''})`,
     detail: `x=${emuToPx(t.x)}px y=${emuToPx(t.y)}px w=${emuToPx(t.cx)}px h=${emuToPx(t.cy)}px rot=${t.rot}`,
     fillHex: fillHex.length === 6 ? fillHex : '',
-    textRuns: extractTextRuns(shapeG),
+    shapeType,
+    paragraphs: extractParagraphs(shapeG),
   };
 }
 
-/** Extract text runs from a shape, merging wrapped tspan fragments. */
-function extractTextRuns(shapeG: SVGGElement): TextRun[] {
-  const runTspans = shapeG.querySelectorAll('tspan[data-ooxml-run-idx]');
-  if (runTspans.length === 0) return [];
+/** Extract paragraphs with full run formatting from SVG data attributes. */
+function extractParagraphs(shapeG: SVGGElement): ParagraphInfo[] {
+  const paraTspans = shapeG.querySelectorAll('tspan[data-ooxml-para-idx]');
+  const parasMap = new Map<number, ParagraphInfo>();
 
-  const seen = new Map<string, number>();
-  const runs: TextRun[] = [];
+  for (const pts of paraTspans) {
+    const pi = parseInt(pts.getAttribute('data-ooxml-para-idx')!);
+    if (!parasMap.has(pi)) {
+      parasMap.set(pi, {
+        pi,
+        align: pts.getAttribute('data-ooxml-para-align') || 'l',
+        runs: [],
+      });
+    }
+    const para = parasMap.get(pi)!;
+    const runTspans = pts.querySelectorAll('tspan[data-ooxml-run-idx]');
 
-  for (const ts of runTspans) {
-    const ri = ts.getAttribute('data-ooxml-run-idx');
-    const paraTspan = ts.closest('tspan[data-ooxml-para-idx]');
-    const pi = paraTspan ? paraTspan.getAttribute('data-ooxml-para-idx') : null;
-    if (pi === null || ri === null) continue;
-
-    const key = `${pi}:${ri}`;
-    if (seen.has(key)) {
-      runs[seen.get(key)!].text += ts.textContent || '';
-    } else {
-      seen.set(key, runs.length);
-      runs.push({ pi: parseInt(pi), ri: parseInt(ri), text: ts.textContent || '' });
+    for (const rts of runTspans) {
+      const ri = parseInt(rts.getAttribute('data-ooxml-run-idx')!);
+      const existing = para.runs.find(r => r.ri === ri);
+      if (existing) {
+        existing.text += rts.textContent || '';
+      } else {
+        para.runs.push({
+          pi,
+          ri,
+          text: rts.textContent || '',
+          bold: rts.getAttribute('data-ooxml-bold') === 'true',
+          italic: rts.getAttribute('font-style') === 'italic',
+          fontSize: parseInt(rts.getAttribute('data-ooxml-font-size') || '0'),
+          color: rts.getAttribute('data-ooxml-color') || '',
+          font: rts.getAttribute('data-ooxml-run-font') || '',
+          eaFont: rts.getAttribute('data-ooxml-ea-font') || '',
+          csFont: rts.getAttribute('data-ooxml-cs-font') || '',
+          underline: rts.getAttribute('data-ooxml-underline') || '',
+          strike: rts.getAttribute('data-ooxml-strike') || '',
+          baseline: parseInt(rts.getAttribute('data-ooxml-baseline') || '0'),
+        });
+      }
     }
   }
 
-  return runs;
+  return Array.from(parasMap.values());
 }
