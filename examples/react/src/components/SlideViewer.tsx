@@ -15,7 +15,6 @@ interface SlideViewerProps {
 }
 
 export function SlideViewer({ containerRef, hasSelection, onSelect }: SlideViewerProps) {
-  // Click to select/deselect shapes
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
