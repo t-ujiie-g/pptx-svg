@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~35KB)
 moon build --target wasm-gc --release
 
+# MoonBit format
+moon fmt
+
 # Build TypeScript library (output: dist/)
 tsc
 
@@ -207,8 +210,12 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `test_fixtures/ffi_stub.js` | FFI stubs for MoonBit JS-target tests |
 | `test_fixtures/minimal.pptx` | 2-slide test fixture |
 | `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |
-| `test_fixtures/gen_test_features.py` | Python script to regenerate test_features.pptx |
-| `test_fixtures/test_node.mjs` | Node.js test suite (ZIP + XML structure assertions) |
+| `test_fixtures/gen_test_features.py` | Thin orchestrator — imports each `fixtures/slides_NN_*.py` category module in order, saves the presentation, then runs `_postprocess` |
+| `test_fixtures/fixtures/_ctx.py` | Shared `prs`/`blank` state + cross-module helpers (`nsmap`, `set_fill_xml`) |
+| `test_fixtures/fixtures/slides_NN_*.py` | Per-category slide builders (text basics, fills, shapes, tables, images, charts, misc, chartex) |
+| `test_fixtures/fixtures/_postprocess.py` | Post-save ZIP patching (OMML, ChartEx, media, WMF) |
+| `test_fixtures/tests/*.test.mjs` | Node `--test` suite split by feature category (structure, text, fills, shapes, tables, images, charts, misc, chartex, emf, wmf, utils) |
+| `test_fixtures/tests/_helpers.mjs` | Shared test helpers (`expect`, `loadFeatures`, `hasTag`, `findRelTarget`, …) |
 | `test_fixtures/test_node_compat.mjs` | Node.js editing API test suite (shape/text/image CRUD, round-trip export) |
 
 ## Adding new OOXML features — required workflow
@@ -237,17 +244,17 @@ Follow the round-trip pipeline — update each relevant file:
 - Test pure functions (color parsing, geometry, serialization) and round-trip (render → parse → compare)
 - Run `npm run test:moon` to confirm all MoonBit tests pass
 
-### 3. Test fixture (`gen_test_features.py`)
-- Add new slide(s) to `gen_test_features.py` exercising the feature
-- Update the docstring at the top of the file with the new slide number/description
-- Run `python3 test_fixtures/gen_test_features.py` to regenerate `test_features.pptx`
-- The `set_gradient_fill()` helper shows how to inject raw XML into shapes via lxml
+### 3. Test fixture (`test_fixtures/fixtures/slides_NN_*.py`)
+- Append the new slide to the matching category module under `test_fixtures/fixtures/` (e.g. `slides_03_fills.py` for a new fill feature). Each module imports `prs`/`blank` from `_ctx` and mutates the shared presentation at import time.
+- If the new slide needs a helper that crosses category modules, put it in `_ctx.py` (alongside `set_fill_xml`) and import it from `_ctx`.
+- Run `python3 test_fixtures/gen_test_features.py` to regenerate `test_features.pptx` (the orchestrator imports each category module in order, then runs `_postprocess`).
+- The `set_gradient_fill()` helper in `slides_03_fills.py` shows how to inject raw XML into shapes via lxml.
 
-### 4. Test assertions (`test_node.mjs`)
-- Update `slide count = N` assertion to match new total
-- Update iteration bounds (`for (let i = 1; i <= N; ...)`) for slide existence and .rels checks
-- Add a new test section verifying the XML structure of the new slides
-- Run `node test_fixtures/test_node.mjs` to confirm all tests pass
+### 4. Test assertions (`test_fixtures/tests/*.test.mjs`)
+- Update the slide-count assertion in `structure.test.mjs` to match the new total.
+- Update iteration bounds (`for (let i = 1; i <= N; ...)`) in `structure.test.mjs` for slide existence and `.rels` checks.
+- Add (or extend) a category file — e.g. a fill change goes in `fills.test.mjs`, a new chart in `charts.test.mjs`. Each file is a single top-level `test(...)` block that calls `resetAssertions()`/`finishAssertions()` from `_helpers.mjs`.
+- Run `node --test test_fixtures/tests/*.test.mjs` to confirm all tests pass.
 
 ### 5. Verification checklist
 ```bash

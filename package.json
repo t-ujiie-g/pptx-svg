@@ -31,7 +31,7 @@
     "build:copy-wasm": "cp _build/wasm-gc/release/build/main/main.wasm dist/main.wasm",
     "build": "npm run build:wasm && npm run build:ts && npm run build:copy-wasm",
     "test:moon": "NODE_OPTIONS='--require ./test_fixtures/ffi_stub.js' moon test --target js",
-    "test:node": "node test_fixtures/test_node.mjs && node test_fixtures/test_editing_helpers.mjs && node test_fixtures/test_node_compat.mjs",
+    "test:node": "node --test test_fixtures/tests/*.test.mjs && node test_fixtures/test_editing_helpers.mjs && node test_fixtures/test_node_compat.mjs",
     "test": "npm run test:moon && npm run test:node",
     "prepublishOnly": "npm run build && npm test"
   },
