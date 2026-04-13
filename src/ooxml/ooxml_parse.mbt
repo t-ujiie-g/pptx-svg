@@ -737,7 +737,7 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
       }
     }
   }
-  if rid.is_empty() {
+  if rid.is_empty() && svg_rid.is_empty() {
     return BlipFill::none()
   }
   let stretch = match @xml.find_child(bf_ch, "a:stretch") {

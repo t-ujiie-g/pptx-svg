@@ -632,12 +632,6 @@ fn parse_text_body(
   let pnodes = @xml.find_children(ch, "a:p")
   let np = pnodes.length()
   let mut pi = 0
-  // Carry endParaRPr color/font properties across paragraphs (PowerPoint inherits these).
-  // Bold/italic are NOT carried over — they reset per paragraph.
-  let mut prev_epr_font_size = 0
-  let mut prev_epr_color = Color::none()
-  let mut prev_epr_font_face = ""
-  let mut prev_epr_ea_font = ""
   while pi < np {
     let p = pnodes[pi]
     let p_ch = @xml.get_children(p)
@@ -720,57 +714,9 @@ fn parse_text_body(
     } else {
       def_ea_font
     }
-    // Apply endParaRPr from current paragraph, updating carry-over state.
-    // PowerPoint inherits color/font across paragraphs but NOT bold/italic.
-    match @xml.find_child(p_ch, "a:endParaRPr") {
-      Some(epr) => {
-        let epr_ch = @xml.get_children(epr)
-        let epr_clr = parse_solid_fill(epr_ch, theme)
-        let epr_sz = attr_int(epr, "sz")
-        let epr_ff = resolve_font_theme(
-          child_attr(epr_ch, "a:latin", "typeface"),
-          theme,
-        )
-        let epr_ea = resolve_ea_font_theme(
-          child_attr(epr_ch, "a:ea", "typeface"),
-          theme,
-        )
-        if epr_sz > 0 {
-          prev_epr_font_size = epr_sz
-        }
-        if !epr_clr.is_none() {
-          prev_epr_color = epr_clr
-        }
-        if !epr_ff.is_empty() {
-          prev_epr_font_face = epr_ff
-        }
-        if !epr_ea.is_empty() {
-          prev_epr_ea_font = epr_ea
-        }
-      }
-      None => ()
-    }
-    // Merge: defRPr/lstStyle take priority, then endParaRPr carry-over (color/font only)
-    let def_font_size = if def_font_size > 0 {
-      def_font_size
-    } else {
-      prev_epr_font_size
-    }
-    let def_color = if !def_color.is_none() {
-      def_color
-    } else {
-      prev_epr_color
-    }
-    let def_font_face = if !def_font_face.is_empty() {
-      def_font_face
-    } else {
-      prev_epr_font_face
-    }
-    let def_ea_font = if !def_ea_font.is_empty() {
-      def_ea_font
-    } else {
-      prev_epr_ea_font
-    }
+    // endParaRPr is NOT applied as a fallback to def_* here — it's stored
+    // on the paragraph (epr_* fields) and applied as last-resort fallback in
+    // main_inherit.mbt, AFTER layout/master placeholder inheritance.
     // Iterate over all children to handle a:r (runs), a:fld (fields), and a:br (breaks)
     let runs : Array[TextRun] = []
     let p_ch_len = p_ch.length()
@@ -824,6 +770,28 @@ fn parse_text_body(
       }
       ri = ri + 1
     }
+    // Capture endParaRPr values for this paragraph as last-resort fallbacks.
+    // These are applied AFTER layout/master inheritance so that, for free
+    // textboxes with no placeholder chain, runs still pick up endParaRPr
+    // color/font (e.g. PowerPoint's "remembered state" behavior).
+    let (epr_font_size, epr_color, epr_font_face, epr_ea_font) = match
+      @xml.find_child(p_ch, "a:endParaRPr") {
+      Some(epr) => {
+        let epr_ch = @xml.get_children(epr)
+        let e_sz = attr_int(epr, "sz")
+        let e_clr = parse_solid_fill(epr_ch, theme)
+        let e_ff = resolve_font_theme(
+          child_attr(epr_ch, "a:latin", "typeface"),
+          theme,
+        )
+        let e_ea = resolve_ea_font_theme(
+          child_attr(epr_ch, "a:ea", "typeface"),
+          theme,
+        )
+        (e_sz, e_clr, e_ff, e_ea)
+      }
+      None => (0, Color::none(), "", "")
+    }
     paras.push({
       runs,
       align,
@@ -842,6 +810,10 @@ fn parse_text_body(
       bullet_img_rid,
       tab_stops,
       rtl,
+      epr_font_size,
+      epr_color,
+      epr_font_face,
+      epr_ea_font,
     })
     pi = pi + 1
   }

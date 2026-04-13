@@ -401,6 +401,98 @@ fn apply_text_defaults(
   apply_para_spacing_from_style(shape.paragraphs, style)
 }
 
+///|
+/// Apply endParaRPr values as a LAST-RESORT fallback to runs in each paragraph
+/// that still have no font_size / color / font_face / ea_font after all other
+/// inheritance (shape lstStyle → layout/master placeholder → master txStyles).
+///
+/// This mirrors PowerPoint's behavior where a run in a free textbox with no
+/// explicit color picks up the paragraph's endParaRPr color (the "remembered
+/// run state"), but layout/master inheritance still takes priority so that
+/// placeholder runs use their style chain.
+fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
+  // Compute shape-wide fallback values: the first non-empty endParaRPr value
+  // of each kind, taken from any paragraph in the shape. PowerPoint's
+  // "remembered run state" persists across paragraphs, so a paragraph with no
+  // endParaRPr still inherits from its siblings.
+  let mut fb_fs = 0
+  let mut fb_clr = @ooxml.Color::none()
+  let mut fb_ff = ""
+  let mut fb_ea = ""
+  for para in shape.paragraphs {
+    if fb_fs == 0 && para.epr_font_size > 0 {
+      fb_fs = para.epr_font_size
+    }
+    if fb_clr.is_none() && !para.epr_color.is_none() {
+      fb_clr = para.epr_color
+    }
+    if fb_ff.is_empty() && !para.epr_font_face.is_empty() {
+      fb_ff = para.epr_font_face
+    }
+    if fb_ea.is_empty() && !para.epr_ea_font.is_empty() {
+      fb_ea = para.epr_ea_font
+    }
+  }
+  if fb_fs == 0 && fb_clr.is_none() && fb_ff.is_empty() && fb_ea.is_empty() {
+    return
+  }
+  // Apply: each paragraph's own epr_* wins over the shape-wide fallback,
+  // and each run's explicit value wins over the paragraph's epr_*.
+  for para in shape.paragraphs {
+    let eff_fs = if para.epr_font_size > 0 { para.epr_font_size } else { fb_fs }
+    let eff_clr = if !para.epr_color.is_none() {
+      para.epr_color
+    } else {
+      fb_clr
+    }
+    let eff_ff = if !para.epr_font_face.is_empty() {
+      para.epr_font_face
+    } else {
+      fb_ff
+    }
+    let eff_ea = if !para.epr_ea_font.is_empty() {
+      para.epr_ea_font
+    } else {
+      fb_ea
+    }
+    let nr = para.runs.length()
+    let mut ri = 0
+    while ri < nr {
+      let run = para.runs[ri]
+      let need_fs = eff_fs > 0 && run.font_size == 0
+      let need_clr = !eff_clr.is_none() && run.color.is_none()
+      let need_ff = !eff_ff.is_empty() && run.font_face.is_empty()
+      let need_ea = !eff_ea.is_empty() && run.ea_font.is_empty()
+      if need_fs || need_clr || need_ff || need_ea {
+        para.runs[ri] = {
+          ..run,
+          font_size: if need_fs {
+            eff_fs
+          } else {
+            run.font_size
+          },
+          color: if need_clr {
+            eff_clr
+          } else {
+            run.color
+          },
+          font_face: if need_ff {
+            eff_ff
+          } else {
+            run.font_face
+          },
+          ea_font: if need_ea {
+            eff_ea
+          } else {
+            run.ea_font
+          },
+        }
+      }
+      ri = ri + 1
+    }
+  }
+}
+
 // ── Placeholder auto-content ─────────────────────────────────────────────
 
 ///|
@@ -502,6 +594,10 @@ fn inject_placeholder_auto_content(
         bullet_img_rid: "",
         tab_stops: [],
         rtl: false,
+        epr_font_size: 0,
+        epr_color: @ooxml.Color::none(),
+        epr_font_face: "",
+        epr_ea_font: "",
       }
       shapes[i] = { ..shape, paragraphs: [para] }
     }

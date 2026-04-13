@@ -941,6 +941,9 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
         Some(master) => apply_text_defaults(shape, master.text_styles)
         None => ()
       }
+      // endParaRPr as last-resort fallback for free textboxes whose runs
+      // still lack color/font after placeholder inheritance.
+      apply_epr_fallbacks(shape)
       shape_i = shape_i + 1
     }
     let s : @ooxml.SlideData = {

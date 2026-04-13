@@ -313,7 +313,7 @@ pub fn BlipFill::none() -> BlipFill {
 
 ///|
 pub fn BlipFill::is_none(self : BlipFill) -> Bool {
-  self.rid.is_empty()
+  self.rid.is_empty() && self.svg_rid.is_empty()
 }
 
 ///|
@@ -898,6 +898,13 @@ pub(all) struct TextParagraph {
   bullet_img_rid : String // a:buBlip r:embed; "" = none
   tab_stops : Array[TabStop] // a:tabLst/a:tab
   rtl : Bool // right-to-left paragraph direction (a:pPr rtl="1")
+  // endParaRPr fallbacks — applied as last-resort defaults for runs missing
+  // values, AFTER layout/master inheritance has had a chance to fill them.
+  // A value of 0 / "" / Color::none() means "endParaRPr did not supply this".
+  epr_font_size : Int
+  epr_color : Color
+  epr_font_face : String
+  epr_ea_font : String
 }
 
 // ── Text body properties ────────────────────────────────────────────────────

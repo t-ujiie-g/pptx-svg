@@ -569,6 +569,10 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             bullet_img_rid: "",
             tab_stops: [],
             rtl,
+            epr_font_size: 0,
+            epr_color: @ooxml.Color::none(),
+            epr_font_face: "",
+            epr_ea_font: "",
           })
         }
       _ => ()

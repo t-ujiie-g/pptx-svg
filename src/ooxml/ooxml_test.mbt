@@ -318,6 +318,70 @@ test "Blur::none and is_none" {
 }
 
 ///|
+test "parse_slide captures endParaRPr into paragraph epr_* fields" {
+  // endParaRPr color/size/font should be stored on the paragraph as
+  // last-resort fallbacks, NOT pre-merged into runs. A run with no explicit
+  // color must still parse with Color::none() so layout/master inheritance
+  // can run first; the epr_* values are only applied as the final fallback
+  // in main_inherit.mbt::apply_epr_fallbacks().
+  let slide_xml =
+    #|<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="1" name="t"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+    #|      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100" cy="100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+    #|      <p:txBody>
+    #|        <a:bodyPr/><a:lstStyle/>
+    #|        <a:p>
+    #|          <a:r><a:rPr lang="ja-JP"/><a:t>0.028</a:t></a:r>
+    #|          <a:endParaRPr lang="ja-JP" sz="1800"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:latin typeface="Arial"/></a:endParaRPr>
+    #|        </a:p>
+    #|        <a:p>
+    #|          <a:r><a:rPr lang="ja-JP"/><a:t>no epr</a:t></a:r>
+    #|        </a:p>
+    #|      </p:txBody>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = parse_slide(slide_xml, SlideSize::default(), ThemeData::default())
+  let paras = slide.shapes[0].paragraphs
+  assert_eq(paras.length(), 2)
+  // Paragraph 0 has endParaRPr — epr_* fields should be populated.
+  assert_eq(paras[0].epr_font_size, 1800)
+  assert_eq(paras[0].epr_color.r, 255)
+  assert_eq(paras[0].epr_color.g, 255)
+  assert_eq(paras[0].epr_color.b, 255)
+  assert_eq(paras[0].epr_font_face, "Arial")
+  // The run itself must still have no explicit color/size — those are only
+  // applied later in apply_epr_fallbacks, after layout/master inheritance.
+  assert_true(paras[0].runs[0].color.is_none())
+  assert_eq(paras[0].runs[0].font_size, 0)
+  // Paragraph 1 has no endParaRPr — epr_* stays empty.
+  assert_eq(paras[1].epr_font_size, 0)
+  assert_true(paras[1].epr_color.is_none())
+  assert_eq(paras[1].epr_font_face, "")
+}
+
+///|
+test "BlipFill::is_none considers svg_rid" {
+  // Fully empty blip — is_none
+  let bf0 = BlipFill::none()
+  assert_true(bf0.is_none())
+  // Raster-only (r:embed) — not none
+  let bf_raster : BlipFill = { ..BlipFill::none(), rid: "rId7" }
+  assert_false(bf_raster.is_none())
+  // SVG-only (asvg:svgBlip, no r:embed) — not none. This is the regression
+  // fixed for cover-slide SVG logos: previously is_none() returned true and
+  // the picture shape rendered as a placeholder rectangle.
+  let bf_svg : BlipFill = { ..BlipFill::none(), svg_rid: "rId8" }
+  assert_false(bf_svg.is_none())
+  // Both set — not none
+  let bf_both : BlipFill = { ..BlipFill::none(), rid: "rId7", svg_rid: "rId8" }
+  assert_false(bf_both.is_none())
+}
+
+///|
 test "EffectList with single effect is not none" {
   // Only outer shadow set
   let e1 : EffectList = {
