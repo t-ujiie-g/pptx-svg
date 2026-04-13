@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.3
+
+### Bug Fixes
+
+- **Fix SVG-only blip fills rendering as placeholders** — `<a:blip>` elements that only carry an `<asvg:svgBlip>` reference in `a:extLst` (no `r:embed`) were treated as empty and dropped during parsing. `BlipFill::is_none()` and `parse_blip_fill_node()` now also check `svg_rid`, and the serializer omits the `r:embed` attribute when only the SVG reference is present. Fixes cover-slide logos that use the SVG-only variant.
+- **Fix bullet overlapping text on positive first-line indent** — the renderer always repositioned text to `marL` after the bullet, which is correct for hanging indent (`indent < 0`) but caused the bullet to overlap the first characters when a paragraph used a positive first-line indent. Repositioning is now restricted to hanging indent; with positive indent the text flows naturally after the bullet.
+- **Fix free-textbox runs losing color from `endParaRPr`** — runs in free textboxes (no placeholder chain) that inherited their color from the paragraph's `endParaRPr` were rendering black when the earlier cross-paragraph carry-over logic was removed. `TextParagraph` now stores `epr_font_size` / `epr_color` / `epr_font_face` / `epr_ea_font`, and `main_inherit.mbt::apply_epr_fallbacks()` applies them as a last-resort fallback *after* layout/master inheritance has run. The fallback is also shared across sibling paragraphs within the same shape so that a paragraph without its own `endParaRPr` still picks up values from its siblings (matches PowerPoint's "remembered run state" behavior).
+- **Fix shape-level rotation not applied to text** — text inside a shape with `<a:xfrm rot="...">` was rendered upright because `renderer_text.mbt` only applied `bodyPr/@rot` (text-only rotation) and ignored the shape transform rotation. For shapes with no visible fill or stroke (e.g. rotated text boxes), the shape's rotated `<rect>` was invisible so nothing showed the rotation. `make_text_header` now composes `t.rot + body_props.rot` into the text's rotate transform, both pivoting on the shape center.
+
 ## 0.5.2
 
 ### Bug Fixes
