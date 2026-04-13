@@ -210,10 +210,15 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
       bf.svg_rid +
       "\"/></a:ext></a:extLst>"
   }
-  if blip_inner.is_empty() {
-    out = out + "<a:blip r:embed=\"" + bf.rid + "\"/>"
+  let embed_attr = if bf.rid.is_empty() {
+    ""
   } else {
-    out = out + "<a:blip r:embed=\"" + bf.rid + "\">" + blip_inner + "</a:blip>"
+    " r:embed=\"" + bf.rid + "\""
+  }
+  if blip_inner.is_empty() {
+    out = out + "<a:blip" + embed_attr + "/>"
+  } else {
+    out = out + "<a:blip" + embed_attr + ">" + blip_inner + "</a:blip>"
   }
   if bf.has_crop() {
     out = out + "<a:srcRect"

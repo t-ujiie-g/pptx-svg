@@ -313,7 +313,7 @@ pub fn BlipFill::none() -> BlipFill {
 
 ///|
 pub fn BlipFill::is_none(self : BlipFill) -> Bool {
-  self.rid.is_empty()
+  self.rid.is_empty() && self.svg_rid.is_empty()
 }
 
 ///|
