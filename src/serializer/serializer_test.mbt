@@ -50,7 +50,10 @@ test "serialize_slide hidden slide" {
 test "serialize_slide svg-only blip background omits r:embed" {
   // Regression: SVG-only blips (no r:embed, only asvg:svgBlip) were being
   // serialized as <a:blip r:embed=""> which PowerPoint rejects.
-  let svg_only : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), svg_rid: "rId9" }
+  let svg_only : @ooxml.BlipFill = {
+    ..@ooxml.BlipFill::none(),
+    svg_rid: "rId9",
+  }
   let slide : @ooxml.SlideData = {
     slide_size: @ooxml.SlideSize::default(),
     background: @ooxml.Color::white(),

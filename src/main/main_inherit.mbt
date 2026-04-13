@@ -440,7 +440,11 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
   // and each run's explicit value wins over the paragraph's epr_*.
   for para in shape.paragraphs {
     let eff_fs = if para.epr_font_size > 0 { para.epr_font_size } else { fb_fs }
-    let eff_clr = if !para.epr_color.is_none() { para.epr_color } else { fb_clr }
+    let eff_clr = if !para.epr_color.is_none() {
+      para.epr_color
+    } else {
+      fb_clr
+    }
     let eff_ff = if !para.epr_font_face.is_empty() {
       para.epr_font_face
     } else {
@@ -462,10 +466,26 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
       if need_fs || need_clr || need_ff || need_ea {
         para.runs[ri] = {
           ..run,
-          font_size: if need_fs { eff_fs } else { run.font_size },
-          color: if need_clr { eff_clr } else { run.color },
-          font_face: if need_ff { eff_ff } else { run.font_face },
-          ea_font: if need_ea { eff_ea } else { run.ea_font },
+          font_size: if need_fs {
+            eff_fs
+          } else {
+            run.font_size
+          },
+          color: if need_clr {
+            eff_clr
+          } else {
+            run.color
+          },
+          font_face: if need_ff {
+            eff_ff
+          } else {
+            run.font_face
+          },
+          ea_font: if need_ea {
+            eff_ea
+          } else {
+            run.ea_font
+          },
         }
       }
       ri = ri + 1

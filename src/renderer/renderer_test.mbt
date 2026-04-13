@@ -754,11 +754,16 @@ test "bullet repositioning only applies to hanging indent" {
     ..make_empty_slide(),
     shapes: [make_bulleted_shape(228600)],
   }
-  let hanging_svg = render_slide_svg(
-    hanging_slide, [], 1, theme, [], [], [], [],
-  )
+  let hanging_svg = render_slide_svg(hanging_slide, [], 1, theme, [], [], [], [])
   let positive_svg = render_slide_svg(
-    positive_slide, [], 1, theme, [], [], [], [],
+    positive_slide,
+    [],
+    1,
+    theme,
+    [],
+    [],
+    [],
+    [],
   )
   // Both must contain the bullet glyph and text.
   assert_true(hanging_svg.contains("•"))
