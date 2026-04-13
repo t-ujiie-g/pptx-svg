@@ -779,6 +779,101 @@ test "bullet repositioning only applies to hanging indent" {
   assert_true(hanging_svg != positive_svg)
 }
 
+///|
+/// Construct a minimal text shape with the given shape-level rotation.
+/// Uses noFill/noStroke so only the text itself is visible — matches the
+/// slide 6 regression where rotation wasn't applied to the text.
+fn make_rotated_text_shape(rot : Int) -> @ooxml.Shape {
+  let run : @ooxml.TextRun = {
+    text: "Tilted",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 2400,
+    color: @ooxml.Color::none(),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    line_spacing: 0,
+    mar_l: -1,
+    indent: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 700000,
+        y: 1500000,
+        cx: 1284515,
+        cy: 445828,
+        rot,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [para],
+  }
+}
+
+///|
+test "shape xfrm rot rotates text, not only the shape rect" {
+  // Regression: slide 6 of rails_study_updated.pptx used text boxes with
+  // <a:xfrm rot="..."/> but noFill/noStroke. The renderer rotated the
+  // (invisible) rect only and emitted the <text> upright. Fix: compose
+  // t.rot + body_props.rot into the text's rotate() transform.
+  let theme = @ooxml.ThemeData::default()
+  let rotated : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_rotated_text_shape(300000)], // 5°
+  }
+  let straight : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_rotated_text_shape(0)],
+  }
+  let rotated_svg = render_slide_svg(rotated, [], 1, theme, [], [], [], [])
+  let straight_svg = render_slide_svg(straight, [], 1, theme, [], [], [], [])
+  // Rotated shape must emit a rotate(...) transform inside its <text>.
+  assert_true(rotated_svg.contains("<text"))
+  assert_true(rotated_svg.contains("transform=\"rotate(5.00"))
+  // Straight shape must not emit any rotate() transform.
+  assert_false(straight_svg.contains("transform=\"rotate"))
+}
+
 // ── ChartEx rendering tests ──────────────────────────────────────────────────
 
 ///|

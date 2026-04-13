@@ -1083,8 +1083,12 @@ fn render_text(
     body_props.vert == "vert270" ||
     body_props.vert == "wordArtVert"
 
-  // Text rotation from bodyPr rot (60000ths of a degree)
-  let bp_rot = body_props.rot
+  // Text rotation. Shape transform rot (t.rot) rotates the whole shape
+  // including its text; bodyPr rot rotates only the text within the shape.
+  // Both pivot on the shape center, so we can sum them into a single
+  // rotate() transform on the <text> element. Without t.rot, text inside
+  // a rotated shape with no visible fill/stroke would render straight.
+  let bp_rot = t.rot + body_props.rot
 
   // Image bullets — render before <text> as separate <image> elements, collect them
   let mut img_bullets_svg = ""
