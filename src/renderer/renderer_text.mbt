@@ -1357,8 +1357,10 @@ fn render_text(
             }
           }
           // On first line with bullet, reposition to cont_anchor_x (= marL)
-          // so text aligns with continuation lines (OOXML text starts at marL)
-          if vli == 0 && !bullet_text.is_empty() {
+          // so text aligns with continuation lines (OOXML text starts at marL).
+          // Only applies to hanging indent (para.indent < 0); for positive
+          // first-line indent, text flows naturally after the bullet.
+          if vli == 0 && !bullet_text.is_empty() && para.indent < 0 {
             out = out +
               "</tspan><tspan" +
               ai("x", cont_anchor_x) +
