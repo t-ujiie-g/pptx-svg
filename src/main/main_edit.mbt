@@ -144,6 +144,10 @@ fn make_default_paragraph(
     bullet_img_rid: "",
     tab_stops: [],
     rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
   }
 }
 

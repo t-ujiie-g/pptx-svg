@@ -47,6 +47,47 @@ test "serialize_slide hidden slide" {
 }
 
 ///|
+test "serialize_slide svg-only blip background omits r:embed" {
+  // Regression: SVG-only blips (no r:embed, only asvg:svgBlip) were being
+  // serialized as <a:blip r:embed=""> which PowerPoint rejects.
+  let svg_only : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), svg_rid: "rId9" }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: svg_only,
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  assert_true(xml.contains("asvg:svgBlip"))
+  assert_true(xml.contains("r:embed=\"rId9\""))
+  // Must NOT emit the empty r:embed attribute
+  assert_false(xml.contains("r:embed=\"\""))
+}
+
+///|
+test "serialize_slide raster blip background keeps r:embed" {
+  let raster : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), rid: "rId7" }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: raster,
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let xml = serialize_slide(slide)
+  assert_true(xml.contains("<a:blip r:embed=\"rId7\""))
+}
+
+///|
 test "serialize_slide with colored background" {
   let slide : @ooxml.SlideData = {
     slide_size: @ooxml.SlideSize::default(),

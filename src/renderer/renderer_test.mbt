@@ -631,6 +631,10 @@ test "roundtrip justify alignment" {
     bullet_img_rid: "",
     tab_stops: [],
     rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
   }
   let shape : @ooxml.Shape = {
     ..@ooxml.Shape::default_with(
@@ -663,6 +667,111 @@ test "roundtrip justify alignment" {
   // Round-trip: parse back
   let parsed = @svg_parser.parse_svg_to_slide(svg)
   assert_eq(parsed.shapes[0].paragraphs[0].align, "just")
+}
+
+///|
+/// Construct a text shape with a single bulleted paragraph for indent tests.
+/// marL = 457200 EMU (0.5"), bullet = "•", font_size = 1800 (18pt).
+fn make_bulleted_shape(indent : Int) -> @ooxml.Shape {
+  let run : @ooxml.TextRun = {
+    text: "Hello",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 1800,
+    color: @ooxml.Color::none(),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    line_spacing: 0,
+    mar_l: 457200,
+    indent,
+    bullet: "•",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 5000000,
+        cy: 2000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [para],
+  }
+}
+
+///|
+test "bullet repositioning only applies to hanging indent" {
+  // With hanging indent (indent < 0) the renderer must reposition the first
+  // line's text anchor to marL so it lines up under continuation lines.
+  // With positive first-line indent the text must flow naturally after the
+  // bullet (regression fix: previous behavior made bullet + text overlap).
+  let theme = @ooxml.ThemeData::default()
+  let hanging_slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_bulleted_shape(-228600)],
+  }
+  let positive_slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_bulleted_shape(228600)],
+  }
+  let hanging_svg = render_slide_svg(
+    hanging_slide, [], 1, theme, [], [], [], [],
+  )
+  let positive_svg = render_slide_svg(
+    positive_slide, [], 1, theme, [], [], [], [],
+  )
+  // Both must contain the bullet glyph and text.
+  assert_true(hanging_svg.contains("•"))
+  assert_true(hanging_svg.contains("Hello"))
+  assert_true(positive_svg.contains("•"))
+  assert_true(positive_svg.contains("Hello"))
+  // Regression guard: the two renderings must differ. The hanging-indent
+  // variant emits an extra reposition tspan (to line up wrapped continuation
+  // with the first line under marL), while the positive-indent variant must
+  // skip that reposition so text flows naturally after the bullet.
+  // If the renderer ever reintroduces the unconditional reposition, both
+  // SVGs would become byte-identical and this assertion catches it.
+  assert_true(hanging_svg != positive_svg)
 }
 
 // ── ChartEx rendering tests ──────────────────────────────────────────────────
