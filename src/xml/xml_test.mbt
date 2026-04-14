@@ -72,6 +72,34 @@ test "str_ends_with" {
   assert_true(str_ends_with("anything", ""))
 }
 
+///|
+test "str_replace_all basic" {
+  assert_eq(str_replace_all("hello world", "world", "there"), "hello there")
+  assert_eq(str_replace_all("aaa", "a", "b"), "bbb")
+  // No match — unchanged
+  assert_eq(str_replace_all("hello", "xyz", "!"), "hello")
+  // Multiple non-adjacent matches
+  assert_eq(str_replace_all("foo bar foo baz", "foo", "X"), "X bar X baz")
+  // Replacement longer than pattern
+  assert_eq(str_replace_all("ab", "a", "xyz"), "xyzb")
+  // Replacement shorter than pattern
+  assert_eq(str_replace_all("xyzb", "xyz", "a"), "ab")
+  // Empty pattern is a no-op (would otherwise loop forever)
+  assert_eq(str_replace_all("hello", "", "X"), "hello")
+  // Empty replacement = deletion
+  assert_eq(str_replace_all("hello world", " world", ""), "hello")
+}
+
+///|
+test "str_replace_all phClr use case" {
+  // The actual use case: substituting phClr in theme fmtScheme XML.
+  let raw = "<a:schemeClr val=\"phClr\"><a:lumMod val=\"110000\"/></a:schemeClr>"
+  let out = str_replace_all(raw, "phClr", "accent1")
+  assert_eq(
+    out, "<a:schemeClr val=\"accent1\"><a:lumMod val=\"110000\"/></a:schemeClr>",
+  )
+}
+
 // ── is_astral / char_step ───────────────────────────────────────────────────
 
 ///|

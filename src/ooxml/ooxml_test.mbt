@@ -410,6 +410,216 @@ test "EffectList with single effect is not none" {
 }
 
 ///|
+test "parse_theme captures fmtScheme fill/ln style lists" {
+  // Minimal theme with one fillStyleLst entry (gradient using phClr) and one
+  // lnStyleLst entry. Both should survive into ThemeData as raw XML with the
+  // `phClr` placeholder intact, so that resolve_fill_ref / resolve_ln_ref can
+  // later substitute the referenced scheme color.
+  let theme_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
+    #|  <a:themeElements>
+    #|    <a:clrScheme name="Test">
+    #|      <a:dk1><a:srgbClr val="000000"/></a:dk1>
+    #|      <a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+    #|      <a:dk2><a:srgbClr val="112233"/></a:dk2>
+    #|      <a:lt2><a:srgbClr val="EEEEEE"/></a:lt2>
+    #|      <a:accent1><a:srgbClr val="4472C4"/></a:accent1>
+    #|      <a:accent2><a:srgbClr val="ED7D31"/></a:accent2>
+    #|      <a:accent3><a:srgbClr val="A5A5A5"/></a:accent3>
+    #|      <a:accent4><a:srgbClr val="FFC000"/></a:accent4>
+    #|      <a:accent5><a:srgbClr val="5B9BD5"/></a:accent5>
+    #|      <a:accent6><a:srgbClr val="70AD47"/></a:accent6>
+    #|      <a:hlink><a:srgbClr val="0563C1"/></a:hlink>
+    #|      <a:folHlink><a:srgbClr val="954F63"/></a:folHlink>
+    #|    </a:clrScheme>
+    #|    <a:fontScheme name="Test">
+    #|      <a:majorFont><a:latin typeface="Calibri Light"/></a:majorFont>
+    #|      <a:minorFont><a:latin typeface="Calibri"/></a:minorFont>
+    #|    </a:fontScheme>
+    #|    <a:fmtScheme name="Test">
+    #|      <a:fillStyleLst>
+    #|        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+    #|        <a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="50000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"/></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>
+    #|      </a:fillStyleLst>
+    #|      <a:lnStyleLst>
+    #|        <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
+    #|      </a:lnStyleLst>
+    #|      <a:effectStyleLst/>
+    #|      <a:bgFillStyleLst/>
+    #|    </a:fmtScheme>
+    #|  </a:themeElements>
+    #|</a:theme>
+  let theme = parse_theme(theme_xml)
+  // Two fill styles captured, one ln style captured.
+  assert_eq(theme.fill_style_xmls.length(), 2)
+  assert_eq(theme.ln_style_xmls.length(), 1)
+  // phClr placeholder must still be present (substitution happens at resolve time).
+  assert_true(@xml.str_starts_with(theme.fill_style_xmls[0], "<a:solidFill"))
+  assert_true(@xml.str_starts_with(theme.fill_style_xmls[1], "<a:gradFill"))
+  assert_true(@xml.str_starts_with(theme.ln_style_xmls[0], "<a:ln"))
+}
+
+///|
+test "parse_slide resolves p:style/a:fillRef via theme fmtScheme" {
+  // Shape has no explicit fill/line in spPr, only a <p:style>/<a:fillRef idx=2>
+  // pointing at the theme's fmtScheme. The gradient fill should be substituted
+  // in and applied to the shape.
+  let theme_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
+    #|  <a:themeElements>
+    #|    <a:clrScheme name="Test">
+    #|      <a:dk1><a:srgbClr val="000000"/></a:dk1>
+    #|      <a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+    #|      <a:dk2><a:srgbClr val="112233"/></a:dk2>
+    #|      <a:lt2><a:srgbClr val="EEEEEE"/></a:lt2>
+    #|      <a:accent1><a:srgbClr val="FF0000"/></a:accent1>
+    #|      <a:accent2><a:srgbClr val="00FF00"/></a:accent2>
+    #|      <a:accent3><a:srgbClr val="A5A5A5"/></a:accent3>
+    #|      <a:accent4><a:srgbClr val="FFC000"/></a:accent4>
+    #|      <a:accent5><a:srgbClr val="5B9BD5"/></a:accent5>
+    #|      <a:accent6><a:srgbClr val="70AD47"/></a:accent6>
+    #|      <a:hlink><a:srgbClr val="0563C1"/></a:hlink>
+    #|      <a:folHlink><a:srgbClr val="954F63"/></a:folHlink>
+    #|    </a:clrScheme>
+    #|    <a:fontScheme name="Test"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme>
+    #|    <a:fmtScheme name="Test">
+    #|      <a:fillStyleLst>
+    #|        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+    #|        <a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"/></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"/></a:gs></a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>
+    #|      </a:fillStyleLst>
+    #|      <a:lnStyleLst>
+    #|        <a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
+    #|      </a:lnStyleLst>
+    #|      <a:effectStyleLst/>
+    #|      <a:bgFillStyleLst/>
+    #|    </a:fmtScheme>
+    #|  </a:themeElements>
+    #|</a:theme>
+  let theme = parse_theme(theme_xml)
+  let slide_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="1" name="r"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+    #|      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000" cy="1000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+    #|      <p:style>
+    #|        <a:lnRef idx="1"><a:schemeClr val="accent1"/></a:lnRef>
+    #|        <a:fillRef idx="2"><a:schemeClr val="accent1"/></a:fillRef>
+    #|        <a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef>
+    #|        <a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef>
+    #|      </p:style>
+    #|      <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = parse_slide(slide_xml, SlideSize::default(), theme)
+  let shape = slide.shapes[0]
+  // fillRef idx=2 → gradFill with phClr=accent1. Two gradient stops expected.
+  assert_false(shape.grad_fill.is_none())
+  assert_eq(shape.grad_fill.stops.length(), 2)
+  // accent1 = FF0000 in our test theme.
+  assert_eq(shape.grad_fill.stops[0].color.r, 255)
+  assert_eq(shape.grad_fill.stops[0].color.g, 0)
+  assert_eq(shape.grad_fill.stops[0].color.b, 0)
+  // solid fill must remain unset when a gradFill is applied.
+  assert_true(shape.fill.is_none())
+  // lnRef idx=1 → 19050 EMU stroke using accent1.
+  assert_eq(shape.stroke_w, 19050)
+  assert_eq(shape.stroke.r, 255)
+  assert_eq(shape.stroke.g, 0)
+  assert_eq(shape.stroke.b, 0)
+}
+
+///|
+test "parse_slide captures lstStyle buAutoNum into level defaults" {
+  // a:lstStyle/a:lvl1pPr/a:buAutoNum type="arabicPeriod" should populate
+  // Shape.lst_style.levels[0].bullet_auto so that placeholder inheritance can
+  // apply it to slide paragraphs.  The earlier bug: we parsed a:buChar but not
+  // a:buAutoNum, so numbered-list layouts inherited nothing and fell back to
+  // the default "•" bullet.
+  let slide_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="1" name="t"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="13"/></p:nvPr></p:nvSpPr>
+    #|      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100" cy="100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+    #|      <p:txBody>
+    #|        <a:bodyPr/>
+    #|        <a:lstStyle>
+    #|          <a:lvl1pPr marL="0" indent="302676"><a:buAutoNum type="arabicPeriod"/></a:lvl1pPr>
+    #|          <a:lvl2pPr marL="100000" indent="0"><a:buAutoNum type="alphaLcPeriod"/></a:lvl2pPr>
+    #|        </a:lstStyle>
+    #|        <a:p><a:r><a:rPr lang="en-US"/><a:t>item</a:t></a:r></a:p>
+    #|      </p:txBody>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = parse_slide(slide_xml, SlideSize::default(), ThemeData::default())
+  let lst = slide.shapes[0].lst_style
+  assert_eq(lst.levels[0].bullet_auto, "arabicPeriod")
+  assert_eq(lst.levels[1].bullet_auto, "alphaLcPeriod")
+  // Other levels untouched
+  assert_eq(lst.levels[2].bullet_auto, "")
+}
+
+///|
+test "parse_slide explicit fill wins over p:style/a:fillRef" {
+  // When spPr carries an explicit fill (solidFill or noFill), the p:style
+  // fillRef must be ignored — explicit properties always take precedence.
+  let theme_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
+    #|  <a:themeElements>
+    #|    <a:clrScheme name="Test">
+    #|      <a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+    #|      <a:dk2><a:srgbClr val="112233"/></a:dk2><a:lt2><a:srgbClr val="EEEEEE"/></a:lt2>
+    #|      <a:accent1><a:srgbClr val="FF0000"/></a:accent1><a:accent2><a:srgbClr val="00FF00"/></a:accent2>
+    #|      <a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4>
+    #|      <a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6>
+    #|      <a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F63"/></a:folHlink>
+    #|    </a:clrScheme>
+    #|    <a:fontScheme name="Test"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme>
+    #|    <a:fmtScheme name="Test">
+    #|      <a:fillStyleLst>
+    #|        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+    #|        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+    #|        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+    #|      </a:fillStyleLst>
+    #|      <a:lnStyleLst/><a:effectStyleLst/><a:bgFillStyleLst/>
+    #|    </a:fmtScheme>
+    #|  </a:themeElements>
+    #|</a:theme>
+  let theme = parse_theme(theme_xml)
+  let slide_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="1" name="r"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+    #|      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000" cy="1000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="0000FF"/></a:solidFill></p:spPr>
+    #|      <p:style>
+    #|        <a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef>
+    #|        <a:fillRef idx="3"><a:schemeClr val="accent1"/></a:fillRef>
+    #|        <a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef>
+    #|        <a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef>
+    #|      </p:style>
+    #|      <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = parse_slide(slide_xml, SlideSize::default(), theme)
+  let shape = slide.shapes[0]
+  // Explicit solidFill 0000FF wins, not the theme accent1 (FF0000).
+  assert_eq(shape.fill.r, 0)
+  assert_eq(shape.fill.g, 0)
+  assert_eq(shape.fill.b, 255)
+}
+
+///|
 test "EffectList with blur is not none" {
   let e : EffectList = { ..EffectList::none(), blur: { rad: 76200 } }
   assert_true(!e.is_none())

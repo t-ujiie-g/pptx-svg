@@ -617,6 +617,45 @@ pub fn str_suffix(s : String, from : Int) -> String {
 }
 
 ///|
+/// Replace every occurrence of `pat` (non-empty, BMP-only chars) in `s` with `repl`.
+pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
+  let slen = s.length()
+  let plen = pat.length()
+  if plen == 0 || slen < plen {
+    return s
+  }
+  let mut out = ""
+  let mut i = 0
+  while i < slen {
+    // Try to match pat starting at i
+    if i + plen <= slen {
+      let mut matched = true
+      let mut k = 0
+      while k < plen {
+        if s.get_char(i + k).unwrap() != pat.get_char(k).unwrap() {
+          matched = false
+          break
+        }
+        k = k + 1
+      }
+      if matched {
+        out = out + repl
+        i = i + plen
+      } else {
+        let c = s.get_char(i).unwrap()
+        out = out + @ffi.ffi_char_code_to_str(Char::to_int(c))
+        i = i + char_step(c)
+      }
+    } else {
+      let c = s.get_char(i).unwrap()
+      out = out + @ffi.ffi_char_code_to_str(Char::to_int(c))
+      i = i + char_step(c)
+    }
+  }
+  out
+}
+
+///|
 /// Check if string `s` starts with `pat`.
 pub fn str_starts_with(s : String, pat : String) -> Bool {
   let slen = s.length()

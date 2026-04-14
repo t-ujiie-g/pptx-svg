@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.4
+
+### Bug Fixes
+
+- **Fix shapes using `p:style`/`a:fillRef` rendering as empty** — shapes with no explicit fill or line in `p:spPr` that relied on `<p:style><a:fillRef idx="N">` (and `<a:lnRef>`) pointing at the theme's `a:fmtScheme/a:fillStyleLst` rendered with no fill at all. `ThemeData` now captures `fill_style_xmls` and `ln_style_xmls` at parse time (raw XML, `phClr` placeholder preserved); `parse_sp` falls back to `resolve_fill_ref` / `resolve_ln_ref`, which substitute `phClr` with the referenced scheme color and re-parse through the existing `parse_gradient_fill` / `parse_solid_fill` / `parse_stroke` helpers. Explicit `spPr` fill/line still wins.
+- **Fix numbered-list layouts losing their bullets** — when a layout placeholder declared `<a:lstStyle><a:lvl1pPr><a:buAutoNum type="arabicPeriod"/>`, slide paragraphs inheriting from that placeholder rendered with the default `•` bullet because `parse_level_defaults` only extracted `a:buChar` and `LevelTextDefaults` had no `bullet_auto` field. `bullet_auto` is now parsed into `LevelTextDefaults` and `apply_para_spacing_from_style` inherits it (with `bullet_none` > `bullet_auto` > `bullet` precedence). Agenda-style numbered lists now render as `1. 2. 3. …`.
+
 ## 0.5.3
 
 ### Bug Fixes

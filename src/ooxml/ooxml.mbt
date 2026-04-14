@@ -360,6 +360,10 @@ pub(all) struct ThemeData {
   minor_font : String
   major_ea_font : String // East Asian major font (from a:majorFont/a:ea)
   minor_ea_font : String // East Asian minor font (from a:minorFont/a:ea)
+  // a:fmtScheme children as raw XML, still containing `phClr` placeholders.
+  // Indexed 0-based; <p:style>/<a:fillRef idx="N"> uses 1-based (and idx 0 = no fill).
+  fill_style_xmls : Array[String]
+  ln_style_xmls : Array[String]
 }
 
 ///|
@@ -381,6 +385,8 @@ pub fn ThemeData::default() -> ThemeData {
     minor_font: "Calibri",
     major_ea_font: "",
     minor_ea_font: "",
+    fill_style_xmls: [],
+    ln_style_xmls: [],
   }
 }
 
@@ -717,6 +723,7 @@ pub(all) struct LevelTextDefaults {
   mar_l : Int // EMU; -1 = unset
   indent : Int // EMU; 0 = unset
   bullet : String // "" = none
+  bullet_auto : String // auto-number type (a:buAutoNum); "" = none
   bullet_none : Bool
   bullet_font : String // "" = inherit
   bullet_size : Int // 0 = inherit
@@ -739,6 +746,7 @@ pub fn LevelTextDefaults::empty() -> LevelTextDefaults {
     mar_l: -1,
     indent: 0,
     bullet: "",
+    bullet_auto: "",
     bullet_none: false,
     bullet_font: "",
     bullet_size: 0,
