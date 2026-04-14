@@ -879,6 +879,79 @@ fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
   (click_rid, hover_rid)
 }
 
+// ── Theme style reference (p:style → fmtScheme) ────────────────────────────
+
+///|
+/// Parse `<a:fillRef>` or `<a:lnRef>` inside `<p:style>`: returns (idx, schemeColorName).
+/// idx 0 means "no reference". schemeColorName is "" if not a scheme color.
+fn parse_style_ref(
+  style_ch : Array[@xml.XmlNode],
+  tag : String,
+) -> (Int, String) {
+  match @xml.find_child(style_ch, tag) {
+    None => (0, "")
+    Some(ref_node) => {
+      let idx = attr_int(ref_node, "idx")
+      let ref_ch = @xml.get_children(ref_node)
+      let scheme_name = match @xml.find_child(ref_ch, "a:schemeClr") {
+        None => ""
+        Some(sc) =>
+          match @xml.get_attr(sc, "val") {
+            Some(v) => v
+            None => ""
+          }
+      }
+      (idx, scheme_name)
+    }
+  }
+}
+
+///|
+/// Resolve `<a:fillRef idx="N"><a:schemeClr val="X"/></a:fillRef>` against the
+/// theme's `a:fmtScheme/a:fillStyleLst`.  Returns the resolved
+/// (solid, gradient, blip, pattern) fill — exactly one will be non-none (or
+/// all none if `idx` is out of range or the style list is empty).
+fn resolve_fill_ref(
+  idx : Int,
+  scheme_color_name : String,
+  theme : ThemeData,
+) -> (Color, GradientFill, BlipFill, PatternFill) {
+  if idx < 1 || idx > theme.fill_style_xmls.length() {
+    return (
+      Color::none(),
+      GradientFill::none(),
+      BlipFill::none(),
+      PatternFill::none(),
+    )
+  }
+  let raw = theme.fill_style_xmls[idx - 1]
+  let substituted = @xml.str_replace_all(raw, "phClr", scheme_color_name)
+  let parsed = @xml.parse_xml(substituted)
+  let color = parse_solid_fill(parsed, theme)
+  let gf = parse_gradient_fill(parsed, theme)
+  let bf = parse_blip_fill(parsed)
+  let pf = parse_pattern_fill(parsed, theme)
+  (color, gf, bf, pf)
+}
+
+///|
+/// Resolve `<a:lnRef idx="N"><a:schemeClr val="X"/></a:lnRef>` against the
+/// theme's `a:fmtScheme/a:lnStyleLst`.  Returns StrokeProps::default() if not
+/// applicable.
+fn resolve_ln_ref(
+  idx : Int,
+  scheme_color_name : String,
+  theme : ThemeData,
+) -> StrokeProps {
+  if idx < 1 || idx > theme.ln_style_xmls.length() {
+    return StrokeProps::default()
+  }
+  let raw = theme.ln_style_xmls[idx - 1]
+  let substituted = @xml.str_replace_all(raw, "phClr", scheme_color_name)
+  let parsed = @xml.parse_xml(substituted)
+  parse_stroke(parsed, theme)
+}
+
 // ── Shape parsers ─────────────────────────────────────────────────────────────
 
 ///|
@@ -938,23 +1011,56 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
       }
   }
   // Fill
-  let fill = match @xml.find_child(sppr_ch, "a:noFill") {
-    Some(_) => Color::none()
+  let (fill, explicit_no_fill) = match @xml.find_child(sppr_ch, "a:noFill") {
+    Some(_) => (Color::none(), true)
     None => {
       let c = parse_solid_fill(sppr_ch, theme)
-      if c.is_none() {
-        Color::none()
-      } else {
-        c
-      }
+      (c, false)
     }
   }
   let grad_fill = parse_gradient_fill(sppr_ch, theme)
-  let sp = parse_stroke(sppr_ch, theme)
-  // Blip fill on AutoShape (a:blipFill inside p:spPr)
   let blip_fill = parse_blip_fill(sppr_ch)
-  // Pattern fill
   let patt_fill = parse_pattern_fill(sppr_ch, theme)
+  let has_ln_in_sppr = match @xml.find_child(sppr_ch, "a:ln") {
+    Some(_) => true
+    None => false
+  }
+  let sp_stroke = parse_stroke(sppr_ch, theme)
+  // ── Theme style reference fallback (<p:style>/<a:fillRef>/<a:lnRef>) ──
+  let mut fill = fill
+  let mut grad_fill = grad_fill
+  let mut blip_fill = blip_fill
+  let mut patt_fill = patt_fill
+  let mut sp = sp_stroke
+  let sppr_has_any_fill = explicit_no_fill ||
+    !fill.is_none() ||
+    !grad_fill.is_none() ||
+    !blip_fill.is_none() ||
+    !patt_fill.is_none()
+  if !sppr_has_any_fill || !has_ln_in_sppr {
+    match @xml.find_child(ch, "p:style") {
+      None => ()
+      Some(style_node) => {
+        let style_ch = @xml.get_children(style_node)
+        if !sppr_has_any_fill {
+          let (fr_idx, fr_scheme) = parse_style_ref(style_ch, "a:fillRef")
+          if fr_idx >= 1 && fr_scheme != "" {
+            let (c, gf, bf, pf) = resolve_fill_ref(fr_idx, fr_scheme, theme)
+            fill = c
+            grad_fill = gf
+            blip_fill = bf
+            patt_fill = pf
+          }
+        }
+        if !has_ln_in_sppr {
+          let (lr_idx, lr_scheme) = parse_style_ref(style_ch, "a:lnRef")
+          if lr_idx >= 1 && lr_scheme != "" {
+            sp = resolve_ln_ref(lr_idx, lr_scheme, theme)
+          }
+        }
+      }
+    }
+  }
   // Text
   let (paras, body_props, txt_lst_style) = match
     @xml.find_child(ch, "p:txBody") {

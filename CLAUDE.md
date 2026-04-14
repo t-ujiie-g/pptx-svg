@@ -147,7 +147,8 @@ TableRow { height: Int, cells: Array[TableCell] }
 TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_span: Int, v_merge, h_merge: Bool, bdr_l/r/t/b_w: Int, bdr_l/r/t/b_color: Color, bdr_tl_br_w/color, bdr_bl_tr_w/color, mar_l/r/t/b: Int, anchor: String }
 
 Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
-ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String }
+ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String, fill_style_xmls, ln_style_xmls: Array[String] }  // fmtScheme entries (raw XML with phClr placeholders) — resolved by parse_sp when a shape's <p:style>/<a:fillRef>/<a:lnRef> has no explicit fill/line
+LevelTextDefaults { font_size, bold, italic, color, font_face, ea_font, align, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, line_spacing, spc_before, spc_after }
 
 ChartData { groups: Array[ChartGroup], axes: Array[ChartAxis], title: String, legend: ChartLegend, style: Int, chart_xml: String, view_3d: ChartView3D }
 ChartKind = BarChart | LineChart | PieChart | DoughnutChart | ScatterChart | AreaChart | RadarChart | BubbleChart | StockChart | SurfaceChart | OfPieChart | WaterfallChart | TreemapChart | SunburstChart | HistogramChart | BoxWhiskerChart | FunnelChart

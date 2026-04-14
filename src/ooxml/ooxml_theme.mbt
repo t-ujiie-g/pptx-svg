@@ -150,6 +150,22 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
       }
     }
   }
+  // ── Format scheme (fillStyleLst / lnStyleLst) ──
+  //
+  //  Each entry is stored as raw XML with the `phClr` placeholder intact,
+  //  so `resolve_fill_ref` / `resolve_ln_ref` can substitute in the actual
+  //  scheme color referenced by a shape's `<p:style>`.  Text nodes
+  //  (whitespace between elements) are skipped.
+  let fill_style_xmls : Array[String] = []
+  let ln_style_xmls : Array[String] = []
+  match @xml.find_child(te_ch, "a:fmtScheme") {
+    None => ()
+    Some(fmt) => {
+      let fmt_ch = @xml.get_children(fmt)
+      collect_style_xmls(fmt_ch, "a:fillStyleLst", fill_style_xmls)
+      collect_style_xmls(fmt_ch, "a:lnStyleLst", ln_style_xmls)
+    }
+  }
   {
     dk1,
     lt1,
@@ -167,6 +183,8 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     minor_font,
     major_ea_font,
     minor_ea_font,
+    fill_style_xmls,
+    ln_style_xmls,
   }
 }
 
@@ -258,6 +276,8 @@ pub fn apply_color_map(theme : ThemeData, cmap : ColorMap) -> ThemeData {
     minor_font: theme.minor_font,
     major_ea_font: theme.major_ea_font,
     minor_ea_font: theme.minor_ea_font,
+    fill_style_xmls: theme.fill_style_xmls,
+    ln_style_xmls: theme.ln_style_xmls,
   }
 }
 
@@ -274,6 +294,31 @@ pub fn extract_clr_map_ovr_from_nodes(
       match @xml.find_child(ovr_ch, "a:overrideClrMapping") {
         Some(mapping_node) => Some(parse_clr_map_from_node(mapping_node))
         None => None
+      }
+    }
+  }
+}
+
+// ── Format scheme helpers ───────────────────────────────────────────────────
+
+///|
+/// Append serialized XML for each element child of `<parent>/<list_tag>` to
+/// `out`. Whitespace text nodes are skipped.
+fn collect_style_xmls(
+  parent_ch : Array[@xml.XmlNode],
+  list_tag : String,
+  out : Array[String],
+) -> Unit {
+  match @xml.find_child(parent_ch, list_tag) {
+    None => ()
+    Some(lst) => {
+      let lst_ch = @xml.get_children(lst)
+      let mut i = 0
+      while i < lst_ch.length() {
+        if @xml.get_tag(lst_ch[i]) != "" {
+          out.push(@xml.serialize_node(lst_ch[i]))
+        }
+        i = i + 1
       }
     }
   }
@@ -302,6 +347,14 @@ fn parse_level_defaults(
     None => ""
     Some(bc) =>
       match @xml.get_attr(bc, "char") {
+        Some(v) => v
+        None => ""
+      }
+  }
+  let bu_auto = match @xml.find_child(ppr_ch, "a:buAutoNum") {
+    None => ""
+    Some(ba) =>
+      match @xml.get_attr(ba, "type") {
         Some(v) => v
         None => ""
       }
@@ -388,6 +441,7 @@ fn parse_level_defaults(
     mar_l,
     indent,
     bullet: bu_char,
+    bullet_auto: bu_auto,
     bullet_none: bu_none,
     bullet_font: bu_font,
     bullet_size: bu_size,

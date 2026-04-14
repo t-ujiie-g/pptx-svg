@@ -334,6 +334,28 @@ fn apply_para_spacing_from_style(
         // Style explicitly disables bullets (a:buNone)
         new_para = { ..new_para, bullet_none: true }
         changed = true
+      } else if !defaults.bullet_auto.is_empty() {
+        // Style provides an auto-number bullet (a:buAutoNum)
+        new_para = {
+          ..new_para,
+          bullet_auto: defaults.bullet_auto,
+          bullet_font: if para.bullet_font.is_empty() {
+            defaults.bullet_font
+          } else {
+            para.bullet_font
+          },
+          bullet_size: if para.bullet_size == 0 {
+            defaults.bullet_size
+          } else {
+            para.bullet_size
+          },
+          bullet_color: if para.bullet_color.is_none() {
+            defaults.bullet_color
+          } else {
+            para.bullet_color
+          },
+        }
+        changed = true
       } else if !defaults.bullet.is_empty() {
         // Style provides a default bullet character
         new_para = {
