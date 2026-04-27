@@ -1,6 +1,6 @@
 {
   "name": "pptx-svg",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "PPTX ↔ SVG round-trip conversion library — browser & Node.js, zero dependencies",
   "repository": {
     "type": "git",

@@ -443,32 +443,44 @@ fn skip_to_close(p : Parser) -> Unit {
     let c = p.peek_char()
     if c == '<' {
       p.advance()
-      if p.at_end() { break }
+      if p.at_end() {
+        break
+      }
       let nc = p.peek_char()
       if nc == '/' {
         // </tag>
         p.advance()
         let _ = p.read_until_char('>')
-        if !p.at_end() { p.advance() }
+        if !p.at_end() {
+          p.advance()
+        }
         depth = depth - 1
       } else if nc == '!' {
         p.advance()
         if p.starts_with("--") {
           p.skip_str("--")
           let _ = p.read_until_str("-->")
-          if !p.at_end() { p.skip_str("-->") }
+          if !p.at_end() {
+            p.skip_str("-->")
+          }
         } else if p.starts_with("[CDATA[") {
           p.skip_str("[CDATA[")
           let _ = p.read_until_str("]]>")
-          if !p.at_end() { p.skip_str("]]>") }
+          if !p.at_end() {
+            p.skip_str("]]>")
+          }
         } else {
           let _ = p.read_until_char('>')
-          if !p.at_end() { p.advance() }
+          if !p.at_end() {
+            p.advance()
+          }
         }
       } else if nc == '?' {
         p.advance()
         let _ = p.read_until_str("?>")
-        if !p.at_end() { p.skip_str("?>") }
+        if !p.at_end() {
+          p.skip_str("?>")
+        }
       } else {
         // Open tag (or self-closing). Read tag + attrs and check terminator.
         let _ = p.parse_name()
@@ -478,7 +490,9 @@ fn skip_to_close(p : Parser) -> Unit {
           let ec = p.peek_char()
           if ec == '/' {
             p.advance()
-            if !p.at_end() { p.advance() }
+            if !p.at_end() {
+              p.advance()
+            }
             // self-closing: depth unchanged
           } else if ec == '>' {
             p.advance()
