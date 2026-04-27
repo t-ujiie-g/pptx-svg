@@ -1103,3 +1103,188 @@ test "roundtrip multiple shapes" {
   assert_eq(parsed.shapes[0].transform.x, 0)
   assert_eq(parsed.shapes[1].transform.x, 300000)
 }
+
+// ── sanitize_url (security: H1/H3) ──────────────────────────────────────────
+
+///|
+test "sanitize_url accepts safe schemes" {
+  assert_eq(sanitize_url("http://example.com/x"), "http://example.com/x")
+  assert_eq(sanitize_url("https://example.com"), "https://example.com")
+  assert_eq(sanitize_url("mailto:a@b.com"), "mailto:a@b.com")
+  assert_eq(sanitize_url("tel:+8190"), "tel:+8190")
+  assert_eq(sanitize_url("ftp://host/file"), "ftp://host/file")
+}
+
+///|
+test "sanitize_url accepts relative URLs and fragments" {
+  assert_eq(sanitize_url("slide2.xml"), "slide2.xml")
+  assert_eq(sanitize_url("../media/x.png"), "../media/x.png")
+  assert_eq(sanitize_url("#anchor"), "#anchor")
+  assert_eq(sanitize_url("/path/to"), "/path/to")
+}
+
+///|
+test "sanitize_url accepts data:image/* only" {
+  assert_eq(
+    sanitize_url("data:image/png;base64,AAAA"),
+    "data:image/png;base64,AAAA",
+  )
+  assert_eq(sanitize_url("data:text/html,<script>alert(1)</script>"), "")
+  assert_eq(sanitize_url("data:application/javascript,alert(1)"), "")
+}
+
+///|
+test "sanitize_url rejects script-execution schemes" {
+  assert_eq(sanitize_url("javascript:alert(1)"), "")
+  assert_eq(sanitize_url("vbscript:msgbox(1)"), "")
+  assert_eq(sanitize_url("file:///etc/passwd"), "")
+  assert_eq(sanitize_url("about:blank"), "")
+}
+
+///|
+test "sanitize_url is case-insensitive on scheme" {
+  // Browsers parse scheme case-insensitively: JaVaScRiPt: must be rejected.
+  assert_eq(sanitize_url("JaVaScRiPt:alert(1)"), "")
+  assert_eq(sanitize_url("HTTP://example.com"), "HTTP://example.com")
+}
+
+///|
+test "sanitize_url strips leading whitespace and control bytes" {
+  // Browsers tolerate leading whitespace/control chars in href scheme
+  // parsing, so "\tjavascript:..." would still execute. We must strip them.
+  assert_eq(sanitize_url("\tjavascript:alert(1)"), "")
+  assert_eq(sanitize_url("\njavascript:alert(1)"), "")
+  assert_eq(sanitize_url(" javascript:alert(1)"), "")
+  assert_eq(sanitize_url(""), "")
+}
+
+// ── End-to-end attribute escape (security: H2) ──────────────────────────────
+
+///|
+/// Helper: find first occurrence of `pat` in `s`, or -1 if not found.
+fn find_substring(s : String, pat : String) -> Int {
+  let slen = s.length()
+  let plen = pat.length()
+  if plen == 0 {
+    return 0
+  }
+  if slen < plen {
+    return -1
+  }
+  let mut i = 0
+  while i + plen <= slen {
+    let mut k = 0
+    let mut matched = true
+    while k < plen {
+      if s.get_char(i + k).unwrap() != pat.get_char(k).unwrap() {
+        matched = false
+        break
+      }
+      k = k + 1
+    }
+    if matched {
+      return i
+    }
+    i = i + 1
+  }
+  -1
+}
+
+///|
+test "rendered SVG escapes malicious ph_type in data attribute" {
+  // ph_type flows through `da("ph-type", ...)`. After H2's fix, da() must
+  // XML-escape, so a literal `"` in the value cannot break the attribute.
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 1000000, cy: 500000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    ph_type: "x\" onload=\"alert(1)",
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  // The literal injection sequence must NOT appear unescaped.
+  assert_eq(find_substring(svg, "\" onload=\""), -1)
+  // The escaped form should appear (proves the value made it through).
+  assert_true(find_substring(svg, "&quot; onload=&quot;") >= 0)
+}
+
+///|
+test "rendered SVG drops javascript: hyperlink target" {
+  // After H1's fix, an unsafe-scheme hyperlink target is dropped from the
+  // <a href> wrapper entirely. The resulting SVG must contain neither
+  // `javascript:` nor an <a href> wrapper around the run text.
+  let run : @ooxml.TextRun = {
+    text: "click",
+    bold: false,
+    italic: false,
+    font_size: 1800,
+    color: @ooxml.Color::black(),
+    font_face: "Arial",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "rId1",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    bold_explicit: false,
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "l",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    line_spacing: 0,
+    mar_l: -1,
+    indent: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 1000000, cy: 500000, rot: 0, flip_h: false, flip_v: false },
+    ),
+    paragraphs: [para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let bad_rels : Array[@ooxml.Relationship] = [
+    {
+      id: "rId1",
+      target: "javascript:alert(1)",
+      type_: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+      target_mode: "External",
+    },
+  ]
+  let svg = render_slide_svg(
+    slide, bad_rels, 1, @ooxml.ThemeData::default(), [], [], [], [],
+  )
+  assert_eq(find_substring(svg, "javascript:"), -1)
+  assert_eq(find_substring(svg, "<a href="), -1)
+}
+

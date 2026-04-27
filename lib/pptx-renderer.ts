@@ -150,6 +150,15 @@ const DEFAULT_SLIDE_CX = 9144000;
 const DEFAULT_SLIDE_CY = 5143500;
 const REL_TYPE_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
 
+/**
+ * Escape RegExp metacharacters so untrusted strings (rIds, targets, etc.
+ * from PPTX) can be embedded in dynamic patterns without breaking them.
+ * Without this, malicious input can throw `SyntaxError` or alter matching.
+ */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** Map MIME type to file extension. Returns null for unsupported types. */
 function mimeToExt(mime: string): string | null {
   const map: Record<string, string> = {
@@ -657,7 +666,7 @@ export class PptxRenderer {
     this.rewriteSlideFiles(slideContents, slideRels, newCount);
 
     // Update presentation.xml
-    this.updatePresentationXmlForAdd(insertIdx, newCount);
+    this.updatePresentationXmlForAdd(insertIdx);
 
     // Update [Content_Types].xml if needed
     this.ensureContentTypeForSlide(newCount);
@@ -785,11 +794,12 @@ export class PptxRenderer {
 
   /** Extract a relationship target from .rels XML by type suffix. */
   private extractRelTarget(relsXml: string, typeSuffix: string): string | null {
-    const re = new RegExp(`<Relationship[^>]+Type="[^"]*${typeSuffix}"[^>]+Target="([^"]+)"`);
+    const ts = escapeRegex(typeSuffix);
+    const re = new RegExp(`<Relationship[^>]+Type="[^"]*${ts}"[^>]+Target="([^"]+)"`);
     const m = relsXml.match(re);
     if (m) return m[1];
     // Try reversed attr order
-    const re2 = new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Type="[^"]*${typeSuffix}"`);
+    const re2 = new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Type="[^"]*${ts}"`);
     const m2 = relsXml.match(re2);
     return m2 ? m2[1] : null;
   }
@@ -840,7 +850,7 @@ export class PptxRenderer {
   }
 
   /** Update presentation.xml and .rels for slide addition. */
-  private updatePresentationXmlForAdd(insertIdx: number, newCount: number): void {
+  private updatePresentationXmlForAdd(insertIdx: number): void {
     let prsXml = this.files.get('ppt/presentation.xml') ?? '';
     let prsRels = this.files.get('ppt/_rels/presentation.xml.rels') ?? '';
 
@@ -863,13 +873,15 @@ export class PptxRenderer {
         const num = parseInt(m[1]);
         if (num >= newSlideNum && rId !== newRId) {
           const newTarget = `slides/slide${num + 1}.xml`;
+          const eRId = escapeRegex(rId);
+          const eTarget = escapeRegex(target);
           prsRels = prsRels.replace(
-            new RegExp(`(<Relationship[^>]+Id="${rId}"[^>]+Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+            new RegExp(`(<Relationship[^>]+Id="${eRId}"[^>]+Target=")${eTarget}"`),
             `$1${newTarget}"`
           );
           // Try reversed order too
           prsRels = prsRels.replace(
-            new RegExp(`(<Relationship[^>]+Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"([^>]+Id="${rId}")`),
+            new RegExp(`(<Relationship[^>]+Target=")${eTarget}"([^>]+Id="${eRId}")`),
             `$1${newTarget}"$2`
           );
         }
@@ -928,7 +940,7 @@ export class PptxRenderer {
 
     // Remove relationship entry
     if (deleteRId) {
-      const relRe = new RegExp(`<Relationship[^>]+Id="${deleteRId}"[^>]*/?>`, 'g');
+      const relRe = new RegExp(`<Relationship[^>]+Id="${escapeRegex(deleteRId)}"[^>]*/?>`, 'g');
       prsRels = prsRels.replace(relRe, '');
     }
 
@@ -940,12 +952,14 @@ export class PptxRenderer {
         const num = parseInt(m[1]);
         if (num > deleteNum) {
           const newTarget = `slides/slide${num - 1}.xml`;
+          const eRId = escapeRegex(rId);
+          const eTarget = escapeRegex(target);
           prsRels = prsRels.replace(
-            new RegExp(`(Id="${rId}"[^>]*Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+            new RegExp(`(Id="${eRId}"[^>]*Target=")${eTarget}"`),
             `$1${newTarget}"`
           );
           prsRels = prsRels.replace(
-            new RegExp(`(Target=")${target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"([^>]*Id="${rId}")`),
+            new RegExp(`(Target=")${eTarget}"([^>]*Id="${eRId}")`),
             `$1${newTarget}"$2`
           );
         }
@@ -987,12 +1001,14 @@ export class PptxRenderer {
       const newTarget = `slides/slide${i + 1}.xml`;
       if (oldTarget && oldTarget !== newTarget) {
         // Use a unique placeholder to avoid conflicts during replacement
+        const eRId = escapeRegex(rId);
+        const eOldTarget = escapeRegex(oldTarget);
         updatedRels = updatedRels.replace(
-          new RegExp(`(Id="${rId}"[^>]*Target=")${oldTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+          new RegExp(`(Id="${eRId}"[^>]*Target=")${eOldTarget}"`),
           `$1${newTarget}"`
         );
         updatedRels = updatedRels.replace(
-          new RegExp(`(Target=")${oldTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"([^>]*Id="${rId}")`),
+          new RegExp(`(Target=")${eOldTarget}"([^>]*Id="${eRId}")`),
           `$1${newTarget}"$2`
         );
       }
@@ -1193,8 +1209,9 @@ export class PptxRenderer {
 
   /** Resolve a relationship ID to its Target attribute in a .rels XML string. */
   private resolveRidTarget(relsXml: string, rid: string): string | null {
-    const m = relsXml.match(new RegExp(`<Relationship[^>]+Id="${rid}"[^>]+Target="([^"]+)"`))
-           ?? relsXml.match(new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Id="${rid}"`));
+    const e = escapeRegex(rid);
+    const m = relsXml.match(new RegExp(`<Relationship[^>]+Id="${e}"[^>]+Target="([^"]+)"`))
+           ?? relsXml.match(new RegExp(`<Relationship[^>]+Target="([^"]+)"[^>]+Id="${e}"`));
     return m ? m[1] : null;
   }
 
@@ -1323,14 +1340,15 @@ export class PptxRenderer {
     if (!relsXml) return null;
 
     // Find Relationship with matching Type
+    const rt = escapeRegex(relType);
     const re = new RegExp(
-      `<Relationship[^>]+Type="[^"]*/${relType}"[^>]+Target="([^"]+)"`,
+      `<Relationship[^>]+Type="[^"]*/${rt}"[^>]+Target="([^"]+)"`,
     );
     const m = relsXml.match(re);
     if (!m) {
       // Try reversed attribute order (Target before Type)
       const re2 = new RegExp(
-        `<Relationship[^>]+Target="([^"]+)"[^>]+Type="[^"]*/${relType}"`,
+        `<Relationship[^>]+Target="([^"]+)"[^>]+Type="[^"]*/${rt}"`,
       );
       const m2 = relsXml.match(re2);
       if (!m2) return null;

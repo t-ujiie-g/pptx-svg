@@ -85,13 +85,13 @@ PPTX を信頼できない入力として扱うブラウザライブラリ。`re
   - 調査: `lib/emf-converter.ts:533-548` の `bmpSize = 14 + cbBmi + cbBits`。`cbBmi` / `cbBits` は Uint32 で攻撃者制御。`new Uint8Array(4e9)` で `RangeError` は出るが、その前に巨大バッファ確保でメモリ圧迫。
   - 対応: `offBmi >= 88`（ヘッダ末尾以降）と `bmiEnd <= recEnd` / `bitsEnd <= recEnd`、加算オーバーフローガード（`bmiEnd >= offset + offBmi`）を追加。検証失敗時はレコードスキップ。
 
-- [ ] **M4: XML パーサが深いネストでスタックオーバーフロー**
+- [x] **M4: XML パーサが深いネストでスタックオーバーフロー** ✅ 2026-04-28
   - 調査: `src/xml/xml.mbt:304-393` の `Parser::parse_children` が再帰でネストを処理、深さ上限なし。極端にネストした OOXML で Wasm スタック枯渇。
-  - 対応: 深さカウンタを引数に持たせ、上限超過で空配列を返す（例: 1000 階）。あるいは反復化（明示スタック）。
+  - 対応: `parse_children(depth)` に深さカウンタを追加、`max_xml_depth = 1024` 超過で `skip_to_close()`（非再帰の lexical skipper）に切り替えて当該要素を読み飛ばす。`parse_xml` のエントリは `depth = 0` から開始。
 
-- [ ] **M5: 文字列連結が O(N²)（性能 DoS）**
+- [x] **M5: 文字列連結が O(N²)（性能 DoS）** ✅ 2026-04-28
   - 調査: `src/xml/xml.mbt` の `read_until_char`、`collect_chars`、`decode_entities`、`xml_escape` 等で `result = result + char_to_str(c)` を 1 文字ずつ実行。MoonBit の文字列はイミュータブルなので二次オーダー。`StringBuilder` 禁止という制約下、数 MB の slide.xml で UI が固まる。
-  - 対応: `Array[String]` に push してから 1 度だけ concat する形に書き換える、もしくは `concat` のコストを抑えるテクニックを再検証。即修正は影響範囲広いので別 issue 化検討。
+  - 対応: `concat_balanced(parts: Array[String])` ヘルパーを追加（バランス型ボトムアップ merge で O(N log N)、`+` のみ使用なので Tier-2/3 ブラウザ互換を維持）。ホットパス 7 関数（`collect_chars` / `read_until_char` / `read_until_str` / `decode_entities` / `parse_name` / `str_suffix` / `str_replace_all` / `str_substring` / `xml_escape`）を Array push + concat_balanced 形式に書き換え。
 
 ### 🟡 低（限定的、または利用者次第）
 
@@ -99,9 +99,9 @@ PPTX を信頼できない入力として扱うブラウザライブラリ。`re
   - 調査: `lib/pptx-renderer.ts:1355-1402` の `extractNotesText` / `parseComments` が `<a:t>` / `<p:text>` の inner XML を `match[1]` のまま返す。`textContent` 用途では問題ないが、`innerHTML` に渡されると `<img onerror=...>` 等が再解釈される。
   - 対応: `decodeXmlEntities()` プライベートメソッドを追加（`&amp; &lt; &gt; &quot; &apos; &#xNN; &#NN;` を一括処理）。`extractNotesText` のテキスト抽出、`parseComments` の `text`、`parseCommentAuthors` の `name` / `initials` に適用。
 
-- [ ] **L2: 動的 RegExp に rid / rels 値を素で埋め込み**
+- [x] **L2: 動的 RegExp に rid / rels 値を素で埋め込み** ✅ 2026-04-28
   - 調査: `lib/pptx-renderer.ts:1196-1198` 等で `new RegExp(\`...Id="${rid}"...\`)` のように rid を直接埋める。悪意 PPTX が rid に正規表現メタ文字を仕込むと `SyntaxError`。例外は `ERROR:` 文字列として返り、その文字列が H2 経由で innerHTML に入るとさらに悪用可。
-  - 対応: 正規表現リテラル化、もしくは値を `replace(/[.*+?^${}()|[\]\\]/g, '\\$&')` でエスケープ（同ファイル内に既存パターンあり）。
+  - 対応: モジュールレベルに `escapeRegex(s)` ヘルパーを追加し、`extractRelTarget` / `updatePresentationXmlFor{Add,Delete,Reorder}` / `resolveRidTarget` / `resolveRelTarget` の `new RegExp` 13 箇所で rid・target・typeSuffix・relType をすべてエスケープ。
 
 ### 🟢 良かった点（現状維持）
 - XML パーサが DOCTYPE / 外部エンティティを完全スキップする実装で、**XXE は構造的に発生不可能**（`xml.mbt:344-350`）。

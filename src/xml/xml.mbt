@@ -115,46 +115,76 @@ fn Parser::skip_whitespace(self : Parser) -> Unit {
 }
 
 // ── String helpers (no StringBuilder) ────────────────────────────────────────
+//
+// `StringBuilder::to_string()` is forbidden (calls `wasm:js-string
+// "fromCharCodeArray"` which is unpolyfillable in Tier-2/3 browsers).
+// Naive `result = result + char` in a loop is O(N²). We instead push
+// fragments into an Array and merge with `concat_balanced`, giving O(N log N)
+// total work via balanced pairwise `+` (which compiles to `concat`).
+
+///|
+/// Combine an array of strings using balanced bottom-up merge.
+/// O(N log N) instead of O(N²) for sequential `result = result + part`.
+/// Mutates `parts` in place; the result is left at index 0.
+pub fn concat_balanced(parts : Array[String]) -> String {
+  let n = parts.length()
+  if n == 0 {
+    return ""
+  }
+  if n == 1 {
+    return parts[0]
+  }
+  let mut step = 1
+  while step < n {
+    let mut i = 0
+    while i + step < n {
+      parts[i] = parts[i] + parts[i + step]
+      i = i + step * 2
+    }
+    step = step * 2
+  }
+  parts[0]
+}
 
 ///|
 fn collect_chars(s : String, start : Int, end_exclusive : Int) -> String {
   let lim = if end_exclusive < s.length() { end_exclusive } else { s.length() }
-  let mut result = ""
+  let parts : Array[String] = []
   let mut i = start
   while i < lim {
     let c = s.get_char(i).unwrap()
-    result = result + char_to_str(c)
+    parts.push(char_to_str(c))
     i = i + char_step(c)
   }
-  result
+  concat_balanced(parts)
 }
 
 ///|
 fn Parser::read_until_char(self : Parser, stop : Char) -> String {
-  let mut result = ""
+  let parts : Array[String] = []
   while !self.at_end() {
     let c = self.peek_char()
     if c == stop {
       break
     }
-    result = result + char_to_str(c)
+    parts.push(char_to_str(c))
     self.advance_char(c)
   }
-  result
+  concat_balanced(parts)
 }
 
 ///|
 fn Parser::read_until_str(self : Parser, stop : String) -> String {
-  let mut result = ""
+  let parts : Array[String] = []
   while !self.at_end() {
     if self.starts_with(stop) {
       break
     }
     let c = self.peek_char()
-    result = result + char_to_str(c)
+    parts.push(char_to_str(c))
     self.advance_char(c)
   }
-  result
+  concat_balanced(parts)
 }
 
 // ── Entity decoding ───────────────────────────────────────────────────────────
@@ -176,7 +206,7 @@ fn decode_entities(s : String) -> String {
   if !has_amp {
     return s
   }
-  let mut result = ""
+  let parts : Array[String] = []
   let mut i = 0
   while i < len {
     let c = s.get_char(i).unwrap()
@@ -187,61 +217,61 @@ fn decode_entities(s : String) -> String {
       }
       let entity = collect_chars(s, i + 1, j)
       if entity == "amp" {
-        result = result + "&"
+        parts.push("&")
       } else if entity == "lt" {
-        result = result + "<"
+        parts.push("<")
       } else if entity == "gt" {
-        result = result + ">"
+        parts.push(">")
       } else if entity == "quot" {
-        result = result + "\""
+        parts.push("\"")
       } else if entity == "apos" {
-        result = result + "'"
+        parts.push("'")
       } else if str_starts_with(entity, "#x") || str_starts_with(entity, "#X") {
         // Hex numeric character reference: &#xHHHH;
         let hex = str_suffix(entity, 2)
         let code = parse_hex_int(hex)
         if code > 0 {
-          result = result + @ffi.ffi_char_code_to_str(code)
+          parts.push(@ffi.ffi_char_code_to_str(code))
         } else {
-          result = result + "&" + entity + ";"
+          parts.push("&" + entity + ";")
         }
       } else if str_starts_with(entity, "#") {
         // Decimal numeric character reference: &#DDD;
         let dec = str_suffix(entity, 1)
         let code = parse_int(dec)
         if code > 0 {
-          result = result + @ffi.ffi_char_code_to_str(code)
+          parts.push(@ffi.ffi_char_code_to_str(code))
         } else {
-          result = result + "&" + entity + ";"
+          parts.push("&" + entity + ";")
         }
       } else {
-        result = result + "&" + entity + ";"
+        parts.push("&" + entity + ";")
       }
       i = j + 1
     } else {
-      result = result + char_to_str(c)
+      parts.push(char_to_str(c))
       i = i + char_step(c)
     }
   }
-  result
+  concat_balanced(parts)
 }
 
 // ── Name and attribute parsing ────────────────────────────────────────────────
 
 ///|
 fn Parser::parse_name(self : Parser) -> String {
-  let mut result = ""
+  let parts : Array[String] = []
   while !self.at_end() {
     let c = self.peek_char()
     match c {
       ' ' | '\t' | '\n' | '\r' | '>' | '/' | '=' => break
       _ => {
-        result = result + char_to_str(c)
+        parts.push(char_to_str(c))
         self.advance()
       }
     }
   }
-  result
+  concat_balanced(parts)
 }
 
 ///|
@@ -301,8 +331,20 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
 // ── Core parsing ──────────────────────────────────────────────────────────────
 
 ///|
-fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
+/// Maximum element nesting depth. Guards against malicious OOXML with
+/// extreme nesting that would overflow the Wasm call stack.
+let max_xml_depth : Int = 1024
+
+///|
+fn Parser::parse_children(self : Parser, depth : Int) -> Array[XmlNode] {
   let children : Array[XmlNode] = []
+  // If we've hit the depth cap, skip the entire content of this element
+  // (including any nested children) until the matching closing tag.
+  // This keeps the parser linear-time on adversarial input.
+  if depth > max_xml_depth {
+    skip_to_close(self)
+    return children
+  }
   let mut running = true
   while running {
     if self.at_end() {
@@ -370,7 +412,7 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
                   children.push(XmlNode::Element(tag, attrs, []))
                 } else if ec == '>' {
                   self.advance()
-                  let ch = self.parse_children()
+                  let ch = self.parse_children(depth + 1)
                   children.push(XmlNode::Element(tag, attrs, ch))
                 }
               }
@@ -392,12 +434,70 @@ fn Parser::parse_children(self : Parser) -> Array[XmlNode] {
   children
 }
 
+///|
+/// Skip parser past one element body (used when depth cap is exceeded).
+/// Tracks nested `<...>` / `</...>` pairs without recursing — purely lexical.
+fn skip_to_close(p : Parser) -> Unit {
+  let mut depth = 1
+  while !p.at_end() && depth > 0 {
+    let c = p.peek_char()
+    if c == '<' {
+      p.advance()
+      if p.at_end() { break }
+      let nc = p.peek_char()
+      if nc == '/' {
+        // </tag>
+        p.advance()
+        let _ = p.read_until_char('>')
+        if !p.at_end() { p.advance() }
+        depth = depth - 1
+      } else if nc == '!' {
+        p.advance()
+        if p.starts_with("--") {
+          p.skip_str("--")
+          let _ = p.read_until_str("-->")
+          if !p.at_end() { p.skip_str("-->") }
+        } else if p.starts_with("[CDATA[") {
+          p.skip_str("[CDATA[")
+          let _ = p.read_until_str("]]>")
+          if !p.at_end() { p.skip_str("]]>") }
+        } else {
+          let _ = p.read_until_char('>')
+          if !p.at_end() { p.advance() }
+        }
+      } else if nc == '?' {
+        p.advance()
+        let _ = p.read_until_str("?>")
+        if !p.at_end() { p.skip_str("?>") }
+      } else {
+        // Open tag (or self-closing). Read tag + attrs and check terminator.
+        let _ = p.parse_name()
+        let _ = p.parse_attrs()
+        p.skip_whitespace()
+        if !p.at_end() {
+          let ec = p.peek_char()
+          if ec == '/' {
+            p.advance()
+            if !p.at_end() { p.advance() }
+            // self-closing: depth unchanged
+          } else if ec == '>' {
+            p.advance()
+            depth = depth + 1
+          }
+        }
+      }
+    } else {
+      let _ = p.read_until_char('<')
+    }
+  }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 ///|
 /// Parse an XML string into a list of top-level XmlNode values.
 pub fn parse_xml(src : String) -> Array[XmlNode] {
-  Parser::new(src).parse_children()
+  Parser::new(src).parse_children(0)
 }
 
 ///|
@@ -606,14 +706,14 @@ pub fn int_to_str(n : Int) -> String {
 /// Extract a substring from index `from` to the end.
 pub fn str_suffix(s : String, from : Int) -> String {
   let len = s.length()
-  let mut result = ""
+  let parts : Array[String] = []
   let mut i = from
   while i < len {
     let c = s.get_char(i).unwrap()
-    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
     i = i + char_step(c)
   }
-  result
+  concat_balanced(parts)
 }
 
 ///|
@@ -624,7 +724,7 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
   if plen == 0 || slen < plen {
     return s
   }
-  let mut out = ""
+  let parts : Array[String] = []
   let mut i = 0
   while i < slen {
     // Try to match pat starting at i
@@ -639,20 +739,20 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
         k = k + 1
       }
       if matched {
-        out = out + repl
+        parts.push(repl)
         i = i + plen
       } else {
         let c = s.get_char(i).unwrap()
-        out = out + @ffi.ffi_char_code_to_str(Char::to_int(c))
+        parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
         i = i + char_step(c)
       }
     } else {
       let c = s.get_char(i).unwrap()
-      out = out + @ffi.ffi_char_code_to_str(Char::to_int(c))
+      parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
       i = i + char_step(c)
     }
   }
-  out
+  concat_balanced(parts)
 }
 
 ///|
@@ -691,14 +791,14 @@ pub fn str_ends_with(s : String, pat : String) -> Bool {
 ///|
 /// Extract substring from `from` (inclusive) to `to` (exclusive).
 pub fn str_substring(s : String, from : Int, to : Int) -> String {
-  let mut result = ""
+  let parts : Array[String] = []
   let mut i = from
   while i < to {
     let c = s.get_char(i).unwrap()
-    result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+    parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
     i = i + char_step(c)
   }
-  result
+  concat_balanced(parts)
 }
 
 ///|
@@ -724,26 +824,26 @@ pub fn xml_escape(s : String) -> String {
   if !needs {
     return s
   }
-  let mut result = ""
+  let parts : Array[String] = []
   let mut i = 0
   while i < len {
     let c = s.get_char(i).unwrap()
     if c == '<' {
-      result = result + "&lt;"
+      parts.push("&lt;")
     } else if c == '>' {
-      result = result + "&gt;"
+      parts.push("&gt;")
     } else if c == '&' {
-      result = result + "&amp;"
+      parts.push("&amp;")
     } else if c == '"' {
-      result = result + "&quot;"
+      parts.push("&quot;")
     } else if c == '\'' {
-      result = result + "&apos;"
+      parts.push("&apos;")
     } else {
-      result = result + @ffi.ffi_char_code_to_str(Char::to_int(c))
+      parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
     }
     i = i + char_step(c)
   }
-  result
+  concat_balanced(parts)
 }
 
 ///|

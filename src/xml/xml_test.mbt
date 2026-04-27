@@ -328,3 +328,99 @@ test "parse_xml OOXML text body" {
     None => assert_true(false)
   }
 }
+
+// ── concat_balanced (security: M5 — O(N²) → O(N log N)) ─────────────────────
+
+///|
+test "concat_balanced empty" {
+  let parts : Array[String] = []
+  assert_eq(concat_balanced(parts), "")
+}
+
+///|
+test "concat_balanced single" {
+  let parts = ["hello"]
+  assert_eq(concat_balanced(parts), "hello")
+}
+
+///|
+test "concat_balanced two" {
+  let parts = ["foo", "bar"]
+  assert_eq(concat_balanced(parts), "foobar")
+}
+
+///|
+test "concat_balanced odd count" {
+  let parts = ["a", "b", "c", "d", "e"]
+  assert_eq(concat_balanced(parts), "abcde")
+}
+
+///|
+test "concat_balanced even count" {
+  let parts = ["a", "b", "c", "d", "e", "f", "g", "h"]
+  assert_eq(concat_balanced(parts), "abcdefgh")
+}
+
+///|
+test "concat_balanced large input matches naive" {
+  // 10000 single-char strings — naive concat would be O(N²) ≈ 50M ops.
+  // concat_balanced should finish quickly and produce identical output.
+  let parts : Array[String] = []
+  let mut i = 0
+  while i < 10000 {
+    parts.push("x")
+    i = i + 1
+  }
+  let result = concat_balanced(parts)
+  assert_eq(result.length(), 10000)
+  // Spot-check via slicing through str_substring (also O(N log N) post-fix).
+  assert_eq(str_substring(result, 0, 5), "xxxxx")
+  assert_eq(str_substring(result, 9995, 10000), "xxxxx")
+}
+
+// ── parse_xml depth limit (security: M4) ────────────────────────────────────
+
+///|
+test "parse_xml shallow nesting works" {
+  // Nesting under the cap parses fully.
+  let mut xml = ""
+  let mut close = ""
+  let mut i = 0
+  while i < 100 {
+    xml = xml + "<a>"
+    close = "</a>" + close
+    i = i + 1
+  }
+  let full = xml + "X" + close
+  let nodes = parse_xml(full)
+  // Walk down to the deepest node and verify text payload survived.
+  let mut n = nodes
+  let mut depth = 0
+  while depth < 100 {
+    match find_child(n, "a") {
+      Some(node) => n = get_children(node)
+      None => break
+    }
+    depth = depth + 1
+  }
+  assert_eq(depth, 100)
+}
+
+///|
+test "parse_xml deep nesting does not stack-overflow" {
+  // Far above max_xml_depth = 1024. Without the depth cap this would
+  // recurse 5000 times and blow the Wasm call stack.
+  let mut xml = ""
+  let mut close = ""
+  let mut i = 0
+  while i < 5000 {
+    xml = xml + "<a>"
+    close = "</a>" + close
+    i = i + 1
+  }
+  let full = xml + "X" + close
+  // Just verify it returns without panicking. Depth past the cap is
+  // skipped lexically (skip_to_close); the outer structure remains.
+  let nodes = parse_xml(full)
+  assert_true(nodes.length() >= 1)
+}
