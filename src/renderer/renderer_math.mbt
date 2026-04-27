@@ -1272,7 +1272,7 @@ fn render_math_text(
   }
   // Build SVG: visual math rendering + hidden text for round-trip
   let visual_svg = "<g" +
-    da("math-xml", @xml.xml_escape(all_math_xml)) +
+    da("math-xml", all_math_xml) +
     ">" +
     math_g(math_x, math_y, math_box.svg) +
     "</g>"
@@ -1291,7 +1291,7 @@ fn render_math_text(
     da("font-size", int_to_str(first_run_fs)) +
     da("color", first_run_color.to_hex()) +
     da("run-font", first_run_font) +
-    da("math-xml", @xml.xml_escape(all_math_xml)) +
+    da("math-xml", all_math_xml) +
     "></tspan></tspan></text>"
   visual_svg + hidden_svg
 }

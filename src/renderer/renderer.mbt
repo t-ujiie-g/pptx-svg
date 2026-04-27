@@ -157,24 +157,29 @@ fn int_to_str(n : Int) -> String {
 // ── SVG attribute helpers ─────────────────────────────────────────────────────
 
 ///|
+/// Build a single SVG attribute. Escapes the value to prevent attribute
+/// injection from untrusted PPTX-derived strings (font names, hrefs, etc.).
 fn a(name : String, value : String) -> String {
-  " " + name + "=\"" + value + "\""
+  " " + name + "=\"" + @xml.xml_escape(value) + "\""
 }
 
 ///|
+/// Build a single SVG attribute with an integer value. Skips escaping
+/// since `int_to_str` cannot produce XML metacharacters.
 fn ai(name : String, value : Int) -> String {
-  a(name, int_to_str(value))
+  " " + name + "=\"" + int_to_str(value) + "\""
 }
 
 ///|
-/// Shorthand for data-ooxml-* attributes.
+/// Shorthand for data-ooxml-* attributes. Escapes the value (see `a`).
 fn da(name : String, value : String) -> String {
-  " data-ooxml-" + name + "=\"" + value + "\""
+  " data-ooxml-" + name + "=\"" + @xml.xml_escape(value) + "\""
 }
 
 ///|
+/// Shorthand for data-ooxml-* attributes with an integer value.
 fn dai(name : String, value : Int) -> String {
-  da(name, int_to_str(value))
+  " data-ooxml-" + name + "=\"" + int_to_str(value) + "\""
 }
 
 ///|
@@ -396,6 +401,93 @@ fn svg_escape(s : String) -> String {
   @xml.xml_escape(s)
 }
 
+///|
+/// Lower-case ASCII letters in a string. Used for URL scheme detection.
+fn ascii_lower(s : String) -> String {
+  let len = s.length()
+  let mut out = ""
+  let mut i = 0
+  while i < len {
+    let c = s.get_char(i).unwrap()
+    let code = Char::to_int(c)
+    let mapped = if code >= 65 && code <= 90 { code + 32 } else { code }
+    out = out + @ffi.ffi_char_code_to_str(mapped)
+    i = i + @xml.char_step(c)
+  }
+  out
+}
+
+///|
+/// Filter a URL to a safe scheme for hyperlink / image href output.
+/// Allows http(s), mailto, tel, ftp(s), data:image/*, fragment, and relative URLs.
+/// Rejects javascript:, vbscript:, data:text/*, etc. — returns "" if unsafe.
+/// Trims leading whitespace and control characters that browsers ignore in scheme parsing.
+pub fn sanitize_url(url : String) -> String {
+  if url.is_empty() {
+    return ""
+  }
+  // Strip leading whitespace + control bytes (0x00-0x20) that browsers tolerate
+  let len = url.length()
+  let mut start = 0
+  while start < len {
+    let c = url.get_char(start).unwrap()
+    let code = Char::to_int(c)
+    if code > 0x20 {
+      break
+    }
+    start = start + 1
+  }
+  if start >= len {
+    return ""
+  }
+  let trimmed = if start == 0 { url } else { @xml.str_suffix(url, start) }
+  // Find ':' before any '/', '?', '#' to detect a scheme
+  let tlen = trimmed.length()
+  let mut colon = -1
+  let mut j = 0
+  while j < tlen {
+    let c = trimmed.get_char(j).unwrap()
+    if c == ':' {
+      colon = j
+      break
+    }
+    if c == '/' || c == '?' || c == '#' {
+      break
+    }
+    j = j + 1
+  }
+  if colon < 0 {
+    // No scheme: treat as relative URL or fragment — safe
+    return trimmed
+  }
+  let scheme = ascii_lower(@xml.str_substring(trimmed, 0, colon))
+  if scheme == "http" ||
+    scheme == "https" ||
+    scheme == "mailto" ||
+    scheme == "tel" ||
+    scheme == "ftp" ||
+    scheme == "ftps" {
+    trimmed
+  } else if scheme == "data" {
+    // Allow only image/* data URIs (constructed internally for embedded images)
+    let rest_start = colon + 1
+    if rest_start + 6 <= tlen {
+      let prefix = ascii_lower(
+        @xml.str_substring(trimmed, rest_start, rest_start + 6),
+      )
+      if prefix == "image/" {
+        trimmed
+      } else {
+        ""
+      }
+    } else {
+      ""
+    }
+  } else {
+    ""
+  }
+}
+
 // ── EMU → pixel conversion ────────────────────────────────────────────────────
 
 ///|
@@ -547,7 +639,7 @@ fn resolve_image_href(
     return ""
   }
   match rel {
-    Some(r) => if r.target_mode == "External" { return target }
+    Some(r) => if r.target_mode == "External" { return sanitize_url(target) }
     None => ()
   }
   let img_path = resolve_image_path(target)

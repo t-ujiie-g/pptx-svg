@@ -18,8 +18,18 @@ function isTextEntry(name: string): boolean {
          lower === '[content_types].xml';
 }
 
+/**
+ * Hard cap on the decompressed size of any single ZIP entry.
+ * Guards against decompression bombs from untrusted PPTX input.
+ * 256 MiB is well above any realistic slide/media asset.
+ */
+const MAX_INFLATE_BYTES = 256 * 1024 * 1024;
+
+/** Total cap across all decompressed entries in one archive. */
+const MAX_ARCHIVE_INFLATE_BYTES = 1024 * 1024 * 1024;
+
 /** Decompress raw DEFLATE bytes using the browser's DecompressionStream. */
-async function inflate(compressed: Uint8Array): Promise<Uint8Array> {
+async function inflate(compressed: Uint8Array, maxBytes = MAX_INFLATE_BYTES): Promise<Uint8Array> {
   const stream = new DecompressionStream('deflate-raw');
   const writer = stream.writable.getWriter();
   const reader = stream.readable.getReader();
@@ -32,8 +42,12 @@ async function inflate(compressed: Uint8Array): Promise<Uint8Array> {
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    chunks.push(value);
     totalLen += value.length;
+    if (totalLen > maxBytes) {
+      try { await reader.cancel(); } catch {}
+      throw new Error(`Decompressed size exceeded ${maxBytes} bytes (decompression bomb?)`);
+    }
+    chunks.push(value);
   }
 
   const result = new Uint8Array(totalLen);
@@ -140,11 +154,19 @@ export async function extractZip(
   // Parse Central Directory for reliable sizes
   const cdEntries = parseCentralDirectory(view, bytes);
 
+  let totalInflated = 0;
+
   // Walk local file headers using CD info for sizes
   for (const [name, cd] of cdEntries) {
     const offset = cd.localHeaderOffset;
     if (offset + 30 > bytes.length) continue;
     if (view.getUint32(offset, true) !== 0x04034b50) continue;
+
+    // Reject entries whose declared size already exceeds the per-entry cap.
+    if (cd.uncompressedSize > MAX_INFLATE_BYTES) {
+      log?.warn(`Skipping ${name}: declared uncompressed size ${cd.uncompressedSize} exceeds cap`);
+      continue;
+    }
 
     const fileNameLen = view.getUint16(offset + 26, true);
     const extraLen    = view.getUint16(offset + 28, true);
@@ -157,10 +179,20 @@ export async function extractZip(
     if (cd.method === 0) {
       decompressed = compressed;
     } else if (cd.method === 8) {
-      decompressed = await inflate(compressed);
+      const remaining = MAX_ARCHIVE_INFLATE_BYTES - totalInflated;
+      const cap = Math.min(MAX_INFLATE_BYTES, Math.max(0, remaining));
+      if (cap === 0) {
+        throw new Error(`Archive total decompressed size exceeded ${MAX_ARCHIVE_INFLATE_BYTES} bytes`);
+      }
+      decompressed = await inflate(compressed, cap);
     } else {
       log?.warn(`Unsupported compression method ${cd.method} for ${name}, skipping`);
       continue;
+    }
+
+    totalInflated += decompressed.length;
+    if (totalInflated > MAX_ARCHIVE_INFLATE_BYTES) {
+      throw new Error(`Archive total decompressed size exceeded ${MAX_ARCHIVE_INFLATE_BYTES} bytes`);
     }
 
     if (isTextEntry(name)) {
@@ -203,7 +235,6 @@ export async function buildZip(
 ): Promise<ArrayBuffer> {
   const origBytes = new Uint8Array(originalBuffer);
   const origView = new DataView(originalBuffer);
-  const decoder = new TextDecoder('utf-8');
   const encoder = new TextEncoder();
 
   // Parse Central Directory for reliable sizes (handles data descriptor flag)
