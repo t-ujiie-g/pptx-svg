@@ -34,20 +34,32 @@ async function inflate(compressed: Uint8Array, maxBytes = MAX_INFLATE_BYTES): Pr
   const writer = stream.writable.getWriter();
   const reader = stream.readable.getReader();
 
-  writer.write(compressed as BufferSource);
-  writer.close();
+  // Track the writer's pending promises so we can settle them on cancel and
+  // avoid unhandled-rejection noise (the writer's queue rejects with
+  // AbortError when the reader cancels mid-stream).
+  const writePromise = writer.write(compressed as BufferSource).catch(() => {});
+  const closePromise = writer.close().catch(() => {});
 
   const chunks: Uint8Array[] = [];
   let totalLen = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    totalLen += value.length;
-    if (totalLen > maxBytes) {
-      try { await reader.cancel(); } catch {}
-      throw new Error(`Decompressed size exceeded ${maxBytes} bytes (decompression bomb?)`);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalLen += value.length;
+      if (totalLen > maxBytes) {
+        try { await reader.cancel(); } catch {}
+        await writePromise;
+        await closePromise;
+        throw new Error(`Decompressed size exceeded ${maxBytes} bytes (decompression bomb?)`);
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } finally {
+    // Drain pending writer promises so they can't surface as
+    // unhandledRejection after the caller has moved on.
+    await writePromise;
+    await closePromise;
   }
 
   const result = new Uint8Array(totalLen);
