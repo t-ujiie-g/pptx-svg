@@ -289,7 +289,7 @@ function parseEmf(data: Uint8Array): string {
 
       case EMR_POLYGON:
       case EMR_POLYGON16: {
-        const pts = readPoints(dv, offset, type === EMR_POLYGON16);
+        const pts = readPoints(dv, offset, type === EMR_POLYGON16, offset + size);
         if (pts.length > 0) {
           const fill = state.brush.style === 1 ? 'none' : state.brush.color;
           const stroke = state.pen.style === 5 ? 'none' : state.pen.color;
@@ -303,7 +303,7 @@ function parseEmf(data: Uint8Array): string {
 
       case EMR_POLYLINE:
       case EMR_POLYLINE16: {
-        const pts = readPoints(dv, offset, type === EMR_POLYLINE16);
+        const pts = readPoints(dv, offset, type === EMR_POLYLINE16, offset + size);
         if (pts.length > 0) {
           const stroke = state.pen.style === 5 ? 'none' : state.pen.color;
           const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]} ${p[1]}`).join(' ');
@@ -316,7 +316,7 @@ function parseEmf(data: Uint8Array): string {
 
       case EMR_POLYBEZIERTO:
       case EMR_POLYBEZIERTO16: {
-        const pts = readPoints(dv, offset, type === EMR_POLYBEZIERTO16);
+        const pts = readPoints(dv, offset, type === EMR_POLYBEZIERTO16, offset + size);
         if (inPath && pts.length >= 3) {
           for (let i = 0; i + 2 < pts.length; i += 3) {
             pathData += `C${pts[i][0]} ${pts[i][1]} ${pts[i + 1][0]} ${pts[i + 1][1]} ${pts[i + 2][0]} ${pts[i + 2][1]} `;
@@ -331,7 +331,7 @@ function parseEmf(data: Uint8Array): string {
 
       case EMR_POLYLINETO:
       case EMR_POLYLINETO16: {
-        const pts = readPoints(dv, offset, type === EMR_POLYLINETO16);
+        const pts = readPoints(dv, offset, type === EMR_POLYLINETO16, offset + size);
         if (inPath) {
           for (const p of pts) pathData += `L${p[0]} ${p[1]} `;
           if (pts.length > 0) {
@@ -530,15 +530,25 @@ function parseEmf(data: Uint8Array): string {
         const offBits = dv.getUint32(offset + 56, true);
         const cbBits = dv.getUint32(offset + 60, true);
 
-        if (cbBmi > 0 && cbBits > 0 && cxDest > 0 && cyDest > 0) {
+        // Validate offsets/lengths fit within this record (defends against
+        // malicious EMF where cbBmi/cbBits sum could allocate gigabytes).
+        const recEnd = offset + size;
+        const bmiEnd = offset + offBmi + cbBmi;
+        const bitsEnd = offset + offBits + cbBits;
+        if (
+          cbBmi > 0 && cbBits > 0 && cxDest > 0 && cyDest > 0 &&
+          offBmi >= 88 && offBits >= 88 &&
+          bmiEnd <= recEnd && bitsEnd <= recEnd &&
+          bmiEnd >= offset + offBmi && bitsEnd >= offset + offBits   // overflow guard
+        ) {
           const bmpSize = 14 + cbBmi + cbBits;
           const bmp = new Uint8Array(bmpSize);
           const bmpDv = new DataView(bmp.buffer);
           bmp[0] = 0x42; bmp[1] = 0x4D; // "BM"
           bmpDv.setUint32(2, bmpSize, true);
           bmpDv.setUint32(10, 14 + cbBmi, true);
-          bmp.set(data.subarray(offset + offBmi, offset + offBmi + cbBmi), 14);
-          bmp.set(data.subarray(offset + offBits, offset + offBits + cbBits), 14 + cbBmi);
+          bmp.set(data.subarray(offset + offBmi, bmiEnd), 14);
+          bmp.set(data.subarray(offset + offBits, bitsEnd), 14 + cbBmi);
           let binary = '';
           for (let i = 0; i < bmp.length; i++) binary += String.fromCharCode(bmp[i]);
           const b64 = btoa(binary);
@@ -571,19 +581,31 @@ function parseEmf(data: Uint8Array): string {
 
 // ── Point readers ───────────────────────────────────────────────────────────
 
+/**
+ * Hard cap on points per EMF record.
+ * Guards against malicious EMF where `count` is set to ~2^32, which would
+ * cause a multi-billion-iteration loop and OOM on the points array.
+ */
+const MAX_POINTS_PER_RECORD = 100_000;
+
 /** Read points from polygon/polyline/polybezier records (with bounds + count header). */
-function readPoints(dv: DataView, offset: number, is16bit: boolean): number[][] {
+function readPoints(dv: DataView, offset: number, is16bit: boolean, recordEnd: number): number[][] {
   // +8: bounds (16 bytes), +24: count (4 bytes), +28: points
-  const count = dv.getUint32(offset + 24, true);
+  const declared = dv.getUint32(offset + 24, true);
+  const ptSize = is16bit ? 4 : 8;
+  // Clamp by declared cap, by record-size capacity, and by absolute maximum.
+  const ptOff = offset + 28;
+  const capacity = Math.max(0, Math.floor((recordEnd - ptOff) / ptSize));
+  const count = Math.min(declared, capacity, MAX_POINTS_PER_RECORD);
   const pts: number[][] = [];
-  let ptOff = offset + 28;
+  let p = ptOff;
   for (let i = 0; i < count; i++) {
     if (is16bit) {
-      pts.push([dv.getInt16(ptOff, true), dv.getInt16(ptOff + 2, true)]);
-      ptOff += 4;
+      pts.push([dv.getInt16(p, true), dv.getInt16(p + 2, true)]);
+      p += 4;
     } else {
-      pts.push([dv.getInt32(ptOff, true), dv.getInt32(ptOff + 4, true)]);
-      ptOff += 8;
+      pts.push([dv.getInt32(p, true), dv.getInt32(p + 4, true)]);
+      p += 8;
     }
   }
   return pts;

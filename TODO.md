@@ -53,6 +53,72 @@
 
 ---
 
+## 🔒 セキュリティ対応（2026-04-27 レビュー）
+
+PPTX を信頼できない入力として扱うブラウザライブラリ。`renderSlideSvg()` の出力を `innerHTML` で挿入する利用パターン（`web/index.html:118`、`web/editing.html:369`、`examples/vanilla/index.html:70`、`examples/react/src/utils/svg.ts:69`）を前提に、細工した PPTX による攻撃ベクタを洗い出した。
+
+### 🔴 高（XSS が成立 — 細工した PPTX で任意コード実行）
+
+- [x] **H1: ハイパーリンク URL のスキーム未検証** ✅ 2026-04-27
+  - 調査: `src/renderer/renderer_text.mbt:851-854` で `<a href="${svg_escape(url)}">` を出力。`svg_escape` は XML メタ文字のみ。`.rels` の `Target="javascript:..."` がそのまま出力され、`innerHTML` で DOM に入った後にユーザがクリックすると親ページのオリジンで JS が走る。`<image href>` 経路（外部画像、`renderer.mbt:549-551`）も同様。
+  - 対応: `renderer.mbt` に `sanitize_url()` を追加（http/https/mailto/tel/ftp(s)/data:image/* と相対 URL のみ許可、先頭の制御文字も剥がす）。`renderer_text.mbt` のハイパーリンク出力時に通し、空ならリンクラップ自体を省略。
+
+- [x] **H2: SVG 属性ヘルパー `a()` / `da()` が値を XML エスケープしない** ✅ 2026-04-27
+  - 調査: `src/renderer/renderer.mbt:160-173` で `" name=\"" + value + "\""` と直結。ユーザー制御文字列（`font_face`、`href`、`ph_type`、`warp_prst`、`3d-cam` 等多数）が値に流れる。`Target` 属性は XML パース時に `decode_entities` を経るため、`Target="x&quot; onload=&quot;alert(1)"` で literal な `"` を混入させ属性ブレイク → 任意属性注入が可能。
+  - 対応: `a()` と `da()` の中で `@xml.xml_escape(value)` を呼ぶよう変更。`ai()`/`dai()` は数値専用なのでエスケープ不要パスを保持（`a()` 経由をやめてインライン化）。二重エスケープ回避のため `renderer_text.mbt:843` と `renderer_math.mbt:1275,1294` の `da("math-xml", @xml.xml_escape(...))` から手動エスケープを除去。
+
+- [x] **H3: 外部画像 URL のスキーム未検証** ✅ 2026-04-27
+  - 調査: `renderer.mbt:549-551` で `r.target_mode == "External"` のとき Target をそのまま `a("href", href)` に渡す。H2 と組み合わせ属性ブレイクの起点になる。
+  - 対応: `resolve_image_href` の External 分岐で `sanitize_url(target)` を経由するよう変更。
+
+### 🟠 中（DoS / ロジック起因）
+
+- [x] **M1: ZIP 解凍サイズ無制限（解凍爆弾）** ✅ 2026-04-27
+  - 調査: `lib/zip.ts:130-174` の `extractZip` は `cd.compressedSize` / `uncompressedSize` を CD から読むのみで、`DecompressionStream` の出力に上限がない。1KB の DEFLATE ブロックで GB 級まで膨張可能 → タブハング DoS。
+  - 対応: `MAX_INFLATE_BYTES = 256 MiB`（単一エントリ）と `MAX_ARCHIVE_INFLATE_BYTES = 1 GiB`（ZIP 全体）の二重キャップを導入。`inflate()` のストリーミングループで超過時に `reader.cancel()` + throw、`extractZip` で `cd.uncompressedSize` の事前チェック + 総量カウントを追加。
+
+- [x] **M2: EMF/WMF のレコード内点数チェック欠如** ✅ 2026-04-27
+  - 調査: `lib/emf-converter.ts:577-590` `readPoints` の `count = dv.getUint32(offset+24)` は無制限で、悪意ある EMF が `count = 0xFFFFFFF0` を渡すと 40 億回ループ→ OOM。`wmf-converter.ts:367` `nPolys` も同様。
+  - 対応: EMF `readPoints` に `recordEnd` 引数を追加し `min(declared, capacity, MAX_POINTS_PER_RECORD = 100,000)` で clamp（4 つの呼び出し元で `offset + size` を渡す）。WMF `META_POLYGON` / `META_POLYLINE` / `META_POLYPOLYGON` も同様にレコード末尾でキャパシティ計算 → 超過時はレコードスキップ。
+
+- [x] **M3: EMF `STRETCHDIBITS` のサイズ未検証** ✅ 2026-04-27
+  - 調査: `lib/emf-converter.ts:533-548` の `bmpSize = 14 + cbBmi + cbBits`。`cbBmi` / `cbBits` は Uint32 で攻撃者制御。`new Uint8Array(4e9)` で `RangeError` は出るが、その前に巨大バッファ確保でメモリ圧迫。
+  - 対応: `offBmi >= 88`（ヘッダ末尾以降）と `bmiEnd <= recEnd` / `bitsEnd <= recEnd`、加算オーバーフローガード（`bmiEnd >= offset + offBmi`）を追加。検証失敗時はレコードスキップ。
+
+- [ ] **M4: XML パーサが深いネストでスタックオーバーフロー**
+  - 調査: `src/xml/xml.mbt:304-393` の `Parser::parse_children` が再帰でネストを処理、深さ上限なし。極端にネストした OOXML で Wasm スタック枯渇。
+  - 対応: 深さカウンタを引数に持たせ、上限超過で空配列を返す（例: 1000 階）。あるいは反復化（明示スタック）。
+
+- [ ] **M5: 文字列連結が O(N²)（性能 DoS）**
+  - 調査: `src/xml/xml.mbt` の `read_until_char`、`collect_chars`、`decode_entities`、`xml_escape` 等で `result = result + char_to_str(c)` を 1 文字ずつ実行。MoonBit の文字列はイミュータブルなので二次オーダー。`StringBuilder` 禁止という制約下、数 MB の slide.xml で UI が固まる。
+  - 対応: `Array[String]` に push してから 1 度だけ concat する形に書き換える、もしくは `concat` のコストを抑えるテクニックを再検証。即修正は影響範囲広いので別 issue 化検討。
+
+### 🟡 低（限定的、または利用者次第）
+
+- [x] **L1: ノート/コメント API が XML エンティティを未デコード** ✅ 2026-04-27
+  - 調査: `lib/pptx-renderer.ts:1355-1402` の `extractNotesText` / `parseComments` が `<a:t>` / `<p:text>` の inner XML を `match[1]` のまま返す。`textContent` 用途では問題ないが、`innerHTML` に渡されると `<img onerror=...>` 等が再解釈される。
+  - 対応: `decodeXmlEntities()` プライベートメソッドを追加（`&amp; &lt; &gt; &quot; &apos; &#xNN; &#NN;` を一括処理）。`extractNotesText` のテキスト抽出、`parseComments` の `text`、`parseCommentAuthors` の `name` / `initials` に適用。
+
+- [ ] **L2: 動的 RegExp に rid / rels 値を素で埋め込み**
+  - 調査: `lib/pptx-renderer.ts:1196-1198` 等で `new RegExp(\`...Id="${rid}"...\`)` のように rid を直接埋める。悪意 PPTX が rid に正規表現メタ文字を仕込むと `SyntaxError`。例外は `ERROR:` 文字列として返り、その文字列が H2 経由で innerHTML に入るとさらに悪用可。
+  - 対応: 正規表現リテラル化、もしくは値を `replace(/[.*+?^${}()|[\]\\]/g, '\\$&')` でエスケープ（同ファイル内に既存パターンあり）。
+
+### 🟢 良かった点（現状維持）
+- XML パーサが DOCTYPE / 外部エンティティを完全スキップする実装で、**XXE は構造的に発生不可能**（`xml.mbt:344-350`）。
+- ZIP 内パスの `..` traversal は in-memory `Map<string, ...>` 上にとどまりファイルシステム影響なし。
+- EMF/WMF 由来 SVG は `data:image/svg+xml,...` URI として `<image href>` に渡すため、その内部の `<script>` は画像コンテキストで非実行。
+- `emfToSvg` / `wmfToSvg` の文字列出力は `escapeXml(...)` 済み。
+
+### 推奨対応順
+1. **H2** を最初に（差分最小、H1/H3 を含む属性注入起点が一掃される）
+2. **H1**（URL スキーム allowlist）
+3. **M1**（解凍サイズ cap）
+4. **M2/M3**（EMF/WMF のサイズ・点数 clamp）
+5. **L1**（ノート/コメント entity デコード）
+6. **M4/M5/L2** は影響範囲を見て段階対応
+
+---
+
 ## 未対応 — レンダリング品質向上
 
 ### P1: Round-trip データ欠損の修正

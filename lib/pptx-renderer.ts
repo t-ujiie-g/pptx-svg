@@ -1351,6 +1351,30 @@ export class PptxRenderer {
     return resolved.join('/');
   }
 
+  /**
+   * Decode XML entity references in a raw inner-text string. Returns plain
+   * text suitable for `.textContent`. Callers must NOT pass the result to
+   * `.innerHTML` — use `.textContent` to avoid HTML re-interpretation.
+   */
+  private decodeXmlEntities(s: string): string {
+    return s.replace(/&(#x[0-9A-Fa-f]+|#\d+|amp|lt|gt|quot|apos);/g, (_, ent: string) => {
+      if (ent === 'amp') return '&';
+      if (ent === 'lt') return '<';
+      if (ent === 'gt') return '>';
+      if (ent === 'quot') return '"';
+      if (ent === 'apos') return "'";
+      if (ent.startsWith('#x') || ent.startsWith('#X')) {
+        const code = parseInt(ent.slice(2), 16);
+        return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : '';
+      }
+      if (ent.startsWith('#')) {
+        const code = parseInt(ent.slice(1), 10);
+        return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : '';
+      }
+      return '';
+    });
+  }
+
   /** Extract text paragraphs from a notesSlide XML (body placeholder). */
   private extractNotesText(xml: string): string[] {
     const paragraphs: string[] = [];
@@ -1368,7 +1392,7 @@ export class PptxRenderer {
       const tRegex = /<a:t>([\s\S]*?)<\/a:t>/g;
       let tm: RegExpExecArray | null;
       while ((tm = tRegex.exec(paraContent)) !== null) {
-        texts.push(tm[1]);
+        texts.push(this.decodeXmlEntities(tm[1]));
       }
       if (texts.length > 0) {
         paragraphs.push(texts.join(''));
@@ -1395,7 +1419,7 @@ export class PptxRenderer {
       const y = parseInt(posMatch?.[2] ?? '0');
 
       const textMatch = body.match(/<p:text>([\s\S]*?)<\/p:text>/);
-      const text = textMatch?.[1] ?? '';
+      const text = this.decodeXmlEntities(textMatch?.[1] ?? '');
 
       comments.push({ authorId, date: dt, index: idx, text, x, y });
     }
@@ -1410,8 +1434,8 @@ export class PptxRenderer {
     while ((am = authorRegex.exec(xml)) !== null) {
       const attrs = am[1];
       const id = parseInt(attrs.match(/id="(\d+)"/)?.[1] ?? '0');
-      const name = attrs.match(/name="([^"]+)"/)?.[1] ?? '';
-      const initials = attrs.match(/initials="([^"]+)"/)?.[1] ?? '';
+      const name = this.decodeXmlEntities(attrs.match(/name="([^"]+)"/)?.[1] ?? '');
+      const initials = this.decodeXmlEntities(attrs.match(/initials="([^"]+)"/)?.[1] ?? '');
       authors.push({ id, name, initials });
     }
     return authors;

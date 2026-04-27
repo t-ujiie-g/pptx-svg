@@ -839,19 +839,21 @@ fn render_run_tspan(
       ""
     }) +
     // OMML math equation raw XML for round-trip
-    (if run.math_xml.length() > 0 {
-      da("math-xml", @xml.xml_escape(run.math_xml))
-    } else {
-      ""
-    }) +
+    (if run.math_xml.length() > 0 { da("math-xml", run.math_xml) } else { "" }) +
     // CSS filter for text-level effects (shadow/glow visual rendering)
     render_text_effect_style(run.effects, scale)
   // Wrap in hyperlink if present
   let inner = svg_escape(display_text)
   if !run.hlink_rid.is_empty() {
     let url = @ooxml.find_rel_target(rels, run.hlink_rid)
-    if !url.is_empty() {
-      span + "><a href=\"" + svg_escape(url) + "\">" + inner + "</a></tspan>"
+    let safe_url = sanitize_url(url)
+    if !safe_url.is_empty() {
+      span +
+      "><a href=\"" +
+      svg_escape(safe_url) +
+      "\">" +
+      inner +
+      "</a></tspan>"
     } else {
       span + ">" + inner + "</tspan>"
     }

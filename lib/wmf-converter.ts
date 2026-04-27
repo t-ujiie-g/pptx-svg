@@ -326,7 +326,10 @@ function parseWmf(data: Uint8Array): string {
 
       case META_POLYGON: {
         // Parameters: NumberOfPoints(int16), Points[](int16 pairs)
-        const nPts = dv.getInt16(p, true);
+        const declared = dv.getInt16(p, true);
+        const recEnd = offset + recSizeBytes;
+        const capacity = Math.max(0, Math.floor((recEnd - (p + 2)) / 4));
+        const nPts = Math.min(Math.max(0, declared), capacity);
         if (nPts > 0) {
           let d = '';
           for (let i = 0; i < nPts; i++) {
@@ -346,7 +349,10 @@ function parseWmf(data: Uint8Array): string {
       }
 
       case META_POLYLINE: {
-        const nPts = dv.getInt16(p, true);
+        const declared = dv.getInt16(p, true);
+        const recEnd = offset + recSizeBytes;
+        const capacity = Math.max(0, Math.floor((recEnd - (p + 2)) / 4));
+        const nPts = Math.min(Math.max(0, declared), capacity);
         if (nPts > 0) {
           let d = '';
           for (let i = 0; i < nPts; i++) {
@@ -364,15 +370,24 @@ function parseWmf(data: Uint8Array): string {
 
       case META_POLYPOLYGON: {
         // Parameters: NumberOfPolygons(uint16), PointCounts[](uint16), Points[]
-        const nPolys = dv.getUint16(p, true);
+        const recEnd = offset + recSizeBytes;
+        const declaredPolys = dv.getUint16(p, true);
+        const polyHeaderEnd = p + 2 + declaredPolys * 2;
+        // Reject if the count table itself runs past the record.
+        if (polyHeaderEnd > recEnd) break;
         const counts: number[] = [];
         let off = p + 2;
-        for (let i = 0; i < nPolys; i++) {
+        for (let i = 0; i < declaredPolys; i++) {
           counts.push(dv.getUint16(off, true));
           off += 2;
         }
+        // Compute total declared points and clamp to remaining record bytes / 4.
+        let totalDeclared = 0;
+        for (const c of counts) totalDeclared += c;
+        const capacityPoints = Math.max(0, Math.floor((recEnd - off) / 4));
+        if (totalDeclared > capacityPoints) break; // malformed/malicious — skip
         let d = '';
-        for (let poly = 0; poly < nPolys; poly++) {
+        for (let poly = 0; poly < declaredPolys; poly++) {
           const cnt = counts[poly];
           for (let i = 0; i < cnt; i++) {
             const px = dv.getInt16(off, true);
