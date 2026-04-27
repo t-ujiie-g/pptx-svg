@@ -1197,13 +1197,28 @@ test "rendered SVG escapes malicious ph_type in data attribute" {
   let shape : @ooxml.Shape = {
     ..@ooxml.Shape::default_with(
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-      { x: 0, y: 0, cx: 1000000, cy: 500000, rot: 0, flip_h: false, flip_v: false },
+      {
+        x: 0,
+        y: 0,
+        cx: 1000000,
+        cy: 500000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
     ),
     ph_type: "x\" onload=\"alert(1)",
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
   let svg = render_slide_svg(
-    slide, [], 1, @ooxml.ThemeData::default(), [], [], [], [],
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
   )
   // The literal injection sequence must NOT appear unescaped.
   assert_eq(find_substring(svg, "\" onload=\""), -1)
@@ -1268,7 +1283,15 @@ test "rendered SVG drops javascript: hyperlink target" {
   let shape : @ooxml.Shape = {
     ..@ooxml.Shape::default_with(
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-      { x: 0, y: 0, cx: 1000000, cy: 500000, rot: 0, flip_h: false, flip_v: false },
+      {
+        x: 0,
+        y: 0,
+        cx: 1000000,
+        cy: 500000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
     ),
     paragraphs: [para],
   }
@@ -1282,9 +1305,15 @@ test "rendered SVG drops javascript: hyperlink target" {
     },
   ]
   let svg = render_slide_svg(
-    slide, bad_rels, 1, @ooxml.ThemeData::default(), [], [], [], [],
+    slide,
+    bad_rels,
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
   )
   assert_eq(find_substring(svg, "javascript:"), -1)
   assert_eq(find_substring(svg, "<a href="), -1)
 }
-
