@@ -57,7 +57,7 @@ let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999" // fallback when no border color specified
 
 ///|
-let round_rect_radius_divisor : Int = 20 // corner radius = width / 20
+let round_rect_default_adj : Int = 16667 // OOXML default adj for prstGeom roundRect (= 16.667%)
 
 ///|
 let group_child_idx_multiplier : Int = 1000 // child_idx = shape_idx * 1000 + ci
@@ -1770,8 +1770,11 @@ pub fn render_shape(
         _ => {
           // Rect / RoundRect
           let rx = match geom {
-            @ooxml.ShapeGeom::RoundRect =>
-              int_to_str(cx_p / round_rect_radius_divisor)
+            @ooxml.ShapeGeom::RoundRect => {
+              // OOXML roundRect: radius = min(width, height) * adj / 100000
+              let ss = if cx_p < cy_p { cx_p } else { cy_p }
+              int_to_str(ss * round_rect_default_adj / 100000)
+            }
             _ => "0"
           }
           let base = "<rect" +
