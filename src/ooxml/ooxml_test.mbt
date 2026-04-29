@@ -1,3 +1,9 @@
+// `assert_eq` from `@test` uses the `Debug` trait for failure messages.
+// The deprecated builtin `assert_eq` falls back to `Show`, which is no longer
+// derived for option / collection types in current MoonBit.
+///|
+using @test {assert_eq}
+
 // ── Color constructors ──────────────────────────────────────────────────────
 
 ///|

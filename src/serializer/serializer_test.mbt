@@ -1,3 +1,6 @@
+///|
+using @test {assert_eq}
+
 // ── serialize_slide minimal ──────────────────────────────────────────────────
 
 ///|
