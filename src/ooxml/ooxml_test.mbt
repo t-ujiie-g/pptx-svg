@@ -120,6 +120,44 @@ test "resolve_scheme_color basic" {
   assert_eq(tx1.r, dk1.r)
 }
 
+///|
+/// Regression: applying an inverted ColorMap (bg1="dk1", tx1="lt1") must not
+/// corrupt the theme's physical slots. Direct `<a:schemeClr val="dk1"/>` must
+/// still resolve to the original theme.dk1 (#000000), not the lt1 color.
+test "apply_color_map preserves physical slot identity" {
+  let theme : ThemeData = {
+    ..ThemeData::default(),
+    dk1: ({ r: 0, g: 0, b: 0, alpha: 255 } : Color),
+    lt1: ({ r: 238, g: 238, b: 238, alpha: 255 } : Color),
+  }
+  let inverted : ColorMap = {
+    bg1: "dk1",
+    tx1: "lt1",
+    bg2: "dk2",
+    tx2: "lt2",
+    accent1: "accent1",
+    accent2: "accent2",
+    accent3: "accent3",
+    accent4: "accent4",
+    accent5: "accent5",
+    accent6: "accent6",
+    hlink: "hlink",
+    fol_hlink: "folHlink",
+  }
+  let remapped = apply_color_map(theme, inverted)
+  // dk1 / lt1 references stay anchored to the physical slots.
+  let dk1 = resolve_scheme_color("dk1", remapped)
+  assert_eq(dk1.r, 0)
+  let lt1 = resolve_scheme_color("lt1", remapped)
+  assert_eq(lt1.r, 238)
+  // bg1 → dk1 (#000000) per the inverted clrMap.
+  let bg1 = resolve_scheme_color("bg1", remapped)
+  assert_eq(bg1.r, 0)
+  // tx1 → lt1 (#EEEEEE) per the inverted clrMap.
+  let tx1 = resolve_scheme_color("tx1", remapped)
+  assert_eq(tx1.r, 238)
+}
+
 // ── apply_color_modifiers ───────────────────────────────────────────────────
 
 ///|

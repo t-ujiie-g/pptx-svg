@@ -364,6 +364,10 @@ pub(all) struct ThemeData {
   // Indexed 0-based; <p:style>/<a:fillRef idx="N"> uses 1-based (and idx 0 = no fill).
   fill_style_xmls : Array[String]
   ln_style_xmls : Array[String]
+  // Effective ColorMap for resolving logical names (bg1/tx1/bg2/tx2, accents, hlink).
+  // The physical slots above stay unchanged so that direct references like
+  // `<a:schemeClr val="dk1"/>` always return the theme's original dk1.
+  clr_map : ColorMap
 }
 
 ///|
@@ -387,21 +391,41 @@ pub fn ThemeData::default() -> ThemeData {
     minor_ea_font: "",
     fill_style_xmls: [],
     ln_style_xmls: [],
+    clr_map: ColorMap::default(),
   }
 }
 
 ///|
 /// Resolve a scheme color name to a Color from the theme.
-///  Handles aliasing: bg1→lt1, tx1→dk1, bg2→lt2, tx2→dk2, then delegates to resolve_slot.
+/// Logical names (bg1/tx1/bg2/tx2, accent1-6, hlink, folHlink) go through the
+/// theme's effective `clr_map`; physical names (dk1/lt1/dk2/lt2) resolve
+/// directly. This matches ECMA-376 §19.5.0 / §20.1.6.2.
 pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
+  let cmap = theme.clr_map
   let resolved = if name == "bg1" {
-    "lt1"
+    cmap.bg1
   } else if name == "tx1" {
-    "dk1"
+    cmap.tx1
   } else if name == "bg2" {
-    "lt2"
+    cmap.bg2
   } else if name == "tx2" {
-    "dk2"
+    cmap.tx2
+  } else if name == "accent1" {
+    cmap.accent1
+  } else if name == "accent2" {
+    cmap.accent2
+  } else if name == "accent3" {
+    cmap.accent3
+  } else if name == "accent4" {
+    cmap.accent4
+  } else if name == "accent5" {
+    cmap.accent5
+  } else if name == "accent6" {
+    cmap.accent6
+  } else if name == "hlink" {
+    cmap.hlink
+  } else if name == "folHlink" {
+    cmap.fol_hlink
   } else {
     name
   }

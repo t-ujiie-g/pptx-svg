@@ -1573,3 +1573,47 @@ test "bullet inherits first run color when buClr is absent" {
   // does not inherit black from <text fill="black">.
   assert_true(find_substring(svg, "<tspan fill=\"rgb(255,255,255)\"") >= 0)
 }
+
+///|
+/// Regression: Google Slides emits bentConnector3 with adj1 values like
+/// -39687500 to push the bend point well beyond the bounding box, producing
+/// a long visible trunk after rotation. The bend math
+/// `(x2 - x1) * adj1 / 100000` overflows Int32 when (x2-x1) and adj1 are both
+/// large in opposite signs, AND the legacy pixel-based math also collapsed to
+/// zero when the bbox was thinner than one pixel. Both must be handled.
+test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(
+      @ooxml.ShapeGeom::Connector("bentConnector3", [-39687500]),
+    ),
+    {
+      x: 3382695,
+      y: 1829144,
+      cx: 900, // sub-pixel — must not collapse the bend math
+      cy: 2016900,
+      rot: 5400000,
+      flip_h: false,
+      flip_v: false,
+    },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // Look for the connector path. With Int32 overflow it would wrap to ~349;
+  // with proper Int64 math the bend lands at ~317 (38 px outside the bbox).
+  // We check that the path contains a coordinate clearly outside the (355±0)
+  // bbox column.
+  assert_true(find_substring(svg, "<path") >= 0)
+  // x=355 is the bbox column; bend should be visibly to the left, e.g. 317.
+  assert_true(
+    find_substring(svg, "317") >= 0 || find_substring(svg, "318") >= 0,
+  )
+}
