@@ -450,6 +450,14 @@ fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
     }
     i = i + 1
   }
+  // Empty paragraphs (no runs) carry their font size on endParaRPr so they
+  // contribute the correct line height. Without this, an empty paragraph in a
+  // text box auto-sized via <a:spAutoFit/> reserves the full default 24pt
+  // line height (~28 px) instead of the actual 8pt (~10 px), inflating the
+  // shape and making content overflow into adjacent shapes.
+  if max_fs == 0 && para.epr_font_size > 0 {
+    max_fs = para.epr_font_size
+  }
   if max_fs > 0 {
     hundredth_pt_to_emu(max_fs)
   } else {

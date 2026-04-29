@@ -1617,3 +1617,70 @@ test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
     find_substring(svg, "317") >= 0 || find_substring(svg, "318") >= 0,
   )
 }
+
+///|
+/// Regression: an empty paragraph in an `<a:spAutoFit/>` text box used to
+/// reserve the default 24 pt (~28 px) line height, ignoring the font size
+/// declared on its `<a:endParaRPr>`. That made the auto-fit shape much
+/// taller than its stored cy, pushing visible content downward and into
+/// neighbouring footer shapes (slide 22 of HTL Japan deck).
+test "empty paragraph uses endParaRPr font size for autofit height" {
+  // Empty paragraph (no runs) with epr_font_size = 800 (= 8 pt).
+  let empty_para : @ooxml.TextParagraph = {
+    runs: [],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    mar_l: 0,
+    indent: 0,
+    line_spacing: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 800,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let body_props : @ooxml.BodyProps = {
+    ..@ooxml.BodyProps::default(),
+    auto_fit: true,
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 4364608,
+        cx: 4572000,
+        cy: 707886, // ≈ 74 px at scale 9525
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [empty_para, empty_para, empty_para, empty_para],
+    body_props,
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The shape's bounding rect should keep its stored height (74 px), not
+  // grow to the 4 × 28 = 112 px the bug produced.
+  assert_true(find_substring(svg, "height=\"74\"") >= 0)
+}
