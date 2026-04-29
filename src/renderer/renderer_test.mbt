@@ -1684,3 +1684,89 @@ test "empty paragraph uses endParaRPr font size for autofit height" {
   // grow to the 4 × 28 = 112 px the bug produced.
   assert_true(find_substring(svg, "height=\"74\"") >= 0)
 }
+
+///|
+/// Regression: bullet markers without an explicit `<a:buSzPct>` / `<a:buSzPts>`
+/// used to inherit the parent `<text>` element's default 18 pt size, making
+/// them visibly larger than the (smaller) run text. Per ECMA-376 they should
+/// match the run's font size when no bullet size is specified.
+test "bullet font-size matches run when bu_size is unspecified" {
+  let run : @ooxml.TextRun = {
+    text: "hello",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 1200, // 12 pt → 16 px at scale 9525
+    color: ({ r: 0, g: 0, b: 0, alpha: 255 } : @ooxml.Color),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    mar_l: 342900,
+    indent: -342900,
+    line_spacing: 0,
+    bullet: "•",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0, // ← unspecified
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 5000000,
+        cy: 1000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The bullet tspan must explicitly set font-size to match the run
+  // (run is 12 pt → 16 px at scale 9525).
+  assert_true(find_substring(svg, "<tspan font-size=\"16\"") >= 0)
+}
