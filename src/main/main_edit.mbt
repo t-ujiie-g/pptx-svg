@@ -369,7 +369,7 @@ pub fn add_shape(
   let geom = if geom_type == "ellipse" {
     @ooxml.ShapeGeom::Ellipse
   } else if geom_type == "roundRect" {
-    @ooxml.ShapeGeom::RoundRect
+    @ooxml.ShapeGeom::RoundRect(@ooxml.round_rect_default_adj)
   } else if geom_type == "line" {
     @ooxml.ShapeGeom::Line
   } else {

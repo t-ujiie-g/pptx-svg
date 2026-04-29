@@ -1210,7 +1210,7 @@ fn render_math_text(
   let fs_emu = if first_run_fs > 0 {
     hundredth_pt_to_emu(first_run_fs)
   } else {
-    default_font_size_emu()
+    default_font_size_emu
   }
   let fs_px = px(fs_emu, scale).to_double()
   // Determine color — use same fallback as regular text rendering

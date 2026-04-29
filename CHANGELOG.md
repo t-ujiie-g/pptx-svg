@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.6
+
+### Bug Fixes
+
+This release fixes a cluster of OOXML rendering issues uncovered by real-world Google Slides / Keynote-exported decks. The fixes split into three groups: shape-geometry compliance, color-map identity, and text/bullet sizing.
+
+#### Shape geometry
+
+- **`prstGeom prst="roundRect"` rendered as a full pill on wide-thin shapes** — the corner radius was computed as `width / 20`, which on a long callout bar (e.g. 12 m × 0.5 m EMU) emitted `rx ≈ 600 px` and SVG clipped it to `height/2`, turning the shape into a capsule. Per ECMA-376 the radius is `min(width, height) × adj / 100000`, default `adj = 16667` (≈ 16.667 %). Same shape now renders ≈ 5 px corners, matching PowerPoint.
+- **Author-specified `roundRect` `<a:gd name="adj"/>` was silently dropped** — `parse_geom("roundRect", avs)` discarded the `avLst`, so any custom corner radius collapsed to the OOXML default during render and again during round-trip. `ShapeGeom::RoundRect` now carries an `Int` adj; the renderer uses it, the serializer writes it back when non-default, and the SVG round-trip preserves it via `data-ooxml-cxn-adj`.
+- **`stripedRightArrow` / `leftRightArrowCallout` rendered as plain rectangles** — both presets fell into a "simplified — render as rectangle" branch in `renderer_geom.mbt`. Replaced with the proper ECMA-376 path definitions (3-subpath striped arrow, 18-segment callout body).
+- **`bentConnector3` / `bentConnector4` / `bentConnector5` produced wrong / missing trunks for sub-pixel-wide bounding boxes** — Google Slides emits horizontal trunk connectors as a vertical bbox (`cx = 900` EMU, `cy = 2 m` EMU) plus `rot = 90°` and a deliberately out-of-range `adj1 = -39687500` so the bend extends visibly beyond the bbox after rotation. Two precision losses combined: (1) the bend math ran in pixel space, where `cx_p = 900 / 9525 → 0` collapsed `(x2 − x1) × adj / 100000` to zero, and (2) when cx wasn't sub-pixel, `(x2 − x1) × adj1` overflowed Int32 (`900 × −39687500` exceeds 2³¹). Both `render_connector_path` and `render_bent_path` / `render_curved_path` now operate in EMU and convert to pixels at output, and a new `bend_offset(start, span, adj)` helper does the multiplication in `Int64`. `curvedConnector3-5` got the same treatment for consistency.
+
+#### Color map / theme
+
+- **`<a:schemeClr val="dk1"/>` resolved to `lt1`'s color on slides with an inverted layout `clrMap`** — `apply_color_map` baked the cmap into the theme by *overwriting the physical slot fields* (`new.dk1 = resolve_slot(cmap.tx1, theme)`), so direct references to `dk1`/`lt1`/`dk2`/`lt2` returned the wrong color whenever a layout used `<a:overrideClrMapping bg1="dk1" tx1="lt1" .../>` (a common pattern for "dark section" layouts). On slides with black connectors specified as `dk1`, the connectors rendered in `lt1` (= near-white) and disappeared into the white background. `ThemeData` now carries an effective `clr_map: ColorMap`; `apply_color_map` only attaches it (`{..theme, clr_map: cmap}`); `resolve_scheme_color` consults it for logical names (`bg1/tx1/bg2/tx2`, accents, `hlink/folHlink`) and physical names (`dk1/lt1/...`) bypass it. Direct slot references stay anchored to the original theme regardless of clrMap.
+
+#### Text / bullets
+
+- **Auto-fit text boxes inflated when content was several empty paragraphs of small text** — `<a:spAutoFit/>` shapes with empty paragraphs whose `<a:endParaRPr>` declared a small font (e.g. 8 pt) reserved the default 24 pt (~28 px) line height because `para_max_font_emu` only inspected `para.runs` and ignored `epr_font_size` for empty paragraphs. The estimated content height exceeded the stored `cy`, the shape grew downward, and reference URL footers spilled into the slide-master footer band. Empty paragraphs now fall back to `epr_font_size` for line-height computation.
+- **Bullet markers were 1.5× larger than the run text** — when neither `<a:buSzPct>` nor `<a:buSzPts>` was present, the bullet `<tspan>` was emitted with no `font-size` attribute, so it inherited the parent `<text>` element's default 18 pt (24 px) instead of the run's actual size. Per ECMA-376 §21.1.2.4.5, a bullet without an explicit size matches the run's font size. The renderer now writes `font-size = run_fs` in this case.
+- **Bullets rendered black on slides whose paragraph had no `<a:buClr>`** — when a paragraph relies on inheritance and no `<a:buClr>` is specified, the bullet should inherit the *first run's* color (per ECMA-376). The renderer was emitting the bullet `<tspan>` with no `fill`, so it inherited the `<text>` element's `fill="black"` default and rendered black on dark-themed slides where the run text was white/light gray. Bullets now read `runs[0].color` when `bullet_color` is absent.
+- **`a:hueOff` was applied at 100× the intended angle** — the conversion `val / 600 * 10` produced 1000 for a 1° offset (`val = 60000` in OOXML units) instead of the correct 10 (in tenths-of-a-degree, the internal hue scale). A 1° hue shift was being applied as a 100° shift, drastically changing colors. Fixed to `val / 6000`.
+- **Gradient stop positions and radial-gradient centers were truncated to integer percent** — sub-percent precision (e.g. `pos = 12500` → 12.5 %) collapsed to whole percent. SVG accepts decimals, so stops are now emitted as 0–1 fractions (`format_pct_decimal`) and radial gradient centers as decimal percents.
+
+### Tests
+
+- **MoonBit unit tests** for: roundRect default adj on a wide-thin bbox (no `rx="576"` regression), roundRect custom-adj round-trip, `stripedRightArrow` / `leftRightArrowCallout` render as multi-segment paths (not the 4-segment rectangle fallback), bullet color inherits the first run's color when `<a:buClr>` is absent, `apply_color_map` preserves physical slot identity under an inverted clrMap (`dk1` stays `#000000`, `bg1` resolves to `#000000` per the cmap), `bentConnector3` with extreme `adj1` keeps the bend outside the bbox (catches both Int32 wrap and the cx ≈ 0 collapse), empty paragraph uses `endParaRPr` font size for autofit height, bullet font-size matches run when bullet size is unspecified, `apply_color_modifiers` `hueOff` produces the correct angular shift on red.
+- Test counts: 178 MoonBit (was 167) + 139 Node compatibility + 15 categorical.
+
+### Documentation
+
+- Update `CLAUDE.md` `ShapeGeom` listing to reflect `RoundRect(Int)` carrying the adj, and `ThemeData` listing to include the new `clr_map` field. Add a "Watch Int32 overflow in geometry math" note under Critical MoonBit constraints, pointing to `bend_offset` as the canonical pattern.
+- Update `docs/svg-specification.md`: rename "Connector Adjustments" to "Preset Geometry Adjustments" and clarify that `data-ooxml-cxn-adj` also carries non-default `roundRect` adj for round-trip.
+- Correct the Wasm size mention in `README.md` / `README.ja.md` / `CLAUDE.md` (~280 KB, was stale at 230 KB / 35 KB).
+
+### Improvements
+
+- Lift the OOXML default `roundRect` adj to a public constant `@ooxml.round_rect_default_adj = 16667`, replacing four inline `16667` literals across `ooxml.mbt`, `renderer.mbt`, `serializer.mbt`, and `main_edit.mbt`.
+- Remove the unused `default_font_size_emu()` wrapper around the `default_font_size_emu_` constant; rename the constant to drop the trailing underscore and inline the three callsites.
+
 ## 0.5.5
 
 ### Security

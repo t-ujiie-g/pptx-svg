@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~35KB)
+# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~280KB)
 moon build --target wasm-gc --release
 
 # MoonBit format
@@ -65,6 +65,8 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 **pub(all) for cross-package construction.** Structs and enums in `ooxml` that need to be constructed from other packages (svg_parser, serializer, main) use `pub(all)` visibility. `pub struct` fields are read-only from other packages.
 
+**Watch Int32 overflow in geometry math.** `Int` is 32-bit. `(x2 - x1) * adj / 100000` overflows when both operands are large in opposite signs (e.g. Google Slides writes connector adj1 = -39687500, paired with multi-million-EMU spans). Use `to_int64()` for the multiplication and divide back, or split as `span / 100 * adj / 1000`. See `bend_offset` in `renderer.mbt`.
+
 ## MoonBit unit tests
 
 Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with FFI stubs.
@@ -79,7 +81,7 @@ Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with
 
 ## Browser compatibility and string constants
 
-`use-js-builtin-string: true` in `src/main/moon.pkg.json` generates Wasm that imports:
+`use-js-builtin-string: true` in `src/main/moon.pkg` generates Wasm that imports:
 1. Functions from `wasm:js-string` (length, charCodeAt, equals, concat)
 2. String-constant globals from module `_` (one per string literal in MoonBit)
 
@@ -111,7 +113,8 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | ChartShape(ChartData) | Other
-ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
+ShapeGeom = Rect | Ellipse | RoundRect(Int) | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
+  // RoundRect carries adj (0-100000); default 16667 (= 16.667%) per ECMA-376.
 GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
 CustomGeomData { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b: String, cxn_lst: String }
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
@@ -147,7 +150,7 @@ TableRow { height: Int, cells: Array[TableCell] }
 TableCell { paragraphs, fill: Color, grad_fill: GradientFill, grid_span, row_span: Int, v_merge, h_merge: Bool, bdr_l/r/t/b_w: Int, bdr_l/r/t/b_color: Color, bdr_tl_br_w/color, bdr_bl_tr_w/color, mar_l/r/t/b: Int, anchor: String }
 
 Color { r, g, b, alpha }  // r=-1 = none (sentinel), alpha: 0-255
-ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String, fill_style_xmls, ln_style_xmls: Array[String] }  // fmtScheme entries (raw XML with phClr placeholders) — resolved by parse_sp when a shape's <p:style>/<a:fillRef>/<a:lnRef> has no explicit fill/line
+ThemeData { dk1..fol_hlink: Color, major_font, minor_font, major_ea_font, minor_ea_font: String, fill_style_xmls, ln_style_xmls: Array[String], clr_map: ColorMap }  // fmtScheme entries (raw XML with phClr placeholders) — resolved by parse_sp when a shape's <p:style>/<a:fillRef>/<a:lnRef> has no explicit fill/line. `clr_map` aliases logical names (bg1/tx1/bg2/tx2, accents, hlink) onto physical slots in `resolve_scheme_color`; physical references (dk1/lt1/...) bypass the cmap.
 LevelTextDefaults { font_size, bold, italic, color, font_face, ea_font, align, mar_l, indent, bullet, bullet_auto, bullet_none, bullet_font, bullet_size, bullet_color, line_spacing, spc_before, spc_after }
 
 ChartData { groups: Array[ChartGroup], axes: Array[ChartAxis], title: String, legend: ChartLegend, style: Int, chart_xml: String, view_3d: ChartView3D }
@@ -192,7 +195,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
 | `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes) |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
-| `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
+| `src/main/moon.pkg` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
 | `lib/pptx-renderer.ts` | `PptxRenderer` class (core API) |
 | `lib/wasm-compat.ts` | 3-tier Wasm js-string builtins fallback |

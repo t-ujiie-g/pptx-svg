@@ -152,7 +152,7 @@ fn flatten_warp_text(
     pi = pi + 1
   }
   // Resolve font size
-  let def_sz = px(default_font_size_emu(), scale)
+  let def_sz = px(default_font_size_emu, scale)
   let fs_raw = if first_font_size > 0 {
     px(first_font_size * @ooxml.emu_per_hundredth_pt, scale)
   } else {

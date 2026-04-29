@@ -175,11 +175,11 @@ When `data-ooxml-geom="custGeom"`:
 | `data-ooxml-cust-rl/rt/rr/rb` | string | Text rectangle guide formulas |
 | `data-ooxml-cust-cxn` | string | Connection points (serialized XML) |
 
-### Connector Adjustments
+### Preset Geometry Adjustments
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `data-ooxml-cxn-adj` | string | Adjustment values (comma-separated integers) |
+| `data-ooxml-cxn-adj` | string | Adjustment values (comma-separated integers). Used by connectors and `Other` preset shapes for their `<a:gd>` adjustments, and by `roundRect` to carry a non-default `adj` (omitted when adj equals the OOXML default of 16667). |
 
 ## Text Element Attributes
 

@@ -364,6 +364,10 @@ pub(all) struct ThemeData {
   // Indexed 0-based; <p:style>/<a:fillRef idx="N"> uses 1-based (and idx 0 = no fill).
   fill_style_xmls : Array[String]
   ln_style_xmls : Array[String]
+  // Effective ColorMap for resolving logical names (bg1/tx1/bg2/tx2, accents, hlink).
+  // The physical slots above stay unchanged so that direct references like
+  // `<a:schemeClr val="dk1"/>` always return the theme's original dk1.
+  clr_map : ColorMap
 }
 
 ///|
@@ -387,21 +391,41 @@ pub fn ThemeData::default() -> ThemeData {
     minor_ea_font: "",
     fill_style_xmls: [],
     ln_style_xmls: [],
+    clr_map: ColorMap::default(),
   }
 }
 
 ///|
 /// Resolve a scheme color name to a Color from the theme.
-///  Handles aliasing: bg1→lt1, tx1→dk1, bg2→lt2, tx2→dk2, then delegates to resolve_slot.
+/// Logical names (bg1/tx1/bg2/tx2, accent1-6, hlink, folHlink) go through the
+/// theme's effective `clr_map`; physical names (dk1/lt1/dk2/lt2) resolve
+/// directly. This matches ECMA-376 §19.5.0 / §20.1.6.2.
 pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
+  let cmap = theme.clr_map
   let resolved = if name == "bg1" {
-    "lt1"
+    cmap.bg1
   } else if name == "tx1" {
-    "dk1"
+    cmap.tx1
   } else if name == "bg2" {
-    "lt2"
+    cmap.bg2
   } else if name == "tx2" {
-    "dk2"
+    cmap.tx2
+  } else if name == "accent1" {
+    cmap.accent1
+  } else if name == "accent2" {
+    cmap.accent2
+  } else if name == "accent3" {
+    cmap.accent3
+  } else if name == "accent4" {
+    cmap.accent4
+  } else if name == "accent5" {
+    cmap.accent5
+  } else if name == "accent6" {
+    cmap.accent6
+  } else if name == "hlink" {
+    cmap.hlink
+  } else if name == "folHlink" {
+    cmap.fol_hlink
   } else {
     name
   }
@@ -638,9 +662,10 @@ pub fn apply_color_modifiers(
           g = c2.g
           b = c2.b
         } else if tag == "a:hueOff" {
-          // Hue offset: val is in 60000ths of a degree
+          // Hue offset: val is in 60000ths of a degree, h is in tenths of a degree.
+          // 1 degree = 60000 val-units = 10 h-units, so divide by 6000.
           let (h, s, l) = rgb_to_hsl(r, g, b)
-          let offset = val / 600 * 10 // convert 60000/deg to tenths of degree
+          let offset = val / 6000
           let mut new_h = h + offset
           if new_h < 0 {
             new_h = new_h + 3600
@@ -937,6 +962,11 @@ pub let cust_dash_prefix_len : Int = 9
 pub let max_outline_levels : Int = 9
 
 ///|
+/// OOXML default `adj` for `prstGeom prst="roundRect"` (16.667% of the short side).
+/// Per ECMA-376 presetShapeDefinitions/roundRect: `<a:gd name="adj" fmla="val 16667"/>`.
+pub let round_rect_default_adj : Int = 16667
+
+///|
 pub(all) struct BodyProps {
   anchor : String // vertical alignment: "t", "ctr", "b", "" = default (top)
   l_ins : Int // left inset in EMU (-1 = default 91440 ≈ 0.1in)
@@ -1120,7 +1150,7 @@ pub fn TableStyleDef::none() -> TableStyleDef {
 pub(all) enum ShapeGeom {
   Rect
   Ellipse
-  RoundRect
+  RoundRect(Int) // adj (0-100000); default 16667 (= 16.667%)
   Line
   Connector(String, Array[Int]) // preset name, adjustment values (0-100000)
   Other(String, Array[Int]) // preset name, adjustment values
@@ -1147,7 +1177,8 @@ pub fn parse_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
   } else if prst == "ellipse" || prst == "oval" {
     ShapeGeom::Ellipse
   } else if prst == "roundRect" {
-    ShapeGeom::RoundRect
+    let adj = if avlst.length() > 0 { avlst[0] } else { round_rect_default_adj }
+    ShapeGeom::RoundRect(adj)
   } else if prst == "line" || prst == "straightConnector1" {
     ShapeGeom::Line
   } else {
@@ -1171,7 +1202,7 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
   match self {
     ShapeGeom::Rect => "rect"
     ShapeGeom::Ellipse => "ellipse"
-    ShapeGeom::RoundRect => "roundRect"
+    ShapeGeom::RoundRect(_) => "roundRect"
     ShapeGeom::Line => "line"
     ShapeGeom::Connector(prst, _) => prst
     ShapeGeom::Other(s, _) => s

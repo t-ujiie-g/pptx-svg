@@ -1317,3 +1317,456 @@ test "rendered SVG drops javascript: hyperlink target" {
   assert_eq(find_substring(svg, "javascript:"), -1)
   assert_eq(find_substring(svg, "<a href="), -1)
 }
+
+// ── Geometry-specific regression tests ──────────────────────────────────────
+
+///|
+/// roundRect must use OOXML default adj 16667 and apply it to min(w,h) — not w/20.
+/// Regression: a wide-thin shape (cx >> cy) used to render as a full pill.
+test "roundRect default adj uses min(w,h) * 16667 / 100000" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(
+      @ooxml.ShapeGeom::RoundRect(@ooxml.round_rect_default_adj),
+    ),
+    {
+      x: 0,
+      y: 0,
+      cx: 11520000, // very wide
+      cy: 550000, //   very thin
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The rendered <rect> should NOT have rx >= cy_p / 2 (pill).
+  // With shape width 11520000 EMU and SVG width scaling to 960 px, cy_p ≈ 28
+  // and the pill threshold rx >= 14. A correct radius should be ≈ 4-5 px.
+  // Easier to verify: rx is far less than the rendered width.
+  assert_true(find_substring(svg, "<rect") >= 0)
+  // Pill shape would have rx equal to half the height (~14). Look for
+  // suspicious large rx — e.g. rx="576" (the old buggy width/20 pixel result).
+  assert_eq(find_substring(svg, "rx=\"576\""), -1)
+  assert_eq(find_substring(svg, "rx=\"288\""), -1)
+}
+
+///|
+/// Author-specified roundRect adj must round-trip through SVG → SlideData.
+test "roundRect custom adj round-trips" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::RoundRect(50000)),
+    {
+      x: 0,
+      y: 0,
+      cx: 1000000,
+      cy: 1000000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  match parsed.shapes[0].kind {
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::RoundRect(adj)) =>
+      assert_eq(adj, 50000)
+    _ => assert_true(false)
+  }
+}
+
+///|
+/// stripedRightArrow and leftRightArrowCallout used to fall back to a 4-corner
+/// rectangle path. Verify the renderer now emits a complex path with multiple
+/// segments per the OOXML preset definitions.
+test "stripedRightArrow renders as multi-segment path" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(
+      @ooxml.ShapeGeom::Other("stripedRightArrow", []),
+    ),
+    {
+      x: 0,
+      y: 0,
+      cx: 2000000,
+      cy: 1000000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // Three subpaths separated by `M` after first move.
+  // Plain rect fallback would have only one subpath with 4 line segments.
+  assert_true(find_substring(svg, "<path") >= 0)
+  // Three subpaths (3 stripes + body+head) → at least 3 `Z` close commands.
+  let mut count = 0
+  let mut idx = 0
+  while idx < svg.length() {
+    if svg.get_char(idx).unwrap() == 'Z' {
+      count = count + 1
+    }
+    idx = idx + 1
+  }
+  assert_true(count >= 3)
+}
+
+///|
+/// leftRightArrowCallout has a 18-point closed path (callout box + two arrows).
+test "leftRightArrowCallout renders as preset path" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(
+      @ooxml.ShapeGeom::Other("leftRightArrowCallout", []),
+    ),
+    {
+      x: 0,
+      y: 0,
+      cx: 2000000,
+      cy: 1500000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  assert_true(find_substring(svg, "<path") >= 0)
+  // Plain rectangle fallback path has only 4 `L` line commands. The OOXML
+  // preset for leftRightArrowCallout has 17 line segments. Count `L` chars
+  // (followed by a digit or `-` to avoid matching `Lt;`/`<`).
+  let mut count = 0
+  let mut idx = 0
+  while idx < svg.length() - 1 {
+    if svg.get_char(idx).unwrap() == 'L' {
+      let next = svg.get_char(idx + 1).unwrap()
+      let nc = Char::to_int(next)
+      let is_digit = nc >= 48 && nc <= 57
+      if is_digit || next == '-' {
+        count = count + 1
+      }
+    }
+    idx = idx + 1
+  }
+  assert_true(count > 4)
+}
+
+// ── Bullet color inheritance (OOXML) ────────────────────────────────────────
+
+///|
+/// When a paragraph has no <a:buClr>, the bullet must inherit the first run's
+/// color (per ECMA-376). Regression: bullets used to fall back to <text fill=
+/// "black"> default and render as black on dark backgrounds.
+test "bullet inherits first run color when buClr is absent" {
+  let run : @ooxml.TextRun = {
+    text: "hello",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 0,
+    color: ({ r: 255, g: 255, b: 255, alpha: 255 } : @ooxml.Color), // white
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    mar_l: 342900,
+    indent: -342900,
+    line_spacing: 0,
+    bullet: "•",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(), // ← intentionally unset
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 5000000,
+        cy: 1000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The bullet tspan must explicitly set fill to the run's white color so it
+  // does not inherit black from <text fill="black">.
+  assert_true(find_substring(svg, "<tspan fill=\"rgb(255,255,255)\"") >= 0)
+}
+
+///|
+/// Regression: Google Slides emits bentConnector3 with adj1 values like
+/// -39687500 to push the bend point well beyond the bounding box, producing
+/// a long visible trunk after rotation. The bend math
+/// `(x2 - x1) * adj1 / 100000` overflows Int32 when (x2-x1) and adj1 are both
+/// large in opposite signs, AND the legacy pixel-based math also collapsed to
+/// zero when the bbox was thinner than one pixel. Both must be handled.
+test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
+  let shape = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(
+      @ooxml.ShapeGeom::Connector("bentConnector3", [-39687500]),
+    ),
+    {
+      x: 3382695,
+      y: 1829144,
+      cx: 900, // sub-pixel — must not collapse the bend math
+      cy: 2016900,
+      rot: 5400000,
+      flip_h: false,
+      flip_v: false,
+    },
+  )
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // Look for the connector path. With Int32 overflow it would wrap to ~349;
+  // with proper Int64 math the bend lands at ~317 (38 px outside the bbox).
+  // We check that the path contains a coordinate clearly outside the (355±0)
+  // bbox column.
+  assert_true(find_substring(svg, "<path") >= 0)
+  // x=355 is the bbox column; bend should be visibly to the left, e.g. 317.
+  assert_true(
+    find_substring(svg, "317") >= 0 || find_substring(svg, "318") >= 0,
+  )
+}
+
+///|
+/// Regression: an empty paragraph in an `<a:spAutoFit/>` text box used to
+/// reserve the default 24 pt (~28 px) line height, ignoring the font size
+/// declared on its `<a:endParaRPr>`. That made the auto-fit shape much
+/// taller than its stored cy, pushing visible content downward and into
+/// neighbouring footer shapes (slide 22 of HTL Japan deck).
+test "empty paragraph uses endParaRPr font size for autofit height" {
+  // Empty paragraph (no runs) with epr_font_size = 800 (= 8 pt).
+  let empty_para : @ooxml.TextParagraph = {
+    runs: [],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    mar_l: 0,
+    indent: 0,
+    line_spacing: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 800,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let body_props : @ooxml.BodyProps = {
+    ..@ooxml.BodyProps::default(),
+    auto_fit: true,
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 4364608,
+        cx: 4572000,
+        cy: 707886, // ≈ 74 px at scale 9525
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [empty_para, empty_para, empty_para, empty_para],
+    body_props,
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The shape's bounding rect should keep its stored height (74 px), not
+  // grow to the 4 × 28 = 112 px the bug produced.
+  assert_true(find_substring(svg, "height=\"74\"") >= 0)
+}
+
+///|
+/// Regression: bullet markers without an explicit `<a:buSzPct>` / `<a:buSzPts>`
+/// used to inherit the parent `<text>` element's default 18 pt size, making
+/// them visibly larger than the (smaller) run text. Per ECMA-376 they should
+/// match the run's font size when no bullet size is specified.
+test "bullet font-size matches run when bu_size is unspecified" {
+  let run : @ooxml.TextRun = {
+    text: "hello",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 1200, // 12 pt → 16 px at scale 9525
+    color: ({ r: 0, g: 0, b: 0, alpha: 255 } : @ooxml.Color),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    mar_l: 342900,
+    indent: -342900,
+    line_spacing: 0,
+    bullet: "•",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0, // ← unspecified
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 5000000,
+        cy: 1000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The bullet tspan must explicitly set font-size to match the run
+  // (run is 12 pt → 16 px at scale 9525).
+  assert_true(find_substring(svg, "<tspan font-size=\"16\"") >= 0)
+}

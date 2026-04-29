@@ -185,6 +185,9 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     minor_ea_font,
     fill_style_xmls,
     ln_style_xmls,
+    // Effective ColorMap is attached later by `apply_color_map` once the
+    // master / layout / slide override chain has been resolved.
+    clr_map: ColorMap::default(),
   }
 }
 
@@ -253,32 +256,13 @@ fn resolve_slot(name : String, theme : ThemeData) -> Color {
 }
 
 ///|
-/// Apply a ColorMap to a ThemeData, producing a remapped ThemeData.
-///
-///  `resolve_scheme_color` hard-codes: bg1/lt1→theme.lt1, tx1/dk1→theme.dk1, etc.
-///  This function sets `new.lt1 = resolve_slot(cmap.bg1, original)` so that
-///  `resolve_scheme_color("bg1")` on the remapped theme yields the correct color.
+/// Apply a ColorMap to a ThemeData by attaching it as the theme's effective
+/// `clr_map`. Physical slots (dk1, lt1, accents, ...) are preserved as-is so
+/// that direct references like `<a:schemeClr val="dk1"/>` always resolve to
+/// the theme's original colors. Aliasing for logical names (bg1/tx1/etc.) is
+/// performed dynamically in `resolve_scheme_color` against this `clr_map`.
 pub fn apply_color_map(theme : ThemeData, cmap : ColorMap) -> ThemeData {
-  {
-    dk1: resolve_slot(cmap.tx1, theme),
-    lt1: resolve_slot(cmap.bg1, theme),
-    dk2: resolve_slot(cmap.tx2, theme),
-    lt2: resolve_slot(cmap.bg2, theme),
-    accent1: resolve_slot(cmap.accent1, theme),
-    accent2: resolve_slot(cmap.accent2, theme),
-    accent3: resolve_slot(cmap.accent3, theme),
-    accent4: resolve_slot(cmap.accent4, theme),
-    accent5: resolve_slot(cmap.accent5, theme),
-    accent6: resolve_slot(cmap.accent6, theme),
-    hlink: resolve_slot(cmap.hlink, theme),
-    fol_hlink: resolve_slot(cmap.fol_hlink, theme),
-    major_font: theme.major_font,
-    minor_font: theme.minor_font,
-    major_ea_font: theme.major_ea_font,
-    minor_ea_font: theme.minor_ea_font,
-    fill_style_xmls: theme.fill_style_xmls,
-    ln_style_xmls: theme.ln_style_xmls,
-  }
+  { ..theme, clr_map: cmap }
 }
 
 ///|

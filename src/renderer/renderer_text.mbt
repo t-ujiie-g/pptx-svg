@@ -450,6 +450,14 @@ fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
     }
     i = i + 1
   }
+  // Empty paragraphs (no runs) carry their font size on endParaRPr so they
+  // contribute the correct line height. Without this, an empty paragraph in a
+  // text box auto-sized via <a:spAutoFit/> reserves the full default 24pt
+  // line height (~28 px) instead of the actual 8pt (~10 px), inflating the
+  // shape and making content overflow into adjacent shapes.
+  if max_fs == 0 && para.epr_font_size > 0 {
+    max_fs = para.epr_font_size
+  }
   if max_fs > 0 {
     hundredth_pt_to_emu(max_fs)
   } else {
@@ -913,7 +921,7 @@ fn render_text(
   let full_text_w = px(t.cx, scale) - pad_l - pad_r
   let mut text_x = base_text_x
   let mut text_w = full_text_w
-  let def_sz = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
+  let def_sz = px(default_font_size_emu, scale) // 24 px for standard slides (unscaled)
   let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
   let mut fs = body_props.font_scale
   let mut lr = body_props.ln_spc_reduction
@@ -1287,6 +1295,11 @@ fn render_text(
           bu_span = bu_span +
             a("font-family", para.bullet_font + ", sans-serif")
         }
+        // Per ECMA-376 §21.1.2.4.5: when no <a:buSzPct> or <a:buSzPts> is set,
+        // the bullet uses the same size as the paragraph's text. Without an
+        // explicit font-size the bullet would inherit the parent <text>
+        // element's default 18 pt, making bullets visibly larger than the
+        // run text whenever the run is smaller (very common — e.g. 12 pt body).
         if para.bullet_size > 0 {
           // Percentage of run font size
           let run_fs = if p_font_sz > 0 { p_font_sz } else { scaled_def_sz }
@@ -1297,9 +1310,21 @@ fn render_text(
           let bu_fs_emu = hundredth_pt_to_emu(-para.bullet_size)
           bu_span = bu_span +
             ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
+        } else {
+          // Unspecified → match the run's font size.
+          let run_fs = if p_font_sz > 0 { p_font_sz } else { scaled_def_sz }
+          bu_span = bu_span + ai("font-size", run_fs)
         }
-        if !para.bullet_color.is_none() {
-          bu_span = bu_span + a("fill", para.bullet_color.to_css())
+        // OOXML: when <a:buClr> is absent, the bullet inherits the first run's color.
+        let bu_fill_color = if !para.bullet_color.is_none() {
+          para.bullet_color
+        } else if para.runs.length() > 0 && !para.runs[0].color.is_none() {
+          para.runs[0].color
+        } else {
+          @ooxml.Color::none()
+        }
+        if !bu_fill_color.is_none() {
+          bu_span = bu_span + a("fill", bu_fill_color.to_css())
         }
         out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
       }
@@ -1550,7 +1575,7 @@ fn estimate_text_height(
   scale : Int,
   body_props : @ooxml.BodyProps,
 ) -> Int {
-  let def_sz = px(default_font_size_emu(), scale)
+  let def_sz = px(default_font_size_emu, scale)
   let def_line_h = def_sz * line_height_numer / line_height_denom
   let t_ins = if body_props.t_ins >= 0 {
     body_props.t_ins

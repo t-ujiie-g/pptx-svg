@@ -15,7 +15,7 @@
 // 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
 ///|
-let default_font_size_emu_ : Int = 228600 // 18 pt
+let default_font_size_emu : Int = 228600 // 18 pt
 
 ///|
 let default_table_font_size_emu : Int = 127000 // 10 pt — built-in table styles typically default to 10pt
@@ -57,9 +57,6 @@ let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999" // fallback when no border color specified
 
 ///|
-let round_rect_radius_divisor : Int = 20 // corner radius = width / 20
-
-///|
 let group_child_idx_multiplier : Int = 1000 // child_idx = shape_idx * 1000 + ci
 
 ///|
@@ -77,10 +74,7 @@ let ooxml_pct_denom : Int = @ooxml.pct_100 // OOXML percentage denominator (1000
 let ooxml_angle_unit : Int = 60000 // 1 degree = 60000 units in OOXML
 
 ///|
-let ooxml_stop_pct : Int = 1000 // stop pos 0-100000 → percentage: divide by 1000
-
-///|
-let ooxml_fill_to_pct : Int = 2000 // fillToRect 0-100000 → center%: divide by 2000
+let ooxml_fill_to_pct : Int = 2000 // fillToRect midpoint num/2000 → center % (decimal)
 
 // ── SVG element ID builders ─────────────────────────────────────────────────
 // Each SVG <defs> element (gradient, pattern, filter, mask) needs a unique ID.
@@ -528,11 +522,6 @@ fn hundredth_pt_to_emu(sz : Int) -> Int {
   sz * @ooxml.emu_per_hundredth_pt
 }
 
-///|
-fn default_font_size_emu() -> Int {
-  default_font_size_emu_
-}
-
 // ── Rotation transform ────────────────────────────────────────────────────────
 
 ///|
@@ -954,34 +943,50 @@ fn adj_val(avs : Array[Int], idx : Int) -> Int {
 }
 
 ///|
+/// Compute `start + span * adj / 100000` without 32-bit overflow.
+/// Connectors written by Google Slides occasionally use very large adj values
+/// (e.g. -39687500); the intermediate `span * adj` can exceed Int32 range.
+fn bend_offset(start : Int, span : Int, adj : Int) -> Int {
+  let prod = span.to_int64() * adj.to_int64()
+  start + (prod / 100000L).to_int()
+}
+
+///|
 /// Render bent/curved connector as SVG <path>.
+/// All bend arithmetic is performed in EMU and converted to pixels at output
+/// time so that very thin bounding boxes (e.g. cx≈0 with a 90° rotation —
+/// common for connectors written by Google Slides) keep sub-pixel precision
+/// when a non-zero adj value is supplied.
 fn render_connector_path(
   prst : String,
   avs : Array[Int],
-  x : Int,
-  y : Int,
-  w : Int,
-  h : Int,
+  x_emu : Int,
+  y_emu : Int,
+  w_emu : Int,
+  h_emu : Int,
+  scale : Int,
   flip_h : Bool,
   flip_v : Bool,
   stroke : String,
   rot : String,
 ) -> String {
-  let (x1, y1, x2, y2) = line_endpoints(x, y, w, h, flip_h, flip_v)
+  let (x1, y1, x2, y2) = line_endpoints(
+    x_emu, y_emu, w_emu, h_emu, flip_h, flip_v,
+  )
   let d = if is_bent_connector(prst) {
-    render_bent_path(prst, avs, x1, y1, x2, y2)
+    render_bent_path(prst, avs, x1, y1, x2, y2, scale)
   } else if is_curved_connector(prst) {
-    render_curved_path(prst, avs, x1, y1, x2, y2)
+    render_curved_path(prst, avs, x1, y1, x2, y2, scale)
   } else {
     // Fallback: straight line
     "M" +
-    int_to_str(x1) +
+    int_to_str(px(x1, scale)) +
     " " +
-    int_to_str(y1) +
+    int_to_str(px(y1, scale)) +
     "L" +
-    int_to_str(x2) +
+    int_to_str(px(x2, scale)) +
     " " +
-    int_to_str(y2)
+    int_to_str(px(y2, scale))
   }
   "<path d=\"" + d + "\" fill=\"none\"" + stroke + rot + "/>"
 }
@@ -1004,6 +1009,10 @@ fn is_curved_connector(prst : String) -> Bool {
 
 ///|
 /// Render bent connector SVG path (right-angle polyline).
+/// `x1/y1/x2/y2` are in EMU; bend points are computed in EMU and converted to
+/// pixels via `scale` only at output. This preserves sub-pixel offsets when
+/// `(x2-x1)` would round to zero in pixel space (e.g. a connector whose cx is
+/// 900 EMU with a non-zero adj1).
 fn render_bent_path(
   prst : String,
   avs : Array[Int],
@@ -1011,105 +1020,98 @@ fn render_bent_path(
   y1 : Int,
   x2 : Int,
   y2 : Int,
+  scale : Int,
 ) -> String {
   let s = " "
+  let p = fn(emu : Int) -> String { int_to_str(px(emu, scale)) }
   if prst == "bentConnector2" {
     // L-shape: horizontal then vertical
-    "M" +
-    int_to_str(x1) +
-    s +
-    int_to_str(y1) +
-    "L" +
-    int_to_str(x2) +
-    s +
-    int_to_str(y1) +
-    "L" +
-    int_to_str(x2) +
-    s +
-    int_to_str(y2)
+    "M" + p(x1) + s + p(y1) + "L" + p(x2) + s + p(y1) + "L" + p(x2) + s + p(y2)
   } else if prst == "bentConnector3" {
     // Z-shape: adj1 controls the horizontal split point
     let adj1 = adj_val(avs, 0)
-    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
+    let mx = bend_offset(x1, x2 - x1, adj1)
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "L" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "L" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y2) +
+    p(y2) +
     "L" +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   } else if prst == "bentConnector4" {
     // 4-segment: adj1 (horizontal split), adj2 (vertical split)
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
-    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
-    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
+    let mx = bend_offset(x1, x2 - x1, adj1)
+    let my = bend_offset(y1, y2 - y1, adj2)
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "L" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "L" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(my) +
+    p(my) +
     "L" +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(my) +
+    p(my) +
     "L" +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   } else {
     // bentConnector5: 5-segment
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
     let adj3 = adj_val(avs, 2)
-    let mx1 = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
-    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
-    let mx2 = x1 + (x2 - x1) * adj3 / ooxml_pct_denom
+    let span_x = x2 - x1
+    let mx1 = bend_offset(x1, span_x, adj1)
+    let my = bend_offset(y1, y2 - y1, adj2)
+    let mx2 = bend_offset(x1, span_x, adj3)
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "L" +
-    int_to_str(mx1) +
+    p(mx1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "L" +
-    int_to_str(mx1) +
+    p(mx1) +
     s +
-    int_to_str(my) +
+    p(my) +
     "L" +
-    int_to_str(mx2) +
+    p(mx2) +
     s +
-    int_to_str(my) +
+    p(my) +
     "L" +
-    int_to_str(mx2) +
+    p(mx2) +
     s +
-    int_to_str(y2) +
+    p(y2) +
     "L" +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   }
 }
 
 ///|
 /// Render curved connector SVG path (bezier curves).
+/// Coordinates and bend math run in EMU; scaled to pixels at output.
 fn render_curved_path(
   prst : String,
   avs : Array[Int],
@@ -1117,129 +1119,132 @@ fn render_curved_path(
   y1 : Int,
   x2 : Int,
   y2 : Int,
+  scale : Int,
 ) -> String {
   let s = " "
+  let p = fn(emu : Int) -> String { int_to_str(px(emu, scale)) }
   if prst == "curvedConnector2" {
     // Simple S-curve
     let mx = (x1 + x2) / 2
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "C" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     s +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y2) +
+    p(y2) +
     s +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   } else if prst == "curvedConnector3" {
     // S-curve with adjustable midpoint
     let adj1 = adj_val(avs, 0)
-    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
+    let mx = bend_offset(x1, x2 - x1, adj1)
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "C" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     s +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y2) +
+    p(y2) +
     s +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   } else if prst == "curvedConnector4" {
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
-    let mx = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
-    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
+    let mx = bend_offset(x1, x2 - x1, adj1)
+    let my = bend_offset(y1, y2 - y1, adj2)
     // Two cubic bezier segments
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "C" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     s +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(my) +
+    p(my) +
     "C" +
-    int_to_str(mx) +
+    p(mx) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   } else {
     // curvedConnector5
     let adj1 = adj_val(avs, 0)
     let adj2 = adj_val(avs, 1)
     let adj3 = adj_val(avs, 2)
-    let mx1 = x1 + (x2 - x1) * adj1 / ooxml_pct_denom
-    let my = y1 + (y2 - y1) * adj2 / ooxml_pct_denom
-    let mx2 = x1 + (x2 - x1) * adj3 / ooxml_pct_denom
+    let span_x = x2 - x1
+    let mx1 = bend_offset(x1, span_x, adj1)
+    let my = bend_offset(y1, y2 - y1, adj2)
+    let mx2 = bend_offset(x1, span_x, adj3)
     "M" +
-    int_to_str(x1) +
+    p(x1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     "C" +
-    int_to_str(mx1) +
+    p(mx1) +
     s +
-    int_to_str(y1) +
+    p(y1) +
     s +
-    int_to_str(mx1) +
+    p(mx1) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(mx1) +
+    p(mx1) +
     s +
-    int_to_str(my) +
+    p(my) +
     "C" +
-    int_to_str(mx1) +
+    p(mx1) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(mx2) +
+    p(mx2) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(mx2) +
+    p(mx2) +
     s +
-    int_to_str(my) +
+    p(my) +
     "C" +
-    int_to_str(mx2) +
+    p(mx2) +
     s +
-    int_to_str(my) +
+    p(my) +
     s +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2) +
+    p(y2) +
     s +
-    int_to_str(x2) +
+    p(x2) +
     s +
-    int_to_str(y2)
+    p(y2)
   }
 }
 
@@ -1652,6 +1657,13 @@ pub fn render_shape(
         } else {
           ""
         }
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::RoundRect(adj)) =>
+        // Only emit when non-default so round-trip stays minimal
+        if adj != @ooxml.round_rect_default_adj {
+          da("cxn-adj", int_to_str(adj))
+        } else {
+          ""
+        }
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Custom(data)) =>
         da("cust-gdlst", data.gdlst) +
         da("cust-paths", data.paths) +
@@ -1754,10 +1766,11 @@ pub fn render_shape(
           render_connector_path(
             prst,
             avs,
-            x_p,
-            y_p,
-            cx_p,
-            cy_p,
+            t.x,
+            t.y,
+            t.cx,
+            t.cy,
+            scale,
             t.flip_h,
             t.flip_v,
             stroke,
@@ -1770,8 +1783,11 @@ pub fn render_shape(
         _ => {
           // Rect / RoundRect
           let rx = match geom {
-            @ooxml.ShapeGeom::RoundRect =>
-              int_to_str(cx_p / round_rect_radius_divisor)
+            @ooxml.ShapeGeom::RoundRect(adj) => {
+              // OOXML roundRect: radius = min(width, height) * adj / 100000
+              let ss = if cx_p < cy_p { cx_p } else { cy_p }
+              int_to_str(ss * adj / ooxml_pct_denom)
+            }
             _ => "0"
           }
           let base = "<rect" +
