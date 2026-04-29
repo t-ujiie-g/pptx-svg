@@ -17,8 +17,8 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
   let mut si = 0
   while si < ns {
     let stop = gf.stops[si]
-    // pos is 0..100000 → percentage 0..100
-    let pct = stop.pos / ooxml_stop_pct
+    // pos is 0..100000 (0.001% precision); emit as 0-1 SVG offset to preserve sub-percent stops.
+    let offset = format_pct_decimal(stop.pos)
     let stop_opacity = if stop.color.alpha < 255 {
       " stop-opacity=\"" + @ooxml.alpha_to_css_str(stop.color.alpha) + "\""
     } else {
@@ -34,8 +34,8 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
       ")"
     stops_svg = stops_svg +
       "<stop offset=\"" +
-      int_to_str(pct) +
-      "%\" stop-color=\"" +
+      offset +
+      "\" stop-color=\"" +
       stop_css +
       "\"" +
       stop_opacity +
@@ -65,14 +65,14 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     stops_svg +
     "</linearGradient>"
   } else if !gf.path_type.is_empty() {
-    // Radial / path gradient
+    // Radial / path gradient: center = midpoint of fillToRect, in 0-100% (decimal preserves sub-pct precision).
     let cx_s = if gf.fill_to_l >= 0 && gf.fill_to_r >= 0 {
-      int_to_str((gf.fill_to_l + (100000 - gf.fill_to_r)) / ooxml_fill_to_pct)
+      format_ratio(gf.fill_to_l + (100000 - gf.fill_to_r), ooxml_fill_to_pct)
     } else {
       "50"
     }
     let cy_s = if gf.fill_to_t >= 0 && gf.fill_to_b >= 0 {
-      int_to_str((gf.fill_to_t + (100000 - gf.fill_to_b)) / ooxml_fill_to_pct)
+      format_ratio(gf.fill_to_t + (100000 - gf.fill_to_b), ooxml_fill_to_pct)
     } else {
       "50"
     }

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~35KB)
+# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~280KB)
 moon build --target wasm-gc --release
 
 # MoonBit format
@@ -79,7 +79,7 @@ Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with
 
 ## Browser compatibility and string constants
 
-`use-js-builtin-string: true` in `src/main/moon.pkg.json` generates Wasm that imports:
+`use-js-builtin-string: true` in `src/main/moon.pkg` generates Wasm that imports:
 1. Functions from `wasm:js-string` (length, charCodeAt, equals, concat)
 2. String-constant globals from module `_` (one per string literal in MoonBit)
 
@@ -111,7 +111,8 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d }
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | ChartShape(ChartData) | Other
-ShapeGeom = Rect | Ellipse | RoundRect | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
+ShapeGeom = Rect | Ellipse | RoundRect(Int) | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
+  // RoundRect carries adj (0-100000); default 16667 (= 16.667%) per ECMA-376.
 GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
 CustomGeomData { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b: String, cxn_lst: String }
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
@@ -192,7 +193,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
 | `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes) |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
-| `src/main/moon.pkg.json` | Export list + `use-js-builtin-string: true` |
+| `src/main/moon.pkg` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
 | `lib/pptx-renderer.ts` | `PptxRenderer` class (core API) |
 | `lib/wasm-compat.ts` | 3-tier Wasm js-string builtins fallback |

@@ -163,6 +163,23 @@ test "apply_color_modifiers tint" {
   assert_eq(result.b, 128)
 }
 
+///|
+/// Regression: a:hueOff val is in 60000ths of a degree. The conversion to the
+/// internal hue scale (tenths of a degree) must divide by 6000 — not by 60.
+/// The previous formula (val / 600 * 10) over-shifted hue by 100x.
+test "apply_color_modifiers hueOff is in correct degrees" {
+  // Pure red (h=0). Apply hueOff val=60000 (= 1° offset). Result should be
+  // *almost* red, not yellow/green. With the old buggy formula val/600*10
+  // = 1000, the hue would jump to 100°, turning red into green.
+  let c = parse_hex_color("FF0000")
+  let nodes = @xml.parse_xml("<a:hueOff val=\"60000\"/>")
+  let result = apply_color_modifiers(c, nodes)
+  // After 1° hue offset on red, R should still dominate by a large margin.
+  assert_true(result.r > 250)
+  assert_true(result.g < 10)
+  assert_true(result.b < 10)
+}
+
 // ── parse_geom / to_prst ────────────────────────────────────────────────────
 
 ///|
@@ -177,6 +194,20 @@ test "parse_geom basic shapes" {
 ///|
 test "parse_geom other" {
   assert_eq(parse_geom("star5", []).to_prst(), "star5")
+}
+
+///|
+test "parse_geom roundRect adj" {
+  // Empty avlst → default 16667
+  match parse_geom("roundRect", []) {
+    ShapeGeom::RoundRect(adj) => assert_eq(adj, 16667)
+    _ => fail("expected RoundRect")
+  }
+  // Author-specified adj preserved
+  match parse_geom("roundRect", [50000]) {
+    ShapeGeom::RoundRect(adj) => assert_eq(adj, 50000)
+    _ => fail("expected RoundRect")
+  }
 }
 
 ///|

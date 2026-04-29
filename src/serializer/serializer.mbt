@@ -683,6 +683,13 @@ fn serialize_prst_geom(geom : @ooxml.ShapeGeom) -> String {
       let avs = match geom {
         @ooxml.ShapeGeom::Connector(_, a) => a
         @ooxml.ShapeGeom::Other(_, a) => a
+        // Only serialize roundRect adj when it differs from the OOXML default.
+        @ooxml.ShapeGeom::RoundRect(adj) =>
+          if adj != @ooxml.round_rect_default_adj {
+            [adj]
+          } else {
+            []
+          }
         _ => []
       }
       if avs.length() == 0 {

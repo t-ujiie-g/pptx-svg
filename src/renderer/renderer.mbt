@@ -15,7 +15,7 @@
 // 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
 ///|
-let default_font_size_emu_ : Int = 228600 // 18 pt
+let default_font_size_emu : Int = 228600 // 18 pt
 
 ///|
 let default_table_font_size_emu : Int = 127000 // 10 pt — built-in table styles typically default to 10pt
@@ -57,9 +57,6 @@ let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999" // fallback when no border color specified
 
 ///|
-let round_rect_default_adj : Int = 16667 // OOXML default adj for prstGeom roundRect (= 16.667%)
-
-///|
 let group_child_idx_multiplier : Int = 1000 // child_idx = shape_idx * 1000 + ci
 
 ///|
@@ -77,10 +74,7 @@ let ooxml_pct_denom : Int = @ooxml.pct_100 // OOXML percentage denominator (1000
 let ooxml_angle_unit : Int = 60000 // 1 degree = 60000 units in OOXML
 
 ///|
-let ooxml_stop_pct : Int = 1000 // stop pos 0-100000 → percentage: divide by 1000
-
-///|
-let ooxml_fill_to_pct : Int = 2000 // fillToRect 0-100000 → center%: divide by 2000
+let ooxml_fill_to_pct : Int = 2000 // fillToRect midpoint num/2000 → center % (decimal)
 
 // ── SVG element ID builders ─────────────────────────────────────────────────
 // Each SVG <defs> element (gradient, pattern, filter, mask) needs a unique ID.
@@ -526,11 +520,6 @@ fn px_frac(emu : Int, scale : Int) -> String {
 ///|
 fn hundredth_pt_to_emu(sz : Int) -> Int {
   sz * @ooxml.emu_per_hundredth_pt
-}
-
-///|
-fn default_font_size_emu() -> Int {
-  default_font_size_emu_
 }
 
 // ── Rotation transform ────────────────────────────────────────────────────────
@@ -1652,6 +1641,13 @@ pub fn render_shape(
         } else {
           ""
         }
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::RoundRect(adj)) =>
+        // Only emit when non-default so round-trip stays minimal
+        if adj != @ooxml.round_rect_default_adj {
+          da("cxn-adj", int_to_str(adj))
+        } else {
+          ""
+        }
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Custom(data)) =>
         da("cust-gdlst", data.gdlst) +
         da("cust-paths", data.paths) +
@@ -1770,10 +1766,10 @@ pub fn render_shape(
         _ => {
           // Rect / RoundRect
           let rx = match geom {
-            @ooxml.ShapeGeom::RoundRect => {
+            @ooxml.ShapeGeom::RoundRect(adj) => {
               // OOXML roundRect: radius = min(width, height) * adj / 100000
               let ss = if cx_p < cy_p { cx_p } else { cy_p }
-              int_to_str(ss * round_rect_default_adj / 100000)
+              int_to_str(ss * adj / ooxml_pct_denom)
             }
             _ => "0"
           }

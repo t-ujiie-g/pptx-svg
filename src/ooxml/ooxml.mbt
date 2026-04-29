@@ -638,9 +638,10 @@ pub fn apply_color_modifiers(
           g = c2.g
           b = c2.b
         } else if tag == "a:hueOff" {
-          // Hue offset: val is in 60000ths of a degree
+          // Hue offset: val is in 60000ths of a degree, h is in tenths of a degree.
+          // 1 degree = 60000 val-units = 10 h-units, so divide by 6000.
           let (h, s, l) = rgb_to_hsl(r, g, b)
-          let offset = val / 600 * 10 // convert 60000/deg to tenths of degree
+          let offset = val / 6000
           let mut new_h = h + offset
           if new_h < 0 {
             new_h = new_h + 3600
@@ -937,6 +938,11 @@ pub let cust_dash_prefix_len : Int = 9
 pub let max_outline_levels : Int = 9
 
 ///|
+/// OOXML default `adj` for `prstGeom prst="roundRect"` (16.667% of the short side).
+/// Per ECMA-376 presetShapeDefinitions/roundRect: `<a:gd name="adj" fmla="val 16667"/>`.
+pub let round_rect_default_adj : Int = 16667
+
+///|
 pub(all) struct BodyProps {
   anchor : String // vertical alignment: "t", "ctr", "b", "" = default (top)
   l_ins : Int // left inset in EMU (-1 = default 91440 ≈ 0.1in)
@@ -1120,7 +1126,7 @@ pub fn TableStyleDef::none() -> TableStyleDef {
 pub(all) enum ShapeGeom {
   Rect
   Ellipse
-  RoundRect
+  RoundRect(Int) // adj (0-100000); default 16667 (= 16.667%)
   Line
   Connector(String, Array[Int]) // preset name, adjustment values (0-100000)
   Other(String, Array[Int]) // preset name, adjustment values
@@ -1147,7 +1153,8 @@ pub fn parse_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
   } else if prst == "ellipse" || prst == "oval" {
     ShapeGeom::Ellipse
   } else if prst == "roundRect" {
-    ShapeGeom::RoundRect
+    let adj = if avlst.length() > 0 { avlst[0] } else { round_rect_default_adj }
+    ShapeGeom::RoundRect(adj)
   } else if prst == "line" || prst == "straightConnector1" {
     ShapeGeom::Line
   } else {
@@ -1171,7 +1178,7 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
   match self {
     ShapeGeom::Rect => "rect"
     ShapeGeom::Ellipse => "ellipse"
-    ShapeGeom::RoundRect => "roundRect"
+    ShapeGeom::RoundRect(_) => "roundRect"
     ShapeGeom::Line => "line"
     ShapeGeom::Connector(prst, _) => prst
     ShapeGeom::Other(s, _) => s

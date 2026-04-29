@@ -829,9 +829,22 @@ fn get_preset_def(prst : String) -> PresetDef? {
       gdlst: "maxAdj2=*/ 100000 w ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;dx=*/ ss a2 100000;x1=+- r 0 dx;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0;dx1=*/ h a2 200000;nx1=+- l dx1 0",
       paths: "M l y1 L x1 y1 L x1 t L r hd2 L x1 b L x1 y2 L l y2 L nx1 hd2 Z",
     })
-  } else if prst == "leftRightArrowCallout" || prst == "stripedRightArrow" {
-    // Simplified — render as rectangle for less common shapes
-    Some({ avlst: "", gdlst: "", paths: "M l t L r t L r b L l b Z" })
+  } else if prst == "stripedRightArrow" {
+    // ECMA-376: three small stripes on the left, then arrow body+head on the right.
+    Some({
+      avlst: "adj1=50000;adj2=50000",
+      gdlst: "maxAdj2=*/ 84375 w ss;a1=pin 0 adj1 100000;a2=pin 0 adj2 maxAdj2;x4=*/ ss 5 32;dx5=*/ ss a2 100000;x5=+- r 0 dx5;dy1=*/ h a1 200000;y1=+- hd2 0 dy1;y2=+- hd2 dy1 0;dx2=*/ ss 1 32;x1=+- l dx2 0;dx3=*/ ss 1 16;x2=+- l dx3 0;x3=+- x2 dx2 0",
+      paths: "M l y1 L x1 y1 L x1 y2 L l y2 Z|M x2 y1 L x3 y1 L x3 y2 L x2 y2 Z|M x4 y1 L x5 y1 L x5 t L r hd2 L x5 b L x5 y2 L x4 y2 Z",
+    })
+  } else if prst == "leftRightArrowCallout" {
+    // ECMA-376: callout box with both ends pointing inward as arrowheads.
+    // adj1=body height ratio, adj2=head height ratio, adj3=head width ratio,
+    // adj4=callout box width ratio.
+    Some({
+      avlst: "adj1=25000;adj2=25000;adj3=25000;adj4=48123",
+      gdlst: "a2=pin 0 adj2 50000;a3=pin 0 adj3 50000;q2=*/ a3 ss w;maxAdj1=+- 100000 0 q2;a1=pin 0 adj1 maxAdj1;dy2=*/ h a2 100000;dy1=*/ h a1 200000;y1=+- hd2 0 dy1;y2=+- hd2 0 dy2;y3=+- hd2 dy2 0;y4=+- hd2 dy1 0;a4=pin 0 adj4 100000;x1=*/ w a3 100000;x4=+- r 0 x1;dx2=*/ w a4 200000;x2=+- wd2 0 dx2;x3=+- wd2 dx2 0",
+      paths: "M l hd2 L x1 y1 L x1 y2 L x2 y2 L x2 t L x3 t L x3 y2 L x4 y2 L x4 y1 L r hd2 L x4 y4 L x4 y3 L x3 y3 L x3 b L x2 b L x2 y3 L x1 y3 L x1 y4 Z",
+    })
     // ── Math ──
   } else if prst == "mathPlus" {
     Some({

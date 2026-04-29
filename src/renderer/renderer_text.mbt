@@ -913,7 +913,7 @@ fn render_text(
   let full_text_w = px(t.cx, scale) - pad_l - pad_r
   let mut text_x = base_text_x
   let mut text_w = full_text_w
-  let def_sz = px(default_font_size_emu(), scale) // 24 px for standard slides (unscaled)
+  let def_sz = px(default_font_size_emu, scale) // 24 px for standard slides (unscaled)
   let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
   let mut fs = body_props.font_scale
   let mut lr = body_props.ln_spc_reduction
@@ -1298,8 +1298,16 @@ fn render_text(
           bu_span = bu_span +
             ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
         }
-        if !para.bullet_color.is_none() {
-          bu_span = bu_span + a("fill", para.bullet_color.to_css())
+        // OOXML: when <a:buClr> is absent, the bullet inherits the first run's color.
+        let bu_fill_color = if !para.bullet_color.is_none() {
+          para.bullet_color
+        } else if para.runs.length() > 0 && !para.runs[0].color.is_none() {
+          para.runs[0].color
+        } else {
+          @ooxml.Color::none()
+        }
+        if !bu_fill_color.is_none() {
+          bu_span = bu_span + a("fill", bu_fill_color.to_css())
         }
         out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
       }
@@ -1550,7 +1558,7 @@ fn estimate_text_height(
   scale : Int,
   body_props : @ooxml.BodyProps,
 ) -> Int {
-  let def_sz = px(default_font_size_emu(), scale)
+  let def_sz = px(default_font_size_emu, scale)
   let def_line_h = def_sz * line_height_numer / line_height_denom
   let t_ins = if body_props.t_ins >= 0 {
     body_props.t_ins
