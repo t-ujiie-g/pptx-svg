@@ -1,3 +1,7 @@
 import {
   "pptx-svg/xml" @xml,
 }
+
+import {
+  "moonbitlang/core/test" @test,
+} for "test"

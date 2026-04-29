@@ -6,4 +6,5 @@ import {
 
 import {
   "pptx-svg/svg_parser" @svg_parser,
+  "moonbitlang/core/test" @test,
 } for "test"
