@@ -1,5 +1,12 @@
 # pptx-svg
 
+[![npm version](https://img.shields.io/npm/v/pptx-svg.svg)](https://www.npmjs.com/package/pptx-svg)
+[![npm downloads](https://img.shields.io/npm/dm/pptx-svg.svg)](https://www.npmjs.com/package/pptx-svg)
+[![CI](https://github.com/t-ujiie-g/pptx-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/t-ujiie-g/pptx-svg/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/npm/l/pptx-svg.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/npm/types/pptx-svg.svg)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/node/v/pptx-svg.svg)](https://nodejs.org/)
+
 PPTX and SVG round-trip conversion library. Runs in the browser and Node.js with zero dependencies.
 - [Viewer Demo (Vanilla JS)](https://t-ujiie-g.github.io/pptx-svg/)
 - [Editor Demo (React)](https://t-ujiie-g.github.io/pptx-svg/react/)
