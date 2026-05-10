@@ -250,18 +250,9 @@ export class PptxRenderer {
       bytes = wasmSource.buffer.slice(wasmSource.byteOffset, wasmSource.byteOffset + wasmSource.byteLength) as ArrayBuffer;
     } else {
       const url = wasmSource ?? DEFAULT_WASM_URL;
-      if (typeof globalThis.fetch === 'function') {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
-        bytes = await response.arrayBuffer();
-      } else {
-        // Node.js without global fetch (< 18) — dynamic import fs
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval
-        const fsModule = 'node:' + 'fs'; // prevent bundlers from resolving
-        const fs = await (Function('m', 'return import(m)')(fsModule)) as any;
-        const buf: Uint8Array = fs.readFileSync(url);
-        bytes = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
-      }
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${url}`);
+      bytes = await response.arrayBuffer();
     }
 
     const result = await instantiateWasmWithFallback(bytes, this.buildImportObject(), this.log);
