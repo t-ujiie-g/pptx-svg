@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.7
+
+### Supply chain
+
+- **Remove `Function('m', 'return import(m)')` fallback in `PptxRenderer.init()`** — the `else` branch in `lib/pptx-renderer.ts` used `new Function(...)` to dynamically import `node:fs` for Node.js < 18 environments without global `fetch`, in a way that bundlers (webpack/vite/esbuild) wouldn't statically resolve. Socket flagged this as a "Uses eval" supply-chain risk because `new Function(...)` is dynamic code execution. Since `package.json` `engines` already requires Node ≥ 22 (which has global `fetch`), the fallback was dead code anyway. `init()` now uses a single `fetch()` path for both browser and Node, dropping the dynamic-import branch entirely. The Socket "Uses eval" warning will clear on next publish. The "Network access" warning remains intentional: `fetch()` is how the library auto-loads the bundled Wasm in browsers, and removing it would force every consumer to manually load `dist/main.wasm` themselves.
+
+### Build / tests
+
+- **Add explicit `moonbitlang/core/test` imports to `moon.pkg` and `*_test.mbt` files** — newer MoonBit compilers require `using @test { assert_eq }` declarations in test files to resolve `assert_eq`, and a corresponding `import { "moonbitlang/core/test" @test } for "test"` block in each package's `moon.pkg`. Added across `xml`, `ooxml`, `renderer`, `serializer`, and `svg_parser` packages so `npm run test:moon` passes on the current toolchain.
+
+### Examples
+
+- **Bump `pptx-svg` dep in `examples/react` from `^0.5.2` to `^0.5.6`** so the React example pulls in the security and OOXML compliance fixes from 0.5.5 / 0.5.6 instead of staying pinned to a pre-hardening release.
+
 ## 0.5.6
 
 ### Bug Fixes
