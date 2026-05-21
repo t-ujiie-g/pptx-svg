@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.8
+
+### Bug Fixes
+
+- **Empty `custGeom` shapes rendered as colored rectangles** (#39, #40) — when a `<a:custGeom>` carried a `<a:pathLst>` with no draw commands (no `moveTo` / `lnTo` / `cubicBezTo`), `render_custom_geom()` fell back to emitting a filled `<rect>` covering the shape's bounding box. Icon placeholders that PowerPoint uses (sometimes a coordinate-space-only `<a:path w="…" h="…"/>`) became opaque colored blocks on the slide — e.g. a solid `#00B4D8` square where an icon should have been. The renderer now returns an empty string for shapes with no path data, so the shape is hidden instead. Thanks @TeslaZY for the report and fix.
+- **Free shape text rendered black instead of the theme color from `<a:fontRef>`** (#42) — for accent-styled rectangles emitted by `python-pptx` (and any free shape whose `<p:style>` carries `<a:fontRef>`), PowerPoint uses the fontRef color as the last-resort default text color: typically `lt1` → white text on an accent fill. The renderer ignored `<a:fontRef>` entirely and runs without an explicit color fell through to SVG's default black, so accent rectangles displayed black-on-blue instead of white-on-blue. `parse_sp` now resolves `<a:fontRef>` through the theme + clrMap into `Shape.font_ref_color`, and a new `apply_font_ref_fallback()` step runs after `apply_epr_fallbacks` to write that color into runs that still lack one. Explicit run colors and placeholder inheritance continue to win.
+
+### Build / tests
+
+- **`moon fmt` for compiler `0.1.20260512`** (#41) — the newer formatter requires a blank line between a leading file-comment block and a following `///|` doc comment. Applied across the affected test file.
+- **Add pre-commit hook (`.githooks/pre-commit`)** running `moon fmt && moon check` so formatting and warning regressions are caught before they land in a commit. Opt-in via `git config core.hooksPath .githooks` (see `.githooks/README.md`).
+
+### Tests
+
+- **MoonBit unit tests**:
+  - `parse_slide resolves p:style/a:fontRef color via theme` — covers the new fontRef parse path
+  - `render_slide_svg empty custGeom hides the shape (no fallback rect)` — back-fills coverage for #40, which was merged without a unit test
+- **Test fixture (`test_features.pptx`)** — new `test_fixtures/fixtures/slides_10_regressions.py` adds **slide 96** combining (a) an accent-styled rectangle whose `<p:style>/<a:fontRef>` resolves to `lt1` (white), (b) an empty `custGeom`, and (c) a valid `custGeom` as a control. New category file `test_fixtures/tests/regressions.test.mjs` asserts the OOXML structure (12 assertions). Total slides bumped from 95 to 96.
+- Test counts: 180 MoonBit (was 178) + 139 Node compatibility + 16 categorical suites (was 15).
+
+### Documentation
+
+- **`CLAUDE.md` Shape data model** — add the new `font_ref_color: Color` field with a description, and fix prior drift by listing `lst_style: TextStyleGroup` (was missing) and typing `CustomGeomData.path_w` / `path_h` correctly as `Int` (was listed under `String`).
+- **`CLAUDE.md` file table** — extend the per-category fixture/test enumerations to include `regressions`.
+
 ## 0.5.7
 
 ### Supply chain
