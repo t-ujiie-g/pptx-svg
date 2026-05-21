@@ -110,13 +110,17 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   st_cxn_id: Int, st_cxn_idx: Int, end_cxn_id: Int, end_cxn_idx: Int,
   sh_link_rid: String, sh_link_hover_rid: String,
   mc_choice_xml: String, ole_xml: String,
-  effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d }
+  effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d,
+  lst_style: TextStyleGroup, font_ref_color: Color }
+  // lst_style: a:lstStyle from p:txBody, used as a placeholder-inheritance source.
+  // font_ref_color: resolved color from <p:style>/<a:fontRef>; applied to text runs
+  //   that still lack an explicit color after all other inheritance (last-resort fallback).
 
 ShapeKind = AutoShape(ShapeGeom) | Picture(String) | TableShape(TableData) | GroupShape(GroupShapeData) | ChartShape(ChartData) | Other
 ShapeGeom = Rect | Ellipse | RoundRect(Int) | Line | Connector(String, Array[Int]) | Other(String, Array[Int]) | Custom(CustomGeomData)
   // RoundRect carries adj (0-100000); default 16667 (= 16.667%) per ECMA-376.
 GroupShapeData { ch_off_x, ch_off_y, ch_ext_cx, ch_ext_cy: Int, children: Array[Shape] }
-CustomGeomData { gdlst, paths, path_w, path_h, rect_l, rect_t, rect_r, rect_b: String, cxn_lst: String }
+CustomGeomData { gdlst: String, paths: String, path_w: Int, path_h: Int, rect_l, rect_t, rect_r, rect_b: String, cxn_lst: String }
 ShapeTransform { x, y, cx, cy, rot, flip_h, flip_v }  // all EMU
 StrokeProps { color, width, dash, cap, join, miter_limit, head_type/w/len, tail_type/w/len, cmpd, no_fill, grad_fill, patt_fill }
 
@@ -216,9 +220,9 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `test_fixtures/test_features.pptx` | Feature regression test fixture (generated) |
 | `test_fixtures/gen_test_features.py` | Thin orchestrator — imports each `fixtures/slides_NN_*.py` category module in order, saves the presentation, then runs `_postprocess` |
 | `test_fixtures/fixtures/_ctx.py` | Shared `prs`/`blank` state + cross-module helpers (`nsmap`, `set_fill_xml`) |
-| `test_fixtures/fixtures/slides_NN_*.py` | Per-category slide builders (text basics, fills, shapes, tables, images, charts, misc, chartex) |
+| `test_fixtures/fixtures/slides_NN_*.py` | Per-category slide builders (text basics, fills, shapes, tables, images, charts, misc, chartex, regressions) |
 | `test_fixtures/fixtures/_postprocess.py` | Post-save ZIP patching (OMML, ChartEx, media, WMF) |
-| `test_fixtures/tests/*.test.mjs` | Node `--test` suite split by feature category (structure, text, fills, shapes, tables, images, charts, misc, chartex, emf, wmf, utils) |
+| `test_fixtures/tests/*.test.mjs` | Node `--test` suite split by feature category (structure, text, fills, shapes, tables, images, charts, misc, chartex, emf, wmf, utils, regressions) |
 | `test_fixtures/tests/_helpers.mjs` | Shared test helpers (`expect`, `loadFeatures`, `hasTag`, `findRelTarget`, …) |
 | `test_fixtures/test_node_compat.mjs` | Node.js editing API test suite (shape/text/image CRUD, round-trip export) |
 

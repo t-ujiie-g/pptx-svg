@@ -610,6 +610,62 @@ test "parse_slide resolves p:style/a:fillRef via theme fmtScheme" {
 }
 
 ///|
+test "parse_slide resolves p:style/a:fontRef color via theme" {
+  // A free shape (no placeholder) with no explicit text color but
+  // <p:style>/<a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef>.
+  // Shape.font_ref_color should resolve to the theme's lt1 (white).
+  let theme_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
+    #|  <a:themeElements>
+    #|    <a:clrScheme name="Test">
+    #|      <a:dk1><a:srgbClr val="000000"/></a:dk1>
+    #|      <a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+    #|      <a:dk2><a:srgbClr val="112233"/></a:dk2>
+    #|      <a:lt2><a:srgbClr val="EEEEEE"/></a:lt2>
+    #|      <a:accent1><a:srgbClr val="FF0000"/></a:accent1>
+    #|      <a:accent2><a:srgbClr val="00FF00"/></a:accent2>
+    #|      <a:accent3><a:srgbClr val="A5A5A5"/></a:accent3>
+    #|      <a:accent4><a:srgbClr val="FFC000"/></a:accent4>
+    #|      <a:accent5><a:srgbClr val="5B9BD5"/></a:accent5>
+    #|      <a:accent6><a:srgbClr val="70AD47"/></a:accent6>
+    #|      <a:hlink><a:srgbClr val="0563C1"/></a:hlink>
+    #|      <a:folHlink><a:srgbClr val="954F63"/></a:folHlink>
+    #|    </a:clrScheme>
+    #|    <a:fontScheme name="Test"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme>
+    #|    <a:fmtScheme name="Test"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme>
+    #|  </a:themeElements>
+    #|</a:theme>
+  let theme = parse_theme(theme_xml)
+  let slide_xml =
+    #|<?xml version="1.0" encoding="UTF-8"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="1" name="r"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+    #|      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000" cy="1000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+    #|      <p:style>
+    #|        <a:lnRef idx="1"><a:schemeClr val="accent1"/></a:lnRef>
+    #|        <a:fillRef idx="1"><a:schemeClr val="accent1"/></a:fillRef>
+    #|        <a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef>
+    #|        <a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef>
+    #|      </p:style>
+    #|      <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>hi</a:t></a:r></a:p></p:txBody>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = parse_slide(slide_xml, SlideSize::default(), theme)
+  let shape = slide.shapes[0]
+  // fontRef → lt1 → FFFFFF (white)
+  assert_eq(shape.font_ref_color.r, 255)
+  assert_eq(shape.font_ref_color.g, 255)
+  assert_eq(shape.font_ref_color.b, 255)
+  // The run itself has no explicit color at parse time — the fallback is
+  // applied later in main_inherit.apply_font_ref_fallback.
+  assert_true(shape.paragraphs[0].runs[0].color.is_none())
+}
+
+///|
 test "parse_slide captures lstStyle buAutoNum into level defaults" {
   // a:lstStyle/a:lvl1pPr/a:buAutoNum type="arabicPeriod" should populate
   // Shape.lst_style.levels[0].bullet_auto so that placeholder inheritance can

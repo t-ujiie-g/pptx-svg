@@ -869,6 +869,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     scene_3d: parse_scene_3d_from_da(g_node),
     sp_3d: parse_sp_3d_from_da(g_node),
     lst_style: @ooxml.TextStyleGroup::empty(),
+    font_ref_color: @ooxml.Color::none(),
   }
 }
 

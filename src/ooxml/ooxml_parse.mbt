@@ -935,6 +935,21 @@ fn resolve_fill_ref(
 }
 
 ///|
+/// Resolve `<a:fontRef>` inside `<p:style>` to a Color.
+/// PowerPoint applies this color to text runs that have no explicit color via
+/// any other inheritance step. Returns Color::none() if absent or no color
+/// child is present.
+fn parse_font_ref_color(
+  style_ch : Array[@xml.XmlNode],
+  theme : ThemeData,
+) -> Color {
+  match @xml.find_child(style_ch, "a:fontRef") {
+    None => Color::none()
+    Some(fr) => parse_color_from_children(@xml.get_children(fr), theme)
+  }
+}
+
+///|
 /// Resolve `<a:lnRef idx="N"><a:schemeClr val="X"/></a:lnRef>` against the
 /// theme's `a:fmtScheme/a:lnStyleLst`.  Returns StrokeProps::default() if not
 /// applicable.
@@ -1032,33 +1047,33 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let mut blip_fill = blip_fill
   let mut patt_fill = patt_fill
   let mut sp = sp_stroke
+  let mut font_ref_color = Color::none()
   let sppr_has_any_fill = explicit_no_fill ||
     !fill.is_none() ||
     !grad_fill.is_none() ||
     !blip_fill.is_none() ||
     !patt_fill.is_none()
-  if !sppr_has_any_fill || !has_ln_in_sppr {
-    match @xml.find_child(ch, "p:style") {
-      None => ()
-      Some(style_node) => {
-        let style_ch = @xml.get_children(style_node)
-        if !sppr_has_any_fill {
-          let (fr_idx, fr_scheme) = parse_style_ref(style_ch, "a:fillRef")
-          if fr_idx >= 1 && fr_scheme != "" {
-            let (c, gf, bf, pf) = resolve_fill_ref(fr_idx, fr_scheme, theme)
-            fill = c
-            grad_fill = gf
-            blip_fill = bf
-            patt_fill = pf
-          }
-        }
-        if !has_ln_in_sppr {
-          let (lr_idx, lr_scheme) = parse_style_ref(style_ch, "a:lnRef")
-          if lr_idx >= 1 && lr_scheme != "" {
-            sp = resolve_ln_ref(lr_idx, lr_scheme, theme)
-          }
+  match @xml.find_child(ch, "p:style") {
+    None => ()
+    Some(style_node) => {
+      let style_ch = @xml.get_children(style_node)
+      if !sppr_has_any_fill {
+        let (fr_idx, fr_scheme) = parse_style_ref(style_ch, "a:fillRef")
+        if fr_idx >= 1 && fr_scheme != "" {
+          let (c, gf, bf, pf) = resolve_fill_ref(fr_idx, fr_scheme, theme)
+          fill = c
+          grad_fill = gf
+          blip_fill = bf
+          patt_fill = pf
         }
       }
+      if !has_ln_in_sppr {
+        let (lr_idx, lr_scheme) = parse_style_ref(style_ch, "a:lnRef")
+        if lr_idx >= 1 && lr_scheme != "" {
+          sp = resolve_ln_ref(lr_idx, lr_scheme, theme)
+        }
+      }
+      font_ref_color = parse_font_ref_color(style_ch, theme)
     }
   }
   // Text
@@ -1106,6 +1121,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     scene_3d: parse_scene_3d(sppr_ch),
     sp_3d: parse_sp_3d(sppr_ch),
     lst_style: txt_lst_style,
+    font_ref_color,
   }
 }
 

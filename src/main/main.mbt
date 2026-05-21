@@ -944,6 +944,9 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       // endParaRPr as last-resort fallback for free textboxes whose runs
       // still lack color/font after placeholder inheritance.
       apply_epr_fallbacks(shape)
+      // <p:style>/<a:fontRef> color as final default for any run that still
+      // has no color (matches PowerPoint behavior for accent-styled shapes).
+      apply_font_ref_fallback(shape)
       shape_i = shape_i + 1
     }
     let s : @ooxml.SlideData = {

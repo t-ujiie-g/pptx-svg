@@ -1773,3 +1773,54 @@ test "bullet font-size matches run when bu_size is unspecified" {
   // (run is 12 pt → 16 px at scale 9525).
   assert_true(find_substring(svg, "<tspan font-size=\"16\"") >= 0)
 }
+
+///|
+test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
+  // Regression for issue #39: a custGeom with no path commands previously
+  // produced a filled <rect> fallback, leading to unwanted colored blocks.
+  // After the fix, the shape should render nothing visible.
+  let custom : @ooxml.CustomGeomData = {
+    gdlst: "",
+    paths: "", // empty pathLst — no draw commands
+    path_w: 508000,
+    path_h: 508000,
+    rect_l: "",
+    rect_t: "",
+    rect_r: "",
+    rect_b: "",
+    cxn_lst: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Custom(custom)),
+      {
+        x: 3000000,
+        y: 1500000,
+        cx: 2000000,
+        cy: 2000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    fill: @ooxml.parse_hex_color("00B4D8"),
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The slide background still emits its own <rect> wrapper, so we check the
+  // shape's fill color directly. The empty shape's color (#00B4D8 →
+  // rgb(0,180,216)) must NOT appear anywhere in the output — neither as a
+  // <path d="..." fill="rgb(0,180,216)"/> nor as a <rect ... fill="..."/>
+  // fallback.
+  assert_eq(find_substring(svg, "rgb(0,180,216)"), -1)
+  assert_eq(find_substring(svg, "<path "), -1)
+}
