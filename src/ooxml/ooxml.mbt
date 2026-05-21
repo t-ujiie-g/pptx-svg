@@ -1640,6 +1640,7 @@ pub(all) struct Shape {
   scene_3d : Scene3d // a:scene3d
   sp_3d : Shape3d // a:sp3d
   lst_style : TextStyleGroup // a:lstStyle from p:txBody (used for placeholder inheritance)
+  font_ref_color : Color // resolved color from <p:style>/<a:fontRef>; used as last-resort text color fallback
 }
 
 ///|
@@ -1687,6 +1688,7 @@ pub fn Shape::default_with(
     scene_3d: Scene3d::none(),
     sp_3d: Shape3d::none(),
     lst_style: TextStyleGroup::empty(),
+    font_ref_color: Color::none(),
   }
 }
 

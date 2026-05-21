@@ -515,6 +515,30 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
   }
 }
 
+///|
+/// Apply the shape's <p:style>/<a:fontRef> color as a final fallback to any
+/// text run that still has no color after all other inheritance.
+/// PowerPoint uses fontRef as the default text color for free shapes whose
+/// style links to a theme font scheme (e.g. accent rectangles get white text
+/// because their fontRef points at lt1).
+fn apply_font_ref_fallback(shape : @ooxml.Shape) -> Unit {
+  if shape.font_ref_color.is_none() {
+    return
+  }
+  let fr_clr = shape.font_ref_color
+  for para in shape.paragraphs {
+    let nr = para.runs.length()
+    let mut ri = 0
+    while ri < nr {
+      let run = para.runs[ri]
+      if run.color.is_none() {
+        para.runs[ri] = { ..run, color: fr_clr }
+      }
+      ri = ri + 1
+    }
+  }
+}
+
 // ── Placeholder auto-content ─────────────────────────────────────────────
 
 ///|

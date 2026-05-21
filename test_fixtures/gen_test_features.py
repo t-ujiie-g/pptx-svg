@@ -17,6 +17,7 @@ Slide categories:
   slides_07_charts        — 52-73 standard charts + 3D/trendline/errBars/composite/stacked
   slides_08_misc          — 74-88 notes, comments, SmartArt, OLE, media, OMML, transition, hidden, WMF, effects
   slides_09_chartex       — 89-94 ChartEx (patched by postprocess)
+  slides_10_regressions   — 96    regression fixtures (empty custGeom, fontRef text color)
 """
 import os, sys
 
@@ -33,6 +34,7 @@ from fixtures import slides_06_images  # noqa: F401
 from fixtures import slides_07_charts  # noqa: F401
 from fixtures import slides_08_misc  # noqa: F401
 from fixtures import slides_09_chartex  # noqa: F401
+from fixtures import slides_10_regressions  # noqa: F401
 
 _ctx.prs.save(_ctx.OUTPUT_PATH)
 
