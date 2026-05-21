@@ -1420,15 +1420,11 @@ fn render_custom_geom(
   let ph = data.path_h.to_double()
   let d = render_geom_paths(env, data.paths, x_p, y_p, w, h, pw, ph)
   if d.is_empty() {
-    "<rect" +
-    ai("x", x_p) +
-    ai("y", y_p) +
-    ai("width", cx_p) +
-    ai("height", cy_p) +
-    fill +
-    stroke +
-    rot +
-    "/>"
+    // Empty custGeom path — no visible shape to render.
+    // Returning a filled rect here produces an unwanted colored block
+    // (e.g. a solid blue square where an icon should be).
+    // Better to hide the shape entirely so it doesn't obstruct the slide.
+    ""
   } else {
     "<path d=\"" + d + "\"" + fill + stroke + rot + "/>"
   }
