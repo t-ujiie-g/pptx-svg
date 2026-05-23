@@ -1,10 +1,10 @@
 import {
-  "pptx-svg/xml" @xml,
-  "pptx-svg/ooxml" @ooxml,
-  "pptx-svg/ffi" @ffi,
+  "pptx-svg/xml",
+  "pptx-svg/ooxml",
+  "pptx-svg/ffi",
 }
 
 import {
-  "pptx-svg/svg_parser" @svg_parser,
-  "moonbitlang/core/test" @test,
+  "pptx-svg/svg_parser",
+  "moonbitlang/core/test",
 } for "test"
