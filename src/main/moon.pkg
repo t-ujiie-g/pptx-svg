@@ -1,10 +1,10 @@
 import {
-  "pptx-svg/xml" @xml,
-  "pptx-svg/ffi" @ffi,
-  "pptx-svg/ooxml" @ooxml,
-  "pptx-svg/renderer" @renderer,
-  "pptx-svg/serializer" @serializer,
-  "pptx-svg/svg_parser" @svg_parser,
+  "pptx-svg/xml",
+  "pptx-svg/ffi",
+  "pptx-svg/ooxml",
+  "pptx-svg/renderer",
+  "pptx-svg/serializer",
+  "pptx-svg/svg_parser",
 }
 
 options(
