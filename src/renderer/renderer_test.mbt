@@ -173,9 +173,10 @@ test "render_slide_svg colored background" {
 /// non-zero pixel sizes, with the SVG scale() factor compensating.
 test "render_group with small chExt renders children" {
   // Child in chExt-space units (4000 wide, 10000 tall)
-  let child = @ooxml.Shape::default_with(@ooxml.ShapeKind::AutoShape(
-      @ooxml.ShapeGeom::Rect,
-    ), { x: 0, y: 0, cx: 4000, cy: 10000, rot: 0, flip_h: false, flip_v: false })
+  let child = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 4000, cy: 10000, rot: 0, flip_h: false, flip_v: false },
+  )
   let grp_data : @ooxml.GroupShapeData = {
     ch_off_x: 0,
     ch_off_y: 0,
