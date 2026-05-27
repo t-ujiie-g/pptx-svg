@@ -188,6 +188,18 @@ fn is_horizontal_bar(groups : Array[@ooxml.ChartGroup]) -> Bool {
 }
 
 ///|
+/// Detect if the primary chart group is a radar chart (uses polar plot area).
+fn is_radar_chart(groups : Array[@ooxml.ChartGroup]) -> Bool {
+  if groups.is_empty() {
+    return false
+  }
+  match groups[0].chart_type {
+    @ooxml.ChartKind::RadarChart => true
+    _ => false
+  }
+}
+
+///|
 /// Render a chart as SVG within the shape's transform bounds.
 fn render_chart(
   chart : @ooxml.ChartData,
@@ -238,7 +250,10 @@ fn render_chart(
   // Legend
   let legend_w = if chart.legend.show { chart_legend_w } else { 0 }
   // Plot area bounds — adapt based on chart type
-  let no_axes = is_pie_or_donut_chart(chart.groups)
+  // Radar charts use a polar plot area, so they need no Cartesian axis padding
+  // and the standard render_axes pass is suppressed below.
+  let is_radar = is_radar_chart(chart.groups)
+  let no_axes = is_pie_or_donut_chart(chart.groups) || is_radar
   let h_bar = is_horizontal_bar(chart.groups)
   // For horizontal bar: category labels on left (wider), value labels at bottom
   // For pie/donut: no axis labels at all
@@ -288,9 +303,12 @@ fn render_chart(
         chart.axes,
       )
   }
-  // Render axes
-  svg = svg +
-    render_axes(chart.axes, plot_x, plot_y, plot_w, plot_h, chart.groups)
+  // Render axes (radar charts draw their own polar gridlines inside
+  // render_radar_chart, so suppress the Cartesian axis pass here).
+  if !is_radar {
+    svg = svg +
+      render_axes(chart.axes, plot_x, plot_y, plot_w, plot_h, chart.groups)
+  }
   // Render legend
   if chart.legend.show {
     svg = svg + render_legend(chart.groups, w - legend_w + 4, plot_y, colors)
@@ -324,7 +342,7 @@ fn render_chart_group(
     @ooxml.ChartKind::AreaChart =>
       render_area_chart(group, px_, py, pw, ph, colors, axes)
     @ooxml.ChartKind::RadarChart =>
-      render_line_chart(group, px_, py, pw, ph, colors, axes)
+      render_radar_chart(group, px_, py, pw, ph, colors, axes)
     @ooxml.ChartKind::BubbleChart =>
       render_bubble_chart(group, px_, py, pw, ph, colors)
     @ooxml.ChartKind::StockChart =>
@@ -596,6 +614,162 @@ fn render_line_chart(
   // Trendlines + error bars
   svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
   svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
+  svg
+}
+
+// ── Radar chart ─────────────────────────────────────────────────────────────
+
+///|
+/// Render a radar (spider) chart: N axes radiating from the center, one per
+/// category, concentric gridline polygons, and one closed polygon per series.
+/// Layout: square plot area inscribed in `(px_, py, pw, ph)`, with a margin
+/// reserved for category labels at the outer vertices.
+fn render_radar_chart(
+  group : @ooxml.ChartGroup,
+  px_ : Int,
+  py : Int,
+  pw : Int,
+  ph : Int,
+  colors : Array[String],
+  axes : Array[@ooxml.ChartAxis],
+) -> String {
+  let ns = group.series.length()
+  if ns == 0 {
+    return ""
+  }
+  let (cats, raw_max) = get_series_range(group.series)
+  let max_val = compute_axis_max(raw_max, axes)
+  let nc = cats.length()
+  if nc < 3 || max_val == 0 {
+    return ""
+  }
+  // Reserve margin for category labels at each vertex
+  let label_margin = 36
+  let cx = px_ + pw / 2
+  let cy = py + ph / 2
+  let r_w = pw / 2 - label_margin
+  let r_h = ph / 2 - label_margin
+  let r = if r_w < r_h { r_w } else { r_h }
+  if r <= 0 {
+    return ""
+  }
+  let n_ticks = chart_axis_ticks
+  let mut svg = ""
+  // Pre-compute per-axis angles (hundredths of degrees). First axis points up.
+  let angles_h : Array[Int] = Array::make(nc, 0)
+  for i in 0..<nc {
+    angles_h[i] = -9000 + 36000 * i / nc
+  }
+  // Concentric gridline polygons
+  for ti in 1..<=n_ticks {
+    let rt = r * ti / n_ticks
+    let mut pts = ""
+    for i in 0..<nc {
+      let ang = angles_h[i]
+      let gx = cx + cos1000(ang) * rt / 1000
+      let gy = cy + sin1000(ang) * rt / 1000
+      if !pts.is_empty() {
+        pts = pts + " "
+      }
+      pts = pts + int_to_str(gx) + "," + int_to_str(gy)
+    }
+    svg = svg +
+      "<polygon points=\"" +
+      pts +
+      "\" fill=\"none\" stroke=\"" +
+      chart_gridline_color +
+      "\" stroke-width=\"0.5\"/>"
+  }
+  // Radial spokes from center to outer vertex
+  for i in 0..<nc {
+    let ang = angles_h[i]
+    let ex = cx + cos1000(ang) * r / 1000
+    let ey = cy + sin1000(ang) * r / 1000
+    svg = svg +
+      "<line x1=\"" +
+      int_to_str(cx) +
+      "\" y1=\"" +
+      int_to_str(cy) +
+      "\" x2=\"" +
+      int_to_str(ex) +
+      "\" y2=\"" +
+      int_to_str(ey) +
+      "\" stroke=\"" +
+      chart_gridline_color +
+      "\" stroke-width=\"0.5\"/>"
+  }
+  // Category labels at each vertex
+  let label_r = r + 12
+  for i in 0..<nc {
+    let ang = angles_h[i]
+    let cos_v = cos1000(ang)
+    let sin_v = sin1000(ang)
+    let lx = cx + cos_v * label_r / 1000
+    let ly = cy + sin_v * label_r / 1000 + 4 // +4 for vertical centering
+    let anchor = if cos_v > 300 {
+      "start"
+    } else if cos_v < -300 {
+      "end"
+    } else {
+      "middle"
+    }
+    svg = svg +
+      "<text x=\"" +
+      int_to_str(lx) +
+      "\" y=\"" +
+      int_to_str(ly) +
+      "\" text-anchor=\"" +
+      anchor +
+      "\" font-size=\"10\" fill=\"" +
+      chart_axis_label_color +
+      "\">" +
+      svg_escape(cats[i]) +
+      "</text>"
+  }
+  // Each series → closed polygon + per-point markers
+  for si in 0..<ns {
+    let ser = group.series[si]
+    let color = series_color(ser, si, colors)
+    let values = get_num_values(ser.val)
+    let nv = values.length()
+    let n_pts = if nv < nc { nv } else { nc }
+    if n_pts < 2 {
+      continue
+    }
+    let mut pts = ""
+    for i in 0..<n_pts {
+      let ang = angles_h[i]
+      let rv = mul_div(values[i], r, max_val)
+      let vx = cx + cos1000(ang) * rv / 1000
+      let vy = cy + sin1000(ang) * rv / 1000
+      if !pts.is_empty() {
+        pts = pts + " "
+      }
+      pts = pts + int_to_str(vx) + "," + int_to_str(vy)
+    }
+    svg = svg +
+      "<polygon points=\"" +
+      pts +
+      "\" fill=\"none\" stroke=\"" +
+      color +
+      "\" stroke-width=\"2\"/>"
+    for i in 0..<n_pts {
+      let ang = angles_h[i]
+      let rv = mul_div(values[i], r, max_val)
+      let vx = cx + cos1000(ang) * rv / 1000
+      let vy = cy + sin1000(ang) * rv / 1000
+      svg = svg +
+        "<circle cx=\"" +
+        int_to_str(vx) +
+        "\" cy=\"" +
+        int_to_str(vy) +
+        "\" r=\"" +
+        int_to_str(chart_line_marker_r) +
+        "\" fill=\"" +
+        color +
+        "\"/>"
+    }
+  }
   svg
 }
 

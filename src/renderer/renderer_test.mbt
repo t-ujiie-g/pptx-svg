@@ -164,6 +164,55 @@ test "render_slide_svg colored background" {
   )
 }
 
+///|
+/// Regression: group with chExt much smaller than ext (e.g. chExt=10000 mapped
+/// onto a multi-million-EMU ext). The naive `px(child_coord, outer_scale)` path
+/// truncates every child dimension to 0px and skips the shape via the
+/// `cx_p <= 0` guard, producing an empty `<g transform="...">` element. The
+/// `render_group` fix introduces a finer `child_scale` so children render at
+/// non-zero pixel sizes, with the SVG scale() factor compensating.
+test "render_group with small chExt renders children" {
+  // Child in chExt-space units (4000 wide, 10000 tall)
+  let child = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 4000, cy: 10000, rot: 0, flip_h: false, flip_v: false },
+  )
+  let grp_data : @ooxml.GroupShapeData = {
+    ch_off_x: 0,
+    ch_off_y: 0,
+    ch_ext_cx: 10000,
+    ch_ext_cy: 10000,
+    children: [child],
+  }
+  // Group occupies a real (large) area on the slide
+  let grp = @ooxml.Shape::default_with(@ooxml.ShapeKind::GroupShape(grp_data), {
+    x: 3657600,
+    y: 3771900,
+    cx: 4876800,
+    cy: 2057400,
+    rot: 0,
+    flip_h: false,
+    flip_v: false,
+  })
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [grp] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The child rect must appear in the SVG — the old behavior emitted an empty
+  // <g transform="..."></g> (no rect inside).
+  assert_true(svg.contains("<rect"))
+  // And it must have non-zero width/height (i.e. not `width="0"` / `height="0"`)
+  assert_true(!svg.contains("width=\"0\""))
+  assert_true(!svg.contains("height=\"0\""))
+}
+
 // ── Round-trip: render → parse → compare ────────────────────────────────────
 
 ///|
@@ -991,6 +1040,60 @@ test "render sunburst chart produces arc paths" {
     [],
   )
   assert_true(svg.contains("<path d=\"M"))
+}
+
+///|
+/// Radar chart should render on a polar plot area: one closed polygon per
+/// series plus concentric gridline polygons and labels at each vertex.
+/// Previously it fell through to render_line_chart, producing a Cartesian
+/// `<polyline>` and laying the category names along the x-axis. The fix
+/// switches the dispatch to a dedicated render_radar_chart.
+test "render radar chart produces closed polygon and vertex labels" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+    #|<c:chart><c:plotArea><c:radarChart><c:ser>
+    #|<c:idx val="0"/><c:order val="0"/>
+    #|<c:cat><c:strRef><c:f>x</c:f><c:strCache>
+    #|<c:ptCount val="5"/>
+    #|<c:pt idx="0"><c:v>Speed</c:v></c:pt>
+    #|<c:pt idx="1"><c:v>Power</c:v></c:pt>
+    #|<c:pt idx="2"><c:v>Range</c:v></c:pt>
+    #|<c:pt idx="3"><c:v>Comfort</c:v></c:pt>
+    #|<c:pt idx="4"><c:v>Price</c:v></c:pt>
+    #|</c:strCache></c:strRef></c:cat>
+    #|<c:val><c:numRef><c:f>y</c:f><c:numCache>
+    #|<c:ptCount val="5"/>
+    #|<c:pt idx="0"><c:v>80</c:v></c:pt>
+    #|<c:pt idx="1"><c:v>90</c:v></c:pt>
+    #|<c:pt idx="2"><c:v>70</c:v></c:pt>
+    #|<c:pt idx="3"><c:v>60</c:v></c:pt>
+    #|<c:pt idx="4"><c:v>50</c:v></c:pt>
+    #|</c:numCache></c:numRef></c:val>
+    #|</c:ser></c:radarChart></c:plotArea></c:chart></c:chartSpace>
+  let chart = @ooxml.parse_chart_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // Polar polygon (series) + gridline polygons — line chart would emit
+  // <polyline> with `fill="none"` and no <polygon>.
+  assert_true(svg.contains("<polygon"))
+  // Vertex labels appear in the polar layout, not collapsed onto an x-axis.
+  assert_true(svg.contains("Speed"))
+  assert_true(svg.contains("Comfort"))
+  // Regression guard: no <polyline> means the line-chart fallback is gone.
+  assert_true(!svg.contains("<polyline"))
 }
 
 ///|

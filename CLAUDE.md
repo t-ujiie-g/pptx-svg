@@ -67,6 +67,8 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 **Watch Int32 overflow in geometry math.** `Int` is 32-bit. `(x2 - x1) * adj / 100000` overflows when both operands are large in opposite signs (e.g. Google Slides writes connector adj1 = -39687500, paired with multi-million-EMU spans). Use `to_int64()` for the multiplication and divide back, or split as `span / 100 * adj / 1000`. See `bend_offset` in `renderer.mbt`.
 
+**Watch integer truncation in `px(emu, scale)`.** `px` is integer division: small EMU values relative to `scale` (≈12700 for a 960px wide 16:9 slide) round down to 0. This matters for group children whose coordinates live in `chExt` space — if `chExt` is small (e.g. 10000 EMU mapped onto a multi-million-EMU group), `px(child_coord, outer_scale)` truncates every dimension to 0px and `render_shape`'s `cx_p <= 0` guard drops the shape, producing an empty `<g transform="..."></g>`. `render_group` works around this by computing a finer-grained `child_scale = min(scale·chExt_x/cx, scale·chExt_y/cy)` (Int64 internally), capped at the outer scale, and compensating with an `(cx·child_scale)/(chExt·scale)` factor inside the SVG `scale()` transform.
+
 ## MoonBit unit tests
 
 Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with FFI stubs.
