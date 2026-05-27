@@ -661,7 +661,7 @@ fn render_radar_chart(
     angles_h[i] = -9000 + 36000 * i / nc
   }
   // Concentric gridline polygons
-  for ti in 1..=n_ticks {
+  for ti in 1..<=n_ticks {
     let rt = r * ti / n_ticks
     let mut pts = ""
     for i in 0..<nc {
