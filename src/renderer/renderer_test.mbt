@@ -1043,6 +1043,60 @@ test "render sunburst chart produces arc paths" {
 }
 
 ///|
+/// Radar chart should render on a polar plot area: one closed polygon per
+/// series plus concentric gridline polygons and labels at each vertex.
+/// Previously it fell through to render_line_chart, producing a Cartesian
+/// `<polyline>` and laying the category names along the x-axis. The fix
+/// switches the dispatch to a dedicated render_radar_chart.
+test "render radar chart produces closed polygon and vertex labels" {
+  let xml =
+    #|<?xml version="1.0"?>
+    #|<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+    #|<c:chart><c:plotArea><c:radarChart><c:ser>
+    #|<c:idx val="0"/><c:order val="0"/>
+    #|<c:cat><c:strRef><c:f>x</c:f><c:strCache>
+    #|<c:ptCount val="5"/>
+    #|<c:pt idx="0"><c:v>Speed</c:v></c:pt>
+    #|<c:pt idx="1"><c:v>Power</c:v></c:pt>
+    #|<c:pt idx="2"><c:v>Range</c:v></c:pt>
+    #|<c:pt idx="3"><c:v>Comfort</c:v></c:pt>
+    #|<c:pt idx="4"><c:v>Price</c:v></c:pt>
+    #|</c:strCache></c:strRef></c:cat>
+    #|<c:val><c:numRef><c:f>y</c:f><c:numCache>
+    #|<c:ptCount val="5"/>
+    #|<c:pt idx="0"><c:v>80</c:v></c:pt>
+    #|<c:pt idx="1"><c:v>90</c:v></c:pt>
+    #|<c:pt idx="2"><c:v>70</c:v></c:pt>
+    #|<c:pt idx="3"><c:v>60</c:v></c:pt>
+    #|<c:pt idx="4"><c:v>50</c:v></c:pt>
+    #|</c:numCache></c:numRef></c:val>
+    #|</c:ser></c:radarChart></c:plotArea></c:chart></c:chartSpace>
+  let chart = @ooxml.parse_chart_xml(xml, @ooxml.ThemeData::default())
+  let slide : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_chart_shape(chart)],
+  }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // Polar polygon (series) + gridline polygons — line chart would emit
+  // <polyline> with `fill="none"` and no <polygon>.
+  assert_true(svg.contains("<polygon"))
+  // Vertex labels appear in the polar layout, not collapsed onto an x-axis.
+  assert_true(svg.contains("Speed"))
+  assert_true(svg.contains("Comfort"))
+  // Regression guard: no <polyline> means the line-chart fallback is gone.
+  assert_true(!svg.contains("<polyline"))
+}
+
+///|
 test "render funnel chart produces centered rects" {
   let xml = make_cx_chart_xml(
     "funnel", "<cx:pt idx=\"0\">Prospects</cx:pt><cx:pt idx=\"1\">Qualified</cx:pt><cx:pt idx=\"2\">Closed</cx:pt>",
