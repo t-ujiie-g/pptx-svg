@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.9
+
+### Bug Fixes
+
+- **Group children with small `chExt` collapsed to zero size** (#45) — `<p:grpSp>` declares a child coordinate space via `<a:chOff>` / `<a:chExt>`, and PowerPoint/python-pptx output sometimes uses a small abstract space (e.g. `chExt = 10000` EMU) mapped onto a multi-million-EMU group. `render_group` rendered children with the outer slide-level `scale` (~12 700 EMU/px), so `px(child_coord, scale)` integer-divided every child dimension to 0 px and `render_shape`'s `cx_p <= 0` guard dropped the shape. The group's SVG became `<g transform="…"></g>` — visually, lower-half shapes on a slide using small `chExt` simply disappeared. `render_group` now computes a finer-grained `child_scale = min(scale · chExt_x / cx, scale · chExt_y / cy)` (Int64-clamped at the outer scale to keep the existing `chExt == ext` path untouched), passes it to `render_shape`, and compensates with a `(cx · child_scale) / (chExt · scale)` factor inside the SVG `scale()` transform; `ch_off` is re-projected through the same scale. A new `format_ratio_64` helper does the Int64 ratio formatting.
+
+### Features
+
+- **Radar charts rendered on a polar plot area** (#45) — `RadarChart` previously fell through to `render_line_chart`, so a 5-category radar emitted a Cartesian polyline with the category names (Speed/Power/Range/Comfort/Price) collapsed onto the x-axis instead of placed at vertices of a pentagon. New `render_radar_chart` inscribes a square plot in the chart's bounding box (reserving margin for vertex labels), draws concentric gridline polygons and radial spokes via the existing integer `cos1000` / `sin1000` lookup tables, labels each vertex with `text-anchor` chosen from the spoke direction (start/middle/end based on the cosine sign), and emits a closed polygon + per-point markers per series scaled to the value-axis maximum. `render_chart` flags radar like pie/donut so the standard Cartesian axis padding and `render_axes` tick pass are suppressed.
+
+### Tests
+
+- **MoonBit unit tests**:
+  - `render_group with small chExt renders children` — minimal reproduction (group at `(3.66M, 3.77M)` EMU with `chExt = 10000 × 10000`, a child rect at `cx = 4000`); asserts the child `<rect>` appears with non-zero width/height in the output.
+  - `render radar chart produces closed polygon and vertex labels` — parses a minimal radar `c:chartSpace`, renders the slide, asserts the SVG contains `<polygon>` and category labels at vertices, and rejects any `<polyline>` (regression guard against re-routing to the line-chart fallback).
+- Test counts: 182 MoonBit (was 180) + 139 Node compatibility + 16 categorical suites.
+
+### Documentation
+
+- **`CLAUDE.md` Critical MoonBit constraints** — add a "Watch integer truncation in `px(emu, scale)`" note describing how small `chExt` causes child-shape zero-truncation and pointing to `render_group`'s `child_scale` workaround. Sits alongside the existing Int32-overflow note.
+
 ## 0.5.8
 
 ### Bug Fixes
