@@ -164,6 +164,54 @@ test "render_slide_svg colored background" {
   )
 }
 
+///|
+/// Regression: group with chExt much smaller than ext (e.g. chExt=10000 mapped
+/// onto a multi-million-EMU ext). The naive `px(child_coord, outer_scale)` path
+/// truncates every child dimension to 0px and skips the shape via the
+/// `cx_p <= 0` guard, producing an empty `<g transform="...">` element. The
+/// `render_group` fix introduces a finer `child_scale` so children render at
+/// non-zero pixel sizes, with the SVG scale() factor compensating.
+test "render_group with small chExt renders children" {
+  // Child in chExt-space units (4000 wide, 10000 tall)
+  let child = @ooxml.Shape::default_with(@ooxml.ShapeKind::AutoShape(
+      @ooxml.ShapeGeom::Rect,
+    ), { x: 0, y: 0, cx: 4000, cy: 10000, rot: 0, flip_h: false, flip_v: false })
+  let grp_data : @ooxml.GroupShapeData = {
+    ch_off_x: 0,
+    ch_off_y: 0,
+    ch_ext_cx: 10000,
+    ch_ext_cy: 10000,
+    children: [child],
+  }
+  // Group occupies a real (large) area on the slide
+  let grp = @ooxml.Shape::default_with(@ooxml.ShapeKind::GroupShape(grp_data), {
+    x: 3657600,
+    y: 3771900,
+    cx: 4876800,
+    cy: 2057400,
+    rot: 0,
+    flip_h: false,
+    flip_v: false,
+  })
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [grp] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // The child rect must appear in the SVG — the old behavior emitted an empty
+  // <g transform="..."></g> (no rect inside).
+  assert_true(svg.contains("<rect"))
+  // And it must have non-zero width/height (i.e. not `width="0"` / `height="0"`)
+  assert_true(!svg.contains("width=\"0\""))
+  assert_true(!svg.contains("height=\"0\""))
+}
+
 // ── Round-trip: render → parse → compare ────────────────────────────────────
 
 ///|

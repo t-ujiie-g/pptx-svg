@@ -872,6 +872,42 @@ fn format_pct_decimal(val : Int) -> String {
 }
 
 ///|
+/// Int64 variant of `format_ratio` — used when `num`/`den` may exceed Int32 range.
+fn format_ratio_64(num : Int64, den : Int64) -> String {
+  if den == 0L || num == den {
+    return "1"
+  }
+  let q1 = num / den
+  let r1 = num - q1 * den
+  let q2 = r1 * 100L / den
+  let r2 = r1 * 100L - q2 * den
+  let q3 = r2 * 100L / den
+  let scaled = q1 * 10000L + q2 * 100L + q3
+  let whole_64 = scaled / 10000L
+  let frac_64 = scaled - whole_64 * 10000L
+  let whole = whole_64.to_int()
+  let frac = frac_64.to_int()
+  let abs_frac = if frac < 0 { -frac } else { frac }
+  if abs_frac == 0 {
+    return int_to_str(whole)
+  }
+  let d1 = abs_frac / 1000
+  let d2 = abs_frac / 100 % 10
+  let d3 = abs_frac / 10 % 10
+  let d4 = abs_frac % 10
+  let f = if d4 != 0 {
+    int_to_str(d1) + int_to_str(d2) + int_to_str(d3) + int_to_str(d4)
+  } else if d3 != 0 {
+    int_to_str(d1) + int_to_str(d2) + int_to_str(d3)
+  } else if d2 != 0 {
+    int_to_str(d1) + int_to_str(d2)
+  } else {
+    int_to_str(d1)
+  }
+  int_to_str(whole) + "." + f
+}
+
+///|
 /// Encode adjustment values as comma-separated string for data attribute.
 fn encode_adj_values(avs : Array[Int]) -> String {
   let n = avs.length()
@@ -2042,10 +2078,49 @@ fn render_group(
   // Build SVG transform: translate(off) scale(ext/chExt) translate(-chOff)
   let off_x = px(t.x, scale)
   let off_y = px(t.y, scale)
-  let ch_off_x = px(grp.ch_off_x, scale)
-  let ch_off_y = px(grp.ch_off_y, scale)
-  let sx = format_ratio(t.cx, grp.ch_ext_cx)
-  let sy = format_ratio(t.cy, grp.ch_ext_cy)
+  // When chExt is much smaller than ext (e.g. child coord space 10000 EMU
+  // mapped onto a 4_876_800 EMU group), `px(child_coord, outer_scale)` truncates
+  // every child dimension to 0px. Use a finer-grained `child_scale` for child
+  // rendering and compensate via the SVG scale() factor. Cap at outer scale so
+  // existing behavior (chExt == ext) is unchanged.
+  let scale_64 = scale.to_int64()
+  let has_scaling = grp.ch_ext_cx > 0 &&
+    grp.ch_ext_cy > 0 &&
+    t.cx > 0 &&
+    t.cy > 0
+  let child_scale = if has_scaling {
+    let cs_x = scale_64 * grp.ch_ext_cx.to_int64() / t.cx.to_int64()
+    let cs_y = scale_64 * grp.ch_ext_cy.to_int64() / t.cy.to_int64()
+    let cs = if cs_x < cs_y { cs_x } else { cs_y }
+    let capped = if cs > scale_64 { scale_64 } else { cs }
+    if capped < 1L {
+      1
+    } else {
+      capped.to_int()
+    }
+  } else {
+    scale
+  }
+  let ch_off_x = px(grp.ch_off_x, child_scale)
+  let ch_off_y = px(grp.ch_off_y, child_scale)
+  let sx = if has_scaling {
+    let child_scale_64 = child_scale.to_int64()
+    format_ratio_64(
+      t.cx.to_int64() * child_scale_64,
+      grp.ch_ext_cx.to_int64() * scale_64,
+    )
+  } else {
+    format_ratio(t.cx, grp.ch_ext_cx)
+  }
+  let sy = if has_scaling {
+    let child_scale_64 = child_scale.to_int64()
+    format_ratio_64(
+      t.cy.to_int64() * child_scale_64,
+      grp.ch_ext_cy.to_int64() * scale_64,
+    )
+  } else {
+    format_ratio(t.cy, grp.ch_ext_cy)
+  }
   let mut transform_str = "translate(" +
     int_to_str(off_x) +
     "," +
@@ -2118,7 +2193,7 @@ fn render_group(
     }
     children_svg = children_svg +
       render_shape(
-        child, rels, slide_num, scale, child_idx, theme, table_styles,
+        child, rels, slide_num, child_scale, child_idx, theme, table_styles,
       )
     ci = ci + 1
   }
