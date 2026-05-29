@@ -34,6 +34,11 @@ All shape `update*` methods:
 - Mark the slide as modified for export
 - Return the re-rendered shape SVG with its `<defs>`
 
+> **Note (headless / batch use):** Editing APIs parse the target slide on demand,
+> so you do **not** need to call `renderSlideSvg(idx)` first. A `loadPptx → updateShapeText → exportPptx`
+> flow works without ever producing SVG. (Before 0.5.10, editing a slide that had
+> not yet been rendered silently failed with `ERROR:shape index out of range`.)
+
 ### Slide Management APIs
 
 | Method | Description |

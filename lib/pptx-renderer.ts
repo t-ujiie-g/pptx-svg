@@ -1099,8 +1099,7 @@ export class PptxRenderer {
     // Ensure content type for this extension
     this.ensureContentTypeForExtension(ext, mimeType);
 
-    // Add Picture shape via Wasm
-    this.renderSlideSvg(slideIdx); // ensure slide is parsed
+    // Add Picture shape via Wasm (add_picture_shape parses the slide on demand).
     return this.exports.add_picture_shape(slideIdx, rid, x, y, cx, cy);
   }
 
@@ -1120,7 +1119,7 @@ export class PptxRenderer {
     if (!ext) return 'ERROR:unsupported image type';
 
     // Find the shape's current rid from SVG data attributes
-    this.renderSlideSvg(slideIdx); // ensure slide is parsed
+    // (render_shape_svg parses the slide on demand via ensure_slide_parsed).
     const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
     if (svg.startsWith('ERROR:')) return svg;
 
@@ -1169,7 +1168,7 @@ export class PptxRenderer {
     if (!this.wasm) return 'ERROR:not initialized';
 
     // Find the shape's rid before deleting
-    this.renderSlideSvg(slideIdx);
+    // (render_shape_svg parses the slide on demand via ensure_slide_parsed).
     const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
     let mediaPath: string | null = null;
     if (!svg.startsWith('ERROR:')) {

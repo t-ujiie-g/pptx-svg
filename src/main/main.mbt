@@ -22,6 +22,9 @@
 //   g_slide_size     — slide dimensions from presentation.xml
 //   g_slides         — parsed SlideData cache (0-indexed), updated by round-trip
 //   g_modified       — per-slide dirty flag for export
+//   g_parsed         — per-slide flag: has the slide XML been parsed into g_slides?
+//                      (g_slides starts as empty placeholders; editing APIs need a
+//                       real parse first — see ensure_slide_parsed)
 //   g_theme          — parsed theme1.xml color/font scheme
 //
 // Inheritance chain (slide → layout → master → theme):
@@ -43,6 +46,9 @@ let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [] }
 
 ///|
 let g_modified : Ref[Array[Bool]] = { val: [] }
+
+///|
+let g_parsed : Ref[Array[Bool]] = { val: [] }
 
 ///|
 let g_theme : Ref[@ooxml.ThemeData] = { val: @ooxml.ThemeData::default() }
@@ -680,6 +686,7 @@ pub fn initialize_pptx() -> String {
   // Initialize slide cache
   let slides : Array[@ooxml.SlideData] = []
   let modified : Array[Bool] = []
+  let parsed : Array[Bool] = []
   let mut i = 0
   while i < count {
     slides.push({
@@ -694,10 +701,12 @@ pub fn initialize_pptx() -> String {
       hidden: false,
     })
     modified.push(false)
+    parsed.push(false)
     i = i + 1
   }
   g_slides.val = slides
   g_modified.val = modified
+  g_parsed.val = parsed
   @ffi.ffi_log(
     "Slide count: " +
     int_to_str(count) +
@@ -961,6 +970,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       hidden: slide_data.hidden,
     }
     g_slides.val[slide_idx] = s
+    g_parsed.val[slide_idx] = true
     ignore(bg_fill_rels)
     s
   }

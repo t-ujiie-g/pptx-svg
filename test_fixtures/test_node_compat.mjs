@@ -1001,6 +1001,34 @@ console.log('Test 35: Image API — deleteImage');
   console.log('  OK: deleteImage');
 }
 
+// --- Test 36: Edit immediately after loadPptx (no prior renderSlideSvg) ---
+// Regression: editing APIs read the g_slides cache, which is populated lazily on
+// the first render. Before the ensure_slide_parsed guard, an edit issued before any
+// renderSlideSvg() silently no-op'd ("ERROR:shape index out of range") and never
+// reached the export. minimal.pptx slide 0 shape 0 is a title with inline text.
+console.log('Test 36: Edit immediately after loadPptx (no prior render)');
+{
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+
+  // No renderSlideSvg(0) here — edit straight after load.
+  const ret = renderer.updateShapeText(0, 0, 0, 0, 'EDITED_NO_PRERENDER');
+  assert(ret.startsWith('<g'), `updateShapeText should return a fragment, got: ${ret.slice(0, 60)}`);
+
+  const ooxml = renderer.getSlideOoxml(0);
+  assert(ooxml.includes('EDITED_NO_PRERENDER'), 'edit should be reflected in slide OOXML');
+
+  // And it must survive a full export round-trip.
+  const out = await renderer.exportPptx();
+  assert(out.byteLength > 0, 'exportPptx should produce bytes');
+  console.log('  OK: edit without pre-render persists to OOXML and export');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);
