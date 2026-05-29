@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.10
+
+### Bug Fixes
+
+- **Editing APIs silently no-op'd when called before the first `renderSlideSvg`** — after `initialize_pptx`, `g_slides[idx]` holds only an empty placeholder (`shapes: []`); the real slide parse + placeholder inheritance ran lazily on the first `render_slide_svg(idx)`. The shape/text editing exports (`update_shape_text`, `update_shape_transform`, `update_shape_fill`, `delete_shape`, `add_shape`, `duplicate_shape`, the E2.5 paragraph/run text APIs, …) read `g_slides` directly, so a headless `loadPptx → updateShapeText → exportPptx` flow — without any intervening render — saw an empty shape array, returned `ERROR:shape index out of range`, left the slide's dirty flag unset, and produced an export with **no edit applied** (verified end-to-end: the round-trip PPTX reopened in python-pptx still showed the original text). Only the three image methods worked, because the TypeScript layer happened to call `renderSlideSvg()` first to "ensure the slide is parsed" — the other editing methods did not, so the contract was inconsistent and undocumented. A new `ensure_slide_parsed(slide_idx)` guard now parses the slide on demand (via the existing `render_slide_svg` parse path, guarded by a new per-slide `g_parsed` flag) at the three Wasm entry points that read `g_slides` directly — `with_shape` (which funnels every shape/text/CRUD edit), `add_shape`, and `add_picture_shape`. Editing now works regardless of call order.
+
+### Refactor
+
+- **Single source of truth for on-demand parsing** — the explicit `this.renderSlideSvg(slideIdx)` "ensure slide is parsed" calls in `addImage` / `replaceImage` / `deleteImage` (`lib/pptx-renderer.ts`) are now redundant (their Wasm exports self-parse via `ensure_slide_parsed`) and have been removed, dropping a wasted full-slide SVG render per image operation.
+
+### Tests
+
+- **Node compatibility**: new *Test 36 — Edit immediately after `loadPptx` (no prior render)* loads `minimal.pptx`, calls `updateShapeText(0,0,0,0,…)` with no preceding `renderSlideSvg`, and asserts the returned fragment, the edited text in `getSlideOoxml(0)`, and a successful `exportPptx` — a direct regression guard for the bug above.
+- Test counts: 182 MoonBit + 142 Node compatibility (was 139) + 16 categorical suites + 25 editing-helper checks.
+
+### Documentation
+
+- **`docs/editing-guide.md`** — note that editing APIs parse the target slide on demand, so `renderSlideSvg(idx)` is not a prerequisite for a headless `loadPptx → edit → exportPptx` flow (with the pre-0.5.10 caveat).
+
 ## 0.5.9
 
 ### Bug Fixes

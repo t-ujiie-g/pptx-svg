@@ -45,6 +45,8 @@ python3 -m http.server 8765 --directory .
 - MoonBit exports (editing): `render_shape_svg`, `update_shape_transform`, `update_shape_text`, `update_shape_fill`, `delete_shape`, `add_shape`, `add_shape_text`, `duplicate_shape`, `update_shape_gradient_fill`, `update_shape_stroke`, `add_paragraph`, `delete_paragraph`, `add_run`, `delete_run`, `update_text_run_style`, `update_text_run_font_size`, `update_text_run_color`, `update_text_run_font`, `update_paragraph_align`, `update_text_run_decoration`, `add_picture_shape`, `replace_picture_rid`
 - Full export list: see `src/main/moon.pkg`
 
+**Lazy slide parse (`g_slides` cache).** `initialize_pptx` fills `g_slides` with empty placeholders (`shapes: []`); the real parse + placeholder inheritance happens on the first `render_slide_svg(idx)`, which caches the resolved `SlideData` and sets `g_parsed[idx]`. Editing exports read `g_slides` directly, so any new editing export that reads the cache **must** route through `with_shape`/`with_run` (which call `ensure_slide_parsed`) or call `ensure_slide_parsed(slide_idx)` itself — otherwise it silently no-ops on a slide that was never rendered (this was the 0.5.10 bug). Don't add per-method `renderSlideSvg()` "ensure parsed" calls in the TS layer; the Wasm boundary is the single source of truth.
+
 **Module dependency (no cycles):**
 ```
 main → renderer   → xml, ooxml, ffi

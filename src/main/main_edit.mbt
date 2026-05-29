@@ -42,6 +42,29 @@ fn resolve_shape_location(
 }
 
 ///|
+/// Ensure a slide's XML has been parsed into the `g_slides` cache.
+///
+/// After `initialize_pptx`, `g_slides[idx]` holds only an empty placeholder
+/// (`shapes: []`); the real parse + placeholder inheritance happens lazily on the
+/// first `render_slide_svg(idx)`. Editing APIs read `g_slides` directly, so calling
+/// one before the slide was ever rendered would silently no-op ("shape index out of
+/// range") and the edit would never reach the export. This guard parses the slide on
+/// demand so editing works regardless of call order.
+fn ensure_slide_parsed(slide_idx : Int) -> Unit {
+  let n = g_slide_count.val
+  if n == 0 || slide_idx < 0 || slide_idx >= n {
+    return
+  }
+  // Already edited (cache authoritative) or already parsed: nothing to do.
+  if g_modified.val[slide_idx] || g_parsed.val[slide_idx] {
+    return
+  }
+  // render_slide_svg parses + inherits and caches into g_slides (sets g_parsed).
+  // The rendered SVG is discarded; we only want the side effect.
+  let _ = render_slide_svg(slide_idx)
+}
+
+///|
 /// Validate slide index and resolve shape. Returns error string or calls `f` with (arr, local_idx).
 fn with_shape(
   slide_idx : Int,
@@ -55,6 +78,7 @@ fn with_shape(
   if slide_idx < 0 || slide_idx >= n {
     return "ERROR:slide index out of range"
   }
+  ensure_slide_parsed(slide_idx)
   let slide = g_slides.val[slide_idx]
   match resolve_shape_location(slide, shape_idx) {
     None => "ERROR:shape index out of range"
@@ -356,6 +380,7 @@ pub fn add_shape(
   if slide_idx < 0 || slide_idx >= n {
     return "ERROR:slide index out of range"
   }
+  ensure_slide_parsed(slide_idx)
   let slide = g_slides.val[slide_idx]
   let transform : @ooxml.ShapeTransform = {
     x,
@@ -418,6 +443,7 @@ pub fn add_picture_shape(
   if slide_idx < 0 || slide_idx >= n {
     return "ERROR:slide index out of range"
   }
+  ensure_slide_parsed(slide_idx)
   let slide = g_slides.val[slide_idx]
   let transform : @ooxml.ShapeTransform = {
     x,
