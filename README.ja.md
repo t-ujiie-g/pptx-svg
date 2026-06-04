@@ -208,6 +208,15 @@ const renderer = new PptxRenderer(options?);
 
 ダブルクリックで直接タイプする `contentEditable` オーバーレイ向け。詳細は [docs/editing-guide.md](docs/editing-guide.md#inline-text-editing)。
 
+**Z-order（重なり順）:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` | `string` | シェイプを最前面 / 最背面へ。`OK:<newShapeIdx>` を返す。 |
+| `bringForward(slideIdx, shapeIdx)` / `sendBackward(...)` | `string` | シェイプを1つ前面 / 背面へ（端では no-op）。`OK:<newShapeIdx>` を返す。 |
+
+z-order はシェイプ配列順（末尾＝最前面）。4つとも undo 可能。
+
 **ノート・コメント:**
 
 | メソッド | 戻り値 | 説明 |

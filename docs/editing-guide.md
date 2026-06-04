@@ -28,6 +28,8 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | Set font family, returns re-rendered SVG |
 | `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | Set paragraph alignment, returns re-rendered SVG |
 | `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | Set underline/strike/super-subscript, returns re-rendered SVG |
+| `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` | Move a shape to the front / back of the z-order, returns `OK:<newShapeIdx>` |
+| `bringForward(slideIdx, shapeIdx)` / `sendBackward(...)` | Move a shape one step toward the front / back, returns `OK:<newShapeIdx>` |
 
 All shape `update*` methods:
 - Modify the cached SlideData in-place (no XML re-parse)
@@ -390,6 +392,26 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Z-Order
+
+Shapes paint in array order — the last shape in a slide is drawn on top (front-most), the first is at the back. These four methods reorder a shape within its container (the slide, or a group for group-child shapes via composite index):
+
+```typescript
+renderer.bringToFront(slideIdx, shapeIdx);   // → "OK:<newShapeIdx>"
+renderer.sendToBack(slideIdx, shapeIdx);
+renderer.bringForward(slideIdx, shapeIdx);   // one step toward front (no-op if front-most)
+renderer.sendBackward(slideIdx, shapeIdx);   // one step toward back  (no-op if back-most)
+```
+
+Reordering changes the shape's index, so each call returns `"OK:<newShapeIdx>"` — use it to keep your selection pointing at the same shape:
+
+```typescript
+const res = renderer.bringToFront(0, selectedIdx);
+if (res.startsWith('OK:')) selectedIdx = parseInt(res.slice(3));
+```
+
+All four are undoable (integrated with [Undo / Redo](#undo--redo)).
 
 ## Inline Text Editing
 

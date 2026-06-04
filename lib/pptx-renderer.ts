@@ -68,6 +68,10 @@ interface PptxWasmExports {
   hit_test_text(slideIdx: number, shapeIdx: number, xEmu: number, yEmu: number): string;
   replace_text_range(slideIdx: number, shapeIdx: number,
     startPara: number, startChar: number, endPara: number, endChar: number, newText: string): string;
+  bring_to_front(slideIdx: number, shapeIdx: number): string;
+  send_to_back(slideIdx: number, shapeIdx: number): string;
+  bring_forward(slideIdx: number, shapeIdx: number): string;
+  send_backward(slideIdx: number, shapeIdx: number): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -895,6 +899,45 @@ export class PptxRenderer {
     startPara: number, startChar: number, endPara: number, endChar: number, newText: string): string {
     this.checkpoint();
     return this.exports.replace_text_range(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText);
+  }
+
+  // ── Z-order API (E6.3) ───────────────────────────────────────────────────────
+
+  /**
+   * Move a shape to the front (top of the z-order).
+   * @returns `"OK:<newShapeIdx>"` (the shape's index changes when reordered, so the
+   *          caller can re-select it), or `"ERROR:..."` on failure.
+   */
+  bringToFront(slideIdx: number, shapeIdx: number): string {
+    this.checkpoint();
+    return this.exports.bring_to_front(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Move a shape to the back (bottom of the z-order).
+   * @returns `"OK:<newShapeIdx>"`, or `"ERROR:..."` on failure.
+   */
+  sendToBack(slideIdx: number, shapeIdx: number): string {
+    this.checkpoint();
+    return this.exports.send_to_back(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Move a shape one step toward the front (no-op if already front-most).
+   * @returns `"OK:<newShapeIdx>"`, or `"ERROR:..."` on failure.
+   */
+  bringForward(slideIdx: number, shapeIdx: number): string {
+    this.checkpoint();
+    return this.exports.bring_forward(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Move a shape one step toward the back (no-op if already back-most).
+   * @returns `"OK:<newShapeIdx>"`, or `"ERROR:..."` on failure.
+   */
+  sendBackward(slideIdx: number, shapeIdx: number): string {
+    this.checkpoint();
+    return this.exports.send_backward(slideIdx, shapeIdx);
   }
 
   // ── Slide management API ────────────────────────────────────────────────────

@@ -969,3 +969,91 @@ pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
   g_parsed.val[slide_idx] = true
   "OK"
 }
+
+// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
+// z-order = position in the containing shape array: `render_slide_svg` and
+// `serialize_slide` both emit shapes in array order, so document order = paint
+// order — the LAST element is front-most, the FIRST is back-most. Reordering
+// happens within the shape's containing array (slide.shapes, or a group's
+// children), and the new composite index is returned so the caller can re-select.
+
+///|
+/// Insert `item` at `idx`, shifting later elements right (in-place).
+fn[T] array_insert_at(arr : Array[T], idx : Int, item : T) -> Unit {
+  arr.push(item)
+  let mut i = arr.length() - 1
+  while i > idx {
+    arr[i] = arr[i - 1]
+    i = i - 1
+  }
+  arr[idx] = item
+}
+
+///|
+/// Composite index for a sibling at `local_idx` within the same container as `shape_idx`.
+fn sibling_composite_idx(shape_idx : Int, local_idx : Int) -> Int {
+  let base = if shape_idx < 1000 { 0 } else { shape_idx / 1000 * 1000 }
+  base + local_idx
+}
+
+///|
+/// Move a shape to the front (top of the z-order = end of the array).
+/// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
+pub fn bring_to_front(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let sh = arr[local_idx]
+    array_remove_at(arr, local_idx)
+    arr.push(sh)
+    g_modified.val[slide_idx] = true
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, arr.length() - 1))
+  })
+}
+
+///|
+/// Move a shape to the back (bottom of the z-order = start of the array).
+/// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
+pub fn send_to_back(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let sh = arr[local_idx]
+    array_remove_at(arr, local_idx)
+    array_insert_at(arr, 0, sh)
+    g_modified.val[slide_idx] = true
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, 0))
+  })
+}
+
+///|
+/// Move a shape one step toward the front (swap with the next sibling).
+/// No-op if already front-most. Returns "OK:<new_composite_idx>".
+pub fn bring_forward(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let new_local = if local_idx < arr.length() - 1 {
+      let sh = arr[local_idx]
+      arr[local_idx] = arr[local_idx + 1]
+      arr[local_idx + 1] = sh
+      g_modified.val[slide_idx] = true
+      local_idx + 1
+    } else {
+      local_idx
+    }
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, new_local))
+  })
+}
+
+///|
+/// Move a shape one step toward the back (swap with the previous sibling).
+/// No-op if already back-most. Returns "OK:<new_composite_idx>".
+pub fn send_backward(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let new_local = if local_idx > 0 {
+      let sh = arr[local_idx]
+      arr[local_idx] = arr[local_idx - 1]
+      arr[local_idx - 1] = sh
+      g_modified.val[slide_idx] = true
+      local_idx - 1
+    } else {
+      local_idx
+    }
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, new_local))
+  })
+}

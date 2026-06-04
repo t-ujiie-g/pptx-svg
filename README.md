@@ -208,6 +208,15 @@ Every mutating editing method records a checkpoint automatically. Configure dept
 
 For double-click-to-type editing with a `contentEditable` overlay. See [docs/editing-guide.md](docs/editing-guide.md#inline-text-editing).
 
+**Z-Order:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` | `string` | Move a shape to the front / back of the z-order. Returns `OK:<newShapeIdx>`. |
+| `bringForward(slideIdx, shapeIdx)` / `sendBackward(...)` | `string` | Move a shape one step toward the front / back (no-op at the edge). Returns `OK:<newShapeIdx>`. |
+
+z-order is shape-array order (later = front). All four are undoable.
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

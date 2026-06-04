@@ -1291,6 +1291,80 @@ console.log('Test 49: replaceTextRange undo');
   console.log('  OK: replaceTextRange undo');
 }
 
+// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
+// Serialized shape order == z-order (later = front). Find each shape by its fill
+// color's position in the slide OOXML.
+function fillPos(ooxml, hex) {
+  return ooxml.toLowerCase().indexOf(hex.toLowerCase());
+}
+// Add red + green rects; returns their shape indices.
+async function twoColoredShapes() {
+  const r = await freshRenderer();
+  const red = parseInt(r.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0).split(':')[1]);
+  const green = parseInt(r.addShape(0, 'rect', 457200, 457200, 914400, 914400, 0, 255, 0).split(':')[1]);
+  return { r, red, green };
+}
+
+// --- Test 50: bringToFront moves a shape to the end (front) ---
+console.log('Test 50: bringToFront');
+{
+  const { r, red, green } = await twoColoredShapes();
+  let ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') < fillPos(ooxml, '00ff00'), 'precondition: red is behind green');
+
+  const ret = r.bringToFront(0, red);
+  assert(ret.startsWith('OK:'), `bringToFront should return OK:<idx>, got ${ret}`);
+  ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') > fillPos(ooxml, '00ff00'), 'red should now be in front of green');
+  console.log('  OK: bringToFront');
+}
+
+// --- Test 51: sendToBack moves a shape to index 0 ---
+console.log('Test 51: sendToBack');
+{
+  const { r, red, green } = await twoColoredShapes();
+  const ret = r.sendToBack(0, green);
+  assert(ret === 'OK:0', `sendToBack should return OK:0, got ${ret}`);
+  const ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, '00ff00') < fillPos(ooxml, 'ff0000'), 'green should now be behind red');
+  console.log('  OK: sendToBack');
+}
+
+// --- Test 52: bringForward / sendBackward swap; no-op at the edge ---
+console.log('Test 52: bringForward / sendBackward');
+{
+  const { r, red, green } = await twoColoredShapes();
+  // red is directly behind green → bringForward swaps them.
+  const fwd = r.bringForward(0, red);
+  assert(fwd === `OK:${red + 1}`, `bringForward should return OK:${red + 1}, got ${fwd}`);
+  let ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') > fillPos(ooxml, '00ff00'), 'red should be in front after bringForward');
+
+  // Move it back down again.
+  const back = r.sendBackward(0, red + 1);
+  assert(back === `OK:${red}`, `sendBackward should return OK:${red}, got ${back}`);
+  ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') < fillPos(ooxml, '00ff00'), 'red should be behind again');
+
+  // green is front-most → bringForward is a no-op (index unchanged).
+  const noop = r.bringForward(0, green);
+  assert(noop === `OK:${green}`, `bringForward at front should be a no-op, got ${noop}`);
+  console.log('  OK: bringForward / sendBackward + edge no-op');
+}
+
+// --- Test 53: z-order change is undoable ---
+console.log('Test 53: z-order undo');
+{
+  const { r, red, green } = await twoColoredShapes();
+  const before = r.getSlideOoxml(0);
+  r.bringToFront(0, red);
+  const after = r.getSlideOoxml(0);
+  assert(after !== before, 'bringToFront should change the slide');
+  r.undo();
+  assert(r.getSlideOoxml(0) === before, 'undo should restore the original z-order');
+  console.log('  OK: z-order undo');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);
