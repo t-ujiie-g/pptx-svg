@@ -198,6 +198,16 @@ Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `imag
 
 Every mutating editing method records a checkpoint automatically. Configure depth via `new PptxRenderer({ maxHistory: 50 })`. See [docs/editing-guide.md](docs/editing-guide.md#undo--redo).
 
+**Inline Text Editing:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getTextLayout(slideIdx, shapeIdx)` | `string` | JSON text geometry (EMU): box + lines → run boxes → per-character boxes. For carets/selections. |
+| `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` | `string` | JSON `{ paraIdx, runIdx, charOffset, paraOffset }` for a click point (EMU). |
+| `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` | `string` | Replace a text range (paragraph-level offsets), preserving boundary run formatting. `\n` splits paragraphs. Undoable. |
+
+For double-click-to-type editing with a `contentEditable` overlay. See [docs/editing-guide.md](docs/editing-guide.md#inline-text-editing).
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

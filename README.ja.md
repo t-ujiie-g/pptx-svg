@@ -198,6 +198,16 @@ const renderer = new PptxRenderer(options?);
 
 すべてのミューテーション編集メソッドが自動でチェックポイントを記録する。深さは `new PptxRenderer({ maxHistory: 50 })` で設定。詳細は [docs/editing-guide.md](docs/editing-guide.md#undo--redo)。
 
+**インライン文字編集:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `getTextLayout(slideIdx, shapeIdx)` | `string` | テキスト幾何の JSON（EMU）: box + 行 → run ボックス → 文字ボックス。キャレット/選択描画用。 |
+| `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` | `string` | クリック座標（EMU）→ JSON `{ paraIdx, runIdx, charOffset, paraOffset }`。 |
+| `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` | `string` | テキスト範囲を置換（段落レベルオフセット）。境界 run の書式を保持。`\n` は段落分割。undo 可能。 |
+
+ダブルクリックで直接タイプする `contentEditable` オーバーレイ向け。詳細は [docs/editing-guide.md](docs/editing-guide.md#inline-text-editing)。
+
 **ノート・コメント:**
 
 | メソッド | 戻り値 | 説明 |

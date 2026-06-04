@@ -4,6 +4,17 @@
 
 ### Features
 
+- **Inline text editing primitives (E6.2)** — three new `PptxRenderer` methods to support a PowerPoint/Google-Slides–style direct-typing experience (double-click to edit, IME input) via a `contentEditable` overlay:
+  - `getTextLayout(slideIdx, shapeIdx)` → JSON text geometry in EMU: `box` + `lines` → run boxes → **per-character boxes** (for drawing carets / selection rectangles). Reuses the renderer's `wrap_paragraph` and a newly shared autofit solver, so **line and run counts always match the rendered SVG**. v1 targets horizontal LTR text (left/center/right/justify); vertical/warp/math/multi-column bodies return only the bounding box.
+  - `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` → JSON `{ paraIdx, runIdx, charOffset, paraOffset }` mapping a click point to a caret insertion position.
+  - `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` → replace a text range (paragraph-level offsets), **preserving the formatting of boundary runs** (runs split/merge as needed). `\n` in `newText` splits into paragraphs; a range spanning paragraphs merges them. Undoable (integrated with the history below).
+  - New TS types exported: `TextLayout`, `TextLine`, `TextRunBox`, `GlyphBox`, `TextHit` (and `HistoryResult`).
+- **New Wasm exports** `get_text_layout` / `hit_test_text` / `replace_text_range`.
+
+### Refactor
+
+- **`solve_text_autofit` extracted** from `render_text` (the normAutofit shrink loop) and shared with the new `build_text_layout`, so the geometry API uses identical font scaling. Render output is unchanged (verified by the existing renderer/Node suites).
+
 - **Undo / Redo edit history (E6.1)** — `PptxRenderer` now tracks a full undo/redo history across every mutating editing API. New methods: `undo()`, `redo()`, `canUndo()`, `canRedo()`, `beginBatch()`, `endBatch()`, `clearHistory()`, plus a `maxHistory` constructor option (default 50). `undo()` / `redo()` return a JSON-encoded `HistoryResult` (`{ slides: number[]; slideCount: number }`) so the caller can re-render only the affected slides, or `"ERROR:nothing to undo"` / `"ERROR:nothing to redo"` on an empty stack.
   - **Unified snapshots** — each checkpoint shallow-clones the document state that diverges from the original ZIP (the TS `files` / `addedFiles` / `removedFiles` / `addedBinaryFiles` collections, strings & bytes shared by reference) plus the OOXML of any in-engine modified slides (via `get_modified_entries`). This covers both shape/text/fill edits (Wasm `g_slides`) and structural edits (`addSlide` / `deleteSlide` / `reorderSlides` / image ops) in one mechanism. Restores rebuild engine state and re-apply pending slide edits.
   - **`beginBatch()` / `endBatch()`** collapse a compound action (e.g. paste = add shape + set text + set fill) into a single undo step; batches are nestable.
@@ -20,8 +31,9 @@
 ### Tests
 
 - **MoonBit**: restore round-trip idempotency tests in `serializer_test.mbt` (`serialize → parse_slide → serialize` is a fixed point; shape text survives a parse_slide round-trip).
-- **Node compatibility**: new Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo. Undo/redo of a transform restores the rendered SVG exactly.
-- Test counts: 184 MoonBit + 177 Node compatibility + 16 categorical suites.
+- **Node compatibility**: Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo (undo/redo of a transform restores the rendered SVG exactly); Tests 44–49 cover `getTextLayout` geometry, `hitTestText`, and `replaceTextRange` insert/delete/merge/newline-split + undo.
+- **MoonBit**: `build_text_layout` structural geometry tests (line/run/char counts, offsets, vertical stacking).
+- Test counts: 188 MoonBit + 201 Node compatibility + 16 categorical suites.
 
 ### Documentation
 

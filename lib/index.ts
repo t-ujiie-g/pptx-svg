@@ -14,7 +14,10 @@
  */
 
 export { PptxRenderer } from './pptx-renderer.js';
-export type { MeasureTextFn, PptxRendererOptions, LogLevel, SlideComment, CommentAuthor } from './pptx-renderer.js';
+export type {
+  MeasureTextFn, PptxRendererOptions, LogLevel, SlideComment, CommentAuthor,
+  HistoryResult, TextLayout, TextLine, TextRunBox, GlyphBox, TextHit,
+} from './pptx-renderer.js';
 export { DEFAULT_FONT_FALLBACKS } from './font-fallbacks.js';
 export type { FontFallbackMap } from './font-fallbacks.js';
 export { bytesToBase64, crc32 } from './utils.js';

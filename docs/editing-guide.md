@@ -73,6 +73,16 @@ Coordinates (`x`, `y`, `cx`, `cy`) are in EMU (English Metric Units). Use `pxToE
 
 Every mutating editing method (shape/text/fill/stroke, add/delete/duplicate, image ops, and slide add/delete/reorder) automatically records a history checkpoint. See [Undo / Redo](#undo--redo) below.
 
+### Inline Text Editing APIs
+
+| Method | Description |
+|--------|-------------|
+| `getTextLayout(slideIdx, shapeIdx)` | Returns JSON text geometry (EMU): box + lines → run boxes → per-character boxes. For drawing carets / selection rectangles. |
+| `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` | Returns JSON `{ paraIdx, runIdx, charOffset, paraOffset }` for a click point (EMU). |
+| `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` | Replace a text range, preserving boundary run formatting. Undoable. |
+
+See [Inline Text Editing](#inline-text-editing) below.
+
 ### Unit Conversion Helpers
 
 ```typescript
@@ -380,6 +390,59 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Inline Text Editing
+
+These three primitives let you build a PowerPoint/Google-Slides–style direct-typing experience (double-click to edit, IME input) using a `contentEditable` overlay: `getTextLayout` gives the geometry to draw a caret/selection, `hitTestText` maps a click to an insertion point, and `replaceTextRange` applies the edit while preserving formatting. All coordinates are in **EMU**.
+
+```typescript
+import type { TextLayout, TextHit } from 'pptx-svg';
+
+// 1. Geometry for caret / selection rendering
+const layout: TextLayout = JSON.parse(renderer.getTextLayout(slideIdx, shapeIdx));
+// layout.box   → { x, y, cx, cy }            (the text body rect, EMU)
+// layout.lines → [{ paraIdx, y, h, runs: [   (each visual line)
+//   { paraIdx, runIdx, x, w, runCharStart, paraCharStart,
+//     chars: [{ x, w }, ...] }                (per-character advance, EMU)
+// ] }]
+
+// 2. Click → caret position
+const hit: TextHit = JSON.parse(renderer.hitTestText(slideIdx, shapeIdx, xEmu, yEmu));
+// hit → { paraIdx, runIdx, charOffset, paraOffset }
+//   charOffset = offset within the run; paraOffset = offset within the paragraph
+
+// 3. Apply a typed/pasted/deleted range (paragraph-level offsets)
+renderer.replaceTextRange(slideIdx, shapeIdx,
+  hit.paraIdx, hit.paraOffset,   // start
+  hit.paraIdx, hit.paraOffset,   // end (== start → insertion)
+  'typed text');
+```
+
+`replaceTextRange` behavior:
+
+- **Offsets are paragraph-level** (use `paraOffset` from `hitTestText`, not `charOffset`).
+- A **collapsed range** (`start == end`) inserts; an **empty `newText`** deletes; a non-empty range with non-empty text replaces.
+- The inserted text **inherits the formatting** of the run at the start boundary; runs are split/merged as needed and surrounding formatting is preserved.
+- **`\n` in `newText` splits into paragraphs** (e.g. multi-line paste); a range spanning paragraphs **merges** them.
+- It is **undoable** (integrated with the history above) and returns the re-rendered shape SVG.
+
+**Scope / limitations of `getTextLayout` (v1):** targets horizontal LTR text (left/center/right/justify). Vertical text, text warp, OMML math, and multi-column bodies return only the bounding box with no per-line geometry. Line and run counts always match the rendered SVG (the layout shares the renderer's wrapping and autofit). Bullets are accounted for approximately on left-aligned lines.
+
+```typescript
+// Example: draw a caret at a click point
+const hit = JSON.parse(renderer.hitTestText(0, shapeIdx, clickXEmu, clickYEmu));
+const layout = JSON.parse(renderer.getTextLayout(0, shapeIdx));
+for (const line of layout.lines) {
+  for (const run of line.runs) {
+    if (run.paraIdx === hit.paraIdx && hit.charOffset >= run.runCharStart &&
+        hit.charOffset <= run.runCharStart + run.chars.length) {
+      const i = hit.charOffset - run.runCharStart;
+      const caretX = i < run.chars.length ? run.chars[i].x : run.x + run.w; // EMU
+      drawCaret(caretX, line.y, line.h);
+    }
+  }
+}
+```
 
 ## Undo / Redo
 

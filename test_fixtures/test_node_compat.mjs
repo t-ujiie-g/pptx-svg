@@ -1175,6 +1175,122 @@ console.log('Test 43: maxHistory cap + export after undo');
   console.log('  OK: maxHistory cap and export-after-undo');
 }
 
+// ── Inline text editing (E6.2) ───────────────────────────────────────────────
+// Build a shape with two runs: "Hello " (normal) + "World" (bold), in one paragraph.
+async function shapeWithTwoRuns() {
+  const r = await freshRenderer();
+  const sIdx = parseInt(r.addShape(0, 'rect', 914400, 914400, 5486400, 1828800, -1, -1, -1).split(':')[1]);
+  r.addShapeText(0, sIdx, 'Hello ', 1800, 0, 0, 0);   // para 0, run 0
+  r.addRun(0, sIdx, 0, 'World');                       // para 0, run 1
+  r.updateTextRunStyle(0, sIdx, 0, 1, 1, -1);          // run 1 → bold
+  return { r, sIdx };
+}
+
+// --- Test 44: getTextLayout returns structured geometry ---
+console.log('Test 44: getTextLayout');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.box && typeof layout.box.cx === 'number', 'layout should carry a box in EMU');
+  assert(Array.isArray(layout.lines) && layout.lines.length >= 1, 'layout should have at least one line');
+  const totalRuns = layout.lines.reduce((n, l) => n + l.runs.length, 0);
+  assert(totalRuns === 2, `expected 2 run boxes, got ${totalRuns}`);
+  const totalChars = layout.lines.reduce((n, l) => n + l.runs.reduce((m, rb) => m + rb.chars.length, 0), 0);
+  assert(totalChars === 'Hello World'.length, `expected 11 glyphs, got ${totalChars}`);
+  // Char x positions are monotonically increasing within the first run.
+  const firstRun = layout.lines[0].runs[0];
+  let monotonic = true;
+  for (let i = 1; i < firstRun.chars.length; i++) {
+    if (firstRun.chars[i].x < firstRun.chars[i - 1].x) monotonic = false;
+  }
+  assert(monotonic, 'char x positions should be monotonically increasing');
+  console.log('  OK: getTextLayout geometry');
+}
+
+// --- Test 45: hitTestText maps a point to a caret position ---
+console.log('Test 45: hitTestText');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const layout = JSON.parse(r.getTextLayout(0, sIdx));
+  const line = layout.lines[0];
+  // Click near the start of the text.
+  const hit = JSON.parse(r.hitTestText(0, sIdx, layout.box.x + 100, line.y + line.h / 2));
+  assert(hit.paraIdx === 0, `expected paraIdx 0, got ${hit.paraIdx}`);
+  assert(typeof hit.charOffset === 'number' && typeof hit.paraOffset === 'number', 'hit should carry offsets');
+  // Click far to the right → caret near the paragraph end.
+  const hitEnd = JSON.parse(r.hitTestText(0, sIdx, layout.box.x + layout.box.cx, line.y + line.h / 2));
+  assert(hitEnd.paraOffset >= hit.paraOffset, 'rightward click should not move caret left');
+  console.log('  OK: hitTestText');
+}
+
+// --- Test 46: replaceTextRange inserts mid-run, preserving boundary formatting ---
+console.log('Test 46: replaceTextRange insert preserves format');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const before = r.getSlideOoxml(0);
+  assert(before.includes('b="1"'), 'precondition: bold run present');
+  // Insert "Brave " at paragraph offset 6 (boundary between "Hello " and "World").
+  const ret = r.replaceTextRange(0, sIdx, 0, 6, 0, 6, 'Brave ');
+  assert(!ret.startsWith('ERROR'), `replaceTextRange should succeed, got ${ret}`);
+  const after = r.getSlideOoxml(0);
+  assert(after.includes('Brave'), 'inserted text should be present');
+  assert(after.includes('Hello') && after.includes('World'), 'original text should be preserved');
+  assert(after.includes('b="1"'), 'bold run (World) should survive the insert');
+  console.log('  OK: insert preserves format');
+}
+
+// --- Test 47: replaceTextRange deletes across runs ---
+console.log('Test 47: replaceTextRange delete across runs');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  // "Hello World" → delete offsets 3..8 ("lo Wo") → "Helrld".
+  r.replaceTextRange(0, sIdx, 0, 3, 0, 8, '');
+  const ooxml = r.getSlideOoxml(0);
+  // Inspect run texts directly (slide 0's pre-existing title also contains "Hello").
+  const texts = [...ooxml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map(m => m[1]);
+  assert(texts.includes('Hel'), `left remainder "Hel" should be a run, got ${JSON.stringify(texts)}`);
+  assert(texts.includes('rld'), `right remainder "rld" should be a run, got ${JSON.stringify(texts)}`);
+  assert(!texts.includes('Hello '), 'deleted "Hello " run should be gone');
+  assert(!texts.includes('World'), 'deleted "World" run should be gone');
+  assert(ooxml.includes('b="1"'), 'bold formatting of "rld" remainder should survive');
+  console.log('  OK: delete across runs');
+}
+
+// --- Test 48: replaceTextRange merges paragraphs / splits on newline ---
+console.log('Test 48: replaceTextRange paragraph merge + newline split');
+{
+  // Two paragraphs "AAA" / "BBB" → delete the boundary → single paragraph "AAABBB".
+  const r = await freshRenderer();
+  const sIdx = parseInt(r.addShape(0, 'rect', 914400, 914400, 5486400, 1828800, -1, -1, -1).split(':')[1]);
+  r.addShapeText(0, sIdx, 'AAA', 1800, 0, 0, 0);  // para 0
+  r.addParagraph(0, sIdx, 'BBB', '');             // para 1
+  let layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.lines.length === 2, `precondition: 2 lines, got ${layout.lines.length}`);
+  r.replaceTextRange(0, sIdx, 0, 3, 1, 0, '');     // merge
+  layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.lines.length === 1, `merge should yield 1 line, got ${layout.lines.length}`);
+
+  // Newline split: insert "X\nY" inside the merged "AAABBB" → 2 paragraphs again.
+  r.replaceTextRange(0, sIdx, 0, 3, 0, 3, 'X\nY');
+  layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.lines.length === 2, `newline should split into 2 lines, got ${layout.lines.length}`);
+  console.log('  OK: paragraph merge + newline split');
+}
+
+// --- Test 49: replaceTextRange is undoable (E6.1 integration) ---
+console.log('Test 49: replaceTextRange undo');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const before = r.renderSlideSvg(0);
+  r.replaceTextRange(0, sIdx, 0, 0, 0, 11, 'Replaced');
+  const after = r.renderSlideSvg(0);
+  assert(after !== before, 'replace should change the SVG');
+  assert(r.canUndo(), 'replaceTextRange should be undoable');
+  r.undo();
+  assert(r.renderSlideSvg(0) === before, 'undo should restore the original text');
+  console.log('  OK: replaceTextRange undo');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

@@ -64,6 +64,10 @@ interface PptxWasmExports {
     x: number, y: number, cx: number, cy: number): string;
   replace_picture_rid(slideIdx: number, shapeIdx: number, newRid: string): string;
   restore_slide_ooxml(slideIdx: number, xml: string): string;
+  get_text_layout(slideIdx: number, shapeIdx: number): string;
+  hit_test_text(slideIdx: number, shapeIdx: number, xEmu: number, yEmu: number): string;
+  replace_text_range(slideIdx: number, shapeIdx: number,
+    startPara: number, startChar: number, endPara: number, endChar: number, newText: string): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -126,6 +130,49 @@ export interface PptxRendererOptions {
 export interface HistoryResult {
   slides: number[];
   slideCount: number;
+}
+
+/** A single glyph box in {@link TextLayout} (EMU, absolute). */
+export interface GlyphBox { x: number; w: number }
+
+/** A run fragment box within a {@link TextLine} (EMU, absolute). */
+export interface TextRunBox {
+  paraIdx: number;
+  runIdx: number;
+  x: number;
+  w: number;
+  /** Char offset within the run where this box begins. */
+  runCharStart: number;
+  /** Char offset within the paragraph where this box begins. */
+  paraCharStart: number;
+  chars: GlyphBox[];
+}
+
+/** A visual line in {@link TextLayout} (EMU). */
+export interface TextLine {
+  paraIdx: number;
+  y: number;
+  h: number;
+  runs: TextRunBox[];
+}
+
+/**
+ * Text geometry returned by {@link PptxRenderer.getTextLayout} (parsed from JSON).
+ * All coordinates are in EMU.
+ */
+export interface TextLayout {
+  box: { x: number; y: number; cx: number; cy: number };
+  lines: TextLine[];
+}
+
+/** Caret position returned by {@link PptxRenderer.hitTestText} (parsed from JSON). */
+export interface TextHit {
+  paraIdx: number;
+  runIdx: number;
+  /** Char offset within the run. */
+  charOffset: number;
+  /** Char offset within the paragraph (use with `replaceTextRange`). */
+  paraOffset: number;
 }
 
 /**
@@ -808,6 +855,46 @@ export class PptxRenderer {
     paraIdx: number, runIdx: number, underline = '', strike = '', baseline = -1): string {
     this.checkpoint();
     return this.exports.update_text_run_decoration(slideIdx, shapeIdx, paraIdx, runIdx, underline, strike, baseline);
+  }
+
+  // ── Inline text editing API (E6.2) ───────────────────────────────────────────
+
+  /**
+   * Get the text geometry of a shape's text body for caret / selection rendering.
+   * @returns JSON-encoded {@link TextLayout} string (coordinates in EMU), or
+   *          `"ERROR:..."` on failure.
+   *
+   * Scope: horizontal LTR text (left/center/right/justify). Vertical text, warp,
+   * OMML math, and multi-column bodies return only the bounding box with no lines.
+   * Line and run counts match the rendered SVG (shared wrapping/autofit).
+   */
+  getTextLayout(slideIdx: number, shapeIdx: number): string {
+    return this.exports.get_text_layout(slideIdx, shapeIdx);
+  }
+
+  /**
+   * Hit-test a point (EMU) against a shape's text to find the caret insertion point.
+   * @returns JSON-encoded {@link TextHit} string, or `"ERROR:..."` on failure.
+   *          `charOffset` is within the run; `paraOffset` is within the paragraph
+   *          (pass `paraOffset` values to {@link replaceTextRange}).
+   */
+  hitTestText(slideIdx: number, shapeIdx: number, xEmu: number, yEmu: number): string {
+    return this.exports.hit_test_text(slideIdx, shapeIdx, xEmu, yEmu);
+  }
+
+  /**
+   * Replace a text range with `newText`, preserving the formatting of the runs at
+   * the range boundaries (splitting/merging runs as needed). Returns re-rendered
+   * shape SVG, or `"ERROR:..."` on failure.
+   *
+   * `startChar` / `endChar` are paragraph-level character offsets (use `paraOffset`
+   * from {@link hitTestText}). A collapsed range (start == end) inserts; an empty
+   * `newText` deletes. `\n` in `newText` splits into multiple paragraphs.
+   */
+  replaceTextRange(slideIdx: number, shapeIdx: number,
+    startPara: number, startChar: number, endPara: number, endChar: number, newText: string): string {
+    this.checkpoint();
+    return this.exports.replace_text_range(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText);
   }
 
   // ── Slide management API ────────────────────────────────────────────────────
