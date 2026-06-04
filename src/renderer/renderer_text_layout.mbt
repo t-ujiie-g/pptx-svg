@@ -46,36 +46,6 @@ pub(all) struct TextLayout {
 }
 
 ///|
-/// Resolve a run's measurement font size in px (matches `measure_line_width`).
-fn layout_run_fs_px(
-  run : @ooxml.TextRun,
-  scale : Int,
-  def_sz : Int,
-  font_scale : Int,
-) -> Double {
-  let fs_raw = if run.font_size > 0 {
-    run.font_size
-  } else if def_sz > 0 {
-    def_sz * scale / @ooxml.emu_per_hundredth_pt
-  } else {
-    1800
-  }
-  px(apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt, scale).to_double()
-}
-
-///|
-/// Resolve a run's measurement font face (matches `measure_line_width`).
-fn layout_run_ff(run : @ooxml.TextRun, theme : @ooxml.ThemeData) -> String {
-  if !run.ea_font.is_empty() {
-    run.ea_font
-  } else if !run.font_face.is_empty() {
-    run.font_face
-  } else {
-    theme.minor_font
-  }
-}
-
-///|
 /// Approximate bullet glyph width (px) for a paragraph's first line.
 fn layout_bullet_width_px(
   para : @ooxml.TextParagraph,
@@ -263,7 +233,7 @@ pub fn build_text_layout(
     }
     let consumed : Array[Int] = Array::make(nr, 0)
 
-    let wrap_w = if do_wrap { text_w - indent } else { 1_000_000_000 }
+    let wrap_w = if do_wrap { text_w - indent } else { no_wrap_width_px }
     let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
     let nvl = vlines.length()
     let mut vli = 0
@@ -317,8 +287,8 @@ pub fn build_text_layout(
       while fi < nf {
         let (run_idx, frag_text) = vline[fi]
         let run = para.runs[run_idx]
-        let ff = layout_run_ff(run, theme)
-        let fs_px = layout_run_fs_px(run, scale, def_sz, fs)
+        let ff = run_font_face(run, theme)
+        let fs_px = run_fs_px(run, scale, def_sz, fs)
         let text = if run.cap == "all" {
           to_upper_ascii(frag_text)
         } else {

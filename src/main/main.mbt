@@ -782,7 +782,6 @@ pub fn get_entry_list() -> String {
 /// placeholders with no text, so re-running this on already-serialized slide XML
 /// is idempotent — Undo/Redo restores keep full visual fidelity.
 fn resolve_slide_data(
-  slide_idx : Int,
   slide_num : Int,
   slide_xml : String,
   rels : Array[@ooxml.Relationship],
@@ -792,7 +791,6 @@ fn resolve_slide_data(
   master_path : String,
   base_theme : @ooxml.ThemeData,
 ) -> @ooxml.SlideData {
-  ignore(slide_idx)
   let effective_theme = {
     // Start with master's clr_map applied to master's theme
     let mut eff = match master_opt {
@@ -995,8 +993,8 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       return "ERROR:slide XML not found: " + slide_path
     }
     let s = resolve_slide_data(
-      slide_idx, slide_num, slide_xml, rels, layout_opt, master_opt, layout_path,
-      master_path, base_theme,
+      slide_num, slide_xml, rels, layout_opt, master_opt, layout_path, master_path,
+      base_theme,
     )
     g_slides.val[slide_idx] = s
     g_parsed.val[slide_idx] = true

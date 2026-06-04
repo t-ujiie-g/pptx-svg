@@ -48,6 +48,12 @@ let pct_line_height_numer : Int = 12 // for %-based spacing: font-size * 12/10 â
 let pct_line_height_denom : Int = 10
 
 ///|
+let default_run_fs_hundredths : Int = 1800 // 18 pt â€” fallback run size when none resolves
+
+///|
+let no_wrap_width_px : Int = 1_000_000_000 // sentinel "infinite" width for non-wrapping layout
+
+///|
 let default_text_fill : String = "black"
 
 ///|

@@ -14,6 +14,8 @@
 ### Refactor
 
 - **`solve_text_autofit` extracted** from `render_text` (the normAutofit shrink loop) and shared with the new `build_text_layout`, so the geometry API uses identical font scaling. Render output is unchanged (verified by the existing renderer/Node suites).
+- **De-duplicated per-run font resolution** — the identical `fs_raw`/`ff` fallback logic in `wrap_paragraph`, `measure_line_width`, and `build_text_layout` is now shared helpers `run_fs_px` / `run_font_face` in `renderer_text.mbt`. Magic numbers named: `default_run_fs_hundredths` (18pt fallback), `no_wrap_width_px` (layout sentinel). Removed the unused `slide_idx` parameter from `resolve_slide_data`.
+- **Inline text editing exports moved** to `src/main/main_text_edit.mbt` (from `main_edit.mbt`) for cohesion. A new "Refactoring checklist" was added to `CLAUDE.md`.
 
 - **Undo / Redo edit history (E6.1)** — `PptxRenderer` now tracks a full undo/redo history across every mutating editing API. New methods: `undo()`, `redo()`, `canUndo()`, `canRedo()`, `beginBatch()`, `endBatch()`, `clearHistory()`, plus a `maxHistory` constructor option (default 50). `undo()` / `redo()` return a JSON-encoded `HistoryResult` (`{ slides: number[]; slideCount: number }`) so the caller can re-render only the affected slides, or `"ERROR:nothing to undo"` / `"ERROR:nothing to redo"` on an empty stack.
   - **Unified snapshots** — each checkpoint shallow-clones the document state that diverges from the original ZIP (the TS `files` / `addedFiles` / `removedFiles` / `addedBinaryFiles` collections, strings & bytes shared by reference) plus the OOXML of any in-engine modified slides (via `get_modified_entries`). This covers both shape/text/fill edits (Wasm `g_slides`) and structural edits (`addSlide` / `deleteSlide` / `reorderSlides` / image ops) in one mechanism. Restores rebuild engine state and re-apply pending slide edits.
@@ -32,8 +34,8 @@
 
 - **MoonBit**: restore round-trip idempotency tests in `serializer_test.mbt` (`serialize → parse_slide → serialize` is a fixed point; shape text survives a parse_slide round-trip).
 - **Node compatibility**: Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo (undo/redo of a transform restores the rendered SVG exactly); Tests 44–49 cover `getTextLayout` geometry, `hitTestText`, and `replaceTextRange` insert/delete/merge/newline-split + undo.
-- **MoonBit**: `build_text_layout` structural geometry tests (line/run/char counts, offsets, vertical stacking).
-- Test counts: 188 MoonBit + 201 Node compatibility + 16 categorical suites.
+- **MoonBit**: `build_text_layout` structural geometry tests (line/run/char counts, offsets, vertical stacking) + `hit_test_layout` vertical-band selection & empty-layout fallback.
+- Test counts: 190 MoonBit + 201 Node compatibility + 16 categorical suites.
 
 ### Documentation
 

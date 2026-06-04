@@ -2089,3 +2089,37 @@ test "build_text_layout empty paragraph yields empty line" {
   assert_eq(tl.lines[1].para_idx, 1)
   assert_eq(tl.lines[1].runs.length(), 0)
 }
+
+///|
+test "hit_test_layout selects line by vertical band" {
+  let tl = build_text_layout(
+    [tl_para([tl_run("First")]), tl_para([tl_run("Second")])],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  // A point inside the second line's vertical band resolves to paragraph 1.
+  let l1 = tl.lines[1]
+  let (p, _, _, _) = hit_test_layout(tl, l1.runs[0].x, l1.y + l1.h / 2)
+  assert_eq(p, 1)
+  // A point above the first line clamps to paragraph 0.
+  let (p0, _, _, _) = hit_test_layout(tl, tl.box_x, tl.lines[0].y - 100000)
+  assert_eq(p0, 0)
+}
+
+///|
+test "hit_test_layout on empty layout returns origin" {
+  let tl = build_text_layout(
+    [],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  let (p, r, c, po) = hit_test_layout(tl, 100000, 100000)
+  assert_eq(p, 0)
+  assert_eq(r, 0)
+  assert_eq(c, 0)
+  assert_eq(po, 0)
+}

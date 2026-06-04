@@ -43,6 +43,8 @@ python3 -m http.server 8765 --directory .
 - MoonBit calls `ffi_get_file(path)` to pull individual files on demand
 - MoonBit exports (read-only): `initialize_pptx`, `get_slide_count`, `is_slide_hidden`, `get_slide_xml_raw`, `get_entry_list`, `render_slide_svg`, `update_slide_from_svg`, `get_slide_ooxml`, `get_modified_entries`
 - MoonBit exports (editing): `render_shape_svg`, `update_shape_transform`, `update_shape_text`, `update_shape_fill`, `delete_shape`, `add_shape`, `add_shape_text`, `duplicate_shape`, `update_shape_gradient_fill`, `update_shape_stroke`, `add_paragraph`, `delete_paragraph`, `add_run`, `delete_run`, `update_text_run_style`, `update_text_run_font_size`, `update_text_run_color`, `update_text_run_font`, `update_paragraph_align`, `update_text_run_decoration`, `add_picture_shape`, `replace_picture_rid`
+- MoonBit exports (history E6.1): `restore_slide_ooxml`
+- MoonBit exports (inline text editing E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range`
 - Full export list: see `src/main/moon.pkg`
 
 **Lazy slide parse (`g_slides` cache).** `initialize_pptx` fills `g_slides` with empty placeholders (`shapes: []`); the real parse + placeholder inheritance happens on the first `render_slide_svg(idx)`, which caches the resolved `SlideData` and sets `g_parsed[idx]`. Editing exports read `g_slides` directly, so any new editing export that reads the cache **must** route through `with_shape`/`with_run` (which call `ensure_slide_parsed`) or call `ensure_slide_parsed(slide_idx)` itself — otherwise it silently no-ops on a slide that was never rendered (this was the 0.5.10 bug). Don't add per-method `renderSlideSvg()` "ensure parsed" calls in the TS layer; the Wasm boundary is the single source of truth.
@@ -192,7 +194,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/ooxml/ooxml_chart.mbt` | ChartML parser (c:chartSpace → ChartData) |
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape rendering + public API |
 | `src/renderer/renderer_table.mbt` | Table SVG rendering (cell borders, merging, conditional formatting) |
-| `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) |
+| `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) + shared helpers (`solve_text_autofit`, `run_fs_px`, `run_ff`, `wrap_paragraph`, `measure_line_width`) |
+| `src/renderer/renderer_text_layout.mbt` | Text geometry for inline editing (E6.2): `build_text_layout` / `text_layout_to_json` / `hit_test_layout` (EMU per-char boxes) |
 | `src/renderer/renderer_warp.mbt` | Text warp rendering (SVG `<textPath>` + transforms for prstTxWarp presets) |
 | `src/renderer/renderer_math.mbt` | OMML math rendering (fractions, radicals, integrals, matrices → SVG) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
@@ -201,7 +204,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
-| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes) |
+| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes) + history (`restore_slide_ooxml`, E6.1) |
+| `src/main/main_text_edit.mbt` | Inline text editing exports (E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range` + `split_para_runs` |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
 | `src/main/moon.pkg` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
@@ -277,3 +281,15 @@ npm run build                               # Full build (Wasm + TypeScript)
 npm run test:node                           # Node.js integration tests pass
 # Browser: http://localhost:8765/web/index.html  # Visual check
 ```
+
+## Refactoring checklist
+
+When asked to "refactor" (リファクタリング), review against these five criteria and apply only low-risk, high-value changes — don't restructure working code for its own sake. If nothing needs doing, say so rather than forcing changes.
+
+1. **Constant management / no magic numbers.** Numeric literals with domain meaning (EMU sizes, font fallbacks, default depths, sentinels) get a named `let` in the constants block (`renderer.mbt` for renderer, module top for others). Re-used literals must be a single shared constant, not copies.
+2. **No duplication / dead code.** Identical logic in 2+ places → extract one shared helper (e.g. per-run font resolution → `run_fs_px`/`run_ff` in `renderer_text.mbt`, shared by `wrap_paragraph`/`measure_line_width`/`build_text_layout`). Remove unused params (don't paper over with `ignore(x)`), unreachable branches, and commented-out code.
+3. **File splitting.** Keep files cohesive and roughly under ~1500 lines where practical. Same-package MoonBit files (`src/main/*.mbt`, `src/renderer/*.mbt`) can be split purely for organization with zero API risk — prefer one file per concern (e.g. `main_text_edit.mbt` for inline-text exports). Don't split the giant pre-existing renderers (`renderer_chart.mbt`, `render_text`) without a strong reason — high risk.
+4. **Docs up to date.** After any change, sync `CLAUDE.md` (Key files table, FFI export list, data model), `docs/editing-guide.md`, `README.md`/`README.ja.md`, `CHANGELOG.md` (`## Unreleased`), and `TODO.md`. Version bumps in `package.json` are deferred to release (keep current; CHANGELOG accumulates under `## Unreleased`).
+5. **Test coverage.** Every behavior has a MoonBit unit test (pure functions, round-trip) and/or a Node integration test (`test_node_compat.mjs`). After refactoring, the full suite (`npm test`) must stay green with unchanged counts unless tests were intentionally added.
+
+After refactoring, run `npm test` and confirm rendering output is unchanged (the renderer/Node suites guard this).

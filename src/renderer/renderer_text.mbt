@@ -168,6 +168,37 @@ fn count_spaces(text : String) -> Int {
 }
 
 ///|
+/// Resolve a run's measurement font size in px (shared by wrapping, line
+/// measurement, and the text-layout geometry builder).
+fn run_fs_px(
+  run : @ooxml.TextRun,
+  scale : Int,
+  def_sz : Int,
+  font_scale : Int,
+) -> Double {
+  let fs_raw = if run.font_size > 0 {
+    run.font_size
+  } else if def_sz > 0 {
+    def_sz * scale / @ooxml.emu_per_hundredth_pt
+  } else {
+    default_run_fs_hundredths
+  }
+  px(apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt, scale).to_double()
+}
+
+///|
+/// Resolve a run's measurement font face: East Asian → Latin → theme minor.
+fn run_font_face(run : @ooxml.TextRun, theme : @ooxml.ThemeData) -> String {
+  if !run.ea_font.is_empty() {
+    run.ea_font
+  } else if !run.font_face.is_empty() {
+    run.font_face
+  } else {
+    theme.minor_font
+  }
+}
+
+///|
 /// Measure total rendered width of a visual line (array of run fragments).
 /// Returns (width_px, space_count).
 fn measure_line_width(
@@ -188,24 +219,8 @@ fn measure_line_width(
   while fi < nf {
     let (run_idx, frag_text) = vline[fi]
     let run = para.runs[run_idx]
-    let fs_raw = if run.font_size > 0 {
-      run.font_size
-    } else if def_sz > 0 {
-      def_sz * scale / @ooxml.emu_per_hundredth_pt
-    } else {
-      1800
-    }
-    let fs_px = px(
-      apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
-      scale,
-    ).to_double()
-    let ff = if !run.ea_font.is_empty() {
-      run.ea_font
-    } else if !run.font_face.is_empty() {
-      run.font_face
-    } else {
-      theme.minor_font
-    }
+    let fs_px = run_fs_px(run, scale, def_sz, font_scale)
+    let ff = run_font_face(run, theme)
     let text = if run.cap == "all" {
       to_upper_ascii(frag_text)
     } else {
@@ -254,24 +269,8 @@ fn wrap_paragraph(
   let mut ri = 0
   while ri < nr {
     let run = para.runs[ri]
-    let fs_raw = if run.font_size > 0 {
-      run.font_size
-    } else if def_sz > 0 {
-      def_sz * scale / @ooxml.emu_per_hundredth_pt
-    } else {
-      1800
-    }
-    let fs_px = px(
-      apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
-      scale,
-    ).to_double()
-    let ff = if !run.ea_font.is_empty() {
-      run.ea_font
-    } else if !run.font_face.is_empty() {
-      run.font_face
-    } else {
-      theme.minor_font
-    }
+    let fs_px = run_fs_px(run, scale, def_sz, font_scale)
+    let ff = run_font_face(run, theme)
     let text = if run.cap == "all" {
       to_upper_ascii(run.text)
     } else {
