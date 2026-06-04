@@ -4,6 +4,9 @@
 
 ### Features
 
+- **Atomic multi-shape transform (E6.4)** — `updateShapesTransform(slideIdx, items)` applies new transforms (EMU; rot in 1/60000 deg) to several shapes in one call. Every `shapeIdx` is validated *before* any change is applied, so an invalid index leaves the slide untouched (no partial application), and the whole batch is a single undo step. Returns `"OK:<count>"`. New Wasm export `update_shapes_transform`.
+  - **History fix**: a failed/no-op `updateShapesTransform` no longer leaves a phantom undo step — a new guarded-checkpoint path (`commitCheckpoint`) captures the pre-edit snapshot but only commits it to the undo stack when the (atomic) operation succeeds.
+
 - **Z-order operations (E6.3)** — `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` / `bringForward(...)` / `sendBackward(...)` on `PptxRenderer` reorder a shape within its container (slide or group). z-order equals shape-array order (later = front-most), so these move the shape to the end / start / one step within the array. Each returns `"OK:<newShapeIdx>"` (the index changes when reordered, so the caller can re-select) and is undoable (integrated with the history). New Wasm exports `bring_to_front` / `send_to_back` / `bring_forward` / `send_backward`.
 
 - **Inline text editing primitives (E6.2)** — three new `PptxRenderer` methods to support a PowerPoint/Google-Slides–style direct-typing experience (double-click to edit, IME input) via a `contentEditable` overlay:
@@ -37,8 +40,8 @@
 - **MoonBit**: restore round-trip idempotency tests in `serializer_test.mbt` (`serialize → parse_slide → serialize` is a fixed point; shape text survives a parse_slide round-trip).
 - **Node compatibility**: Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo (undo/redo of a transform restores the rendered SVG exactly); Tests 44–49 cover `getTextLayout` geometry, `hitTestText`, and `replaceTextRange` insert/delete/merge/newline-split + undo.
 - **MoonBit**: `build_text_layout` structural geometry tests (line/run/char counts, offsets, vertical stacking) + `hit_test_layout` vertical-band selection & empty-layout fallback.
-- **Node compatibility**: Tests 50–53 cover z-order bringToFront/sendToBack/bringForward/sendBackward (serialized order checks, edge no-op, returned index) and undo.
-- Test counts: 190 MoonBit + 213 Node compatibility + 16 categorical suites.
+- **Node compatibility**: Tests 50–53 cover z-order bringToFront/sendToBack/bringForward/sendBackward (serialized order checks, edge no-op, returned index) and undo; Test 54 covers `updateShapesTransform` atomic batch apply, atomicity on a bad index (no partial application), and single-undo revert.
+- Test counts: 190 MoonBit + 220 Node compatibility + 16 categorical suites.
 
 ### Documentation
 

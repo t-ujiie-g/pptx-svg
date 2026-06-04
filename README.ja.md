@@ -140,6 +140,7 @@ const renderer = new PptxRenderer(options?);
 |--------|---------|------|
 | `renderShapeSvg(slideIdx, shapeIdx)` | `string` | 単一シェイプを SVG フラグメントとして描画。 |
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | 位置/サイズ/回転を更新（EMU単位）。再描画SVGを返す。 |
+| `updateShapesTransform(slideIdx, items)` | `string` | 複数シェイプの transform を原子的に一括更新（1 undo 単位）。`OK:<count>` を返す。 |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | テキスト内容を更新。再描画SVGを返す。 |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | 塗りつぶし色を更新（0-255）。再描画SVGを返す。 |
 | `deleteShape(slideIdx, shapeIdx)` | `string` | シェイプを削除。グループ内シェイプは composite index で指定。 |

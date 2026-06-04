@@ -10,6 +10,7 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 |--------|-------------|
 | `renderShapeSvg(slideIdx, shapeIdx)` | Render a single shape as SVG fragment |
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | Update position/size/rotation (EMU), returns re-rendered SVG |
+| `updateShapesTransform(slideIdx, items)` | Atomically update several shapes' transforms as one undo step, returns `OK:<count>` |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | Update text content, returns re-rendered SVG |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | Update solid fill color, returns re-rendered SVG |
 | `deleteShape(slideIdx, shapeIdx)` | Delete a shape by index (supports group children via composite index) |
@@ -392,6 +393,20 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Multi-shape Transform
+
+For multi-select move/align, `updateShapesTransform` applies new transforms to several shapes in a single atomic call — every `shapeIdx` is validated before any change is applied (a bad index leaves the slide untouched), and the whole batch becomes **one** undo step:
+
+```typescript
+const res = renderer.updateShapesTransform(0, [
+  { shapeIdx: 2, x: 1000000, y: 1000000, cx: 914400, cy: 914400, rot: 0 },
+  { shapeIdx: 5, x: 2000000, y: 1000000, cx: 914400, cy: 914400, rot: 0 },
+]); // → "OK:2"
+renderer.renderSlideSvg(0); // re-render the slide afterwards
+```
+
+Values are EMU (rotation in 1/60000°). This is equivalent to wrapping individual `updateShapeTransform` calls in `beginBatch()`/`endBatch()`, but additionally guarantees atomicity (no partial application on a bad index) in a single Wasm call. A failed call records no undo step.
 
 ## Z-Order
 

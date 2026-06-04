@@ -50,6 +50,7 @@ options(
         "send_to_back",
         "bring_forward",
         "send_backward",
+        "update_shapes_transform",
       ],
       "use-js-builtin-string": true,
     },

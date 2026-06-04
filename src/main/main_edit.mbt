@@ -313,6 +313,71 @@ pub fn update_shape_transform(
 }
 
 ///|
+/// Update several shapes' transforms atomically in a single call (E6.4).
+///
+/// `items_data` is `"shapeIdx,x,y,cx,cy,rot;..."` (all EMU; rot in 1/60000 deg).
+/// Every shape index is resolved and validated *before* any change is applied, so
+/// a bad index leaves the slide untouched (no partial application). Intended for
+/// multi-select move/align as one undo step. Returns "OK:<count>" or "ERROR:...".
+pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  ensure_slide_parsed(slide_idx)
+  let slide = g_slides.val[slide_idx]
+  // Pass 1: parse + validate every item, collecting (array, local_idx, transform).
+  let targets : Array[(Array[@ooxml.Shape], Int, @ooxml.ShapeTransform)] = []
+  let parts = split_string(items_data, ';')
+  let np = parts.length()
+  let mut i = 0
+  while i < np {
+    let part = parts[i]
+    i = i + 1
+    if part.is_empty() {
+      continue
+    }
+    let vals = split_string(part, ',')
+    if vals.length() < 6 {
+      return "ERROR:invalid transform item: " + part
+    }
+    let s_idx = @xml.parse_int(vals[0])
+    match resolve_shape_location(slide, s_idx) {
+      None => return "ERROR:shape index out of range: " + vals[0]
+      Some((arr, local_idx)) => {
+        let cur = arr[local_idx]
+        let t : @ooxml.ShapeTransform = {
+          x: @xml.parse_int(vals[1]),
+          y: @xml.parse_int(vals[2]),
+          cx: @xml.parse_int(vals[3]),
+          cy: @xml.parse_int(vals[4]),
+          rot: @xml.parse_int(vals[5]),
+          flip_h: cur.transform.flip_h,
+          flip_v: cur.transform.flip_v,
+        }
+        targets.push((arr, local_idx, t))
+      }
+    }
+  }
+  if targets.is_empty() {
+    return "ERROR:no transform items"
+  }
+  // Pass 2: apply (transform edits never change indices, so this is safe).
+  let nt = targets.length()
+  let mut j = 0
+  while j < nt {
+    let (arr, local_idx, t) = targets[j]
+    arr[local_idx] = { ..arr[local_idx], transform: t }
+    j = j + 1
+  }
+  g_modified.val[slide_idx] = true
+  "OK:" + int_to_str(nt)
+}
+
+///|
 /// Update a text run's content and return the shape's re-rendered SVG.
 pub fn update_shape_text(
   slide_idx : Int,

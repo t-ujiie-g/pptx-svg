@@ -1365,6 +1365,43 @@ console.log('Test 53: z-order undo');
   console.log('  OK: z-order undo');
 }
 
+// ── Multi-shape transform (E6.4) ─────────────────────────────────────────────
+function shapeX(r, idx) {
+  const m = r.renderShapeSvg(0, idx).match(/data-ooxml-x="(-?\d+)"/);
+  return m ? parseInt(m[1]) : NaN;
+}
+
+// --- Test 54: updateShapesTransform — atomic batch + single undo ---
+console.log('Test 54: updateShapesTransform (atomic + undo)');
+{
+  const { r, red, green } = await twoColoredShapes();
+  const redX0 = shapeX(r, red);
+  const greenX0 = shapeX(r, green);
+
+  // Batch move both.
+  const ret = r.updateShapesTransform(0, [
+    { shapeIdx: red, x: 1000000, y: 1000000, cx: 914400, cy: 914400, rot: 0 },
+    { shapeIdx: green, x: 2000000, y: 2000000, cx: 914400, cy: 914400, rot: 0 },
+  ]);
+  assert(ret === 'OK:2', `updateShapesTransform should return OK:2, got ${ret}`);
+  assert(shapeX(r, red) === 1000000, 'red should move to x=1000000');
+  assert(shapeX(r, green) === 2000000, 'green should move to x=2000000');
+
+  // Atomicity: one bad index → nothing applied.
+  const bad = r.updateShapesTransform(0, [
+    { shapeIdx: red, x: 5000000, y: 0, cx: 914400, cy: 914400, rot: 0 },
+    { shapeIdx: 9999, x: 0, y: 0, cx: 914400, cy: 914400, rot: 0 },
+  ]);
+  assert(bad.startsWith('ERROR'), `bad index should error, got ${bad}`);
+  assert(shapeX(r, red) === 1000000, 'atomic: red must NOT move when batch fails');
+
+  // Single undo reverts the whole successful batch.
+  r.undo();
+  assert(shapeX(r, red) === redX0, 'undo should restore red');
+  assert(shapeX(r, green) === greenX0, 'undo should restore green');
+  console.log('  OK: updateShapesTransform atomic batch + single undo');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

@@ -72,6 +72,7 @@ interface PptxWasmExports {
   send_to_back(slideIdx: number, shapeIdx: number): string;
   bring_forward(slideIdx: number, shapeIdx: number): string;
   send_backward(slideIdx: number, shapeIdx: number): string;
+  update_shapes_transform(slideIdx: number, itemsData: string): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -540,15 +541,27 @@ export class PptxRenderer {
    */
   private checkpoint(): void {
     if (!this.wasm || this.maxHistory === 0) return;
+    this.commitCheckpoint(this.captureSnapshot());
+  }
+
+  /**
+   * Commit a previously captured pre-edit snapshot to the undo stack, respecting
+   * batch semantics. Lets callers capture the snapshot *before* a fallible op and
+   * only commit it once the op is known to have succeeded (so a failed/no-op edit
+   * leaves no phantom undo step). Returns true if a snapshot was recorded.
+   */
+  private commitCheckpoint(snap: DocSnapshot): boolean {
+    if (this.maxHistory === 0) return false;
     if (this.batchDepth > 0) {
-      if (this.batchRecorded) return;
+      if (this.batchRecorded) return false;
       this.batchRecorded = true;
     }
-    this.undoStack.push(this.captureSnapshot());
+    this.undoStack.push(snap);
     this.redoStack = [];
     while (this.undoStack.length > this.maxHistory) {
       this.undoStack.shift();
     }
+    return true;
   }
 
   /** Capture a shallow snapshot of all state diverging from the original ZIP. */
@@ -665,6 +678,25 @@ export class PptxRenderer {
     x: number, y: number, cx: number, cy: number, rot: number): string {
     this.checkpoint();
     return this.exports.update_shape_transform(slideIdx, shapeIdx, x, y, cx, cy, rot);
+  }
+
+  /**
+   * Update several shapes' transforms atomically as a single undo step (EMU; rot
+   * in 1/60000 deg). Every `shapeIdx` is validated before any change is applied,
+   * so an invalid index leaves the slide untouched (no partial application). Use
+   * for multi-select move/align. Re-render the slide afterwards with
+   * `renderSlideSvg(slideIdx)`.
+   * @returns `"OK:<count>"` on success, or `"ERROR:..."` on failure.
+   */
+  updateShapesTransform(slideIdx: number,
+    items: Array<{ shapeIdx: number; x: number; y: number; cx: number; cy: number; rot: number }>): string {
+    const data = items.map(it => `${it.shapeIdx},${it.x},${it.y},${it.cx},${it.cy},${it.rot}`).join(';');
+    // Capture before, but only commit to history if the (atomic) op succeeds, so a
+    // validation failure leaves no phantom undo step.
+    const snap = (this.wasm && this.maxHistory > 0) ? this.captureSnapshot() : null;
+    const result = this.exports.update_shapes_transform(slideIdx, data);
+    if (snap && !result.startsWith('ERROR')) this.commitCheckpoint(snap);
+    return result;
   }
 
   /**

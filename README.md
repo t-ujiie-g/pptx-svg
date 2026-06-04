@@ -140,6 +140,7 @@ const renderer = new PptxRenderer(options?);
 |--------|---------|-------------|
 | `renderShapeSvg(slideIdx, shapeIdx)` | `string` | Render a single shape as SVG fragment. |
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | Update position/size/rotation (EMU). Returns re-rendered SVG. |
+| `updateShapesTransform(slideIdx, items)` | `string` | Atomically update several shapes' transforms (one undo step). Returns `OK:<count>`. |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | Update text content. Returns re-rendered SVG. |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | Update solid fill color (0-255). Returns re-rendered SVG. |
 | `deleteShape(slideIdx, shapeIdx)` | `string` | Delete a shape. Supports group children via composite index. |
