@@ -286,6 +286,12 @@ const FIRST_SLIDE_ID = 256;
 const RE_SLIDE_FILE = /^ppt\/slides\/slide\d+\.xml$/;
 const RE_SLIDE_RELS_FILE = /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/;
 
+/** Default number of undo steps retained (overridable via `maxHistory` option). */
+const DEFAULT_MAX_HISTORY = 50;
+
+/** Relationship-ID attribute names found on shapes (image/link refs), as a regex source. */
+const RID_ATTR_PATTERN = 'r:(?:embed|link|id)';
+
 export class PptxRenderer {
   private wasm: WebAssembly.Instance | null = null;
 
@@ -334,7 +340,7 @@ export class PptxRenderer {
 
   constructor(options?: PptxRendererOptions) {
     this.log = createLogger(options?.logLevel ?? 'error');
-    this.maxHistory = Math.max(0, options?.maxHistory ?? 50);
+    this.maxHistory = Math.max(0, options?.maxHistory ?? DEFAULT_MAX_HISTORY);
     if (options?.measureText) {
       this.measureTextFn = options.measureText;
     }
@@ -588,6 +594,19 @@ export class PptxRenderer {
     return true;
   }
 
+  /**
+   * Run a mutating `op` that returns `"OK..."`/SVG on success or `"ERROR:..."` on
+   * failure, recording a history checkpoint **only when it succeeds** (so a failed
+   * or no-op edit leaves no phantom undo step). The pre-edit snapshot is captured
+   * before `op` runs. Used for fallible ops whose validation happens in Wasm.
+   */
+  private runGuarded(op: () => string): string {
+    const snap = (this.wasm && this.maxHistory > 0) ? this.captureSnapshot() : null;
+    const result = op();
+    if (snap && !result.startsWith('ERROR')) this.commitCheckpoint(snap);
+    return result;
+  }
+
   /** Capture a shallow snapshot of all state diverging from the original ZIP. */
   private captureSnapshot(): DocSnapshot {
     const modifiedSlides: Array<[number, string]> = [];
@@ -715,12 +734,7 @@ export class PptxRenderer {
   updateShapesTransform(slideIdx: number,
     items: Array<{ shapeIdx: number; x: number; y: number; cx: number; cy: number; rot: number }>): string {
     const data = items.map(it => `${it.shapeIdx},${it.x},${it.y},${it.cx},${it.cy},${it.rot}`).join(';');
-    // Capture before, but only commit to history if the (atomic) op succeeds, so a
-    // validation failure leaves no phantom undo step.
-    const snap = (this.wasm && this.maxHistory > 0) ? this.captureSnapshot() : null;
-    const result = this.exports.update_shapes_transform(slideIdx, data);
-    if (snap && !result.startsWith('ERROR')) this.commitCheckpoint(snap);
-    return result;
+    return this.runGuarded(() => this.exports.update_shapes_transform(slideIdx, data));
   }
 
   /**
@@ -1011,7 +1025,7 @@ export class PptxRenderer {
     const relsXml = this.files.get(`ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`) ?? '';
     const media: ShapeSpec['media'] = [];
     const seen = new Set<string>();
-    const re = /r:(?:embed|link|id)="([^"]+)"/g;
+    const re = new RegExp(`${RID_ATTR_PATTERN}="([^"]+)"`, 'g');
     let m: RegExpExecArray | null;
     while ((m = re.exec(xml)) !== null) {
       const rid = m[1];
@@ -1044,36 +1058,33 @@ export class PptxRenderer {
     }
     if (!parsed || typeof parsed.xml !== 'string') return 'ERROR:invalid shape spec';
 
-    // Capture before mutating, commit to history only on success (guarded).
-    const snap = this.maxHistory > 0 ? this.captureSnapshot() : null;
+    // Re-link media + parse the shape as one undo step; failure records no history.
+    return this.runGuarded(() => {
+      let xml = parsed.xml;
+      const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+      for (const item of parsed.media ?? []) {
+        const ext = item.ext || 'png';
+        const bytes = base64ToBytes(item.b64);
+        const mediaPath = this.nextMediaPath(ext);
+        this.rawFiles.set(mediaPath, bytes);
+        this.addedBinaryFiles.set(mediaPath, bytes);
+        this.ensureContentTypeForExtension(ext, item.mime || extToMime(ext));
 
-    let xml = parsed.xml;
-    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
-    for (const item of parsed.media ?? []) {
-      const ext = item.ext || 'png';
-      const bytes = base64ToBytes(item.b64);
-      const mediaPath = this.nextMediaPath(ext);
-      this.rawFiles.set(mediaPath, bytes);
-      this.addedBinaryFiles.set(mediaPath, bytes);
-      this.ensureContentTypeForExtension(ext, item.mime || extToMime(ext));
+        let relsXml = this.files.get(relsPath)
+          ?? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_XMLNS}"></Relationships>`;
+        const newRid = this.nextRid(relsXml);
+        const relEntry = `<Relationship Id="${newRid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
+        relsXml = relsXml.includes('</Relationships>')
+          ? relsXml.replace('</Relationships>', relEntry + '</Relationships>')
+          : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_XMLNS}">${relEntry}</Relationships>`;
+        this.persistFile(relsPath, relsXml);
 
-      let relsXml = this.files.get(relsPath)
-        ?? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_XMLNS}"></Relationships>`;
-      const newRid = this.nextRid(relsXml);
-      const relEntry = `<Relationship Id="${newRid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
-      relsXml = relsXml.includes('</Relationships>')
-        ? relsXml.replace('</Relationships>', relEntry + '</Relationships>')
-        : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_XMLNS}">${relEntry}</Relationships>`;
-      this.persistFile(relsPath, relsXml);
-
-      // Re-link this image's rId in the shape XML.
-      const ridRe = new RegExp(`(r:(?:embed|link|id)=")${escapeRegex(item.rid)}(")`, 'g');
-      xml = xml.replace(ridRe, `$1${newRid}$2`);
-    }
-
-    const result = this.exports.add_shape_from_ooxml(slideIdx, xml, dxEmu, dyEmu);
-    if (snap && !result.startsWith('ERROR')) this.commitCheckpoint(snap);
-    return result;
+        // Re-link this image's rId in the shape XML.
+        const ridRe = new RegExp(`(${RID_ATTR_PATTERN}=")${escapeRegex(item.rid)}(")`, 'g');
+        xml = xml.replace(ridRe, `$1${newRid}$2`);
+      }
+      return this.exports.add_shape_from_ooxml(slideIdx, xml, dxEmu, dyEmu);
+    });
   }
 
   // ── Slide management API ────────────────────────────────────────────────────

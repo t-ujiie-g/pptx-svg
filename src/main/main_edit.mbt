@@ -10,22 +10,28 @@
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 ///|
-/// Resolve a composite shape index (used by group children: parent*1000+child)
-/// to the containing array and the local index within it.
+/// Composite shape-index radix: a group child is addressed as
+/// `parent_composite * group_index_base + child_local` (so up to 999 children per
+/// level). Top-level shapes use indices `0..group_index_base-1`.
+let group_index_base : Int = 1000
+
+///|
+/// Resolve a composite shape index (used by group children) to the containing
+/// array and the local index within it (see `group_index_base`).
 /// Returns (shapes_array, local_index) or None if out of range.
 fn resolve_shape_location(
   slide : @ooxml.SlideData,
   composite_idx : Int,
 ) -> (Array[@ooxml.Shape], Int)? {
-  if composite_idx < 1000 {
+  if composite_idx < group_index_base {
     if composite_idx >= 0 && composite_idx < slide.shapes.length() {
       Some((slide.shapes, composite_idx))
     } else {
       None
     }
   } else {
-    let parent_composite = composite_idx / 1000
-    let child_local = composite_idx % 1000
+    let parent_composite = composite_idx / group_index_base
+    let child_local = composite_idx % group_index_base
     match resolve_shape_location(slide, parent_composite) {
       Some((parent_arr, parent_local)) =>
         match parent_arr[parent_local].kind {
@@ -628,11 +634,11 @@ pub fn duplicate_shape(
       },
     }
     arr.push(dup)
-    let new_idx = if shape_idx < 1000 {
+    let new_idx = if shape_idx < group_index_base {
       g_slides.val[slide_idx].shapes.length() - 1
     } else {
-      let parent_composite = shape_idx / 1000
-      parent_composite * 1000 + (arr.length() - 1)
+      let parent_composite = shape_idx / group_index_base
+      parent_composite * group_index_base + (arr.length() - 1)
     }
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(new_idx)
@@ -1057,7 +1063,11 @@ fn[T] array_insert_at(arr : Array[T], idx : Int, item : T) -> Unit {
 ///|
 /// Composite index for a sibling at `local_idx` within the same container as `shape_idx`.
 fn sibling_composite_idx(shape_idx : Int, local_idx : Int) -> Int {
-  let base = if shape_idx < 1000 { 0 } else { shape_idx / 1000 * 1000 }
+  let base = if shape_idx < group_index_base {
+    0
+  } else {
+    shape_idx / group_index_base * group_index_base
+  }
   base + local_idx
 }
 
