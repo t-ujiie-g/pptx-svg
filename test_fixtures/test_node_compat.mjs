@@ -1402,6 +1402,96 @@ console.log('Test 54: updateShapesTransform (atomic + undo)');
   console.log('  OK: updateShapesTransform atomic batch + single undo');
 }
 
+// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
+const MINI_PNG = new Uint8Array([
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+  0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+  0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+  0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+  0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
+
+// --- Test 55: copy a plain shape to another slide ---
+console.log('Test 55: getShapeSpec / insertShapeSpec (plain shape)');
+{
+  const r = await freshRenderer();
+  const red = parseInt(r.addShape(0, 'rect', 100000, 100000, 914400, 914400, 255, 0, 0).split(':')[1]);
+  const spec = r.getShapeSpec(0, red);
+  assert(!spec.startsWith('ERROR'), `getShapeSpec should succeed, got ${spec.slice(0, 40)}`);
+  const parsed = JSON.parse(spec);
+  assert(typeof parsed.xml === 'string' && parsed.xml.includes('<p:sp'), 'spec should carry shape XML');
+  assert(Array.isArray(parsed.media) && parsed.media.length === 0, 'plain shape has no media');
+
+  // Paste onto a new slide with an offset.
+  const { insertedIdx } = await r.addSlide();
+  const ins = r.insertShapeSpec(insertedIdx, spec, 457200, 457200);
+  assert(ins.startsWith('OK:'), `insertShapeSpec should return OK:<idx>, got ${ins}`);
+  const svg = r.renderSlideSvg(insertedIdx);
+  assert(svg.includes('ff0000') || svg.includes('FF0000'), 'pasted red shape should render on the target slide');
+  // Offset applied: original x=100000 → pasted x=557200.
+  const pastedIdx = parseInt(ins.split(':')[1]);
+  const px = r.renderShapeSvg(insertedIdx, pastedIdx).match(/data-ooxml-x="(-?\d+)"/);
+  assert(px && parseInt(px[1]) === 557200, `paste offset should apply (x=557200), got ${px && px[1]}`);
+  console.log('  OK: plain shape cross-slide copy/paste');
+}
+
+// --- Test 56: copy an image shape — media re-link + export ---
+console.log('Test 56: copy image shape (media re-link)');
+{
+  const r = await freshRenderer();
+  const addRes = r.addImage(0, MINI_PNG, 'image/png', 100000, 100000, 914400, 914400);
+  const imgIdx = parseInt(addRes.split(':')[1]);
+  const spec = r.getShapeSpec(0, imgIdx);
+  const parsed = JSON.parse(spec);
+  assert(parsed.media.length === 1, `image shape should carry 1 media entry, got ${parsed.media.length}`);
+  assert(parsed.media[0].b64.length > 0, 'media should be base64-encoded inline');
+  assert(parsed.media[0].mime === 'image/png', 'media mime should be image/png');
+
+  const { insertedIdx } = await r.addSlide();
+  const ins = r.insertShapeSpec(insertedIdx, spec, 0, 0);
+  assert(ins.startsWith('OK:'), `image paste should return OK:<idx>, got ${ins}`);
+
+  // The target slide's .rels must reference a (new) media file, and the shape XML
+  // must point at that new rId — verify the slide renders an <image>.
+  const svg = r.renderSlideSvg(insertedIdx);
+  assert(svg.includes('<image'), 'pasted image should render as <image> on the target slide');
+
+  // Export must include the media binary and rebuild cleanly.
+  const out = await r.exportPptx();
+  assert(out.byteLength > 0, 'export with pasted image should produce bytes');
+  console.log('  OK: image cross-slide copy/paste + export');
+}
+
+// --- Test 57: insertShapeSpec is undoable ---
+console.log('Test 57: paste undo');
+{
+  const r = await freshRenderer();
+  const red = parseInt(r.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0).split(':')[1]);
+  const spec = r.getShapeSpec(0, red);
+  const { insertedIdx } = await r.addSlide();
+  const before = r.renderSlideSvg(insertedIdx);
+  r.insertShapeSpec(insertedIdx, spec);
+  const after = r.renderSlideSvg(insertedIdx);
+  assert(after !== before, 'paste should change the target slide');
+  r.undo();
+  assert(r.renderSlideSvg(insertedIdx) === before, 'undo should remove the pasted shape');
+  console.log('  OK: paste undo');
+}
+
+// --- Test 58: boundary errors ---
+console.log('Test 58: copy/paste boundary errors');
+{
+  const r = await freshRenderer();
+  assert(r.getShapeSpec(0, 9999).startsWith('ERROR'), 'getShapeSpec on bad index should error');
+  assert(r.insertShapeSpec(0, 'not json').startsWith('ERROR'), 'insertShapeSpec with bad spec should error');
+  assert(r.insertShapeSpec(0, JSON.stringify({ xml: '', media: [] })).startsWith('ERROR'), 'empty xml should error');
+  console.log('  OK: boundary errors');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

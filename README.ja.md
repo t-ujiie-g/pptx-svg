@@ -218,6 +218,15 @@ const renderer = new PptxRenderer(options?);
 
 z-order はシェイプ配列順（末尾＝最前面）。4つとも undo 可能。
 
+**コピー / ペースト（スライド跨ぎ）:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `getShapeSpec(slideIdx, shapeIdx)` | `string` | シェイプを移植可能な JSON スペックにコピー（画像は base64 で内包）。 |
+| `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | `string` | スペックをスライドに貼り付け（メディアを新 rId に再リンク）。`OK:<index>` を返す。undo 可能。 |
+
+別スライド/別プレゼンテーションへの貼り付けに対応。詳細は [docs/editing-guide.md](docs/editing-guide.md#copy--paste-cross-slide)。
+
 **ノート・コメント:**
 
 | メソッド | 戻り値 | 説明 |

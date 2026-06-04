@@ -1122,3 +1122,59 @@ pub fn send_backward(slide_idx : Int, shape_idx : Int) -> String {
     "OK:" + int_to_str(sibling_composite_idx(shape_idx, new_local))
   })
 }
+
+// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
+// The shape's OOXML is the portable form. The TS layer extracts media/rels by
+// scanning the XML's rIds (see getShapeSpec), re-links them on paste, then calls
+// add_shape_from_ooxml on the target slide.
+
+///|
+/// Serialize a single shape to its OOXML fragment (for copy). Returns the XML, or
+/// "ERROR:<message>" (e.g. charts, which are preserved out-of-band, serialize to "").
+pub fn get_shape_ooxml(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let xml = @serializer.serialize_shape(arr[local_idx])
+    if xml.is_empty() {
+      "ERROR:shape not serializable"
+    } else {
+      xml
+    }
+  })
+}
+
+///|
+/// Parse a shape OOXML fragment and append it to a slide, offset by (dx, dy) EMU
+/// (for paste). rIds in `shape_xml` must already point at the target slide's rels.
+/// Returns "OK:<shape_index>" or "ERROR:<message>".
+pub fn add_shape_from_ooxml(
+  slide_idx : Int,
+  shape_xml : String,
+  dx_emu : Int,
+  dy_emu : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  ensure_slide_parsed(slide_idx)
+  let shapes = @ooxml.parse_shapes_xml(shape_xml, g_theme.val)
+  if shapes.is_empty() {
+    return "ERROR:no shape parsed from spec"
+  }
+  let src = shapes[0]
+  let pasted = {
+    ..src,
+    transform: {
+      ..src.transform,
+      x: src.transform.x + dx_emu,
+      y: src.transform.y + dy_emu,
+    },
+  }
+  let slide = g_slides.val[slide_idx]
+  slide.shapes.push(pasted)
+  g_modified.val[slide_idx] = true
+  "OK:" + int_to_str(slide.shapes.length() - 1)
+}

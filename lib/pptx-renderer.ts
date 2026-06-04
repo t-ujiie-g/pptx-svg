@@ -4,7 +4,7 @@
  * Handles Wasm lifecycle, PPTX loading, SVG rendering, and export.
  */
 
-import { bytesToBase64 } from './utils.js';
+import { bytesToBase64, base64ToBytes } from './utils.js';
 import { emfToSvg } from './emf-converter.js';
 import { wmfToSvg } from './wmf-converter.js';
 import { instantiateWasmWithFallback } from './wasm-compat.js';
@@ -73,6 +73,8 @@ interface PptxWasmExports {
   bring_forward(slideIdx: number, shapeIdx: number): string;
   send_backward(slideIdx: number, shapeIdx: number): string;
   update_shapes_transform(slideIdx: number, itemsData: string): string;
+  get_shape_ooxml(slideIdx: number, shapeIdx: number): string;
+  add_shape_from_ooxml(slideIdx: number, shapeXml: string, dxEmu: number, dyEmu: number): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -170,6 +172,18 @@ export interface TextLayout {
   lines: TextLine[];
 }
 
+/**
+ * A portable, self-contained shape spec for cross-slide (or cross-document)
+ * copy/paste, produced by {@link PptxRenderer.getShapeSpec} and consumed by
+ * {@link PptxRenderer.insertShapeSpec}. `xml` is the shape's OOXML fragment;
+ * `media` carries any referenced images inline (base64) so the spec survives a
+ * clipboard round-trip. (JSON-encoded as a string at the API boundary.)
+ */
+export interface ShapeSpec {
+  xml: string;
+  media: Array<{ rid: string; ext: string; mime: string; b64: string }>;
+}
+
 /** Caret position returned by {@link PptxRenderer.hitTestText} (parsed from JSON). */
 export interface TextHit {
   paraIdx: number;
@@ -253,6 +267,16 @@ function mimeToExt(mime: string): string | null {
     'image/bmp': 'bmp', 'image/tiff': 'tiff',
   };
   return map[mime] ?? null;
+}
+
+/** Map a media file extension to a MIME type (used for cross-slide paste). */
+function extToMime(ext: string): string {
+  const map: Record<string, string> = {
+    png: 'image/png', jpeg: 'image/jpeg', jpg: 'image/jpeg', gif: 'image/gif',
+    svg: 'image/svg+xml', webp: 'image/webp', bmp: 'image/bmp',
+    tiff: 'image/tiff', tif: 'image/tiff', emf: 'image/x-emf', wmf: 'image/x-wmf',
+  };
+  return map[ext.toLowerCase()] ?? 'application/octet-stream';
 }
 
 /** First slide ID used in presentation.xml sldIdLst (OOXML convention). */
@@ -970,6 +994,86 @@ export class PptxRenderer {
   sendBackward(slideIdx: number, shapeIdx: number): string {
     this.checkpoint();
     return this.exports.send_backward(slideIdx, shapeIdx);
+  }
+
+  // ── Copy / paste API (E6.5) ──────────────────────────────────────────────────
+
+  /**
+   * Extract a shape as a portable, self-contained spec for copy/paste — including
+   * any referenced images inline (base64), so it survives a clipboard round-trip
+   * and can be pasted onto another slide (or another presentation).
+   * @returns JSON-encoded {@link ShapeSpec} string, or `"ERROR:..."` on failure
+   *          (e.g. charts, which serialize out-of-band, are not copyable in v1).
+   */
+  getShapeSpec(slideIdx: number, shapeIdx: number): string {
+    const xml = this.exports.get_shape_ooxml(slideIdx, shapeIdx);
+    if (xml.startsWith('ERROR')) return xml;
+    const relsXml = this.files.get(`ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`) ?? '';
+    const media: ShapeSpec['media'] = [];
+    const seen = new Set<string>();
+    const re = /r:(?:embed|link|id)="([^"]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(xml)) !== null) {
+      const rid = m[1];
+      if (seen.has(rid)) continue;
+      seen.add(rid);
+      const target = this.resolveRidTarget(relsXml, rid);
+      if (!target) continue;
+      const mediaPath = this.resolveRelPath('ppt/slides/', target);
+      const bytes = this.rawFiles.get(mediaPath);
+      if (!bytes) continue; // non-media rIds (e.g. hyperlink URLs) are skipped
+      const ext = (mediaPath.split('.').pop() ?? '').toLowerCase();
+      media.push({ rid, ext, mime: extToMime(ext), b64: bytesToBase64(bytes) });
+    }
+    return JSON.stringify({ xml, media });
+  }
+
+  /**
+   * Paste a {@link ShapeSpec} (from {@link getShapeSpec}) onto a slide, offset by
+   * (dxEmu, dyEmu). Inlined media is re-added to the package and the shape's image
+   * relationships are re-linked to fresh rIds on the target slide. Undoable.
+   * @returns `"OK:<shapeIdx>"` on success, or `"ERROR:..."` on failure.
+   */
+  insertShapeSpec(slideIdx: number, spec: string, dxEmu = 0, dyEmu = 0): string {
+    if (!this.wasm) return 'ERROR:not initialized';
+    let parsed: ShapeSpec;
+    try {
+      parsed = JSON.parse(spec) as ShapeSpec;
+    } catch {
+      return 'ERROR:invalid shape spec';
+    }
+    if (!parsed || typeof parsed.xml !== 'string') return 'ERROR:invalid shape spec';
+
+    // Capture before mutating, commit to history only on success (guarded).
+    const snap = this.maxHistory > 0 ? this.captureSnapshot() : null;
+
+    let xml = parsed.xml;
+    const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
+    for (const item of parsed.media ?? []) {
+      const ext = item.ext || 'png';
+      const bytes = base64ToBytes(item.b64);
+      const mediaPath = this.nextMediaPath(ext);
+      this.rawFiles.set(mediaPath, bytes);
+      this.addedBinaryFiles.set(mediaPath, bytes);
+      this.ensureContentTypeForExtension(ext, item.mime || extToMime(ext));
+
+      let relsXml = this.files.get(relsPath)
+        ?? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_XMLNS}"></Relationships>`;
+      const newRid = this.nextRid(relsXml);
+      const relEntry = `<Relationship Id="${newRid}" Type="${REL_TYPE_IMAGE}" Target="../media/${mediaPath.split('/').pop()}"/>`;
+      relsXml = relsXml.includes('</Relationships>')
+        ? relsXml.replace('</Relationships>', relEntry + '</Relationships>')
+        : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${RELS_XMLNS}">${relEntry}</Relationships>`;
+      this.persistFile(relsPath, relsXml);
+
+      // Re-link this image's rId in the shape XML.
+      const ridRe = new RegExp(`(r:(?:embed|link|id)=")${escapeRegex(item.rid)}(")`, 'g');
+      xml = xml.replace(ridRe, `$1${newRid}$2`);
+    }
+
+    const result = this.exports.add_shape_from_ooxml(slideIdx, xml, dxEmu, dyEmu);
+    if (snap && !result.startsWith('ERROR')) this.commitCheckpoint(snap);
+    return result;
   }
 
   // ── Slide management API ────────────────────────────────────────────────────

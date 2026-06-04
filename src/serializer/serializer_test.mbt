@@ -483,3 +483,37 @@ test "restore round-trip: shape text survives parse_slide" {
   )
   assert_eq(out, serialize_slide(slide2))
 }
+
+// ── parse_shapes_xml round-trip (E6.5 copy/paste) ────────────────────────────
+
+///|
+test "parse_shapes_xml round-trips a serialized shape" {
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 100000,
+        y: 200000,
+        cx: 500000,
+        cy: 300000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    fill: { r: 200, g: 100, b: 50, alpha: 255 },
+  }
+  let xml = serialize_shape(shape)
+  let shapes = @ooxml.parse_shapes_xml(xml, @ooxml.ThemeData::default())
+  assert_eq(shapes.length(), 1)
+  let s = shapes[0]
+  assert_eq(s.transform.x, 100000)
+  assert_eq(s.transform.y, 200000)
+  assert_eq(s.transform.cx, 500000)
+  assert_eq(s.transform.cy, 300000)
+  let is_rect = match s.kind {
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect) => true
+    _ => false
+  }
+  assert_true(is_rect)
+}

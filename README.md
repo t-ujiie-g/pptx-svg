@@ -218,6 +218,15 @@ For double-click-to-type editing with a `contentEditable` overlay. See [docs/edi
 
 z-order is shape-array order (later = front). All four are undoable.
 
+**Copy / Paste (cross-slide):**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getShapeSpec(slideIdx, shapeIdx)` | `string` | Copy a shape to a portable JSON spec (images inlined as base64). |
+| `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | `string` | Paste a shape spec onto a slide (re-links media to fresh rIds). Returns `OK:<index>`. Undoable. |
+
+Supports pasting onto a different slide/presentation. See [docs/editing-guide.md](docs/editing-guide.md#copy--paste-cross-slide).
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

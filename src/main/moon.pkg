@@ -51,6 +51,8 @@ options(
         "bring_forward",
         "send_backward",
         "update_shapes_transform",
+        "get_shape_ooxml",
+        "add_shape_from_ooxml",
       ],
       "use-js-builtin-string": true,
     },

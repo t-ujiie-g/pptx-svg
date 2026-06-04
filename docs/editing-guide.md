@@ -16,6 +16,8 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `deleteShape(slideIdx, shapeIdx)` | Delete a shape by index (supports group children via composite index) |
 | `addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB)` | Add a basic shape (rect/ellipse/roundRect/line), returns `OK:<index>` |
 | `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | Duplicate a shape with offset, returns `OK:<index>` |
+| `getShapeSpec(slideIdx, shapeIdx)` | Copy a shape to a portable JSON spec (media inlined), returns spec or `ERROR:...` |
+| `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | Paste a shape spec onto a slide (re-links media), returns `OK:<index>` |
 | `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | Apply linear gradient fill, returns re-rendered SVG |
 | `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | Add a text paragraph to a shape, returns `OK:<paraIndex>` |
 | `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | Set stroke color/width/dash, returns re-rendered SVG |
@@ -393,6 +395,24 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Copy & Paste (cross-slide)
+
+`getShapeSpec` / `insertShapeSpec` implement `Ctrl+C` / `Ctrl+V`, including pasting onto a **different** slide (or even a different presentation). `getShapeSpec` returns a portable, self-contained JSON string — the shape's OOXML plus any referenced images inlined as base64 — so it survives a clipboard round-trip. `insertShapeSpec` re-adds the media to the package and re-links the shape's image relationships to fresh rIds on the target slide.
+
+```typescript
+// Copy
+const clipboard = renderer.getShapeSpec(0, shapeIdx); // JSON string
+
+// Paste onto another slide, offset by (dx, dy) EMU
+const res = renderer.insertShapeSpec(2, clipboard, 457200, 457200);
+if (res.startsWith('OK:')) {
+  const newIdx = parseInt(res.slice(3));
+  renderer.renderSlideSvg(2); // re-render the target slide
+}
+```
+
+Undoable (integrated with the history). **v1 limitations:** charts (serialized out-of-band) are not copyable (`getShapeSpec` returns `ERROR`); for OLE/SmartArt only inline image media is re-linked, not other external parts.
 
 ## Multi-shape Transform
 

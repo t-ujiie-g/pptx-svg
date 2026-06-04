@@ -47,6 +47,7 @@ python3 -m http.server 8765 --directory .
 - MoonBit exports (inline text editing E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range`
 - MoonBit exports (z-order E6.3): `bring_to_front`, `send_to_back`, `bring_forward`, `send_backward`
 - MoonBit exports (multi-transform E6.4): `update_shapes_transform`
+- MoonBit exports (copy/paste E6.5): `get_shape_ooxml`, `add_shape_from_ooxml`
 - Full export list: see `src/main/moon.pkg`
 
 **Lazy slide parse (`g_slides` cache).** `initialize_pptx` fills `g_slides` with empty placeholders (`shapes: []`); the real parse + placeholder inheritance happens on the first `render_slide_svg(idx)`, which caches the resolved `SlideData` and sets `g_parsed[idx]`. Editing exports read `g_slides` directly, so any new editing export that reads the cache **must** route through `with_shape`/`with_run` (which call `ensure_slide_parsed`) or call `ensure_slide_parsed(slide_idx)` itself — otherwise it silently no-ops on a slide that was never rendered (this was the 0.5.10 bug). Don't add per-method `renderSlideSvg()` "ensure parsed" calls in the TS layer; the Wasm boundary is the single source of truth.

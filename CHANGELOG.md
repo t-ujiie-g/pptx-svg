@@ -4,6 +4,8 @@
 
 ### Features
 
+- **Cross-slide shape copy/paste (E6.5)** — `getShapeSpec(slideIdx, shapeIdx)` extracts a shape as a portable, self-contained JSON spec (its OOXML fragment + any referenced images inlined as base64), and `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` pastes it onto another slide, re-adding the media to the package and re-linking image relationships to fresh rIds on the target slide. Survives a clipboard round-trip; undoable. New Wasm exports `get_shape_ooxml` / `add_shape_from_ooxml`; `serialize_shape` made public and a new `parse_shapes_xml` parser added. New `base64ToBytes` util. _v1 limitation: charts (serialized out-of-band) and external OLE/SmartArt parts are not copyable; image media only is re-linked._
+
 - **Atomic multi-shape transform (E6.4)** — `updateShapesTransform(slideIdx, items)` applies new transforms (EMU; rot in 1/60000 deg) to several shapes in one call. Every `shapeIdx` is validated *before* any change is applied, so an invalid index leaves the slide untouched (no partial application), and the whole batch is a single undo step. Returns `"OK:<count>"`. New Wasm export `update_shapes_transform`.
   - **History fix**: a failed/no-op `updateShapesTransform` no longer leaves a phantom undo step — a new guarded-checkpoint path (`commitCheckpoint`) captures the pre-edit snapshot but only commits it to the undo stack when the (atomic) operation succeeds.
 
@@ -40,8 +42,9 @@
 - **MoonBit**: restore round-trip idempotency tests in `serializer_test.mbt` (`serialize → parse_slide → serialize` is a fixed point; shape text survives a parse_slide round-trip).
 - **Node compatibility**: Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo (undo/redo of a transform restores the rendered SVG exactly); Tests 44–49 cover `getTextLayout` geometry, `hitTestText`, and `replaceTextRange` insert/delete/merge/newline-split + undo.
 - **MoonBit**: `build_text_layout` structural geometry tests (line/run/char counts, offsets, vertical stacking) + `hit_test_layout` vertical-band selection & empty-layout fallback.
-- **Node compatibility**: Tests 50–53 cover z-order bringToFront/sendToBack/bringForward/sendBackward (serialized order checks, edge no-op, returned index) and undo; Test 54 covers `updateShapesTransform` atomic batch apply, atomicity on a bad index (no partial application), and single-undo revert.
-- Test counts: 190 MoonBit + 220 Node compatibility + 16 categorical suites.
+- **Node compatibility**: Tests 50–53 cover z-order bringToFront/sendToBack/bringForward/sendBackward (serialized order checks, edge no-op, returned index) and undo; Test 54 covers `updateShapesTransform` atomic batch apply, atomicity on a bad index (no partial application), and single-undo revert; Tests 55–58 cover cross-slide copy/paste of a plain shape (with offset), an image shape (media re-link + export), paste undo, and boundary errors.
+- **MoonBit**: `parse_shapes_xml` round-trip test (`serialize_shape → parse_shapes_xml`).
+- Test counts: 191 MoonBit + 237 Node compatibility + 16 categorical suites.
 
 ### Documentation
 
