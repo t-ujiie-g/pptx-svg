@@ -61,6 +61,18 @@ Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `imag
 
 Coordinates (`x`, `y`, `cx`, `cy`) are in EMU (English Metric Units). Use `pxToEmu()` for conversion.
 
+### History APIs (Undo / Redo)
+
+| Method | Description |
+|--------|-------------|
+| `undo()` | Revert the most recent edit (or batch). Returns a JSON `HistoryResult` string, or `"ERROR:nothing to undo"` |
+| `redo()` | Re-apply the most recently undone edit. Returns a JSON `HistoryResult` string, or `"ERROR:nothing to redo"` |
+| `canUndo()` / `canRedo()` | Whether an undo / redo step is available |
+| `beginBatch()` / `endBatch()` | Collapse multiple edits into a single undo step (nestable) |
+| `clearHistory()` | Discard all undo/redo history |
+
+Every mutating editing method (shape/text/fill/stroke, add/delete/duplicate, image ops, and slide add/delete/reorder) automatically records a history checkpoint. See [Undo / Redo](#undo--redo) below.
+
 ### Unit Conversion Helpers
 
 ```typescript
@@ -368,6 +380,51 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Undo / Redo
+
+Every mutating editing method records a checkpoint before it runs, so `undo()` / `redo()` work across all edit types — shape transforms, text, fills, strokes, add/delete/duplicate, image operations, and slide add/delete/reorder. This makes a `Ctrl+Z` / `Ctrl+Y` workflow trivial to wire up.
+
+```typescript
+// Configure history depth (default 50; 0 disables history)
+const renderer = new PptxRenderer({ maxHistory: 100 });
+// ... init + loadPptx ...
+
+renderer.updateShapeTransform(0, 0, 1000000, 1000000, 2000000, 1000000, 0);
+
+if (renderer.canUndo()) {
+  const result = JSON.parse(renderer.undo()); // { slides: [0], slideCount: 2 }
+  result.slides.forEach(i => repaint(i, renderer.renderSlideSvg(i)));
+}
+
+if (renderer.canRedo()) {
+  JSON.parse(renderer.redo());
+}
+```
+
+`undo()` / `redo()` return a JSON-encoded `HistoryResult` (`{ slides: number[]; slideCount: number }`) listing the 0-indexed slides whose content changed (re-render just those) and the slide count after the operation. On an empty stack they return `"ERROR:nothing to undo"` / `"ERROR:nothing to redo"`.
+
+### Batching
+
+Wrap a compound action (e.g. paste = add shape + set text + set fill) so a single `Ctrl+Z` reverts the whole thing. Batches are nestable; only the outermost pair takes effect.
+
+```typescript
+renderer.beginBatch();
+try {
+  const idx = parseInt(renderer.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0).split(':')[1]);
+  renderer.addShapeText(0, idx, 'Pasted', 1800, 255, 255, 255);
+  renderer.updateShapeStroke(0, idx, 0, 0, 0, 12700, '');
+} finally {
+  renderer.endBatch();
+}
+// One undo() reverts all three edits.
+```
+
+### Notes
+
+- History is cleared automatically on `loadPptx()`. Call `clearHistory()` to reset it manually.
+- Snapshots are lightweight: they shallow-clone the file overrides (strings/bytes are shared by reference) plus the OOXML of any in-engine modified slides. `undo()` / `redo()` rebuild engine state from the snapshot, so they are O(document) and intended for user-initiated actions, not per-keystroke calls.
+- Memory is bounded by `maxHistory` (oldest steps are discarded once exceeded).
 
 ## Export
 

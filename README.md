@@ -186,6 +186,18 @@ Slide management methods update `presentation.xml`, `.rels`, and `[Content_Types
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
 
+**Undo / Redo:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `undo()` | `string` | Revert the most recent edit (or batch). JSON `{ slides, slideCount }`, or `ERROR:nothing to undo`. |
+| `redo()` | `string` | Re-apply the most recently undone edit. JSON `{ slides, slideCount }`, or `ERROR:nothing to redo`. |
+| `canUndo()` / `canRedo()` | `boolean` | Whether an undo / redo step is available. |
+| `beginBatch()` / `endBatch()` | `void` | Collapse multiple edits into one undo step (nestable). |
+| `clearHistory()` | `void` | Discard all history (also cleared on `loadPptx`). |
+
+Every mutating editing method records a checkpoint automatically. Configure depth via `new PptxRenderer({ maxHistory: 50 })`. See [docs/editing-guide.md](docs/editing-guide.md#undo--redo).
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

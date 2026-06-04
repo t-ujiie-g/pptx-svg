@@ -186,6 +186,18 @@ const renderer = new PptxRenderer(options?);
 
 対応 MIME タイプ: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`。
 
+**Undo / Redo（編集履歴）:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `undo()` | `string` | 直近の編集（またはバッチ）を取り消す。JSON `{ slides, slideCount }`、または `ERROR:nothing to undo`。 |
+| `redo()` | `string` | 直近に取り消した編集をやり直す。JSON `{ slides, slideCount }`、または `ERROR:nothing to redo`。 |
+| `canUndo()` / `canRedo()` | `boolean` | undo / redo 可能かどうか。 |
+| `beginBatch()` / `endBatch()` | `void` | 複数編集を 1 つの undo 単位にまとめる（ネスト可）。 |
+| `clearHistory()` | `void` | 履歴を全消去（`loadPptx` 時にも自動クリア）。 |
+
+すべてのミューテーション編集メソッドが自動でチェックポイントを記録する。深さは `new PptxRenderer({ maxHistory: 50 })` で設定。詳細は [docs/editing-guide.md](docs/editing-guide.md#undo--redo)。
+
 **ノート・コメント:**
 
 | メソッド | 戻り値 | 説明 |

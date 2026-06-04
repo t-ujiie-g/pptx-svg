@@ -400,3 +400,86 @@ test "serialize_slide no effectLst when none" {
   // No effects → no a:effectLst in output
   assert_true(!xml.contains("<a:effectLst>"))
 }
+
+// ── restore round-trip idempotency (E6.1 Undo/Redo) ──────────────────────────
+// The Undo/Redo history captures a slide's OOXML via get_slide_ooxml and restores
+// it through restore_slide_ooxml (parse_slide → g_slides). This must be stable:
+// serialize → parse_slide → serialize should be a fixed point, so no data is lost
+// across an undo/redo cycle.
+
+///|
+test "restore round-trip: serialize is idempotent after parse_slide" {
+  let shape1 : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 100000,
+        y: 200000,
+        cx: 500000,
+        cy: 300000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    fill: { r: 200, g: 100, b: 50, alpha: 255 },
+    stroke: { r: 0, g: 0, b: 0, alpha: 255 },
+    stroke_w: 12700,
+  }
+  let shape2 : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Ellipse),
+      {
+        x: 700000,
+        y: 100000,
+        cx: 400000,
+        cy: 400000,
+        rot: 5400000,
+        flip_h: true,
+        flip_v: false,
+      },
+    ),
+    fill: { r: 30, g: 144, b: 255, alpha: 255 },
+  }
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::white(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [shape1, shape2],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+  }
+  let s1 = serialize_slide(slide)
+  let slide2 = @ooxml.parse_slide(
+    s1,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
+  let s2 = serialize_slide(slide2)
+  assert_eq(s1, s2)
+}
+
+///|
+test "restore round-trip: shape text survives parse_slide" {
+  let xml =
+    #|<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="TextBox"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="100000" y="100000"/><a:ext cx="500000" cy="300000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>Hello Undo</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>
+  let slide = @ooxml.parse_slide(
+    xml,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
+  // Re-serialize and confirm the text is preserved.
+  let out = serialize_slide(slide)
+  assert_true(out.contains("Hello Undo"))
+  // And the re-serialize is a fixed point.
+  let slide2 = @ooxml.parse_slide(
+    out,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
+  assert_eq(out, serialize_slide(slide2))
+}

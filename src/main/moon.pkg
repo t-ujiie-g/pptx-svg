@@ -42,6 +42,7 @@ options(
         "update_text_run_decoration",
         "add_picture_shape",
         "replace_picture_rid",
+        "restore_slide_ooxml",
       ],
       "use-js-builtin-string": true,
     },

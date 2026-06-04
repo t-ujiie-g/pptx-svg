@@ -1029,6 +1029,152 @@ console.log('Test 36: Edit immediately after loadPptx (no prior render)');
   console.log('  OK: edit without pre-render persists to OOXML and export');
 }
 
+// ── Undo / Redo (E6.1) ───────────────────────────────────────────────────────
+// Shared helper: a freshly loaded renderer on minimal.pptx.
+async function freshRenderer(opts = { logLevel: 'silent' }) {
+  const renderer = new PptxRenderer(opts);
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  return renderer;
+}
+
+// --- Test 37: Undo/redo a transform edit restores exact SVG ---
+console.log('Test 37: Undo/redo transform');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+  assert(r.canUndo() === false, 'fresh load should have nothing to undo');
+
+  r.updateShapeTransform(0, 0, 1234567, 2345678, 1828800, 914400, 0);
+  const after = r.renderSlideSvg(0);
+  assert(after !== before, 'transform edit should change the SVG');
+  assert(r.canUndo() === true, 'should be able to undo after an edit');
+
+  const u = r.undo();
+  assert(!u.startsWith('ERROR'), `undo should succeed, got ${u}`);
+  const parsed = JSON.parse(u);
+  assert(Array.isArray(parsed.slides), 'undo result should carry a slides array');
+  assert(parsed.slides.includes(0), 'undo result should flag slide 0');
+  assert(r.renderSlideSvg(0) === before, 'undo should restore the original SVG exactly');
+  assert(r.canRedo() === true, 'should be able to redo after undo');
+
+  const re = r.redo();
+  assert(!re.startsWith('ERROR'), `redo should succeed, got ${re}`);
+  assert(r.renderSlideSvg(0) === after, 'redo should re-apply the edit exactly');
+  console.log('  OK: transform undo/redo restores SVG');
+}
+
+// --- Test 38: Undo an addShape removes the shape; redo restores it ---
+console.log('Test 38: Undo/redo addShape');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+  r.addShape(0, 'rect', 914400, 914400, 1828800, 914400, 255, 0, 0);
+  const withShape = r.renderSlideSvg(0);
+  assert(withShape.includes('ff0000') || withShape.includes('FF0000'), 'added shape should be red');
+
+  r.undo();
+  const afterUndo = r.renderSlideSvg(0);
+  assert(!(afterUndo.includes('ff0000') || afterUndo.includes('FF0000')), 'undo should remove the red shape');
+  assert(afterUndo === before, 'undo should restore the original SVG');
+
+  r.redo();
+  const afterRedo = r.renderSlideSvg(0);
+  assert(afterRedo.includes('ff0000') || afterRedo.includes('FF0000'), 'redo should bring the red shape back');
+  console.log('  OK: addShape undo/redo');
+}
+
+// --- Test 39: Undo a deleteShape restores the deleted shape ---
+console.log('Test 39: Undo deleteShape');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+  const del = r.deleteShape(0, 0);
+  assert(del === 'OK', `deleteShape should return OK, got ${del}`);
+  const afterDel = r.renderSlideSvg(0);
+  assert(afterDel !== before, 'delete should change the SVG');
+
+  r.undo();
+  assert(r.renderSlideSvg(0) === before, 'undo should restore the deleted shape');
+  console.log('  OK: deleteShape undo');
+}
+
+// --- Test 40: Undo/redo addSlide changes slide count ---
+console.log('Test 40: Undo/redo addSlide');
+{
+  const r = await freshRenderer();
+  const n = r.getSlideCount();
+  await r.addSlide();
+  assert(r.getSlideCount() === n + 1, 'addSlide should increase the count');
+
+  const u = JSON.parse(r.undo());
+  assert(r.getSlideCount() === n, 'undo addSlide should restore the count');
+  assert(u.slideCount === n, `undo result slideCount should be ${n}, got ${u.slideCount}`);
+
+  r.redo();
+  assert(r.getSlideCount() === n + 1, 'redo addSlide should re-add the slide');
+  console.log('  OK: addSlide undo/redo');
+}
+
+// --- Test 41: beginBatch/endBatch collapses multiple edits into one undo ---
+console.log('Test 41: Batch = single undo step');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+
+  r.beginBatch();
+  r.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0);
+  r.addShape(0, 'ellipse', 914400, 0, 914400, 914400, 0, 255, 0);
+  r.updateShapeTransform(0, 0, 100000, 100000, 500000, 500000, 0);
+  r.endBatch();
+
+  const after = r.renderSlideSvg(0);
+  assert(after !== before, 'batch edits should change the SVG');
+
+  const u = r.undo();
+  assert(!u.startsWith('ERROR'), 'single undo should revert the whole batch');
+  assert(r.renderSlideSvg(0) === before, 'one undo should revert all batch edits');
+  assert(r.canUndo() === false, 'batch should be a single undo entry');
+  console.log('  OK: batch collapses to one undo');
+}
+
+// --- Test 42: empty history + clearHistory ---
+console.log('Test 42: Empty history and clearHistory');
+{
+  const r = await freshRenderer();
+  assert(r.undo() === 'ERROR:nothing to undo', 'undo on empty history should error');
+  assert(r.redo() === 'ERROR:nothing to redo', 'redo on empty history should error');
+
+  r.updateShapeFill(0, 0, 10, 20, 30);
+  assert(r.canUndo() === true, 'edit should create an undo entry');
+  r.clearHistory();
+  assert(r.canUndo() === false, 'clearHistory should drop undo entries');
+  assert(r.canRedo() === false, 'clearHistory should drop redo entries');
+  assert(r.undo() === 'ERROR:nothing to undo', 'undo after clearHistory should error');
+  console.log('  OK: empty history and clearHistory');
+}
+
+// --- Test 43: maxHistory caps the undo depth; export survives undo/redo ---
+console.log('Test 43: maxHistory cap + export after undo');
+{
+  const r = await freshRenderer({ logLevel: 'silent', maxHistory: 2 });
+  r.updateShapeFill(0, 0, 1, 1, 1);
+  r.updateShapeFill(0, 0, 2, 2, 2);
+  r.updateShapeFill(0, 0, 3, 3, 3);
+  // Only the 2 most recent pre-edit states are retained.
+  assert(r.undo().startsWith('{'), 'first undo should succeed');
+  assert(r.undo().startsWith('{'), 'second undo should succeed');
+  assert(r.undo() === 'ERROR:nothing to undo', 'third undo should be capped out');
+
+  // Export still works after undo/redo churn.
+  const out = await r.exportPptx();
+  assert(out.byteLength > 0, 'exportPptx should produce bytes after undo/redo');
+  console.log('  OK: maxHistory cap and export-after-undo');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

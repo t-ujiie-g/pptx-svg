@@ -63,6 +63,7 @@ interface PptxWasmExports {
   add_picture_shape(slideIdx: number, rid: string,
     x: number, y: number, cx: number, cy: number): string;
   replace_picture_rid(slideIdx: number, shapeIdx: number, newRid: string): string;
+  restore_slide_ooxml(slideIdx: number, xml: string): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -108,6 +109,39 @@ export interface PptxRendererOptions {
    * - `'debug'`:  All messages including debug details
    */
   logLevel?: LogLevel;
+  /**
+   * Maximum number of undo steps retained in the edit history. Default: `50`.
+   * Older steps are discarded once the limit is exceeded. Set to `0` to disable
+   * history (undo/redo become no-ops).
+   */
+  maxHistory?: number;
+}
+
+/**
+ * Result of an {@link PptxRenderer.undo} / {@link PptxRenderer.redo} call,
+ * returned as a JSON string. `slides` lists the 0-indexed slides whose content
+ * changed (so the caller can re-render just those); `slideCount` is the slide
+ * count after the operation (changes when undoing/redoing add/delete slide).
+ */
+export interface HistoryResult {
+  slides: number[];
+  slideCount: number;
+}
+
+/**
+ * Internal snapshot of all document state that diverges from the original ZIP.
+ * Captured before each mutating operation so it can be restored on undo/redo.
+ * File contents and image byte arrays are shared by reference (cheap clone);
+ * `persistFile` replaces map entries rather than mutating them, so snapshots
+ * stay immutable.
+ */
+interface DocSnapshot {
+  files: Map<string, string>;
+  addedFiles: Map<string, string>;
+  removedFiles: Set<string>;
+  addedBinaryFiles: Map<string, Uint8Array>;
+  /** Pending Wasm-side slide edits: [slideIdx, slide OOXML]. */
+  modifiedSlides: Array<[number, string]>;
 }
 
 const LOG_LEVELS: Record<LogLevel, number> = {
@@ -210,8 +244,21 @@ export class PptxRenderer {
   /** Internal logger */
   private log: Logger;
 
+  // ── Undo/Redo history (E6.1) ───────────────────────────────────────────────
+  /** Past document states (top = most recent state before the current one). */
+  private undoStack: DocSnapshot[] = [];
+  /** Future document states for redo. */
+  private redoStack: DocSnapshot[] = [];
+  /** Nesting depth of beginBatch()/endBatch(). */
+  private batchDepth = 0;
+  /** Whether the current batch has already recorded its pre-edit snapshot. */
+  private batchRecorded = false;
+  /** Max retained undo steps. */
+  private maxHistory: number;
+
   constructor(options?: PptxRendererOptions) {
     this.log = createLogger(options?.logLevel ?? 'error');
+    this.maxHistory = Math.max(0, options?.maxHistory ?? 50);
     if (options?.measureText) {
       this.measureTextFn = options.measureText;
     }
@@ -271,6 +318,7 @@ export class PptxRenderer {
     this.addedFiles.clear();
     this.addedBinaryFiles.clear();
     this.removedFiles.clear();
+    this.clearHistory();
     this.log.debug('Parsing ZIP archive...');
     const { textFiles, binaryFiles } = await extractZip(arrayBuffer, this.log);
     this.files = textFiles;
@@ -370,6 +418,148 @@ export class PptxRenderer {
     );
   }
 
+  // ── Undo / Redo API (E6.1) ─────────────────────────────────────────────────
+
+  /**
+   * Start a batch: all mutations until the matching {@link endBatch} collapse
+   * into a single undo step. Calls may be nested; only the outermost pair has an
+   * effect. Use this to make a compound action (e.g. paste = add shape + set
+   * text + set fill) a single Ctrl+Z.
+   */
+  beginBatch(): void {
+    if (this.batchDepth === 0) this.batchRecorded = false;
+    this.batchDepth++;
+  }
+
+  /** End a batch started with {@link beginBatch}. */
+  endBatch(): void {
+    if (this.batchDepth > 0) this.batchDepth--;
+  }
+
+  /** Whether there is at least one step that can be undone. */
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  /** Whether there is at least one step that can be redone. */
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  /** Discard all undo/redo history (e.g. after loading a new file). */
+  clearHistory(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.batchDepth = 0;
+    this.batchRecorded = false;
+  }
+
+  /**
+   * Undo the most recent edit (or batch).
+   * @returns JSON-encoded {@link HistoryResult} on success, or
+   *          `"ERROR:nothing to undo"` if the history is empty.
+   */
+  undo(): string {
+    if (this.undoStack.length === 0) return 'ERROR:nothing to undo';
+    const current = this.captureSnapshot();
+    const prev = this.undoStack.pop()!;
+    this.redoStack.push(current);
+    this.restoreSnapshot(prev);
+    return JSON.stringify(this.diffSnapshots(current, prev));
+  }
+
+  /**
+   * Redo the most recently undone edit (or batch).
+   * @returns JSON-encoded {@link HistoryResult} on success, or
+   *          `"ERROR:nothing to redo"` if there is nothing to redo.
+   */
+  redo(): string {
+    if (this.redoStack.length === 0) return 'ERROR:nothing to redo';
+    const current = this.captureSnapshot();
+    const next = this.redoStack.pop()!;
+    this.undoStack.push(current);
+    this.restoreSnapshot(next);
+    return JSON.stringify(this.diffSnapshots(current, next));
+  }
+
+  /**
+   * Record the pre-edit document state before a mutating operation. Called at
+   * the top of every mutating public method. Within a batch, only the first
+   * call records a snapshot. Any new edit clears the redo stack.
+   */
+  private checkpoint(): void {
+    if (!this.wasm || this.maxHistory === 0) return;
+    if (this.batchDepth > 0) {
+      if (this.batchRecorded) return;
+      this.batchRecorded = true;
+    }
+    this.undoStack.push(this.captureSnapshot());
+    this.redoStack = [];
+    while (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+  }
+
+  /** Capture a shallow snapshot of all state diverging from the original ZIP. */
+  private captureSnapshot(): DocSnapshot {
+    const modifiedSlides: Array<[number, string]> = [];
+    const modifiedStr = this.exports.get_modified_entries();
+    if (modifiedStr) {
+      for (const line of modifiedStr.split('\n')) {
+        if (!line) continue;
+        const tabIdx = line.indexOf('\t');
+        if (tabIdx < 0) continue;
+        const path = line.substring(0, tabIdx);
+        const m = path.match(/^ppt\/slides\/slide(\d+)\.xml$/);
+        if (!m) continue;
+        modifiedSlides.push([parseInt(m[1]) - 1, line.substring(tabIdx + 1)]);
+      }
+    }
+    return {
+      files: new Map(this.files),
+      addedFiles: new Map(this.addedFiles),
+      removedFiles: new Set(this.removedFiles),
+      addedBinaryFiles: new Map(this.addedBinaryFiles),
+      modifiedSlides,
+    };
+  }
+
+  /** Restore a previously captured snapshot, rebuilding Wasm state. */
+  private restoreSnapshot(s: DocSnapshot): void {
+    this.files = new Map(s.files);
+    this.addedFiles = new Map(s.addedFiles);
+    this.removedFiles = new Set(s.removedFiles);
+    this.addedBinaryFiles = new Map(s.addedBinaryFiles);
+    // Rebuild Wasm from the restored files map (resets g_slides to placeholders).
+    this.reinitializeWasm();
+    // Re-apply pending Wasm-side slide edits captured in the snapshot.
+    for (const [slideIdx, xml] of s.modifiedSlides) {
+      const r = this.exports.restore_slide_ooxml(slideIdx, xml);
+      if (r.startsWith('ERROR:')) {
+        this.log.warn(`restore_slide_ooxml(${slideIdx}) failed: ${r}`);
+      }
+    }
+  }
+
+  /** Compute which slides differ between two snapshots, for re-render hints. */
+  private diffSnapshots(from: DocSnapshot, to: DocSnapshot): HistoryResult {
+    const slides = new Set<number>();
+    const fromMap = new Map(from.modifiedSlides);
+    const toMap = new Map(to.modifiedSlides);
+    for (const [idx, xml] of toMap) {
+      if (fromMap.get(idx) !== xml) slides.add(idx);
+    }
+    for (const [idx] of fromMap) {
+      if (!toMap.has(idx)) slides.add(idx);
+    }
+    // Structural change (slide files added/removed) → flag all slides.
+    const slideCount = this.getSlideCount();
+    if (from.files.size !== to.files.size) {
+      for (let i = 0; i < slideCount; i++) slides.add(i);
+    }
+    return { slides: [...slides].sort((a, b) => a - b), slideCount };
+  }
+
   // ── Notes & Comments API ──────────────────────────────────────────────────
 
   /**
@@ -422,6 +612,7 @@ export class PptxRenderer {
    */
   updateShapeTransform(slideIdx: number, shapeIdx: number,
     x: number, y: number, cx: number, cy: number, rot: number): string {
+    this.checkpoint();
     return this.exports.update_shape_transform(slideIdx, shapeIdx, x, y, cx, cy, rot);
   }
 
@@ -431,6 +622,7 @@ export class PptxRenderer {
    */
   updateShapeText(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, text: string): string {
+    this.checkpoint();
     return this.exports.update_shape_text(slideIdx, shapeIdx, paraIdx, runIdx, text);
   }
 
@@ -440,6 +632,7 @@ export class PptxRenderer {
    */
   updateShapeFill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string {
+    this.checkpoint();
     return this.exports.update_shape_fill(slideIdx, shapeIdx, r, g, b);
   }
 
@@ -448,6 +641,7 @@ export class PptxRenderer {
    * @returns "OK" on success, "ERROR:..." on failure.
    */
   deleteShape(slideIdx: number, shapeIdx: number): string {
+    this.checkpoint();
     return this.exports.delete_shape(slideIdx, shapeIdx);
   }
 
@@ -461,6 +655,7 @@ export class PptxRenderer {
   addShape(slideIdx: number, geomType: string,
     x: number, y: number, cx: number, cy: number,
     fillR = -1, fillG = -1, fillB = -1): string {
+    this.checkpoint();
     return this.exports.add_shape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB);
   }
 
@@ -472,6 +667,7 @@ export class PptxRenderer {
    */
   addShapeText(slideIdx: number, shapeIdx: number, text: string,
     fontSize = 0, colorR = -1, colorG = -1, colorB = -1): string {
+    this.checkpoint();
     return this.exports.add_shape_text(slideIdx, shapeIdx, text, fontSize, colorR, colorG, colorB);
   }
 
@@ -481,6 +677,7 @@ export class PptxRenderer {
    */
   duplicateShape(slideIdx: number, shapeIdx: number,
     dxEmu = 457200, dyEmu = 457200): string {
+    this.checkpoint();
     return this.exports.duplicate_shape(slideIdx, shapeIdx, dxEmu, dyEmu);
   }
 
@@ -491,6 +688,7 @@ export class PptxRenderer {
    */
   updateShapeGradientFill(slideIdx: number, shapeIdx: number,
     angle: number, stops: Array<{ pos: number; r: number; g: number; b: number }>): string {
+    this.checkpoint();
     const stopsData = stops.map(s => `${s.pos},${s.r},${s.g},${s.b}`).join(';');
     return this.exports.update_shape_gradient_fill(slideIdx, shapeIdx, angle, stopsData);
   }
@@ -503,6 +701,7 @@ export class PptxRenderer {
    */
   updateShapeStroke(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number, widthEmu = 12700, dash = ''): string {
+    this.checkpoint();
     return this.exports.update_shape_stroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash);
   }
 
@@ -514,6 +713,7 @@ export class PptxRenderer {
    * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
    */
   addParagraph(slideIdx: number, shapeIdx: number, text: string, align = ''): string {
+    this.checkpoint();
     return this.exports.add_paragraph(slideIdx, shapeIdx, text, align);
   }
 
@@ -522,6 +722,7 @@ export class PptxRenderer {
    * @returns "OK" on success, "ERROR:..." on failure.
    */
   deleteParagraph(slideIdx: number, shapeIdx: number, paraIdx: number): string {
+    this.checkpoint();
     return this.exports.delete_paragraph(slideIdx, shapeIdx, paraIdx);
   }
 
@@ -530,6 +731,7 @@ export class PptxRenderer {
    * @returns "OK:<runIndex>" on success, "ERROR:..." on failure.
    */
   addRun(slideIdx: number, shapeIdx: number, paraIdx: number, text: string): string {
+    this.checkpoint();
     return this.exports.add_run(slideIdx, shapeIdx, paraIdx, text);
   }
 
@@ -538,6 +740,7 @@ export class PptxRenderer {
    * @returns "OK" on success, "ERROR:..." on failure.
    */
   deleteRun(slideIdx: number, shapeIdx: number, paraIdx: number, runIdx: number): string {
+    this.checkpoint();
     return this.exports.delete_run(slideIdx, shapeIdx, paraIdx, runIdx);
   }
 
@@ -548,6 +751,7 @@ export class PptxRenderer {
    */
   updateTextRunStyle(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, bold = -1, italic = -1): string {
+    this.checkpoint();
     return this.exports.update_text_run_style(slideIdx, shapeIdx, paraIdx, runIdx, bold, italic);
   }
 
@@ -557,6 +761,7 @@ export class PptxRenderer {
    */
   updateTextRunFontSize(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, fontSize: number): string {
+    this.checkpoint();
     return this.exports.update_text_run_font_size(slideIdx, shapeIdx, paraIdx, runIdx, fontSize);
   }
 
@@ -566,6 +771,7 @@ export class PptxRenderer {
    */
   updateTextRunColor(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, r: number, g: number, b: number): string {
+    this.checkpoint();
     return this.exports.update_text_run_color(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b);
   }
 
@@ -577,6 +783,7 @@ export class PptxRenderer {
    */
   updateTextRunFont(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, fontFace = '', eaFont = '', csFont = ''): string {
+    this.checkpoint();
     return this.exports.update_text_run_font(slideIdx, shapeIdx, paraIdx, runIdx, fontFace, eaFont, csFont);
   }
 
@@ -586,6 +793,7 @@ export class PptxRenderer {
    */
   updateParagraphAlign(slideIdx: number, shapeIdx: number,
     paraIdx: number, align: string): string {
+    this.checkpoint();
     return this.exports.update_paragraph_align(slideIdx, shapeIdx, paraIdx, align);
   }
 
@@ -598,6 +806,7 @@ export class PptxRenderer {
    */
   updateTextRunDecoration(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, underline = '', strike = '', baseline = -1): string {
+    this.checkpoint();
     return this.exports.update_text_run_decoration(slideIdx, shapeIdx, paraIdx, runIdx, underline, strike, baseline);
   }
 
@@ -623,6 +832,8 @@ export class PptxRenderer {
     if (insertIdx < 0 || insertIdx > oldCount) {
       throw new Error(`Invalid insert position: ${insertIdx}`);
     }
+
+    this.checkpoint();
 
     // Determine source layout info
     const srcIdx = sourceSlideIdx ?? Math.max(0, oldCount - 1);
@@ -684,6 +895,8 @@ export class PptxRenderer {
       throw new Error(`Slide index out of range: ${slideIdx}`);
     }
 
+    this.checkpoint();
+
     // Collect current slides
     const slideContents: string[] = [];
     const slideRels: string[] = [];
@@ -739,6 +952,8 @@ export class PptxRenderer {
       }
       seen.add(idx);
     }
+
+    this.checkpoint();
 
     // Collect current slides
     const slideContents: string[] = [];
@@ -1077,6 +1292,8 @@ export class PptxRenderer {
     const ext = mimeToExt(mimeType);
     if (!ext) return 'ERROR:unsupported image type';
 
+    this.checkpoint();
+
     // Generate unique media filename
     const mediaPath = this.nextMediaPath(ext);
 
@@ -1126,6 +1343,8 @@ export class PptxRenderer {
     const ridMatch = svg.match(/data-ooxml-blip-rid="([^"]+)"/);
     if (!ridMatch) return 'ERROR:shape has no image reference';
     const currentRid = ridMatch[1];
+
+    this.checkpoint();
 
     // Resolve current image path from rels
     const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
@@ -1183,6 +1402,8 @@ export class PptxRenderer {
         }
       }
     }
+
+    this.checkpoint();
 
     // Delete the shape
     const result = this.exports.delete_shape(slideIdx, shapeIdx);

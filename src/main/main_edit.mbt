@@ -5,6 +5,7 @@
 //   - delete_shape, add_shape, add_shape_text, duplicate_shape
 //   - update_shape_gradient_fill, update_shape_stroke
 //   - Text editing (E2.5): add/delete paragraph/run, style/font/color/align/decoration
+//   - History support (E6.1): restore_slide_ooxml
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -897,4 +898,75 @@ pub fn update_text_run_decoration(
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
+}
+
+// ── History support (E6.1) ───────────────────────────────────────────────────
+
+///|
+/// Restore a slide's SlideData from a previously serialized OOXML slide XML.
+///
+/// Used by the TypeScript-layer Undo/Redo history (DocSnapshot): the history
+/// captures each modified slide's OOXML via `get_slide_ooxml`, and restoring a
+/// snapshot re-parses that XML back into `g_slides` here. Mirrors
+/// `update_slide_from_svg` (sets the cache directly, marks modified), but takes
+/// OOXML slide XML instead of SVG.
+///
+/// Runs the same full parse + resolve pipeline as `render_slide_svg`
+/// (`resolve_slide_data`): effective theme, chart shapes, placeholder
+/// inheritance, auto-content, background inheritance, and text-style defaults.
+/// Those steps are idempotent on already-serialized slide XML (they only fill
+/// missing values; auto-content only injects into empty placeholders), so the
+/// restored slide is visually identical to the live-edited one — Undo/Redo keeps
+/// full fidelity.
+///
+/// Returns "OK" or "ERROR:<message>".
+pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  if xml.is_empty() {
+    return "ERROR:empty xml"
+  }
+  let slide_num = slide_idx + 1
+  // Resolve the slide's .rels + layout/master/theme (mirror render_slide_svg).
+  let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+  let rels_xml = @ffi.ffi_get_file(rels_path)
+  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
+  let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
+    g_slide_layout_paths.val[slide_idx]
+  } else {
+    ""
+  }
+  let layout_opt = if !layout_path.is_empty() {
+    get_layout(layout_path)
+  } else {
+    None
+  }
+  let master_path = if !layout_path.is_empty() {
+    find_master_for_layout(layout_path)
+  } else {
+    ""
+  }
+  let master_opt = if !master_path.is_empty() {
+    get_master(master_path)
+  } else {
+    None
+  }
+  let base_theme = if !master_path.is_empty() {
+    get_master_theme(master_path)
+  } else {
+    g_theme.val
+  }
+  let slide_data = resolve_slide_data(
+    slide_idx, slide_num, xml, rels, layout_opt, master_opt, layout_path, master_path,
+    base_theme,
+  )
+  g_slides.val[slide_idx] = slide_data
+  g_modified.val[slide_idx] = true
+  g_parsed.val[slide_idx] = true
+  "OK"
 }

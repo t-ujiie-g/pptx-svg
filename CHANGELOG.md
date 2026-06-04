@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **Undo / Redo edit history (E6.1)** — `PptxRenderer` now tracks a full undo/redo history across every mutating editing API. New methods: `undo()`, `redo()`, `canUndo()`, `canRedo()`, `beginBatch()`, `endBatch()`, `clearHistory()`, plus a `maxHistory` constructor option (default 50). `undo()` / `redo()` return a JSON-encoded `HistoryResult` (`{ slides: number[]; slideCount: number }`) so the caller can re-render only the affected slides, or `"ERROR:nothing to undo"` / `"ERROR:nothing to redo"` on an empty stack.
+  - **Unified snapshots** — each checkpoint shallow-clones the document state that diverges from the original ZIP (the TS `files` / `addedFiles` / `removedFiles` / `addedBinaryFiles` collections, strings & bytes shared by reference) plus the OOXML of any in-engine modified slides (via `get_modified_entries`). This covers both shape/text/fill edits (Wasm `g_slides`) and structural edits (`addSlide` / `deleteSlide` / `reorderSlides` / image ops) in one mechanism. Restores rebuild engine state and re-apply pending slide edits.
+  - **`beginBatch()` / `endBatch()`** collapse a compound action (e.g. paste = add shape + set text + set fill) into a single undo step; batches are nestable.
+  - History is cleared on `loadPptx()`.
+
+### MoonBit / Wasm
+
+- **New export `restore_slide_ooxml(slideIdx, xml)`** — re-parses a previously serialized OOXML slide back into the `g_slides` cache, used to restore pending slide edits when stepping through history. Runs the **same** parse + resolve pipeline as `render_slide_svg` (effective theme, chart shapes, placeholder inheritance, auto-content, background inheritance, text-style defaults), so a restored slide is identical to the live-edited one — Undo/Redo keeps full visual fidelity. The pipeline is idempotent on already-serialized XML (inheritance only fills missing values; `inject_placeholder_auto_content` only injects into empty placeholders).
+
+### Refactor
+
+- **Shared `resolve_slide_data` helper** — the slide parse + resolve logic previously inline in `render_slide_svg`'s fresh-parse branch is extracted into a single `resolve_slide_data(...)` function reused by both `render_slide_svg` and `restore_slide_ooxml`, eliminating a duplicate ~140-line inheritance pipeline.
+
+### Tests
+
+- **MoonBit**: restore round-trip idempotency tests in `serializer_test.mbt` (`serialize → parse_slide → serialize` is a fixed point; shape text survives a parse_slide round-trip).
+- **Node compatibility**: new Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo. Undo/redo of a transform restores the rendered SVG exactly.
+- Test counts: 184 MoonBit + 177 Node compatibility + 16 categorical suites.
+
+### Documentation
+
+- **`docs/editing-guide.md`** — new "Undo / Redo" section + History APIs table.
+
 ## 0.5.10
 
 ### Bug Fixes
