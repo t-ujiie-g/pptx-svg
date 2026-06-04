@@ -1993,7 +1993,15 @@ fn tl_para(runs : Array[@ooxml.TextRun]) -> @ooxml.TextParagraph {
 
 ///|
 fn tl_transform() -> @ooxml.ShapeTransform {
-  { x: 914400, y: 914400, cx: 5486400, cy: 2743200, rot: 0, flip_h: false, flip_v: false }
+  {
+    x: 914400,
+    y: 914400,
+    cx: 5486400,
+    cy: 2743200,
+    rot: 0,
+    flip_h: false,
+    flip_v: false,
+  }
 }
 
 ///|

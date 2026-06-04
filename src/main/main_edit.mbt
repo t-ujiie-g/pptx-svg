@@ -1156,20 +1156,8 @@ pub fn replace_text_range(
     // Clamp char offsets to paragraph text lengths.
     let sp_len = para_text_len(shape.paragraphs[sp])
     let ep_len = para_text_len(shape.paragraphs[ep])
-    let sc = if sc_in < 0 {
-      0
-    } else if sc_in > sp_len {
-      sp_len
-    } else {
-      sc_in
-    }
-    let ec = if ec_in < 0 {
-      0
-    } else if ec_in > ep_len {
-      ep_len
-    } else {
-      ec_in
-    }
+    let sc = if sc_in < 0 { 0 } else if sc_in > sp_len { sp_len } else { sc_in }
+    let ec = if ec_in < 0 { 0 } else if ec_in > ep_len { ep_len } else { ec_in }
     let (prefix, _) = split_para_runs(shape.paragraphs[sp], sc)
     let (_, suffix) = split_para_runs(shape.paragraphs[ep], ec)
     // Insertion format template: the run at the caret, else first run, else default.
@@ -1209,7 +1197,7 @@ pub fn replace_text_range(
         runs.push(mk_run(seg0))
       }
       append_all(runs, suffix)
-      new_paras.push({ ..base_para, runs })
+      new_paras.push({ ..base_para, runs, })
     } else {
       let last = segs.length() - 1
       // First paragraph: prefix + seg0

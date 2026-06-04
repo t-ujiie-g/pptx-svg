@@ -988,7 +988,9 @@ fn solve_text_autofit(
     }
     break
   }
-  (fs, lr, total_text_h, last_para_line_h, last_para_font_sz, last_para_spc_after)
+  (
+    fs, lr, total_text_h, last_para_line_h, last_para_font_sz, last_para_spc_after,
+  )
 }
 
 ///|
@@ -1077,10 +1079,17 @@ fn render_text(
 
   // Calculate total text height for vertical alignment + solve normAutofit shrink.
   let np = paragraphs.length()
-  let (fs, lr, total_text_h, last_para_line_h, last_para_font_sz, last_para_spc_after) = solve_text_autofit(
-      paragraphs, scale, theme, def_sz, def_line_h, init_fs, init_lr, do_wrap,
-      col_w, avail_h,
-    )
+  let (
+    fs,
+    lr,
+    total_text_h,
+    last_para_line_h,
+    last_para_font_sz,
+    last_para_spc_after,
+  ) = solve_text_autofit(
+    paragraphs, scale, theme, def_sz, def_line_h, init_fs, init_lr, do_wrap, col_w,
+    avail_h,
+  )
   // For vertical centering/bottom alignment, the trailing space of the last line
   // (line_height - font_size) and spc_after should not count toward the text extent.
   // The rendering places text at the baseline (font_size from line top), so the visual

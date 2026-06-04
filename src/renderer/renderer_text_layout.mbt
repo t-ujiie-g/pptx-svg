@@ -125,10 +125,26 @@ pub fn build_text_layout(
   let scale_d = scale.to_double()
 
   // Insets / text rectangle (mirror render_text)
-  let l_ins = if body_props.l_ins >= 0 { body_props.l_ins } else { default_l_inset }
-  let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { default_t_inset }
-  let r_ins = if body_props.r_ins >= 0 { body_props.r_ins } else { default_l_inset }
-  let b_ins = if body_props.b_ins >= 0 { body_props.b_ins } else { default_t_inset }
+  let l_ins = if body_props.l_ins >= 0 {
+    body_props.l_ins
+  } else {
+    default_l_inset
+  }
+  let t_ins = if body_props.t_ins >= 0 {
+    body_props.t_ins
+  } else {
+    default_t_inset
+  }
+  let r_ins = if body_props.r_ins >= 0 {
+    body_props.r_ins
+  } else {
+    default_l_inset
+  }
+  let b_ins = if body_props.b_ins >= 0 {
+    body_props.b_ins
+  } else {
+    default_t_inset
+  }
   let pad_l = px(l_ins, scale)
   let pad_t = px(t_ins, scale)
   let pad_r = px(r_ins, scale)
@@ -143,10 +159,25 @@ pub fn build_text_layout(
   let avail_h = shape_h - pad_t - pad_b
 
   // Solve autofit (shared with render_text → identical line/run counts).
-  let (fs, lr, total_text_h, last_para_line_h, last_para_font_sz, last_para_spc_after) = solve_text_autofit(
-      paragraphs, scale, theme, def_sz, def_line_h, body_props.font_scale,
-      body_props.ln_spc_reduction, do_wrap, col_w, avail_h,
-    )
+  let (
+    fs,
+    lr,
+    total_text_h,
+    last_para_line_h,
+    last_para_font_sz,
+    last_para_spc_after,
+  ) = solve_text_autofit(
+    paragraphs,
+    scale,
+    theme,
+    def_sz,
+    def_line_h,
+    body_props.font_scale,
+    body_props.ln_spc_reduction,
+    do_wrap,
+    col_w,
+    avail_h,
+  )
 
   // Vertical anchor offset (mirror render_text)
   let trailing_space = if last_para_line_h > last_para_font_sz {
@@ -243,7 +274,9 @@ pub fn build_text_layout(
       let baseline = cur_y
       let top = baseline - p_font_sz
       let vline = vlines[vli]
-      let (line_w, _) = measure_line_width(vline, para, scale, def_sz, fs, theme)
+      let (line_w, _) = measure_line_width(
+        vline, para, scale, def_sz, fs, theme,
+      )
       // Left edge of the line content (px, Double)
       let ind = if vli == 0 { first_line_indent } else { indent }
       let bullet_off = if vli == 0 { bullet_w } else { 0.0 }
@@ -311,7 +344,10 @@ pub fn build_text_layout(
           let cum_w = @ffi.ffi_measure_text(prefix, ff, fs_px)
           let ch_w = cum_w - prev_w
           let ch_x = x + prev_w
-          cur_chars.push({ x: (ch_x * scale_d).to_int(), w: (ch_w * scale_d).to_int() })
+          cur_chars.push({
+            x: (ch_x * scale_d).to_int(),
+            w: (ch_w * scale_d).to_int(),
+          })
           prev_w = cum_w
           ci = ci + step
         }
@@ -449,7 +485,12 @@ pub fn hit_test_layout(
   // Before the line start → caret at the first run's start.
   let first = line.runs[0]
   if x_emu <= first.x {
-    return (line.para_idx, first.run_idx, first.run_char_start, first.para_char_start)
+    return (
+      line.para_idx,
+      first.run_idx,
+      first.run_char_start,
+      first.para_char_start,
+    )
   }
   let mut ri = 0
   while ri < nr {
@@ -483,5 +524,10 @@ pub fn hit_test_layout(
   // Past the line end → caret after the last run box.
   let last = line.runs[nr - 1]
   let lc = last.chars.length()
-  (line.para_idx, last.run_idx, last.run_char_start + lc, last.para_char_start + lc)
+  (
+    line.para_idx,
+    last.run_idx,
+    last.run_char_start + lc,
+    last.para_char_start + lc,
+  )
 }
