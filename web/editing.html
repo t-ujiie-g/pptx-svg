@@ -54,6 +54,47 @@
       width: 1px; height: 24px; background: #3a3a7a; margin: 0 4px;
     }
 
+    /* ── History + clipboard toolbar (E6.1 / E6.5) ── */
+    #history-toolbar {
+      display: none; gap: 8px; align-items: center; flex-wrap: wrap;
+      padding: 8px 12px; background: #0f1a33; border: 1px solid #3a3a7a;
+      border-radius: 6px; margin-bottom: 12px;
+    }
+    #history-toolbar.visible { display: flex; }
+    #history-toolbar .sep { width: 1px; height: 20px; background: #3a3a7a; margin: 0 4px; }
+    #history-toolbar button:disabled { opacity: 0.4; cursor: default; }
+
+    /* ── Table editing panel (E6.6) ── */
+    #table-panel {
+      display: none; gap: 8px; align-items: center; flex-wrap: wrap;
+      padding: 12px; background: #0a1628; border: 1px solid #b07a30;
+      border-radius: 6px; margin-bottom: 12px;
+    }
+    #table-panel.visible { display: flex; }
+    #table-panel label, #table-panel span { color: #c9a45a; font-size: 0.85em; }
+    #table-panel .sep { width: 1px; height: 24px; background: #3a3a7a; margin: 0 4px; }
+    #table-panel input {
+      padding: 4px 8px; border: 1px solid #3a3a7a; border-radius: 4px;
+      background: #16213e; color: #e0e0e0; font-size: 13px;
+    }
+
+    /* ── Inline text editing overlays (E6.2) ── */
+    #edit-toolbar.inline-active #inline-edit-btn { background: #4a90d9; color: #fff; }
+    .text-caret {
+      position: absolute; width: 2px; background: #4a90d9;
+      pointer-events: none; z-index: 103; animation: caret-blink 1s step-end infinite;
+    }
+    @keyframes caret-blink { 50% { opacity: 0; } }
+    .layout-box {
+      position: absolute; pointer-events: none; z-index: 102;
+      border: 1px solid rgba(74,144,217,0.35); background: rgba(74,144,217,0.06);
+    }
+    /* ── Multi-select overlay (E6.4) ── */
+    .multi-overlay {
+      position: absolute; pointer-events: none; z-index: 99;
+      border: 2px dashed #d98a4a; background: rgba(217,138,74,0.08);
+    }
+
     /* ── Text runs panel ── */
     #text-runs-panel {
       display: none;
@@ -244,6 +285,17 @@
   <!-- SVG slide viewer -->
   <div class="card" id="slide-viewer-card">
     <h2>Interactive Editor</h2>
+    <details style="margin-bottom:12px;background:#0a1628;border:1px solid #2a3a6a;border-radius:6px;padding:8px 12px">
+      <summary style="cursor:pointer;color:#9ab;font-size:0.85em">E6 editing features — how to test</summary>
+      <ul style="margin:8px 0 0 18px;color:#9ab;font-size:0.82em;line-height:1.6">
+        <li><b>Undo/Redo (E6.1)</b>: any edit, then the Undo/Redo buttons or <code>Ctrl+Z</code> / <code>Ctrl+Y</code>.</li>
+        <li><b>Inline text (E6.2)</b>: select a text shape → <b>✎ Inline Text</b> → click in the text (boxes show per-char geometry), type, Backspace, Enter; <code>Esc</code> exits.</li>
+        <li><b>Z-order (E6.3)</b>: select a shape (overlapping ones help) → Front / ▲ / ▼ / Back.</li>
+        <li><b>Group move (E6.4)</b>: <code>Shift+click</code> several shapes → arrow keys move them together as <b>one</b> undo step.</li>
+        <li><b>Copy/Paste (E6.5)</b>: select a shape → Copy (<code>Ctrl+C</code>), change slide, Paste (<code>Ctrl+V</code>). Works with images.</li>
+        <li><b>Table (E6.6)</b>: select a table → set R/C + text and Set Cell, or +Row/−Row/+Col/−Col.</li>
+      </ul>
+    </details>
     <div class="slide-nav">
       <button id="prev-btn" disabled>&#x25C0; Prev</button>
       <span id="slide-num">Slide 1 / 1</span>
@@ -261,6 +313,15 @@
       <button id="move-right-btn" title="Move current slide right">Move Right &#x2192;</button>
       <div class="sep"></div>
       <button id="del-slide-btn" class="danger" title="Delete current slide">Delete Slide</button>
+    </div>
+
+    <!-- History + clipboard toolbar (E6.1 / E6.5) -->
+    <div id="history-toolbar">
+      <button id="undo-btn" disabled title="Undo (Ctrl+Z)">&#x21A9; Undo</button>
+      <button id="redo-btn" disabled title="Redo (Ctrl+Y / Ctrl+Shift+Z)">Redo &#x21AA;</button>
+      <div class="sep"></div>
+      <button id="paste-btn" disabled title="Paste copied shape onto this slide (Ctrl+V)">Paste Shape</button>
+      <span id="clipboard-info" style="color:#888;font-size:0.8em"></span>
     </div>
 
     <!-- Slide thumbnails -->
@@ -314,10 +375,33 @@
       <button id="apply-stroke-btn">Apply Stroke</button>
       <button id="remove-stroke-btn">No Stroke</button>
       <div class="sep"></div>
+      <label>Z-order:</label>
+      <button id="z-front-btn" title="Bring to front">Front</button>
+      <button id="z-forward-btn" title="Bring forward">&#x25B2;</button>
+      <button id="z-backward-btn" title="Send backward">&#x25BC;</button>
+      <button id="z-back-btn" title="Send to back">Back</button>
+      <div class="sep"></div>
+      <button id="copy-shape-btn" title="Copy shape (Ctrl+C)">Copy</button>
+      <button id="inline-edit-btn" title="Click-to-type inline text editing">&#x270E; Inline Text</button>
+      <div class="sep"></div>
       <button id="dup-shape-btn">Duplicate</button>
       <button id="del-shape-btn" style="border-color:#d9534f">Delete</button>
       <div class="sep"></div>
       <label id="shape-label">No shape selected</label>
+    </div>
+
+    <!-- Table editing panel (visible when a table shape is selected — E6.6) -->
+    <div id="table-panel">
+      <label>Table cell:</label>
+      <span>R</span><input type="number" id="tbl-row" value="0" min="0" style="width:48px">
+      <span>C</span><input type="number" id="tbl-col" value="0" min="0" style="width:48px">
+      <input type="text" id="tbl-cell-text" placeholder="cell text" style="width:140px">
+      <button id="tbl-set-cell-btn">Set Cell</button>
+      <div class="sep"></div>
+      <button id="tbl-add-row-btn" title="Add row after R">+ Row</button>
+      <button id="tbl-del-row-btn" title="Delete row R">&#8722; Row</button>
+      <button id="tbl-add-col-btn" title="Add column after C">+ Col</button>
+      <button id="tbl-del-col-btn" title="Delete column C">&#8722; Col</button>
     </div>
 
     <!-- Text runs panel (visible when shape with text is selected) -->
@@ -350,11 +434,16 @@
     const MIN_OVERLAY_PX = 10;     // minimum overlay dimension in CSS pixels
     const HANDLE_POSITIONS = ['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'];
 
-    const renderer = new PptxRenderer({ logLevel: 'debug' });
+    const renderer = new PptxRenderer({ logLevel: 'error' });
     let currentSlide = 0;
     let totalSlides = 0;
     let selectedShapeIdx = -1;
     let dragState = null;
+    // E6 demo state
+    let clipboardSpec = null;        // copied ShapeSpec JSON (E6.5)
+    const multiSel = new Set();      // multi-selected shape indices (E6.4)
+    let inlineMode = false;          // inline text editing active (E6.2)
+    let caret = null;                // { paraIdx, paraOffset } in inline mode
 
     function getSvgEl() { return $('svg-container').querySelector('svg'); }
 
@@ -382,6 +471,9 @@
     function renderAndRefresh() {
       insertSvg(renderer.renderSlideSvg(currentSlide));
       reSelectCurrentShape();
+      updateHistoryButtons();
+      if (multiSel.size > 0) drawMultiOverlays();
+      if (inlineMode) drawInlineLayout();
     }
 
     // ── EMU-per-CSS-pixel ──
@@ -444,20 +536,29 @@
     // ── Selection ──
     function deselect() {
       selectedShapeIdx = -1;
+      exitInlineMode();
       removeSelectionOverlay();
       $('edit-toolbar').classList.remove('visible');
       $('shape-info').classList.remove('visible');
+      $('table-panel').classList.remove('visible');
       hideTextRuns();
     }
 
     function selectShape(shapeG) {
       if (!shapeG) { deselect(); return; }
-      selectedShapeIdx = parseInt(shapeG.getAttribute('data-ooxml-shape-idx') ?? '-1', 10);
+      const newIdx = parseInt(shapeG.getAttribute('data-ooxml-shape-idx') ?? '-1', 10);
+      if (inlineMode && newIdx !== selectedShapeIdx) exitInlineMode();
+      selectedShapeIdx = newIdx;
       const fillHex = shapeG.getAttribute('data-ooxml-fill') || '';
       if (fillHex && fillHex.length === 6) $('fill-color').value = '#' + fillHex;
       showSelectionOverlay(shapeG);
       updateToolbar();
       showTextRuns(shapeG);
+      // Table panel + inline-edit availability depend on shape type.
+      const shapeType = shapeG.getAttribute('data-ooxml-shape-type') || '';
+      $('table-panel').classList.toggle('visible', shapeType === 'table');
+      const hasText = !!shapeG.querySelector('tspan[data-ooxml-para-idx]');
+      $('inline-edit-btn').style.display = hasText ? '' : 'none';
     }
 
     function reSelectCurrentShape() {
@@ -815,10 +916,14 @@
       panel.classList.add('visible');
     }
 
-    // ── Click: select ──
+    // ── Click: select (Shift = multi-select; inline mode = place caret) ──
     $('svg-container').addEventListener('click', (e) => {
       if (e.target.classList.contains('resize-handle')) return;
-      selectShape(e.target.closest('g[data-ooxml-shape-idx]'));
+      if (inlineMode) { placeCaretFromClick(e); return; }
+      const g = e.target.closest('g[data-ooxml-shape-idx]');
+      if (e.shiftKey && g) { toggleMultiSelect(g); return; }
+      clearMultiSelect();
+      selectShape(g);
     });
 
     // ── Fill color ──
@@ -1117,6 +1222,24 @@
     });
 
     // ── Slide thumbnails ──
+    // Re-render only one slide's thumbnail (avoids re-rendering all N slides for a
+    // single-slide edit — full renderThumbnails() is O(slides) Wasm renders).
+    function refreshThumb(idx) {
+      const thumb = $('slide-thumbs').querySelectorAll('.slide-thumb')[idx];
+      if (!thumb) return;
+      const svg = renderer.renderSlideSvg(idx);
+      if (!svg.startsWith('<svg')) return;
+      const label = thumb.querySelector('.thumb-label');
+      thumb.innerHTML = svg;
+      const svgEl = thumb.querySelector('svg');
+      if (svgEl) {
+        const w = svgEl.getAttribute('width'), h = svgEl.getAttribute('height');
+        if (w && h && !svgEl.getAttribute('viewBox')) svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        svgEl.removeAttribute('width'); svgEl.removeAttribute('height');
+      }
+      if (label) thumb.appendChild(label);
+    }
+
     function renderThumbnails() {
       const container = $('slide-thumbs');
       container.innerHTML = '';
@@ -1244,14 +1367,355 @@
           $('slide-viewer-card').style.display = 'block';
           $('export-card').style.display = 'block';
           $('slide-mgmt').classList.add('visible');
+          $('history-toolbar').classList.add('visible');
           $('shape-add-toolbar').classList.add('visible');
           $('image-toolbar').classList.add('visible');
+          clipboardSpec = null;
+          multiSel.clear();
           renderThumbnails();
           showSlide(0);
+          updateHistoryButtons();
         }
       } catch (err) {
         setStatus(`Error: ${err.message}`, 'error');
         console.error(err);
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  E6 feature demos
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── History (E6.1): Undo / Redo ──
+    function updateHistoryButtons() {
+      const ub = $('undo-btn'), rb = $('redo-btn'), pb = $('paste-btn');
+      if (ub) ub.disabled = !(renderer.canUndo && renderer.canUndo());
+      if (rb) rb.disabled = !(renderer.canRedo && renderer.canRedo());
+      if (pb) pb.disabled = !clipboardSpec;
+      const ci = $('clipboard-info');
+      if (ci) ci.textContent = clipboardSpec ? '(shape copied)' : '';
+    }
+
+    function applyHistoryStep(label) {
+      totalSlides = renderer.getSlideCount();
+      if (currentSlide >= totalSlides) currentSlide = totalSlides - 1;
+      if (currentSlide < 0) currentSlide = 0;
+      $('slide-num').textContent = `Slide ${currentSlide + 1} / ${totalSlides}`;
+      $('prev-btn').disabled = currentSlide === 0;
+      $('next-btn').disabled = currentSlide >= totalSlides - 1;
+      exitInlineMode();
+      clearMultiSelect();
+      deselect();
+      renderThumbnails();
+      renderAndRefresh();
+      setStatus(`${label}`, 'ok');
+    }
+
+    function doUndo() {
+      if (!(renderer.canUndo && renderer.canUndo())) return;
+      const res = renderer.undo();
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); updateHistoryButtons(); return; }
+      applyHistoryStep('Undo');
+    }
+    function doRedo() {
+      if (!(renderer.canRedo && renderer.canRedo())) return;
+      const res = renderer.redo();
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); updateHistoryButtons(); return; }
+      applyHistoryStep('Redo');
+    }
+    $('undo-btn').addEventListener('click', doUndo);
+    $('redo-btn').addEventListener('click', doRedo);
+
+    // ── Z-order (E6.3) ──
+    function zorder(opFn, label) {
+      if (selectedShapeIdx < 0) return;
+      const res = opFn(currentSlide, selectedShapeIdx);
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); return; }
+      selectedShapeIdx = parseInt(res.split(':')[1]);
+      setStatus(`${label} → shape #${selectedShapeIdx}`, 'ok');
+      renderAndRefresh();
+      refreshThumb(currentSlide);
+    }
+    $('z-front-btn').addEventListener('click', () => zorder((s, i) => renderer.bringToFront(s, i), 'Bring to front'));
+    $('z-back-btn').addEventListener('click', () => zorder((s, i) => renderer.sendToBack(s, i), 'Send to back'));
+    $('z-forward-btn').addEventListener('click', () => zorder((s, i) => renderer.bringForward(s, i), 'Bring forward'));
+    $('z-backward-btn').addEventListener('click', () => zorder((s, i) => renderer.sendBackward(s, i), 'Send backward'));
+
+    // ── Copy / paste (E6.5) ──
+    function doCopy() {
+      if (selectedShapeIdx < 0) return;
+      const spec = renderer.getShapeSpec(currentSlide, selectedShapeIdx);
+      if (spec.startsWith('ERROR')) { setStatus(spec, 'error'); return; }
+      clipboardSpec = spec;
+      const mediaN = (JSON.parse(spec).media || []).length;
+      setStatus(`Copied shape #${selectedShapeIdx}${mediaN ? ` (+${mediaN} image)` : ''}`, 'ok');
+      updateHistoryButtons();
+    }
+    function doPaste() {
+      if (!clipboardSpec) return;
+      const res = renderer.insertShapeSpec(currentSlide, clipboardSpec, 457200, 457200);
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); return; }
+      const newIdx = parseInt(res.split(':')[1]);
+      setStatus(`Pasted shape → #${newIdx} on slide ${currentSlide + 1}`, 'ok');
+      renderAndRefresh();
+      refreshThumb(currentSlide);
+      const svgEl = getSvgEl();
+      const g = svgEl && findShapeElement(svgEl, newIdx);
+      if (g) selectShape(g);
+    }
+    $('copy-shape-btn').addEventListener('click', doCopy);
+    $('paste-btn').addEventListener('click', doPaste);
+
+    // ── Multi-select + group transform (E6.4) ──
+    function removeMultiOverlays() {
+      $('svg-container').querySelectorAll('.multi-overlay').forEach(el => el.remove());
+    }
+    function clearMultiSelect() {
+      multiSel.clear();
+      removeMultiOverlays();
+    }
+    function drawMultiOverlays() {
+      removeMultiOverlays();
+      const svgEl = getSvgEl();
+      if (!svgEl) return;
+      const container = $('svg-container');
+      const cr = container.getBoundingClientRect();
+      for (const idx of multiSel) {
+        const g = findShapeElement(svgEl, idx);
+        if (!g) continue;
+        const r = g.getBoundingClientRect();
+        const o = document.createElement('div');
+        o.className = 'multi-overlay';
+        o.style.left = `${r.left - cr.left + container.scrollLeft}px`;
+        o.style.top = `${r.top - cr.top + container.scrollTop}px`;
+        o.style.width = `${r.width}px`;
+        o.style.height = `${r.height}px`;
+        container.appendChild(o);
+      }
+    }
+    function toggleMultiSelect(g) {
+      const idx = parseInt(g.getAttribute('data-ooxml-shape-idx'));
+      // Seed with the currently single-selected shape so the first Shift+click
+      // groups both, not just the newly clicked one.
+      if (multiSel.size === 0 && selectedShapeIdx >= 0 && selectedShapeIdx !== idx) {
+        multiSel.add(selectedShapeIdx);
+      }
+      deselect();
+      if (multiSel.has(idx)) multiSel.delete(idx); else multiSel.add(idx);
+      drawMultiOverlays();
+      setStatus(`Multi-select: ${multiSel.size} shape(s) — use arrow keys to move together (one undo)`, 'info');
+    }
+    function nudgeMultiSelection(dx, dy) {
+      const svgEl = getSvgEl();
+      if (!svgEl || multiSel.size === 0) return;
+      const items = [];
+      for (const idx of multiSel) {
+        const g = findShapeElement(svgEl, idx);
+        if (!g) continue;
+        const t = getShapeTransform(g);
+        items.push({ shapeIdx: idx, x: t.x + dx, y: t.y + dy, cx: t.cx, cy: t.cy, rot: t.rot });
+      }
+      if (items.length === 0) return;
+      const res = renderer.updateShapesTransform(currentSlide, items);
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); return; }
+      setStatus(`Moved ${items.length} shape(s) together (${res})`, 'ok');
+      renderAndRefresh();
+    }
+
+    // ── Inline text editing (E6.2): getTextLayout / hitTestText / replaceTextRange ──
+    const NUDGE_EMU = 91440; // 0.1 inch per arrow-key step
+
+    function removeInlineOverlays() {
+      $('svg-container').querySelectorAll('.layout-box, .text-caret').forEach(el => el.remove());
+    }
+    function exitInlineMode() {
+      if (!inlineMode) return;
+      inlineMode = false;
+      caret = null;
+      removeInlineOverlays();
+      $('edit-toolbar').classList.remove('inline-active');
+    }
+    function getLayout() {
+      const raw = renderer.getTextLayout(currentSlide, selectedShapeIdx);
+      if (raw.startsWith('ERROR')) return null;
+      try { return JSON.parse(raw); } catch { return null; }
+    }
+    // EMU (slide-absolute) → CSS px relative to the svg-container.
+    function emuToContainerPx(ex, ey) {
+      const svgEl = getSvgEl();
+      const container = $('svg-container');
+      const sr = svgEl.getBoundingClientRect();
+      const cr = container.getBoundingClientRect();
+      const epp = getEmuPerCssPx(); // EMU per CSS px
+      return {
+        left: (sr.left - cr.left + container.scrollLeft) + ex / epp,
+        top: (sr.top - cr.top + container.scrollTop) + ey / epp,
+        epp,
+      };
+    }
+    function drawInlineLayout() {
+      removeInlineOverlays();
+      const layout = getLayout();
+      if (!layout) return;
+      const container = $('svg-container');
+      const epp = getEmuPerCssPx();
+      for (const line of layout.lines) {
+        for (const run of line.runs) {
+          for (const ch of run.chars) {
+            const p = emuToContainerPx(ch.x, line.y);
+            const box = document.createElement('div');
+            box.className = 'layout-box';
+            box.style.left = `${p.left}px`;
+            box.style.top = `${p.top}px`;
+            box.style.width = `${Math.max(1, ch.w / epp)}px`;
+            box.style.height = `${line.h / epp}px`;
+            container.appendChild(box);
+          }
+        }
+      }
+      drawCaret();
+    }
+    function drawCaret() {
+      $('svg-container').querySelectorAll('.text-caret').forEach(el => el.remove());
+      if (!caret) return;
+      const layout = getLayout();
+      if (!layout) return;
+      // Find the caret's pixel position from the layout's char boxes.
+      let cx = null, cy = null, ch = null;
+      for (const line of layout.lines) {
+        for (const run of line.runs) {
+          if (run.paraIdx !== caret.paraIdx) continue;
+          for (let i = 0; i < run.chars.length; i++) {
+            if (run.paraCharStart + i === caret.paraOffset) {
+              cx = run.chars[i].x; cy = line.y; ch = line.h;
+            }
+          }
+          // caret at end of this run segment
+          if (run.paraCharStart + run.chars.length === caret.paraOffset) {
+            cx = run.x + run.w; cy = line.y; ch = line.h;
+          }
+        }
+        if (cx === null && line.runs.length === 0 && line.paraIdx === caret.paraIdx) {
+          // empty line — caret at the box left
+          cx = layout.box.x; cy = line.y; ch = line.h;
+        }
+      }
+      if (cx === null) {
+        // fall back to start of the box
+        const first = layout.lines[0];
+        if (!first) return;
+        cx = layout.box.x; cy = first.y; ch = first.h;
+      }
+      const p = emuToContainerPx(cx, cy);
+      const el = document.createElement('div');
+      el.className = 'text-caret';
+      el.style.left = `${p.left}px`;
+      el.style.top = `${p.top}px`;
+      el.style.height = `${ch / p.epp}px`;
+      $('svg-container').appendChild(el);
+    }
+    function placeCaretFromClick(e) {
+      const svgEl = getSvgEl();
+      if (!svgEl) return;
+      const sr = svgEl.getBoundingClientRect();
+      const epp = getEmuPerCssPx();
+      const ex = (e.clientX - sr.left) * epp;
+      const ey = (e.clientY - sr.top) * epp;
+      const raw = renderer.hitTestText(currentSlide, selectedShapeIdx, Math.round(ex), Math.round(ey));
+      if (raw.startsWith('ERROR')) { setStatus(raw, 'error'); return; }
+      const hit = JSON.parse(raw);
+      caret = { paraIdx: hit.paraIdx, paraOffset: hit.paraOffset };
+      drawCaret();
+      setStatus(`Caret: para ${hit.paraIdx}, offset ${hit.paraOffset} — type to insert, Esc to exit`, 'info');
+    }
+    function enterInlineMode() {
+      if (selectedShapeIdx < 0) return;
+      clearMultiSelect();
+      inlineMode = true;
+      caret = { paraIdx: 0, paraOffset: 0 };
+      $('edit-toolbar').classList.add('inline-active');
+      drawInlineLayout();
+      setStatus('Inline text mode: click in the text to place the caret, then type. Esc to exit.', 'info');
+    }
+    $('inline-edit-btn').addEventListener('click', () => {
+      if (inlineMode) exitInlineMode(); else enterInlineMode();
+    });
+    function inlineReplace(startOff, endOff, text) {
+      const res = renderer.replaceTextRange(
+        currentSlide, selectedShapeIdx, caret.paraIdx, startOff, caret.paraIdx, endOff, text);
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); return false; }
+      return true;
+    }
+    function inlineType(text) {
+      if (!caret) { setStatus('Click in the text to place a caret first', 'info'); return; }
+      if (!inlineReplace(caret.paraOffset, caret.paraOffset, text)) return;
+      caret = { paraIdx: caret.paraIdx, paraOffset: caret.paraOffset + text.length };
+      renderAndRefresh();
+    }
+    function inlineBackspace() {
+      if (!caret || caret.paraOffset <= 0) return;
+      if (!inlineReplace(caret.paraOffset - 1, caret.paraOffset, '')) return;
+      caret = { paraIdx: caret.paraIdx, paraOffset: caret.paraOffset - 1 };
+      renderAndRefresh();
+    }
+
+    // ── Table editing (E6.6) ──
+    function tableOp(opFn, label) {
+      if (selectedShapeIdx < 0) return;
+      const res = opFn();
+      if (res.startsWith('ERROR')) { setStatus(res, 'error'); return; }
+      setStatus(`${label} (${res})`, 'ok');
+      renderAndRefresh();
+      refreshThumb(currentSlide);
+    }
+    const tblRow = () => parseInt($('tbl-row').value || '0', 10);
+    const tblCol = () => parseInt($('tbl-col').value || '0', 10);
+    $('tbl-set-cell-btn').addEventListener('click', () =>
+      tableOp(() => renderer.updateTableCellText(currentSlide, selectedShapeIdx, tblRow(), tblCol(), $('tbl-cell-text').value), 'Set cell'));
+    $('tbl-add-row-btn').addEventListener('click', () =>
+      tableOp(() => renderer.addTableRow(currentSlide, selectedShapeIdx, tblRow()), 'Add row'));
+    $('tbl-del-row-btn').addEventListener('click', () =>
+      tableOp(() => renderer.deleteTableRow(currentSlide, selectedShapeIdx, tblRow()), 'Delete row'));
+    $('tbl-add-col-btn').addEventListener('click', () =>
+      tableOp(() => renderer.addTableColumn(currentSlide, selectedShapeIdx, tblCol(), 0), 'Add column'));
+    $('tbl-del-col-btn').addEventListener('click', () =>
+      tableOp(() => renderer.deleteTableColumn(currentSlide, selectedShapeIdx, tblCol()), 'Delete column'));
+
+    // ── Keyboard shortcuts ──
+    document.addEventListener('keydown', (e) => {
+      const inField = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target.tagName || '').toUpperCase());
+
+      // Inline text editing captures keys (unless typing in a form field).
+      if (inlineMode && !inField) {
+        if (e.key === 'Escape') { exitInlineMode(); setStatus('Exited inline text mode', 'info'); e.preventDefault(); return; }
+        if (e.key === 'Backspace') { inlineBackspace(); e.preventDefault(); return; }
+        if (e.key === 'Enter') { inlineType('\n'); e.preventDefault(); return; }
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) { inlineType(e.key); e.preventDefault(); return; }
+      }
+
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) doRedo(); else doUndo();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); doRedo(); return; }
+      if (mod && e.key.toLowerCase() === 'c' && !inField) {
+        if (selectedShapeIdx >= 0) { e.preventDefault(); doCopy(); }
+        return;
+      }
+      if (mod && e.key.toLowerCase() === 'v' && !inField) {
+        if (clipboardSpec) { e.preventDefault(); doPaste(); }
+        return;
+      }
+      // Arrow keys move a multi-selection together (E6.4).
+      if (!inField && multiSel.size > 0 && e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const d = NUDGE_EMU;
+        if (e.key === 'ArrowLeft') nudgeMultiSelection(-d, 0);
+        else if (e.key === 'ArrowRight') nudgeMultiSelection(d, 0);
+        else if (e.key === 'ArrowUp') nudgeMultiSelection(0, -d);
+        else if (e.key === 'ArrowDown') nudgeMultiSelection(0, d);
       }
     });
 
