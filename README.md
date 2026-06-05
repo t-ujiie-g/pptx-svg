@@ -227,6 +227,16 @@ z-order is shape-array order (later = front). All four are undoable.
 
 Supports pasting onto a different slide/presentation. See [docs/editing-guide.md](docs/editing-guide.md#copy--paste-cross-slide).
 
+**Table Editing:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `updateTableCellText(slideIdx, shapeIdx, row, col, text)` | `string` | Set a table cell's text. Returns re-rendered SVG. |
+| `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | `string` | Insert / delete a table row. |
+| `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | `string` | Insert / delete a table column. |
+
+All undoable. Merged cells are not span-adjusted (v1). See [docs/editing-guide.md](docs/editing-guide.md#table-editing).
+
 **Notes & Comments:**
 
 | Method | Returns | Description |

@@ -48,6 +48,7 @@ python3 -m http.server 8765 --directory .
 - MoonBit exports (z-order E6.3): `bring_to_front`, `send_to_back`, `bring_forward`, `send_backward`
 - MoonBit exports (multi-transform E6.4): `update_shapes_transform`
 - MoonBit exports (copy/paste E6.5): `get_shape_ooxml`, `add_shape_from_ooxml`
+- MoonBit exports (table editing E6.6): `update_table_cell_text`, `add_table_row`, `delete_table_row`, `add_table_column`, `delete_table_column`
 - Full export list: see `src/main/moon.pkg`
 
 **Lazy slide parse (`g_slides` cache).** `initialize_pptx` fills `g_slides` with empty placeholders (`shapes: []`); the real parse + placeholder inheritance happens on the first `render_slide_svg(idx)`, which caches the resolved `SlideData` and sets `g_parsed[idx]`. Editing exports read `g_slides` directly, so any new editing export that reads the cache **must** route through `with_shape`/`with_run` (which call `ensure_slide_parsed`) or call `ensure_slide_parsed(slide_idx)` itself — otherwise it silently no-ops on a slide that was never rendered (this was the 0.5.10 bug). Don't add per-method `renderSlideSvg()` "ensure parsed" calls in the TS layer; the Wasm boundary is the single source of truth.
@@ -207,8 +208,9 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
-| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes) + history (`restore_slide_ooxml`, E6.1) |
+| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes); history (`restore_slide_ooxml`, E6.1); z-order (E6.3); multi-transform (E6.4); copy/paste (E6.5). Shared helpers: `with_shape`/`with_run`, `make_default_run`/`paragraph`, `array_remove_at`/`array_insert_at` |
 | `src/main/main_text_edit.mbt` | Inline text editing exports (E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range` + `split_para_runs` |
+| `src/main/main_table_edit.mbt` | Table editing exports (E6.6): `update_table_cell_text`, `add_table_row`/`column`, `delete_table_row`/`column` + `with_table` |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
 | `src/main/moon.pkg` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |

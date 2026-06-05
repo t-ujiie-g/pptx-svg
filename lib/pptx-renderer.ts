@@ -75,6 +75,11 @@ interface PptxWasmExports {
   update_shapes_transform(slideIdx: number, itemsData: string): string;
   get_shape_ooxml(slideIdx: number, shapeIdx: number): string;
   add_shape_from_ooxml(slideIdx: number, shapeXml: string, dxEmu: number, dyEmu: number): string;
+  update_table_cell_text(slideIdx: number, shapeIdx: number, row: number, col: number, text: string): string;
+  add_table_row(slideIdx: number, shapeIdx: number, afterRow: number): string;
+  delete_table_row(slideIdx: number, shapeIdx: number, row: number): string;
+  add_table_column(slideIdx: number, shapeIdx: number, afterCol: number, widthEmu: number): string;
+  delete_table_column(slideIdx: number, shapeIdx: number, col: number): string;
 }
 
 /** Options for text measurement callback. Font size is in CSS pixels (px). */
@@ -1085,6 +1090,50 @@ export class PptxRenderer {
       }
       return this.exports.add_shape_from_ooxml(slideIdx, xml, dxEmu, dyEmu);
     });
+  }
+
+  // ── Table editing API (E6.6) ─────────────────────────────────────────────────
+
+  /**
+   * Set a table cell's text (plain text, replacing the cell's contents). The new
+   * text inherits the cell's existing first-run formatting when present.
+   * Returns re-rendered shape SVG, or `"ERROR:..."` (e.g. not a table).
+   */
+  updateTableCellText(slideIdx: number, shapeIdx: number, row: number, col: number, text: string): string {
+    this.checkpoint();
+    return this.exports.update_table_cell_text(slideIdx, shapeIdx, row, col, text);
+  }
+
+  /**
+   * Insert an empty row. `afterRow = -1` inserts at the top; otherwise after the
+   * given row. Returns `"OK:<newRowIdx>"`, or `"ERROR:..."`.
+   * Note: tables with merged cells are not span-adjusted (v1 limitation).
+   */
+  addTableRow(slideIdx: number, shapeIdx: number, afterRow = -1): string {
+    this.checkpoint();
+    return this.exports.add_table_row(slideIdx, shapeIdx, afterRow);
+  }
+
+  /** Delete a table row (at least one must remain). Returns `"OK"` or `"ERROR:..."`. */
+  deleteTableRow(slideIdx: number, shapeIdx: number, row: number): string {
+    this.checkpoint();
+    return this.exports.delete_table_row(slideIdx, shapeIdx, row);
+  }
+
+  /**
+   * Insert an empty column. `afterCol = -1` inserts at the left; otherwise after
+   * the given column. `widthEmu = 0` copies a neighbour's width. Returns
+   * `"OK:<newColIdx>"`, or `"ERROR:..."`. Merged cells are not span-adjusted (v1).
+   */
+  addTableColumn(slideIdx: number, shapeIdx: number, afterCol = -1, widthEmu = 0): string {
+    this.checkpoint();
+    return this.exports.add_table_column(slideIdx, shapeIdx, afterCol, widthEmu);
+  }
+
+  /** Delete a table column (at least one must remain). Returns `"OK"` or `"ERROR:..."`. */
+  deleteTableColumn(slideIdx: number, shapeIdx: number, col: number): string {
+    this.checkpoint();
+    return this.exports.delete_table_column(slideIdx, shapeIdx, col);
   }
 
   // ── Slide management API ────────────────────────────────────────────────────

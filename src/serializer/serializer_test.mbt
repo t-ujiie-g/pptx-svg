@@ -517,3 +517,18 @@ test "parse_shapes_xml round-trips a serialized shape" {
   }
   assert_true(is_rect)
 }
+
+// ── Table editing (E6.6) ─────────────────────────────────────────────────────
+
+///|
+test "TableCell::empty has parser defaults" {
+  let c = @ooxml.TableCell::empty()
+  assert_eq(c.grid_span, 1)
+  assert_eq(c.row_span, 1)
+  assert_eq(c.paragraphs.length(), 0)
+  assert_true(c.fill.is_none())
+  assert_false(c.v_merge)
+  assert_false(c.h_merge)
+  assert_eq(c.mar_l, -1)
+  assert_eq(c.anchor, "")
+}

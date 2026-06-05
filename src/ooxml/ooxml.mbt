@@ -1045,6 +1045,38 @@ pub(all) struct TableCell {
 }
 
 ///|
+/// An empty table cell with parser defaults (no text, no merge, no fill/borders,
+/// default margins/anchor). Used when adding rows/columns (E6.6).
+pub fn TableCell::empty() -> TableCell {
+  {
+    paragraphs: [],
+    fill: Color::none(),
+    grad_fill: GradientFill::none(),
+    grid_span: 1,
+    row_span: 1,
+    v_merge: false,
+    h_merge: false,
+    bdr_l_w: 0,
+    bdr_r_w: 0,
+    bdr_t_w: 0,
+    bdr_b_w: 0,
+    bdr_l_color: Color::none(),
+    bdr_r_color: Color::none(),
+    bdr_t_color: Color::none(),
+    bdr_b_color: Color::none(),
+    bdr_tl_br_w: 0,
+    bdr_tl_br_color: Color::none(),
+    bdr_bl_tr_w: 0,
+    bdr_bl_tr_color: Color::none(),
+    mar_l: -1,
+    mar_r: -1,
+    mar_t: -1,
+    mar_b: -1,
+    anchor: "",
+  }
+}
+
+///|
 pub(all) struct TableRow {
   height : Int // EMU
   cells : Array[TableCell]

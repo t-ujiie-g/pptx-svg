@@ -5,7 +5,7 @@
  * Requires: Node.js 22+ (WasmGC support)
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -1490,6 +1490,91 @@ console.log('Test 58: copy/paste boundary errors');
   assert(r.insertShapeSpec(0, 'not json').startsWith('ERROR'), 'insertShapeSpec with bad spec should error');
   assert(r.insertShapeSpec(0, JSON.stringify({ xml: '', media: [] })).startsWith('ERROR'), 'empty xml should error');
   console.log('  OK: boundary errors');
+}
+
+// ── Table editing (E6.6) ─────────────────────────────────────────────────────
+// test_features.pptx slide 41 (0-indexed) has a plain 3×3 table at shape index 0.
+const FEATURES_PATH = join(__dirname, 'test_features.pptx');
+const TABLE_SLIDE = 41, TABLE_SHAPE = 0;
+async function freshFeatures() {
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  renderer.__hasFeatures = false;
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const buf = readFileSync(FEATURES_PATH);
+  await renderer.loadPptx(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  return renderer;
+}
+const trCount = (xml) => (xml.match(/<a:tr[ >]/g) || []).length;
+const gridColCount = (xml) => (xml.match(/<a:gridCol/g) || []).length;
+
+if (!existsSync(FEATURES_PATH)) {
+  console.log('Tests 59–62: SKIPPED (test_features.pptx not found)');
+} else {
+  // --- Test 59: updateTableCellText + undo ---
+  console.log('Test 59: updateTableCellText');
+  {
+    const r = await freshFeatures();
+    const ret = r.updateTableCellText(TABLE_SLIDE, TABLE_SHAPE, 0, 0, 'EDITED_CELL_X');
+    assert(!ret.startsWith('ERROR'), `updateTableCellText should succeed, got ${ret.slice(0, 40)}`);
+    const ooxml = r.getSlideOoxml(TABLE_SLIDE);
+    assert(ooxml.includes('EDITED_CELL_X'), 'new cell text should appear in the slide OOXML');
+
+    const before = r.renderSlideSvg(TABLE_SLIDE);
+    r.updateTableCellText(TABLE_SLIDE, TABLE_SHAPE, 1, 1, 'UNDO_ME');
+    assert(r.renderSlideSvg(TABLE_SLIDE) !== before, 'cell edit should change the slide');
+    r.undo();
+    assert(r.renderSlideSvg(TABLE_SLIDE) === before, 'undo should restore the cell');
+    console.log('  OK: updateTableCellText + undo');
+  }
+
+  // --- Test 60: add/delete row ---
+  console.log('Test 60: add/delete table row');
+  {
+    const r = await freshFeatures();
+    const rows0 = trCount(r.getSlideOoxml(TABLE_SLIDE));
+    const add = r.addTableRow(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(add.startsWith('OK:'), `addTableRow should return OK:<idx>, got ${add}`);
+    assert(trCount(r.getSlideOoxml(TABLE_SLIDE)) === rows0 + 1, 'row count should increase by 1');
+    const del = r.deleteTableRow(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(del === 'OK', `deleteTableRow should return OK, got ${del}`);
+    assert(trCount(r.getSlideOoxml(TABLE_SLIDE)) === rows0, 'row count should return to original');
+    console.log('  OK: add/delete row');
+  }
+
+  // --- Test 61: add/delete column ---
+  console.log('Test 61: add/delete table column');
+  {
+    const r = await freshFeatures();
+    const cols0 = gridColCount(r.getSlideOoxml(TABLE_SLIDE));
+    const add = r.addTableColumn(TABLE_SLIDE, TABLE_SHAPE, 0, 914400);
+    assert(add.startsWith('OK:'), `addTableColumn should return OK:<idx>, got ${add}`);
+    let ooxml = r.getSlideOoxml(TABLE_SLIDE);
+    assert(gridColCount(ooxml) === cols0 + 1, 'gridCol count should increase by 1');
+    // Every row must gain a cell (tc count = rows * cols).
+    const rows = trCount(ooxml);
+    const tcCount = (ooxml.match(/<a:tc[ >]/g) || []).length;
+    assert(tcCount === rows * (cols0 + 1), `tc count should be rows*cols (${rows}*${cols0 + 1}), got ${tcCount}`);
+    const del = r.deleteTableColumn(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(del === 'OK', `deleteTableColumn should return OK, got ${del}`);
+    assert(gridColCount(r.getSlideOoxml(TABLE_SLIDE)) === cols0, 'gridCol count should return to original');
+    console.log('  OK: add/delete column');
+  }
+
+  // --- Test 62: boundary errors ---
+  console.log('Test 62: table editing boundary errors');
+  {
+    const r = await freshFeatures();
+    // shape 1 on this slide is not a table.
+    assert(r.addTableRow(TABLE_SLIDE, 1, -1).startsWith('ERROR'), 'non-table shape should error');
+    assert(r.updateTableCellText(TABLE_SLIDE, TABLE_SHAPE, 99, 0, 'x').startsWith('ERROR'), 'row out of range should error');
+    assert(r.deleteTableColumn(TABLE_SLIDE, TABLE_SHAPE, 99).startsWith('ERROR'), 'col out of range should error');
+    // Delete rows down to the last one → next delete must error.
+    const rows = trCount(r.getSlideOoxml(TABLE_SLIDE));
+    for (let i = 0; i < rows - 1; i++) r.deleteTableRow(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(r.deleteTableRow(TABLE_SLIDE, TABLE_SHAPE, 0).startsWith('ERROR'), 'deleting the last row should error');
+    console.log('  OK: boundary errors');
+  }
 }
 
 // --- Summary ---

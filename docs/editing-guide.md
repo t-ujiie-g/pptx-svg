@@ -18,6 +18,9 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | Duplicate a shape with offset, returns `OK:<index>` |
 | `getShapeSpec(slideIdx, shapeIdx)` | Copy a shape to a portable JSON spec (media inlined), returns spec or `ERROR:...` |
 | `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | Paste a shape spec onto a slide (re-links media), returns `OK:<index>` |
+| `updateTableCellText(slideIdx, shapeIdx, row, col, text)` | Set a table cell's text, returns re-rendered SVG |
+| `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | Insert / delete a table row |
+| `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | Insert / delete a table column |
 | `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | Apply linear gradient fill, returns re-rendered SVG |
 | `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | Add a text paragraph to a shape, returns `OK:<paraIndex>` |
 | `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | Set stroke color/width/dash, returns re-rendered SVG |
@@ -395,6 +398,22 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Table Editing
+
+Edit a table shape's cells and structure. `updateTableCellText` sets a cell's text (inheriting the cell's existing first-run formatting); the row/column methods insert or delete (at least one row and column must remain). All are undoable.
+
+```typescript
+renderer.updateTableCellText(0, tableShapeIdx, 1, 2, 'New value'); // row 1, col 2
+
+renderer.addTableRow(0, tableShapeIdx, 0);        // insert after row 0 (-1 = top)
+renderer.deleteTableRow(0, tableShapeIdx, 3);
+renderer.addTableColumn(0, tableShapeIdx, -1, 914400); // insert at left, 1in wide (0 = copy neighbour)
+renderer.deleteTableColumn(0, tableShapeIdx, 2);
+renderer.renderSlideSvg(0); // re-render afterwards
+```
+
+These target a shape whose `data-ooxml-shape-type` is `table`; calling them on a non-table shape returns `ERROR`. **v1 limitation:** merged cells (`gridSpan`/`rowSpan`/`hMerge`/`vMerge`) are **not** span-adjusted when rows/columns change — editing the structure of a table with merged cells may corrupt it.
 
 ## Copy & Paste (cross-slide)
 
