@@ -5,7 +5,7 @@
  * Requires: Node.js 22+ (WasmGC support)
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -1027,6 +1027,554 @@ console.log('Test 36: Edit immediately after loadPptx (no prior render)');
   const out = await renderer.exportPptx();
   assert(out.byteLength > 0, 'exportPptx should produce bytes');
   console.log('  OK: edit without pre-render persists to OOXML and export');
+}
+
+// ── Undo / Redo (E6.1) ───────────────────────────────────────────────────────
+// Shared helper: a freshly loaded renderer on minimal.pptx.
+async function freshRenderer(opts = { logLevel: 'silent' }) {
+  const renderer = new PptxRenderer(opts);
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const pptxBuf = readFileSync(join(__dirname, 'minimal.pptx'));
+  const pptxAb = pptxBuf.buffer.slice(pptxBuf.byteOffset, pptxBuf.byteOffset + pptxBuf.byteLength);
+  await renderer.loadPptx(pptxAb);
+  return renderer;
+}
+
+// --- Test 37: Undo/redo a transform edit restores exact SVG ---
+console.log('Test 37: Undo/redo transform');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+  assert(r.canUndo() === false, 'fresh load should have nothing to undo');
+
+  r.updateShapeTransform(0, 0, 1234567, 2345678, 1828800, 914400, 0);
+  const after = r.renderSlideSvg(0);
+  assert(after !== before, 'transform edit should change the SVG');
+  assert(r.canUndo() === true, 'should be able to undo after an edit');
+
+  const u = r.undo();
+  assert(!u.startsWith('ERROR'), `undo should succeed, got ${u}`);
+  const parsed = JSON.parse(u);
+  assert(Array.isArray(parsed.slides), 'undo result should carry a slides array');
+  assert(parsed.slides.includes(0), 'undo result should flag slide 0');
+  assert(r.renderSlideSvg(0) === before, 'undo should restore the original SVG exactly');
+  assert(r.canRedo() === true, 'should be able to redo after undo');
+
+  const re = r.redo();
+  assert(!re.startsWith('ERROR'), `redo should succeed, got ${re}`);
+  assert(r.renderSlideSvg(0) === after, 'redo should re-apply the edit exactly');
+  console.log('  OK: transform undo/redo restores SVG');
+}
+
+// --- Test 38: Undo an addShape removes the shape; redo restores it ---
+console.log('Test 38: Undo/redo addShape');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+  r.addShape(0, 'rect', 914400, 914400, 1828800, 914400, 255, 0, 0);
+  const withShape = r.renderSlideSvg(0);
+  assert(withShape.includes('ff0000') || withShape.includes('FF0000'), 'added shape should be red');
+
+  r.undo();
+  const afterUndo = r.renderSlideSvg(0);
+  assert(!(afterUndo.includes('ff0000') || afterUndo.includes('FF0000')), 'undo should remove the red shape');
+  assert(afterUndo === before, 'undo should restore the original SVG');
+
+  r.redo();
+  const afterRedo = r.renderSlideSvg(0);
+  assert(afterRedo.includes('ff0000') || afterRedo.includes('FF0000'), 'redo should bring the red shape back');
+  console.log('  OK: addShape undo/redo');
+}
+
+// --- Test 39: Undo a deleteShape restores the deleted shape ---
+console.log('Test 39: Undo deleteShape');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+  const del = r.deleteShape(0, 0);
+  assert(del === 'OK', `deleteShape should return OK, got ${del}`);
+  const afterDel = r.renderSlideSvg(0);
+  assert(afterDel !== before, 'delete should change the SVG');
+
+  r.undo();
+  assert(r.renderSlideSvg(0) === before, 'undo should restore the deleted shape');
+  console.log('  OK: deleteShape undo');
+}
+
+// --- Test 40: Undo/redo addSlide changes slide count ---
+console.log('Test 40: Undo/redo addSlide');
+{
+  const r = await freshRenderer();
+  const n = r.getSlideCount();
+  await r.addSlide();
+  assert(r.getSlideCount() === n + 1, 'addSlide should increase the count');
+
+  const u = JSON.parse(r.undo());
+  assert(r.getSlideCount() === n, 'undo addSlide should restore the count');
+  assert(u.slideCount === n, `undo result slideCount should be ${n}, got ${u.slideCount}`);
+
+  r.redo();
+  assert(r.getSlideCount() === n + 1, 'redo addSlide should re-add the slide');
+  console.log('  OK: addSlide undo/redo');
+}
+
+// --- Test 41: beginBatch/endBatch collapses multiple edits into one undo ---
+console.log('Test 41: Batch = single undo step');
+{
+  const r = await freshRenderer();
+  const before = r.renderSlideSvg(0);
+
+  r.beginBatch();
+  r.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0);
+  r.addShape(0, 'ellipse', 914400, 0, 914400, 914400, 0, 255, 0);
+  r.updateShapeTransform(0, 0, 100000, 100000, 500000, 500000, 0);
+  r.endBatch();
+
+  const after = r.renderSlideSvg(0);
+  assert(after !== before, 'batch edits should change the SVG');
+
+  const u = r.undo();
+  assert(!u.startsWith('ERROR'), 'single undo should revert the whole batch');
+  assert(r.renderSlideSvg(0) === before, 'one undo should revert all batch edits');
+  assert(r.canUndo() === false, 'batch should be a single undo entry');
+  console.log('  OK: batch collapses to one undo');
+}
+
+// --- Test 42: empty history + clearHistory ---
+console.log('Test 42: Empty history and clearHistory');
+{
+  const r = await freshRenderer();
+  assert(r.undo() === 'ERROR:nothing to undo', 'undo on empty history should error');
+  assert(r.redo() === 'ERROR:nothing to redo', 'redo on empty history should error');
+
+  r.updateShapeFill(0, 0, 10, 20, 30);
+  assert(r.canUndo() === true, 'edit should create an undo entry');
+  r.clearHistory();
+  assert(r.canUndo() === false, 'clearHistory should drop undo entries');
+  assert(r.canRedo() === false, 'clearHistory should drop redo entries');
+  assert(r.undo() === 'ERROR:nothing to undo', 'undo after clearHistory should error');
+  console.log('  OK: empty history and clearHistory');
+}
+
+// --- Test 43: maxHistory caps the undo depth; export survives undo/redo ---
+console.log('Test 43: maxHistory cap + export after undo');
+{
+  const r = await freshRenderer({ logLevel: 'silent', maxHistory: 2 });
+  r.updateShapeFill(0, 0, 1, 1, 1);
+  r.updateShapeFill(0, 0, 2, 2, 2);
+  r.updateShapeFill(0, 0, 3, 3, 3);
+  // Only the 2 most recent pre-edit states are retained.
+  assert(r.undo().startsWith('{'), 'first undo should succeed');
+  assert(r.undo().startsWith('{'), 'second undo should succeed');
+  assert(r.undo() === 'ERROR:nothing to undo', 'third undo should be capped out');
+
+  // Export still works after undo/redo churn.
+  const out = await r.exportPptx();
+  assert(out.byteLength > 0, 'exportPptx should produce bytes after undo/redo');
+  console.log('  OK: maxHistory cap and export-after-undo');
+}
+
+// ── Inline text editing (E6.2) ───────────────────────────────────────────────
+// Build a shape with two runs: "Hello " (normal) + "World" (bold), in one paragraph.
+async function shapeWithTwoRuns() {
+  const r = await freshRenderer();
+  const sIdx = parseInt(r.addShape(0, 'rect', 914400, 914400, 5486400, 1828800, -1, -1, -1).split(':')[1]);
+  r.addShapeText(0, sIdx, 'Hello ', 1800, 0, 0, 0);   // para 0, run 0
+  r.addRun(0, sIdx, 0, 'World');                       // para 0, run 1
+  r.updateTextRunStyle(0, sIdx, 0, 1, 1, -1);          // run 1 → bold
+  return { r, sIdx };
+}
+
+// --- Test 44: getTextLayout returns structured geometry ---
+console.log('Test 44: getTextLayout');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.box && typeof layout.box.cx === 'number', 'layout should carry a box in EMU');
+  assert(Array.isArray(layout.lines) && layout.lines.length >= 1, 'layout should have at least one line');
+  const totalRuns = layout.lines.reduce((n, l) => n + l.runs.length, 0);
+  assert(totalRuns === 2, `expected 2 run boxes, got ${totalRuns}`);
+  const totalChars = layout.lines.reduce((n, l) => n + l.runs.reduce((m, rb) => m + rb.chars.length, 0), 0);
+  assert(totalChars === 'Hello World'.length, `expected 11 glyphs, got ${totalChars}`);
+  // Char x positions are monotonically increasing within the first run.
+  const firstRun = layout.lines[0].runs[0];
+  let monotonic = true;
+  for (let i = 1; i < firstRun.chars.length; i++) {
+    if (firstRun.chars[i].x < firstRun.chars[i - 1].x) monotonic = false;
+  }
+  assert(monotonic, 'char x positions should be monotonically increasing');
+  console.log('  OK: getTextLayout geometry');
+}
+
+// --- Test 45: hitTestText maps a point to a caret position ---
+console.log('Test 45: hitTestText');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const layout = JSON.parse(r.getTextLayout(0, sIdx));
+  const line = layout.lines[0];
+  // Click near the start of the text.
+  const hit = JSON.parse(r.hitTestText(0, sIdx, layout.box.x + 100, line.y + line.h / 2));
+  assert(hit.paraIdx === 0, `expected paraIdx 0, got ${hit.paraIdx}`);
+  assert(typeof hit.charOffset === 'number' && typeof hit.paraOffset === 'number', 'hit should carry offsets');
+  // Click far to the right → caret near the paragraph end.
+  const hitEnd = JSON.parse(r.hitTestText(0, sIdx, layout.box.x + layout.box.cx, line.y + line.h / 2));
+  assert(hitEnd.paraOffset >= hit.paraOffset, 'rightward click should not move caret left');
+  console.log('  OK: hitTestText');
+}
+
+// --- Test 46: replaceTextRange inserts mid-run, preserving boundary formatting ---
+console.log('Test 46: replaceTextRange insert preserves format');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const before = r.getSlideOoxml(0);
+  assert(before.includes('b="1"'), 'precondition: bold run present');
+  // Insert "Brave " at paragraph offset 6 (boundary between "Hello " and "World").
+  const ret = r.replaceTextRange(0, sIdx, 0, 6, 0, 6, 'Brave ');
+  assert(!ret.startsWith('ERROR'), `replaceTextRange should succeed, got ${ret}`);
+  const after = r.getSlideOoxml(0);
+  assert(after.includes('Brave'), 'inserted text should be present');
+  assert(after.includes('Hello') && after.includes('World'), 'original text should be preserved');
+  assert(after.includes('b="1"'), 'bold run (World) should survive the insert');
+  console.log('  OK: insert preserves format');
+}
+
+// --- Test 47: replaceTextRange deletes across runs ---
+console.log('Test 47: replaceTextRange delete across runs');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  // "Hello World" → delete offsets 3..8 ("lo Wo") → "Helrld".
+  r.replaceTextRange(0, sIdx, 0, 3, 0, 8, '');
+  const ooxml = r.getSlideOoxml(0);
+  // Inspect run texts directly (slide 0's pre-existing title also contains "Hello").
+  const texts = [...ooxml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map(m => m[1]);
+  assert(texts.includes('Hel'), `left remainder "Hel" should be a run, got ${JSON.stringify(texts)}`);
+  assert(texts.includes('rld'), `right remainder "rld" should be a run, got ${JSON.stringify(texts)}`);
+  assert(!texts.includes('Hello '), 'deleted "Hello " run should be gone');
+  assert(!texts.includes('World'), 'deleted "World" run should be gone');
+  assert(ooxml.includes('b="1"'), 'bold formatting of "rld" remainder should survive');
+  console.log('  OK: delete across runs');
+}
+
+// --- Test 48: replaceTextRange merges paragraphs / splits on newline ---
+console.log('Test 48: replaceTextRange paragraph merge + newline split');
+{
+  // Two paragraphs "AAA" / "BBB" → delete the boundary → single paragraph "AAABBB".
+  const r = await freshRenderer();
+  const sIdx = parseInt(r.addShape(0, 'rect', 914400, 914400, 5486400, 1828800, -1, -1, -1).split(':')[1]);
+  r.addShapeText(0, sIdx, 'AAA', 1800, 0, 0, 0);  // para 0
+  r.addParagraph(0, sIdx, 'BBB', '');             // para 1
+  let layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.lines.length === 2, `precondition: 2 lines, got ${layout.lines.length}`);
+  r.replaceTextRange(0, sIdx, 0, 3, 1, 0, '');     // merge
+  layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.lines.length === 1, `merge should yield 1 line, got ${layout.lines.length}`);
+
+  // Newline split: insert "X\nY" inside the merged "AAABBB" → 2 paragraphs again.
+  r.replaceTextRange(0, sIdx, 0, 3, 0, 3, 'X\nY');
+  layout = JSON.parse(r.getTextLayout(0, sIdx));
+  assert(layout.lines.length === 2, `newline should split into 2 lines, got ${layout.lines.length}`);
+  console.log('  OK: paragraph merge + newline split');
+}
+
+// --- Test 49: replaceTextRange is undoable (E6.1 integration) ---
+console.log('Test 49: replaceTextRange undo');
+{
+  const { r, sIdx } = await shapeWithTwoRuns();
+  const before = r.renderSlideSvg(0);
+  r.replaceTextRange(0, sIdx, 0, 0, 0, 11, 'Replaced');
+  const after = r.renderSlideSvg(0);
+  assert(after !== before, 'replace should change the SVG');
+  assert(r.canUndo(), 'replaceTextRange should be undoable');
+  r.undo();
+  assert(r.renderSlideSvg(0) === before, 'undo should restore the original text');
+  console.log('  OK: replaceTextRange undo');
+}
+
+// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
+// Serialized shape order == z-order (later = front). Find each shape by its fill
+// color's position in the slide OOXML.
+function fillPos(ooxml, hex) {
+  return ooxml.toLowerCase().indexOf(hex.toLowerCase());
+}
+// Add red + green rects; returns their shape indices.
+async function twoColoredShapes() {
+  const r = await freshRenderer();
+  const red = parseInt(r.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0).split(':')[1]);
+  const green = parseInt(r.addShape(0, 'rect', 457200, 457200, 914400, 914400, 0, 255, 0).split(':')[1]);
+  return { r, red, green };
+}
+
+// --- Test 50: bringToFront moves a shape to the end (front) ---
+console.log('Test 50: bringToFront');
+{
+  const { r, red, green } = await twoColoredShapes();
+  let ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') < fillPos(ooxml, '00ff00'), 'precondition: red is behind green');
+
+  const ret = r.bringToFront(0, red);
+  assert(ret.startsWith('OK:'), `bringToFront should return OK:<idx>, got ${ret}`);
+  ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') > fillPos(ooxml, '00ff00'), 'red should now be in front of green');
+  console.log('  OK: bringToFront');
+}
+
+// --- Test 51: sendToBack moves a shape to index 0 ---
+console.log('Test 51: sendToBack');
+{
+  const { r, red, green } = await twoColoredShapes();
+  const ret = r.sendToBack(0, green);
+  assert(ret === 'OK:0', `sendToBack should return OK:0, got ${ret}`);
+  const ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, '00ff00') < fillPos(ooxml, 'ff0000'), 'green should now be behind red');
+  console.log('  OK: sendToBack');
+}
+
+// --- Test 52: bringForward / sendBackward swap; no-op at the edge ---
+console.log('Test 52: bringForward / sendBackward');
+{
+  const { r, red, green } = await twoColoredShapes();
+  // red is directly behind green → bringForward swaps them.
+  const fwd = r.bringForward(0, red);
+  assert(fwd === `OK:${red + 1}`, `bringForward should return OK:${red + 1}, got ${fwd}`);
+  let ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') > fillPos(ooxml, '00ff00'), 'red should be in front after bringForward');
+
+  // Move it back down again.
+  const back = r.sendBackward(0, red + 1);
+  assert(back === `OK:${red}`, `sendBackward should return OK:${red}, got ${back}`);
+  ooxml = r.getSlideOoxml(0);
+  assert(fillPos(ooxml, 'ff0000') < fillPos(ooxml, '00ff00'), 'red should be behind again');
+
+  // green is front-most → bringForward is a no-op (index unchanged).
+  const noop = r.bringForward(0, green);
+  assert(noop === `OK:${green}`, `bringForward at front should be a no-op, got ${noop}`);
+  console.log('  OK: bringForward / sendBackward + edge no-op');
+}
+
+// --- Test 53: z-order change is undoable ---
+console.log('Test 53: z-order undo');
+{
+  const { r, red, green } = await twoColoredShapes();
+  const before = r.getSlideOoxml(0);
+  r.bringToFront(0, red);
+  const after = r.getSlideOoxml(0);
+  assert(after !== before, 'bringToFront should change the slide');
+  r.undo();
+  assert(r.getSlideOoxml(0) === before, 'undo should restore the original z-order');
+  console.log('  OK: z-order undo');
+}
+
+// ── Multi-shape transform (E6.4) ─────────────────────────────────────────────
+function shapeX(r, idx) {
+  const m = r.renderShapeSvg(0, idx).match(/data-ooxml-x="(-?\d+)"/);
+  return m ? parseInt(m[1]) : NaN;
+}
+
+// --- Test 54: updateShapesTransform — atomic batch + single undo ---
+console.log('Test 54: updateShapesTransform (atomic + undo)');
+{
+  const { r, red, green } = await twoColoredShapes();
+  const redX0 = shapeX(r, red);
+  const greenX0 = shapeX(r, green);
+
+  // Batch move both.
+  const ret = r.updateShapesTransform(0, [
+    { shapeIdx: red, x: 1000000, y: 1000000, cx: 914400, cy: 914400, rot: 0 },
+    { shapeIdx: green, x: 2000000, y: 2000000, cx: 914400, cy: 914400, rot: 0 },
+  ]);
+  assert(ret === 'OK:2', `updateShapesTransform should return OK:2, got ${ret}`);
+  assert(shapeX(r, red) === 1000000, 'red should move to x=1000000');
+  assert(shapeX(r, green) === 2000000, 'green should move to x=2000000');
+
+  // Atomicity: one bad index → nothing applied.
+  const bad = r.updateShapesTransform(0, [
+    { shapeIdx: red, x: 5000000, y: 0, cx: 914400, cy: 914400, rot: 0 },
+    { shapeIdx: 9999, x: 0, y: 0, cx: 914400, cy: 914400, rot: 0 },
+  ]);
+  assert(bad.startsWith('ERROR'), `bad index should error, got ${bad}`);
+  assert(shapeX(r, red) === 1000000, 'atomic: red must NOT move when batch fails');
+
+  // Single undo reverts the whole successful batch.
+  r.undo();
+  assert(shapeX(r, red) === redX0, 'undo should restore red');
+  assert(shapeX(r, green) === greenX0, 'undo should restore green');
+  console.log('  OK: updateShapesTransform atomic batch + single undo');
+}
+
+// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
+const MINI_PNG = new Uint8Array([
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
+  0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
+  0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
+  0x00, 0x00, 0x03, 0x00, 0x01, 0x36, 0x28, 0x19,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
+  0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
+
+// --- Test 55: copy a plain shape to another slide ---
+console.log('Test 55: getShapeSpec / insertShapeSpec (plain shape)');
+{
+  const r = await freshRenderer();
+  const red = parseInt(r.addShape(0, 'rect', 100000, 100000, 914400, 914400, 255, 0, 0).split(':')[1]);
+  const spec = r.getShapeSpec(0, red);
+  assert(!spec.startsWith('ERROR'), `getShapeSpec should succeed, got ${spec.slice(0, 40)}`);
+  const parsed = JSON.parse(spec);
+  assert(typeof parsed.xml === 'string' && parsed.xml.includes('<p:sp'), 'spec should carry shape XML');
+  assert(Array.isArray(parsed.media) && parsed.media.length === 0, 'plain shape has no media');
+
+  // Paste onto a new slide with an offset.
+  const { insertedIdx } = await r.addSlide();
+  const ins = r.insertShapeSpec(insertedIdx, spec, 457200, 457200);
+  assert(ins.startsWith('OK:'), `insertShapeSpec should return OK:<idx>, got ${ins}`);
+  const svg = r.renderSlideSvg(insertedIdx);
+  assert(svg.includes('ff0000') || svg.includes('FF0000'), 'pasted red shape should render on the target slide');
+  // Offset applied: original x=100000 → pasted x=557200.
+  const pastedIdx = parseInt(ins.split(':')[1]);
+  const px = r.renderShapeSvg(insertedIdx, pastedIdx).match(/data-ooxml-x="(-?\d+)"/);
+  assert(px && parseInt(px[1]) === 557200, `paste offset should apply (x=557200), got ${px && px[1]}`);
+  console.log('  OK: plain shape cross-slide copy/paste');
+}
+
+// --- Test 56: copy an image shape — media re-link + export ---
+console.log('Test 56: copy image shape (media re-link)');
+{
+  const r = await freshRenderer();
+  const addRes = r.addImage(0, MINI_PNG, 'image/png', 100000, 100000, 914400, 914400);
+  const imgIdx = parseInt(addRes.split(':')[1]);
+  const spec = r.getShapeSpec(0, imgIdx);
+  const parsed = JSON.parse(spec);
+  assert(parsed.media.length === 1, `image shape should carry 1 media entry, got ${parsed.media.length}`);
+  assert(parsed.media[0].b64.length > 0, 'media should be base64-encoded inline');
+  assert(parsed.media[0].mime === 'image/png', 'media mime should be image/png');
+
+  const { insertedIdx } = await r.addSlide();
+  const ins = r.insertShapeSpec(insertedIdx, spec, 0, 0);
+  assert(ins.startsWith('OK:'), `image paste should return OK:<idx>, got ${ins}`);
+
+  // The target slide's .rels must reference a (new) media file, and the shape XML
+  // must point at that new rId — verify the slide renders an <image>.
+  const svg = r.renderSlideSvg(insertedIdx);
+  assert(svg.includes('<image'), 'pasted image should render as <image> on the target slide');
+
+  // Export must include the media binary and rebuild cleanly.
+  const out = await r.exportPptx();
+  assert(out.byteLength > 0, 'export with pasted image should produce bytes');
+  console.log('  OK: image cross-slide copy/paste + export');
+}
+
+// --- Test 57: insertShapeSpec is undoable ---
+console.log('Test 57: paste undo');
+{
+  const r = await freshRenderer();
+  const red = parseInt(r.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0).split(':')[1]);
+  const spec = r.getShapeSpec(0, red);
+  const { insertedIdx } = await r.addSlide();
+  const before = r.renderSlideSvg(insertedIdx);
+  r.insertShapeSpec(insertedIdx, spec);
+  const after = r.renderSlideSvg(insertedIdx);
+  assert(after !== before, 'paste should change the target slide');
+  r.undo();
+  assert(r.renderSlideSvg(insertedIdx) === before, 'undo should remove the pasted shape');
+  console.log('  OK: paste undo');
+}
+
+// --- Test 58: boundary errors ---
+console.log('Test 58: copy/paste boundary errors');
+{
+  const r = await freshRenderer();
+  assert(r.getShapeSpec(0, 9999).startsWith('ERROR'), 'getShapeSpec on bad index should error');
+  assert(r.insertShapeSpec(0, 'not json').startsWith('ERROR'), 'insertShapeSpec with bad spec should error');
+  assert(r.insertShapeSpec(0, JSON.stringify({ xml: '', media: [] })).startsWith('ERROR'), 'empty xml should error');
+  console.log('  OK: boundary errors');
+}
+
+// ── Table editing (E6.6) ─────────────────────────────────────────────────────
+// test_features.pptx slide 41 (0-indexed) has a plain 3×3 table at shape index 0.
+const FEATURES_PATH = join(__dirname, 'test_features.pptx');
+const TABLE_SLIDE = 41, TABLE_SHAPE = 0;
+async function freshFeatures() {
+  const renderer = new PptxRenderer({ logLevel: 'silent' });
+  renderer.__hasFeatures = false;
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const buf = readFileSync(FEATURES_PATH);
+  await renderer.loadPptx(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  return renderer;
+}
+const trCount = (xml) => (xml.match(/<a:tr[ >]/g) || []).length;
+const gridColCount = (xml) => (xml.match(/<a:gridCol/g) || []).length;
+
+if (!existsSync(FEATURES_PATH)) {
+  console.log('Tests 59–62: SKIPPED (test_features.pptx not found)');
+} else {
+  // --- Test 59: updateTableCellText + undo ---
+  console.log('Test 59: updateTableCellText');
+  {
+    const r = await freshFeatures();
+    const ret = r.updateTableCellText(TABLE_SLIDE, TABLE_SHAPE, 0, 0, 'EDITED_CELL_X');
+    assert(!ret.startsWith('ERROR'), `updateTableCellText should succeed, got ${ret.slice(0, 40)}`);
+    const ooxml = r.getSlideOoxml(TABLE_SLIDE);
+    assert(ooxml.includes('EDITED_CELL_X'), 'new cell text should appear in the slide OOXML');
+
+    const before = r.renderSlideSvg(TABLE_SLIDE);
+    r.updateTableCellText(TABLE_SLIDE, TABLE_SHAPE, 1, 1, 'UNDO_ME');
+    assert(r.renderSlideSvg(TABLE_SLIDE) !== before, 'cell edit should change the slide');
+    r.undo();
+    assert(r.renderSlideSvg(TABLE_SLIDE) === before, 'undo should restore the cell');
+    console.log('  OK: updateTableCellText + undo');
+  }
+
+  // --- Test 60: add/delete row ---
+  console.log('Test 60: add/delete table row');
+  {
+    const r = await freshFeatures();
+    const rows0 = trCount(r.getSlideOoxml(TABLE_SLIDE));
+    const add = r.addTableRow(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(add.startsWith('OK:'), `addTableRow should return OK:<idx>, got ${add}`);
+    assert(trCount(r.getSlideOoxml(TABLE_SLIDE)) === rows0 + 1, 'row count should increase by 1');
+    const del = r.deleteTableRow(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(del === 'OK', `deleteTableRow should return OK, got ${del}`);
+    assert(trCount(r.getSlideOoxml(TABLE_SLIDE)) === rows0, 'row count should return to original');
+    console.log('  OK: add/delete row');
+  }
+
+  // --- Test 61: add/delete column ---
+  console.log('Test 61: add/delete table column');
+  {
+    const r = await freshFeatures();
+    const cols0 = gridColCount(r.getSlideOoxml(TABLE_SLIDE));
+    const add = r.addTableColumn(TABLE_SLIDE, TABLE_SHAPE, 0, 914400);
+    assert(add.startsWith('OK:'), `addTableColumn should return OK:<idx>, got ${add}`);
+    let ooxml = r.getSlideOoxml(TABLE_SLIDE);
+    assert(gridColCount(ooxml) === cols0 + 1, 'gridCol count should increase by 1');
+    // Every row must gain a cell (tc count = rows * cols).
+    const rows = trCount(ooxml);
+    const tcCount = (ooxml.match(/<a:tc[ >]/g) || []).length;
+    assert(tcCount === rows * (cols0 + 1), `tc count should be rows*cols (${rows}*${cols0 + 1}), got ${tcCount}`);
+    const del = r.deleteTableColumn(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(del === 'OK', `deleteTableColumn should return OK, got ${del}`);
+    assert(gridColCount(r.getSlideOoxml(TABLE_SLIDE)) === cols0, 'gridCol count should return to original');
+    console.log('  OK: add/delete column');
+  }
+
+  // --- Test 62: boundary errors ---
+  console.log('Test 62: table editing boundary errors');
+  {
+    const r = await freshFeatures();
+    // shape 1 on this slide is not a table.
+    assert(r.addTableRow(TABLE_SLIDE, 1, -1).startsWith('ERROR'), 'non-table shape should error');
+    assert(r.updateTableCellText(TABLE_SLIDE, TABLE_SHAPE, 99, 0, 'x').startsWith('ERROR'), 'row out of range should error');
+    assert(r.deleteTableColumn(TABLE_SLIDE, TABLE_SHAPE, 99).startsWith('ERROR'), 'col out of range should error');
+    // Delete rows down to the last one → next delete must error.
+    const rows = trCount(r.getSlideOoxml(TABLE_SLIDE));
+    for (let i = 0; i < rows - 1; i++) r.deleteTableRow(TABLE_SLIDE, TABLE_SHAPE, 0);
+    assert(r.deleteTableRow(TABLE_SLIDE, TABLE_SHAPE, 0).startsWith('ERROR'), 'deleting the last row should error');
+    console.log('  OK: boundary errors');
+  }
 }
 
 // --- Summary ---

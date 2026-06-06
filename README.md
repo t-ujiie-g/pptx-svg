@@ -140,6 +140,7 @@ const renderer = new PptxRenderer(options?);
 |--------|---------|-------------|
 | `renderShapeSvg(slideIdx, shapeIdx)` | `string` | Render a single shape as SVG fragment. |
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | Update position/size/rotation (EMU). Returns re-rendered SVG. |
+| `updateShapesTransform(slideIdx, items)` | `string` | Atomically update several shapes' transforms (one undo step). Returns `OK:<count>`. |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | Update text content. Returns re-rendered SVG. |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | Update solid fill color (0-255). Returns re-rendered SVG. |
 | `deleteShape(slideIdx, shapeIdx)` | `string` | Delete a shape. Supports group children via composite index. |
@@ -185,6 +186,56 @@ Slide management methods update `presentation.xml`, `.rels`, and `[Content_Types
 | `deleteImage(slideIdx, shapeIdx)` | `string` | Delete picture shape and clean up orphaned media. Returns `OK`. |
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+**Undo / Redo:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `undo()` | `string` | Revert the most recent edit (or batch). JSON `{ slides, slideCount }`, or `ERROR:nothing to undo`. |
+| `redo()` | `string` | Re-apply the most recently undone edit. JSON `{ slides, slideCount }`, or `ERROR:nothing to redo`. |
+| `canUndo()` / `canRedo()` | `boolean` | Whether an undo / redo step is available. |
+| `beginBatch()` / `endBatch()` | `void` | Collapse multiple edits into one undo step (nestable). |
+| `clearHistory()` | `void` | Discard all history (also cleared on `loadPptx`). |
+
+Every mutating editing method records a checkpoint automatically. Configure depth via `new PptxRenderer({ maxHistory: 50 })`. See [docs/editing-guide.md](docs/editing-guide.md#undo--redo).
+
+**Inline Text Editing:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getTextLayout(slideIdx, shapeIdx)` | `string` | JSON text geometry (EMU): box + lines → run boxes → per-character boxes. For carets/selections. |
+| `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` | `string` | JSON `{ paraIdx, runIdx, charOffset, paraOffset }` for a click point (EMU). |
+| `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` | `string` | Replace a text range (paragraph-level offsets), preserving boundary run formatting. `\n` splits paragraphs. Undoable. |
+
+For double-click-to-type editing with a `contentEditable` overlay. See [docs/editing-guide.md](docs/editing-guide.md#inline-text-editing).
+
+**Z-Order:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` | `string` | Move a shape to the front / back of the z-order. Returns `OK:<newShapeIdx>`. |
+| `bringForward(slideIdx, shapeIdx)` / `sendBackward(...)` | `string` | Move a shape one step toward the front / back (no-op at the edge). Returns `OK:<newShapeIdx>`. |
+
+z-order is shape-array order (later = front). All four are undoable.
+
+**Copy / Paste (cross-slide):**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getShapeSpec(slideIdx, shapeIdx)` | `string` | Copy a shape to a portable JSON spec (images inlined as base64). |
+| `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | `string` | Paste a shape spec onto a slide (re-links media to fresh rIds). Returns `OK:<index>`. Undoable. |
+
+Supports pasting onto a different slide/presentation. See [docs/editing-guide.md](docs/editing-guide.md#copy--paste-cross-slide).
+
+**Table Editing:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `updateTableCellText(slideIdx, shapeIdx, row, col, text)` | `string` | Set a table cell's text. Returns re-rendered SVG. |
+| `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | `string` | Insert / delete a table row. |
+| `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | `string` | Insert / delete a table column. |
+
+All undoable. Merged cells are not span-adjusted (v1). See [docs/editing-guide.md](docs/editing-guide.md#table-editing).
 
 **Notes & Comments:**
 

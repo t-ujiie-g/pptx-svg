@@ -10,11 +10,17 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 |--------|-------------|
 | `renderShapeSvg(slideIdx, shapeIdx)` | Render a single shape as SVG fragment |
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | Update position/size/rotation (EMU), returns re-rendered SVG |
+| `updateShapesTransform(slideIdx, items)` | Atomically update several shapes' transforms as one undo step, returns `OK:<count>` |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | Update text content, returns re-rendered SVG |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | Update solid fill color, returns re-rendered SVG |
 | `deleteShape(slideIdx, shapeIdx)` | Delete a shape by index (supports group children via composite index) |
 | `addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB)` | Add a basic shape (rect/ellipse/roundRect/line), returns `OK:<index>` |
 | `duplicateShape(slideIdx, shapeIdx, dxEmu?, dyEmu?)` | Duplicate a shape with offset, returns `OK:<index>` |
+| `getShapeSpec(slideIdx, shapeIdx)` | Copy a shape to a portable JSON spec (media inlined), returns spec or `ERROR:...` |
+| `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | Paste a shape spec onto a slide (re-links media), returns `OK:<index>` |
+| `updateTableCellText(slideIdx, shapeIdx, row, col, text)` | Set a table cell's text, returns re-rendered SVG |
+| `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | Insert / delete a table row |
+| `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | Insert / delete a table column |
 | `updateShapeGradientFill(slideIdx, shapeIdx, angle, stops)` | Apply linear gradient fill, returns re-rendered SVG |
 | `addShapeText(slideIdx, shapeIdx, text, fontSize?, colorR?, colorG?, colorB?)` | Add a text paragraph to a shape, returns `OK:<paraIndex>` |
 | `updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu?, dash?)` | Set stroke color/width/dash, returns re-rendered SVG |
@@ -28,6 +34,8 @@ This guide describes how to build an interactive PPTX editor UI using pptx-svg's
 | `updateTextRunFont(slideIdx, shapeIdx, paraIdx, runIdx, fontFace?, eaFont?, csFont?)` | Set font family, returns re-rendered SVG |
 | `updateParagraphAlign(slideIdx, shapeIdx, paraIdx, align)` | Set paragraph alignment, returns re-rendered SVG |
 | `updateTextRunDecoration(slideIdx, shapeIdx, paraIdx, runIdx, underline?, strike?, baseline?)` | Set underline/strike/super-subscript, returns re-rendered SVG |
+| `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` | Move a shape to the front / back of the z-order, returns `OK:<newShapeIdx>` |
+| `bringForward(slideIdx, shapeIdx)` / `sendBackward(...)` | Move a shape one step toward the front / back, returns `OK:<newShapeIdx>` |
 
 All shape `update*` methods:
 - Modify the cached SlideData in-place (no XML re-parse)
@@ -60,6 +68,28 @@ Slide management methods update package metadata (`presentation.xml`, `.rels`, `
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
 
 Coordinates (`x`, `y`, `cx`, `cy`) are in EMU (English Metric Units). Use `pxToEmu()` for conversion.
+
+### History APIs (Undo / Redo)
+
+| Method | Description |
+|--------|-------------|
+| `undo()` | Revert the most recent edit (or batch). Returns a JSON `HistoryResult` string, or `"ERROR:nothing to undo"` |
+| `redo()` | Re-apply the most recently undone edit. Returns a JSON `HistoryResult` string, or `"ERROR:nothing to redo"` |
+| `canUndo()` / `canRedo()` | Whether an undo / redo step is available |
+| `beginBatch()` / `endBatch()` | Collapse multiple edits into a single undo step (nestable) |
+| `clearHistory()` | Discard all undo/redo history |
+
+Every mutating editing method (shape/text/fill/stroke, add/delete/duplicate, image ops, and slide add/delete/reorder) automatically records a history checkpoint. See [Undo / Redo](#undo--redo) below.
+
+### Inline Text Editing APIs
+
+| Method | Description |
+|--------|-------------|
+| `getTextLayout(slideIdx, shapeIdx)` | Returns JSON text geometry (EMU): box + lines → run boxes → per-character boxes. For drawing carets / selection rectangles. |
+| `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` | Returns JSON `{ paraIdx, runIdx, charOffset, paraOffset }` for a click point (EMU). |
+| `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` | Replace a text range, preserving boundary run formatting. Undoable. |
+
+See [Inline Text Editing](#inline-text-editing) below.
 
 ### Unit Conversion Helpers
 
@@ -368,6 +398,172 @@ renderer.deleteImage(0, shapeIdx);
 ```
 
 Supported MIME types: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`.
+
+## Table Editing
+
+Edit a table shape's cells and structure. `updateTableCellText` sets a cell's text (inheriting the cell's existing first-run formatting); the row/column methods insert or delete (at least one row and column must remain). All are undoable.
+
+```typescript
+renderer.updateTableCellText(0, tableShapeIdx, 1, 2, 'New value'); // row 1, col 2
+
+renderer.addTableRow(0, tableShapeIdx, 0);        // insert after row 0 (-1 = top)
+renderer.deleteTableRow(0, tableShapeIdx, 3);
+renderer.addTableColumn(0, tableShapeIdx, -1, 914400); // insert at left, 1in wide (0 = copy neighbour)
+renderer.deleteTableColumn(0, tableShapeIdx, 2);
+renderer.renderSlideSvg(0); // re-render afterwards
+```
+
+These target a shape whose `data-ooxml-shape-type` is `table`; calling them on a non-table shape returns `ERROR`. **v1 limitation:** merged cells (`gridSpan`/`rowSpan`/`hMerge`/`vMerge`) are **not** span-adjusted when rows/columns change — editing the structure of a table with merged cells may corrupt it.
+
+## Copy & Paste (cross-slide)
+
+`getShapeSpec` / `insertShapeSpec` implement `Ctrl+C` / `Ctrl+V`, including pasting onto a **different** slide (or even a different presentation). `getShapeSpec` returns a portable, self-contained JSON string — the shape's OOXML plus any referenced images inlined as base64 — so it survives a clipboard round-trip. `insertShapeSpec` re-adds the media to the package and re-links the shape's image relationships to fresh rIds on the target slide.
+
+```typescript
+// Copy
+const clipboard = renderer.getShapeSpec(0, shapeIdx); // JSON string
+
+// Paste onto another slide, offset by (dx, dy) EMU
+const res = renderer.insertShapeSpec(2, clipboard, 457200, 457200);
+if (res.startsWith('OK:')) {
+  const newIdx = parseInt(res.slice(3));
+  renderer.renderSlideSvg(2); // re-render the target slide
+}
+```
+
+Undoable (integrated with the history). **v1 limitations:** charts (serialized out-of-band) are not copyable (`getShapeSpec` returns `ERROR`); for OLE/SmartArt only inline image media is re-linked, not other external parts.
+
+## Multi-shape Transform
+
+For multi-select move/align, `updateShapesTransform` applies new transforms to several shapes in a single atomic call — every `shapeIdx` is validated before any change is applied (a bad index leaves the slide untouched), and the whole batch becomes **one** undo step:
+
+```typescript
+const res = renderer.updateShapesTransform(0, [
+  { shapeIdx: 2, x: 1000000, y: 1000000, cx: 914400, cy: 914400, rot: 0 },
+  { shapeIdx: 5, x: 2000000, y: 1000000, cx: 914400, cy: 914400, rot: 0 },
+]); // → "OK:2"
+renderer.renderSlideSvg(0); // re-render the slide afterwards
+```
+
+Values are EMU (rotation in 1/60000°). This is equivalent to wrapping individual `updateShapeTransform` calls in `beginBatch()`/`endBatch()`, but additionally guarantees atomicity (no partial application on a bad index) in a single Wasm call. A failed call records no undo step.
+
+## Z-Order
+
+Shapes paint in array order — the last shape in a slide is drawn on top (front-most), the first is at the back. These four methods reorder a shape within its container (the slide, or a group for group-child shapes via composite index):
+
+```typescript
+renderer.bringToFront(slideIdx, shapeIdx);   // → "OK:<newShapeIdx>"
+renderer.sendToBack(slideIdx, shapeIdx);
+renderer.bringForward(slideIdx, shapeIdx);   // one step toward front (no-op if front-most)
+renderer.sendBackward(slideIdx, shapeIdx);   // one step toward back  (no-op if back-most)
+```
+
+Reordering changes the shape's index, so each call returns `"OK:<newShapeIdx>"` — use it to keep your selection pointing at the same shape:
+
+```typescript
+const res = renderer.bringToFront(0, selectedIdx);
+if (res.startsWith('OK:')) selectedIdx = parseInt(res.slice(3));
+```
+
+All four are undoable (integrated with [Undo / Redo](#undo--redo)).
+
+## Inline Text Editing
+
+These three primitives let you build a PowerPoint/Google-Slides–style direct-typing experience (double-click to edit, IME input) using a `contentEditable` overlay: `getTextLayout` gives the geometry to draw a caret/selection, `hitTestText` maps a click to an insertion point, and `replaceTextRange` applies the edit while preserving formatting. All coordinates are in **EMU**.
+
+```typescript
+import type { TextLayout, TextHit } from 'pptx-svg';
+
+// 1. Geometry for caret / selection rendering
+const layout: TextLayout = JSON.parse(renderer.getTextLayout(slideIdx, shapeIdx));
+// layout.box   → { x, y, cx, cy }            (the text body rect, EMU)
+// layout.lines → [{ paraIdx, y, h, runs: [   (each visual line)
+//   { paraIdx, runIdx, x, w, runCharStart, paraCharStart,
+//     chars: [{ x, w }, ...] }                (per-character advance, EMU)
+// ] }]
+
+// 2. Click → caret position
+const hit: TextHit = JSON.parse(renderer.hitTestText(slideIdx, shapeIdx, xEmu, yEmu));
+// hit → { paraIdx, runIdx, charOffset, paraOffset }
+//   charOffset = offset within the run; paraOffset = offset within the paragraph
+
+// 3. Apply a typed/pasted/deleted range (paragraph-level offsets)
+renderer.replaceTextRange(slideIdx, shapeIdx,
+  hit.paraIdx, hit.paraOffset,   // start
+  hit.paraIdx, hit.paraOffset,   // end (== start → insertion)
+  'typed text');
+```
+
+`replaceTextRange` behavior:
+
+- **Offsets are paragraph-level** (use `paraOffset` from `hitTestText`, not `charOffset`).
+- A **collapsed range** (`start == end`) inserts; an **empty `newText`** deletes; a non-empty range with non-empty text replaces.
+- The inserted text **inherits the formatting** of the run at the start boundary; runs are split/merged as needed and surrounding formatting is preserved.
+- **`\n` in `newText` splits into paragraphs** (e.g. multi-line paste); a range spanning paragraphs **merges** them.
+- It is **undoable** (integrated with the history above) and returns the re-rendered shape SVG.
+
+**Scope / limitations of `getTextLayout` (v1):** targets horizontal LTR text (left/center/right/justify). Vertical text, text warp, OMML math, and multi-column bodies return only the bounding box with no per-line geometry. Line and run counts always match the rendered SVG (the layout shares the renderer's wrapping and autofit). Bullets are accounted for approximately on left-aligned lines.
+
+```typescript
+// Example: draw a caret at a click point
+const hit = JSON.parse(renderer.hitTestText(0, shapeIdx, clickXEmu, clickYEmu));
+const layout = JSON.parse(renderer.getTextLayout(0, shapeIdx));
+for (const line of layout.lines) {
+  for (const run of line.runs) {
+    if (run.paraIdx === hit.paraIdx && hit.charOffset >= run.runCharStart &&
+        hit.charOffset <= run.runCharStart + run.chars.length) {
+      const i = hit.charOffset - run.runCharStart;
+      const caretX = i < run.chars.length ? run.chars[i].x : run.x + run.w; // EMU
+      drawCaret(caretX, line.y, line.h);
+    }
+  }
+}
+```
+
+## Undo / Redo
+
+Every mutating editing method records a checkpoint before it runs, so `undo()` / `redo()` work across all edit types — shape transforms, text, fills, strokes, add/delete/duplicate, image operations, and slide add/delete/reorder. This makes a `Ctrl+Z` / `Ctrl+Y` workflow trivial to wire up.
+
+```typescript
+// Configure history depth (default 50; 0 disables history)
+const renderer = new PptxRenderer({ maxHistory: 100 });
+// ... init + loadPptx ...
+
+renderer.updateShapeTransform(0, 0, 1000000, 1000000, 2000000, 1000000, 0);
+
+if (renderer.canUndo()) {
+  const result = JSON.parse(renderer.undo()); // { slides: [0], slideCount: 2 }
+  result.slides.forEach(i => repaint(i, renderer.renderSlideSvg(i)));
+}
+
+if (renderer.canRedo()) {
+  JSON.parse(renderer.redo());
+}
+```
+
+`undo()` / `redo()` return a JSON-encoded `HistoryResult` (`{ slides: number[]; slideCount: number }`) listing the 0-indexed slides whose content changed (re-render just those) and the slide count after the operation. On an empty stack they return `"ERROR:nothing to undo"` / `"ERROR:nothing to redo"`.
+
+### Batching
+
+Wrap a compound action (e.g. paste = add shape + set text + set fill) so a single `Ctrl+Z` reverts the whole thing. Batches are nestable; only the outermost pair takes effect.
+
+```typescript
+renderer.beginBatch();
+try {
+  const idx = parseInt(renderer.addShape(0, 'rect', 0, 0, 914400, 914400, 255, 0, 0).split(':')[1]);
+  renderer.addShapeText(0, idx, 'Pasted', 1800, 255, 255, 255);
+  renderer.updateShapeStroke(0, idx, 0, 0, 0, 12700, '');
+} finally {
+  renderer.endBatch();
+}
+// One undo() reverts all three edits.
+```
+
+### Notes
+
+- History is cleared automatically on `loadPptx()`. Call `clearHistory()` to reset it manually.
+- Snapshots are lightweight: they shallow-clone the file overrides (strings/bytes are shared by reference) plus the OOXML of any in-engine modified slides. `undo()` / `redo()` rebuild engine state from the snapshot, so they are O(document) and intended for user-initiated actions, not per-keystroke calls.
+- Memory is bounded by `maxHistory` (oldest steps are discarded once exceeded).
 
 ## Export
 

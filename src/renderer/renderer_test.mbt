@@ -1927,3 +1927,199 @@ test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
   assert_eq(find_substring(svg, "rgb(0,180,216)"), -1)
   assert_eq(find_substring(svg, "<path "), -1)
 }
+
+// ── build_text_layout geometry (E6.2) ────────────────────────────────────────
+// The renderer-package FFI stub returns measure_text = 0.0, so per-char widths
+// collapse to 0; these tests assert the structural geometry (line/run/char counts
+// and char offsets), which is independent of measurement. Real x/w geometry is
+// covered by the Node integration suite (proportional measure fallback).
+
+///|
+fn tl_run(text : String) -> @ooxml.TextRun {
+  {
+    text,
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 1800,
+    color: @ooxml.Color::none(),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+}
+
+///|
+fn tl_para(runs : Array[@ooxml.TextRun]) -> @ooxml.TextParagraph {
+  {
+    runs,
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    line_spacing: 0,
+    mar_l: -1,
+    indent: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+}
+
+///|
+fn tl_transform() -> @ooxml.ShapeTransform {
+  {
+    x: 914400,
+    y: 914400,
+    cx: 5486400,
+    cy: 2743200,
+    rot: 0,
+    flip_h: false,
+    flip_v: false,
+  }
+}
+
+///|
+fn tl_body_props() -> @ooxml.BodyProps {
+  // Reuse a default shape's BodyProps (no wrap restriction).
+  @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    tl_transform(),
+  ).body_props
+}
+
+///|
+test "build_text_layout single run one line" {
+  let para = tl_para([tl_run("Hello")])
+  let tl = build_text_layout(
+    [para],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  assert_eq(tl.box_x, 914400)
+  assert_eq(tl.lines.length(), 1)
+  let line = tl.lines[0]
+  assert_eq(line.para_idx, 0)
+  assert_eq(line.runs.length(), 1)
+  let rb = line.runs[0]
+  assert_eq(rb.run_idx, 0)
+  assert_eq(rb.run_char_start, 0)
+  assert_eq(rb.para_char_start, 0)
+  assert_eq(rb.chars.length(), 5)
+}
+
+///|
+test "build_text_layout two runs offsets" {
+  let para = tl_para([tl_run("Hello"), tl_run("World!")])
+  let tl = build_text_layout(
+    [para],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  assert_eq(tl.lines.length(), 1)
+  let runs = tl.lines[0].runs
+  assert_eq(runs.length(), 2)
+  assert_eq(runs[0].para_char_start, 0)
+  assert_eq(runs[0].chars.length(), 5)
+  assert_eq(runs[1].run_idx, 1)
+  assert_eq(runs[1].run_char_start, 0)
+  assert_eq(runs[1].para_char_start, 5)
+  assert_eq(runs[1].chars.length(), 6)
+}
+
+///|
+test "build_text_layout two paragraphs stack vertically" {
+  let p0 = tl_para([tl_run("First")])
+  let p1 = tl_para([tl_run("Second")])
+  let tl = build_text_layout(
+    [p0, p1],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  assert_eq(tl.lines.length(), 2)
+  assert_eq(tl.lines[0].para_idx, 0)
+  assert_eq(tl.lines[1].para_idx, 1)
+  // Second line is below the first.
+  assert_true(tl.lines[1].y > tl.lines[0].y)
+}
+
+///|
+test "build_text_layout empty paragraph yields empty line" {
+  let p0 = tl_para([tl_run("Text")])
+  let p1 = tl_para([])
+  let tl = build_text_layout(
+    [p0, p1],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  assert_eq(tl.lines.length(), 2)
+  assert_eq(tl.lines[1].para_idx, 1)
+  assert_eq(tl.lines[1].runs.length(), 0)
+}
+
+///|
+test "hit_test_layout selects line by vertical band" {
+  let tl = build_text_layout(
+    [tl_para([tl_run("First")]), tl_para([tl_run("Second")])],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  // A point inside the second line's vertical band resolves to paragraph 1.
+  let l1 = tl.lines[1]
+  let (p, _, _, _) = hit_test_layout(tl, l1.runs[0].x, l1.y + l1.h / 2)
+  assert_eq(p, 1)
+  // A point above the first line clamps to paragraph 0.
+  let (p0, _, _, _) = hit_test_layout(tl, tl.box_x, tl.lines[0].y - 100000)
+  assert_eq(p0, 0)
+}
+
+///|
+test "hit_test_layout on empty layout returns origin" {
+  let tl = build_text_layout(
+    [],
+    tl_transform(),
+    12700,
+    @ooxml.ThemeData::default(),
+    tl_body_props(),
+  )
+  let (p, r, c, po) = hit_test_layout(tl, 100000, 100000)
+  assert_eq(p, 0)
+  assert_eq(r, 0)
+  assert_eq(c, 0)
+  assert_eq(po, 0)
+}

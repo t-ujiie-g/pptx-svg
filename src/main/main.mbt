@@ -772,6 +772,172 @@ pub fn get_entry_list() -> String {
 }
 
 ///|
+/// Parse slide XML into a fully-resolved `SlideData`: effective theme + color
+/// map overrides, chart shapes, placeholder inheritance, auto-content injection,
+/// background inheritance, and text-style defaults.
+///
+/// Shared by `render_slide_svg` (fresh parse path) and `restore_slide_ooxml`
+/// (Undo/Redo history). The inheritance/auto-content steps only fill values that
+/// are still missing and `inject_placeholder_auto_content` only injects into
+/// placeholders with no text, so re-running this on already-serialized slide XML
+/// is idempotent — Undo/Redo restores keep full visual fidelity.
+fn resolve_slide_data(
+  slide_num : Int,
+  slide_xml : String,
+  rels : Array[@ooxml.Relationship],
+  layout_opt : @ooxml.SlideLayoutData?,
+  master_opt : @ooxml.SlideMasterData?,
+  layout_path : String,
+  master_path : String,
+  base_theme : @ooxml.ThemeData,
+) -> @ooxml.SlideData {
+  let effective_theme = {
+    // Start with master's clr_map applied to master's theme
+    let mut eff = match master_opt {
+      Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
+      None => base_theme
+    }
+    // Apply layout clrMapOvr if present
+    match layout_opt {
+      Some(layout) =>
+        match layout.clr_map_ovr {
+          Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
+          None => ()
+        }
+      None => ()
+    }
+    // Apply slide's own clrMapOvr if present
+    let slide_nodes = @xml.parse_xml(slide_xml)
+    let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
+      Some(n) => @xml.get_children(n)
+      None => []
+    }
+    match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
+      Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
+      None => ()
+    }
+    eff
+  }
+  // Parse slide and cache it
+  let slide_data = @ooxml.parse_slide(
+    slide_xml,
+    g_slide_size.val,
+    effective_theme,
+  )
+  // ── Resolve chart shapes: load chart XML and parse ChartML ──
+  resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
+  // ── Placeholder inheritance: resolve transforms from layout/master ──
+  resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
+  // ── Placeholder auto-content: inject slide number/date/footer text ──
+  inject_placeholder_auto_content(
+    slide_data.shapes,
+    slide_num,
+    layout_opt,
+    master_opt,
+  )
+  // ── Background inheritance: slide → layout → master → white ──
+  let mut bg = slide_data.background
+  let mut bg_grad = slide_data.bg_grad
+  let mut bg_blip_fill = slide_data.bg_blip_fill
+  let mut bg_patt_fill = slide_data.bg_patt_fill
+  let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
+  // Check if slide has any explicit background
+  let slide_has_bg = !bg.is_none() ||
+    !bg_grad.is_none() ||
+    !bg_blip_fill.is_none() ||
+    !bg_patt_fill.is_none()
+  if !slide_has_bg {
+    // Try layout
+    let mut inherited = false
+    match layout_opt {
+      Some(layout) => {
+        let layout_has_bg = !layout.background.is_none() ||
+          !layout.bg_grad.is_none() ||
+          !layout.bg_blip_fill.is_none() ||
+          !layout.bg_patt_fill.is_none()
+        if layout_has_bg {
+          bg = layout.background
+          bg_grad = layout.bg_grad
+          bg_blip_fill = layout.bg_blip_fill
+          bg_patt_fill = layout.bg_patt_fill
+          bg_fill_rels = if !layout_path.is_empty() {
+            get_layout_rels(layout_path)
+          } else {
+            rels
+          }
+          inherited = true
+        }
+      }
+      None => ()
+    }
+    // Try master
+    if !inherited {
+      match master_opt {
+        Some(master) => {
+          let master_has_bg = !master.background.is_none() ||
+            !master.bg_grad.is_none() ||
+            !master.bg_blip_fill.is_none() ||
+            !master.bg_patt_fill.is_none()
+          if master_has_bg {
+            bg = master.background
+            bg_grad = master.bg_grad
+            bg_blip_fill = master.bg_blip_fill
+            bg_patt_fill = master.bg_patt_fill
+            bg_fill_rels = if !master_path.is_empty() {
+              get_master_rels(master_path)
+            } else {
+              rels
+            }
+            inherited = true
+          }
+        }
+        None => ()
+      }
+    }
+    if !inherited && bg.is_none() {
+      bg = @ooxml.Color::white()
+    }
+  }
+  // ── Apply text style defaults: layout first (more specific), then master ──
+  let ns = slide_data.shapes.length()
+  let mut shape_i = 0
+  while shape_i < ns {
+    let shape = slide_data.shapes[shape_i]
+    // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
+    // This applies to all shapes (both placeholders and free-standing text boxes)
+    apply_inline_lst_style(shape)
+    // Layout placeholder defaults first (more specific)
+    apply_layout_text_defaults(shape, layout_opt)
+    // Master placeholder's lstStyle as second fallback
+    apply_master_ph_text_defaults(shape, master_opt)
+    // Master text styles (p:txStyles) as final fallback
+    match master_opt {
+      Some(master) => apply_text_defaults(shape, master.text_styles)
+      None => ()
+    }
+    // endParaRPr as last-resort fallback for free textboxes whose runs
+    // still lack color/font after placeholder inheritance.
+    apply_epr_fallbacks(shape)
+    // <p:style>/<a:fontRef> color as final default for any run that still
+    // has no color (matches PowerPoint behavior for accent-styled shapes).
+    apply_font_ref_fallback(shape)
+    shape_i = shape_i + 1
+  }
+  ignore(bg_fill_rels)
+  {
+    slide_size: slide_data.slide_size,
+    background: bg,
+    bg_grad,
+    bg_blip_fill,
+    bg_patt_fill,
+    shapes: slide_data.shapes,
+    transition_xml: slide_data.transition_xml,
+    timing_xml: slide_data.timing_xml,
+    hidden: slide_data.hidden,
+  }
+}
+
+///|
 /// Render slide `slide_idx` (0-indexed) as an SVG string.
 ///
 /// Returns the SVG markup on success, or "ERROR:<message>" on failure.
@@ -826,152 +992,12 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     if slide_xml.is_empty() {
       return "ERROR:slide XML not found: " + slide_path
     }
-    let effective_theme = {
-      // Start with master's clr_map applied to master's theme
-      let mut eff = match master_opt {
-        Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
-        None => base_theme
-      }
-      // Apply layout clrMapOvr if present
-      match layout_opt {
-        Some(layout) =>
-          match layout.clr_map_ovr {
-            Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-            None => ()
-          }
-        None => ()
-      }
-      // Apply slide's own clrMapOvr if present
-      let slide_nodes = @xml.parse_xml(slide_xml)
-      let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
-        Some(n) => @xml.get_children(n)
-        None => []
-      }
-      match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
-        Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-        None => ()
-      }
-      eff
-    }
-    // Parse slide and cache it
-    let slide_data = @ooxml.parse_slide(
-      slide_xml,
-      g_slide_size.val,
-      effective_theme,
+    let s = resolve_slide_data(
+      slide_num, slide_xml, rels, layout_opt, master_opt, layout_path, master_path,
+      base_theme,
     )
-    // ── Resolve chart shapes: load chart XML and parse ChartML ──
-    resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
-    // ── Placeholder inheritance: resolve transforms from layout/master ──
-    resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
-    // ── Placeholder auto-content: inject slide number/date/footer text ──
-    inject_placeholder_auto_content(
-      slide_data.shapes,
-      slide_num,
-      layout_opt,
-      master_opt,
-    )
-    // ── Background inheritance: slide → layout → master → white ──
-    let mut bg = slide_data.background
-    let mut bg_grad = slide_data.bg_grad
-    let mut bg_blip_fill = slide_data.bg_blip_fill
-    let mut bg_patt_fill = slide_data.bg_patt_fill
-    let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
-    // Check if slide has any explicit background
-    let slide_has_bg = !bg.is_none() ||
-      !bg_grad.is_none() ||
-      !bg_blip_fill.is_none() ||
-      !bg_patt_fill.is_none()
-    if !slide_has_bg {
-      // Try layout
-      let mut inherited = false
-      match layout_opt {
-        Some(layout) => {
-          let layout_has_bg = !layout.background.is_none() ||
-            !layout.bg_grad.is_none() ||
-            !layout.bg_blip_fill.is_none() ||
-            !layout.bg_patt_fill.is_none()
-          if layout_has_bg {
-            bg = layout.background
-            bg_grad = layout.bg_grad
-            bg_blip_fill = layout.bg_blip_fill
-            bg_patt_fill = layout.bg_patt_fill
-            bg_fill_rels = if !layout_path.is_empty() {
-              get_layout_rels(layout_path)
-            } else {
-              rels
-            }
-            inherited = true
-          }
-        }
-        None => ()
-      }
-      // Try master
-      if !inherited {
-        match master_opt {
-          Some(master) => {
-            let master_has_bg = !master.background.is_none() ||
-              !master.bg_grad.is_none() ||
-              !master.bg_blip_fill.is_none() ||
-              !master.bg_patt_fill.is_none()
-            if master_has_bg {
-              bg = master.background
-              bg_grad = master.bg_grad
-              bg_blip_fill = master.bg_blip_fill
-              bg_patt_fill = master.bg_patt_fill
-              bg_fill_rels = if !master_path.is_empty() {
-                get_master_rels(master_path)
-              } else {
-                rels
-              }
-              inherited = true
-            }
-          }
-          None => ()
-        }
-      }
-      if !inherited && bg.is_none() {
-        bg = @ooxml.Color::white()
-      }
-    }
-    // ── Apply text style defaults: layout first (more specific), then master ──
-    let ns = slide_data.shapes.length()
-    let mut shape_i = 0
-    while shape_i < ns {
-      let shape = slide_data.shapes[shape_i]
-      // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
-      // This applies to all shapes (both placeholders and free-standing text boxes)
-      apply_inline_lst_style(shape)
-      // Layout placeholder defaults first (more specific)
-      apply_layout_text_defaults(shape, layout_opt)
-      // Master placeholder's lstStyle as second fallback
-      apply_master_ph_text_defaults(shape, master_opt)
-      // Master text styles (p:txStyles) as final fallback
-      match master_opt {
-        Some(master) => apply_text_defaults(shape, master.text_styles)
-        None => ()
-      }
-      // endParaRPr as last-resort fallback for free textboxes whose runs
-      // still lack color/font after placeholder inheritance.
-      apply_epr_fallbacks(shape)
-      // <p:style>/<a:fontRef> color as final default for any run that still
-      // has no color (matches PowerPoint behavior for accent-styled shapes).
-      apply_font_ref_fallback(shape)
-      shape_i = shape_i + 1
-    }
-    let s : @ooxml.SlideData = {
-      slide_size: slide_data.slide_size,
-      background: bg,
-      bg_grad,
-      bg_blip_fill,
-      bg_patt_fill,
-      shapes: slide_data.shapes,
-      transition_xml: slide_data.transition_xml,
-      timing_xml: slide_data.timing_xml,
-      hidden: slide_data.hidden,
-    }
     g_slides.val[slide_idx] = s
     g_parsed.val[slide_idx] = true
-    ignore(bg_fill_rels)
     s
   }
   // ── Resolve effective theme for rendering (needed for both paths) ──

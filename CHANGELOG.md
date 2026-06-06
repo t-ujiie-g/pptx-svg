@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.6.0
+
+Direct-manipulation editing release: completes the **E6 editing roadmap (P1–P6)** —
+Undo/Redo history, inline text editing, z-order, atomic multi-shape transform,
+cross-slide copy/paste, and table editing — plus an interactive browser demo
+(`web/editing.html`) exercising all of them.
+
+### Features
+
+- **Table editing (E6.6)** — `updateTableCellText(slideIdx, shapeIdx, row, col, text)` sets a cell's text (inheriting the cell's existing first-run formatting), and `addTableRow` / `deleteTableRow` / `addTableColumn(.., afterCol?, widthEmu?)` / `deleteTableColumn` insert/remove rows and columns (at least one row/column must remain). All undoable. New `TableCell::empty()` constructor + Wasm exports. _v1 limitation: merged cells (gridSpan/rowSpan/hMerge/vMerge) are not span-adjusted on row/column changes — editing the structure of a merged table may corrupt it._ **This completes the E6 direct-manipulation editing roadmap (P1–P6).**
+
+- **Cross-slide shape copy/paste (E6.5)** — `getShapeSpec(slideIdx, shapeIdx)` extracts a shape as a portable, self-contained JSON spec (its OOXML fragment + any referenced images inlined as base64), and `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` pastes it onto another slide, re-adding the media to the package and re-linking image relationships to fresh rIds on the target slide. Survives a clipboard round-trip; undoable. New Wasm exports `get_shape_ooxml` / `add_shape_from_ooxml`; `serialize_shape` made public and a new `parse_shapes_xml` parser added. New `base64ToBytes` util. _v1 limitation: charts (serialized out-of-band) and external OLE/SmartArt parts are not copyable; image media only is re-linked._
+
+- **Atomic multi-shape transform (E6.4)** — `updateShapesTransform(slideIdx, items)` applies new transforms (EMU; rot in 1/60000 deg) to several shapes in one call. Every `shapeIdx` is validated *before* any change is applied, so an invalid index leaves the slide untouched (no partial application), and the whole batch is a single undo step. Returns `"OK:<count>"`. New Wasm export `update_shapes_transform`.
+  - **History fix**: a failed/no-op `updateShapesTransform` no longer leaves a phantom undo step — a new guarded-checkpoint path (`commitCheckpoint`) captures the pre-edit snapshot but only commits it to the undo stack when the (atomic) operation succeeds.
+
+- **Z-order operations (E6.3)** — `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` / `bringForward(...)` / `sendBackward(...)` on `PptxRenderer` reorder a shape within its container (slide or group). z-order equals shape-array order (later = front-most), so these move the shape to the end / start / one step within the array. Each returns `"OK:<newShapeIdx>"` (the index changes when reordered, so the caller can re-select) and is undoable (integrated with the history). New Wasm exports `bring_to_front` / `send_to_back` / `bring_forward` / `send_backward`.
+
+- **Inline text editing primitives (E6.2)** — three new `PptxRenderer` methods to support a PowerPoint/Google-Slides–style direct-typing experience (double-click to edit, IME input) via a `contentEditable` overlay:
+  - `getTextLayout(slideIdx, shapeIdx)` → JSON text geometry in EMU: `box` + `lines` → run boxes → **per-character boxes** (for drawing carets / selection rectangles). Reuses the renderer's `wrap_paragraph` and a newly shared autofit solver, so **line and run counts always match the rendered SVG**. v1 targets horizontal LTR text (left/center/right/justify); vertical/warp/math/multi-column bodies return only the bounding box.
+  - `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` → JSON `{ paraIdx, runIdx, charOffset, paraOffset }` mapping a click point to a caret insertion position.
+  - `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` → replace a text range (paragraph-level offsets), **preserving the formatting of boundary runs** (runs split/merge as needed). `\n` in `newText` splits into paragraphs; a range spanning paragraphs merges them. Undoable (integrated with the history below).
+  - New TS types exported: `TextLayout`, `TextLine`, `TextRunBox`, `GlyphBox`, `TextHit` (and `HistoryResult`).
+- **New Wasm exports** `get_text_layout` / `hit_test_text` / `replace_text_range`.
+
+### Refactor
+
+- **`solve_text_autofit` extracted** from `render_text` (the normAutofit shrink loop) and shared with the new `build_text_layout`, so the geometry API uses identical font scaling. Render output is unchanged (verified by the existing renderer/Node suites).
+- **De-duplicated per-run font resolution** — the identical `fs_raw`/`ff` fallback logic in `wrap_paragraph`, `measure_line_width`, and `build_text_layout` is now shared helpers `run_fs_px` / `run_font_face` in `renderer_text.mbt`. Magic numbers named: `default_run_fs_hundredths` (18pt fallback), `no_wrap_width_px` (layout sentinel). Removed the unused `slide_idx` parameter from `resolve_slide_data`.
+- **Inline text editing exports moved** to `src/main/main_text_edit.mbt` (from `main_edit.mbt`) for cohesion. A new "Refactoring checklist" was added to `CLAUDE.md`.
+- **Guarded-history helper `runGuarded`** — the capture-then-commit-on-success pattern (used by `updateShapesTransform` and `insertShapeSpec`) is unified into one private method, so a failed/no-op edit never records a phantom undo step. Named constants for the undo depth (`DEFAULT_MAX_HISTORY`) and the rId attribute pattern (`RID_ATTR_PATTERN`, shared by `getShapeSpec`/`insertShapeSpec`); the composite shape-index radix is now `group_index_base` in `main_edit.mbt` (was a bare `1000` in `resolve_shape_location` / `duplicate_shape` / `sibling_composite_idx`).
+- **Table editing split out** to `src/main/main_table_edit.mbt` (from `main_edit.mbt`) for cohesion; the insertion-index clamp shared by `add_table_row`/`add_table_column` is extracted into `clamp_insert_index`, and the 1-inch default column width is named `default_table_col_width_emu`.
+
+- **Undo / Redo edit history (E6.1)** — `PptxRenderer` now tracks a full undo/redo history across every mutating editing API. New methods: `undo()`, `redo()`, `canUndo()`, `canRedo()`, `beginBatch()`, `endBatch()`, `clearHistory()`, plus a `maxHistory` constructor option (default 50). `undo()` / `redo()` return a JSON-encoded `HistoryResult` (`{ slides: number[]; slideCount: number }`) so the caller can re-render only the affected slides, or `"ERROR:nothing to undo"` / `"ERROR:nothing to redo"` on an empty stack.
+  - **Unified snapshots** — each checkpoint shallow-clones the document state that diverges from the original ZIP (the TS `files` / `addedFiles` / `removedFiles` / `addedBinaryFiles` collections, strings & bytes shared by reference) plus the OOXML of any in-engine modified slides (via `get_modified_entries`). This covers both shape/text/fill edits (Wasm `g_slides`) and structural edits (`addSlide` / `deleteSlide` / `reorderSlides` / image ops) in one mechanism. Restores rebuild engine state and re-apply pending slide edits.
+  - **`beginBatch()` / `endBatch()`** collapse a compound action (e.g. paste = add shape + set text + set fill) into a single undo step; batches are nestable.
+  - History is cleared on `loadPptx()`.
+
+### MoonBit / Wasm
+
+- **New export `restore_slide_ooxml(slideIdx, xml)`** — re-parses a previously serialized OOXML slide back into the `g_slides` cache, used to restore pending slide edits when stepping through history. Runs the **same** parse + resolve pipeline as `render_slide_svg` (effective theme, chart shapes, placeholder inheritance, auto-content, background inheritance, text-style defaults), so a restored slide is identical to the live-edited one — Undo/Redo keeps full visual fidelity. The pipeline is idempotent on already-serialized XML (inheritance only fills missing values; `inject_placeholder_auto_content` only injects into empty placeholders).
+
+### Refactor
+
+- **Shared `resolve_slide_data` helper** — the slide parse + resolve logic previously inline in `render_slide_svg`'s fresh-parse branch is extracted into a single `resolve_slide_data(...)` function reused by both `render_slide_svg` and `restore_slide_ooxml`, eliminating a duplicate ~140-line inheritance pipeline.
+
+### Tests
+
+- **MoonBit**: restore round-trip idempotency tests in `serializer_test.mbt` (`serialize → parse_slide → serialize` is a fixed point; shape text survives a parse_slide round-trip).
+- **Node compatibility**: Tests 37–43 cover undo/redo of transform / addShape / deleteShape / addSlide, batch collapsing to a single undo, empty-history & `clearHistory`, `maxHistory` capping, and export-after-undo (undo/redo of a transform restores the rendered SVG exactly); Tests 44–49 cover `getTextLayout` geometry, `hitTestText`, and `replaceTextRange` insert/delete/merge/newline-split + undo.
+- **MoonBit**: `build_text_layout` structural geometry tests (line/run/char counts, offsets, vertical stacking) + `hit_test_layout` vertical-band selection & empty-layout fallback.
+- **Node compatibility**: Tests 50–53 cover z-order bringToFront/sendToBack/bringForward/sendBackward (serialized order checks, edge no-op, returned index) and undo; Test 54 covers `updateShapesTransform` atomic batch apply, atomicity on a bad index (no partial application), and single-undo revert; Tests 55–58 cover cross-slide copy/paste of a plain shape (with offset), an image shape (media re-link + export), paste undo, and boundary errors.
+- **MoonBit**: `parse_shapes_xml` round-trip test (`serialize_shape → parse_shapes_xml`) + `TableCell::empty` defaults.
+- **Node compatibility**: Tests 59–62 cover table cell-text edit (+undo), add/delete row, add/delete column, and boundary errors (non-table shape, out-of-range, last row/column guard), using a plain table in `test_features.pptx`.
+- Test counts: 192 MoonBit + 254 Node compatibility + 16 categorical suites.
+
+### Documentation
+
+- **`docs/editing-guide.md`** — new "Undo / Redo" section + History APIs table.
+
 ## 0.5.10
 
 ### Bug Fixes

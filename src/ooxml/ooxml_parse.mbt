@@ -2307,6 +2307,15 @@ fn parse_shapes_from_tree(
   parse_shapes_from_children(@xml.get_children(tree), theme)
 }
 
+///|
+/// Parse one or more top-level shape fragments (`<p:sp>` / `<p:pic>` /
+/// `<p:grpSp>` / `<p:cxnSp>` / `<p:graphicFrame>` / `mc:AlternateContent`) from an
+/// XML string. Public for cross-slide copy/paste (E6.5): a shape spec produced by
+/// `serialize_shape` is parsed back into `Shape` values here.
+pub fn parse_shapes_xml(xml : String, theme : ThemeData) -> Array[Shape] {
+  parse_shapes_from_children(@xml.parse_xml(xml), theme)
+}
+
 // ── Table style parsing ─────────────────────────────────────────────────────
 
 ///|

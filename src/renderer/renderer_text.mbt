@@ -168,6 +168,37 @@ fn count_spaces(text : String) -> Int {
 }
 
 ///|
+/// Resolve a run's measurement font size in px (shared by wrapping, line
+/// measurement, and the text-layout geometry builder).
+fn run_fs_px(
+  run : @ooxml.TextRun,
+  scale : Int,
+  def_sz : Int,
+  font_scale : Int,
+) -> Double {
+  let fs_raw = if run.font_size > 0 {
+    run.font_size
+  } else if def_sz > 0 {
+    def_sz * scale / @ooxml.emu_per_hundredth_pt
+  } else {
+    default_run_fs_hundredths
+  }
+  px(apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt, scale).to_double()
+}
+
+///|
+/// Resolve a run's measurement font face: East Asian → Latin → theme minor.
+fn run_font_face(run : @ooxml.TextRun, theme : @ooxml.ThemeData) -> String {
+  if !run.ea_font.is_empty() {
+    run.ea_font
+  } else if !run.font_face.is_empty() {
+    run.font_face
+  } else {
+    theme.minor_font
+  }
+}
+
+///|
 /// Measure total rendered width of a visual line (array of run fragments).
 /// Returns (width_px, space_count).
 fn measure_line_width(
@@ -188,24 +219,8 @@ fn measure_line_width(
   while fi < nf {
     let (run_idx, frag_text) = vline[fi]
     let run = para.runs[run_idx]
-    let fs_raw = if run.font_size > 0 {
-      run.font_size
-    } else if def_sz > 0 {
-      def_sz * scale / @ooxml.emu_per_hundredth_pt
-    } else {
-      1800
-    }
-    let fs_px = px(
-      apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
-      scale,
-    ).to_double()
-    let ff = if !run.ea_font.is_empty() {
-      run.ea_font
-    } else if !run.font_face.is_empty() {
-      run.font_face
-    } else {
-      theme.minor_font
-    }
+    let fs_px = run_fs_px(run, scale, def_sz, font_scale)
+    let ff = run_font_face(run, theme)
     let text = if run.cap == "all" {
       to_upper_ascii(frag_text)
     } else {
@@ -254,24 +269,8 @@ fn wrap_paragraph(
   let mut ri = 0
   while ri < nr {
     let run = para.runs[ri]
-    let fs_raw = if run.font_size > 0 {
-      run.font_size
-    } else if def_sz > 0 {
-      def_sz * scale / @ooxml.emu_per_hundredth_pt
-    } else {
-      1800
-    }
-    let fs_px = px(
-      apply_font_scale(fs_raw, font_scale) * @ooxml.emu_per_hundredth_pt,
-      scale,
-    ).to_double()
-    let ff = if !run.ea_font.is_empty() {
-      run.ea_font
-    } else if !run.font_face.is_empty() {
-      run.font_face
-    } else {
-      theme.minor_font
-    }
+    let fs_px = run_fs_px(run, scale, def_sz, font_scale)
+    let ff = run_font_face(run, theme)
     let text = if run.cap == "all" {
       to_upper_ascii(run.text)
     } else {
@@ -871,93 +870,29 @@ fn render_run_tspan(
 }
 
 ///|
-fn render_text(
+/// Solve the normAutofit-style font/line shrink for a text body and compute its
+/// total laid-out height. Shared by `render_text` and `build_text_layout` so the
+/// geometry API uses identical font scaling (→ identical line/run counts).
+///
+/// Returns `(fs, lr, total_text_h, last_para_line_h, last_para_font_sz,
+/// last_para_spc_after)` where `fs` = resolved font scale (1000ths of %),
+/// `lr` = line-spacing reduction. All heights are in px (at `scale`).
+fn solve_text_autofit(
   paragraphs : Array[@ooxml.TextParagraph],
-  t : @ooxml.ShapeTransform,
   scale : Int,
   theme : @ooxml.ThemeData,
-  body_props : @ooxml.BodyProps,
-  rels : Array[@ooxml.Relationship],
-  slide_num : Int,
-  shape_idx : Int,
-) -> String {
-  if paragraphs.length() == 0 {
-    return ""
-  }
-  // Warp text: delegate to warp renderer for non-trivial presets
-  let wp = body_props.warp_prst
-  if !wp.is_empty() && wp != "textNoShape" && wp != "textPlain" {
-    return render_warp_text(
-      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
-    )
-  }
-  // Math text: delegate to math renderer for OMML-only text boxes
-  if is_all_math(paragraphs) {
-    return render_math_text(
-      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
-    )
-  }
-  // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
-  let l_ins = if body_props.l_ins >= 0 {
-    body_props.l_ins
-  } else {
-    default_l_inset
-  }
-  let t_ins = if body_props.t_ins >= 0 {
-    body_props.t_ins
-  } else {
-    default_t_inset
-  }
-  let r_ins = if body_props.r_ins >= 0 {
-    body_props.r_ins
-  } else {
-    default_l_inset
-  }
-
-  let pad_l = px(l_ins, scale)
-  let pad_t = px(t_ins, scale)
-  let pad_r = px(r_ins, scale)
-  let base_text_x = px(t.x, scale) + pad_l
-  let full_text_w = px(t.cx, scale) - pad_l - pad_r
-  let mut text_x = base_text_x
-  let mut text_w = full_text_w
-  let def_sz = px(default_font_size_emu, scale) // 24 px for standard slides (unscaled)
-  let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
-  let mut fs = body_props.font_scale
-  let mut lr = body_props.ln_spc_reduction
-
-  let do_wrap = body_props.wrap != "none"
-
-  // Multi-column support
-  let num_cols = if body_props.num_cols > 1 { body_props.num_cols } else { 1 }
-  let col_spacing_px = if num_cols > 1 {
-    px(body_props.col_spacing, scale)
-  } else {
-    0
-  }
-  let col_w = if num_cols > 1 {
-    (full_text_w - col_spacing_px * (num_cols - 1)) / num_cols
-  } else {
-    full_text_w
-  }
-  if num_cols > 1 {
-    text_w = col_w
-  }
-
-  // Compute available height (needed for normAutofit and anchor offset)
-  let shape_h = px(t.cy, scale)
-  let b_ins = if body_props.b_ins >= 0 {
-    body_props.b_ins
-  } else {
-    default_t_inset
-  }
-  let pad_b = px(b_ins, scale)
-  let avail_h = shape_h - pad_t - pad_b
-
-  // Calculate total text height for vertical alignment
+  def_sz : Int,
+  def_line_h : Int,
+  init_fs : Int,
+  init_lr : Int,
+  do_wrap : Bool,
+  col_w : Int,
+  avail_h : Int,
+) -> (Int, Int, Int, Int, Int, Int) {
   let np = paragraphs.length()
+  let mut fs = init_fs
+  let mut lr = init_lr
   let mut total_text_h = 0
-  // Track last paragraph's trailing space for vertical centering correction
   let mut last_para_line_h = 0
   let mut last_para_font_sz = 0
   let mut last_para_spc_after = 0
@@ -1052,6 +987,108 @@ fn render_text(
     }
     break
   }
+  (
+    fs, lr, total_text_h, last_para_line_h, last_para_font_sz, last_para_spc_after,
+  )
+}
+
+///|
+fn render_text(
+  paragraphs : Array[@ooxml.TextParagraph],
+  t : @ooxml.ShapeTransform,
+  scale : Int,
+  theme : @ooxml.ThemeData,
+  body_props : @ooxml.BodyProps,
+  rels : Array[@ooxml.Relationship],
+  slide_num : Int,
+  shape_idx : Int,
+) -> String {
+  if paragraphs.length() == 0 {
+    return ""
+  }
+  // Warp text: delegate to warp renderer for non-trivial presets
+  let wp = body_props.warp_prst
+  if !wp.is_empty() && wp != "textNoShape" && wp != "textPlain" {
+    return render_warp_text(
+      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
+    )
+  }
+  // Math text: delegate to math renderer for OMML-only text boxes
+  if is_all_math(paragraphs) {
+    return render_math_text(
+      paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
+    )
+  }
+  // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
+  let l_ins = if body_props.l_ins >= 0 {
+    body_props.l_ins
+  } else {
+    default_l_inset
+  }
+  let t_ins = if body_props.t_ins >= 0 {
+    body_props.t_ins
+  } else {
+    default_t_inset
+  }
+  let r_ins = if body_props.r_ins >= 0 {
+    body_props.r_ins
+  } else {
+    default_l_inset
+  }
+
+  let pad_l = px(l_ins, scale)
+  let pad_t = px(t_ins, scale)
+  let pad_r = px(r_ins, scale)
+  let base_text_x = px(t.x, scale) + pad_l
+  let full_text_w = px(t.cx, scale) - pad_l - pad_r
+  let mut text_x = base_text_x
+  let mut text_w = full_text_w
+  let def_sz = px(default_font_size_emu, scale) // 24 px for standard slides (unscaled)
+  let def_line_h = def_sz * line_height_numer / line_height_denom // unscaled default line height
+  let init_fs = body_props.font_scale
+  let init_lr = body_props.ln_spc_reduction
+
+  let do_wrap = body_props.wrap != "none"
+
+  // Multi-column support
+  let num_cols = if body_props.num_cols > 1 { body_props.num_cols } else { 1 }
+  let col_spacing_px = if num_cols > 1 {
+    px(body_props.col_spacing, scale)
+  } else {
+    0
+  }
+  let col_w = if num_cols > 1 {
+    (full_text_w - col_spacing_px * (num_cols - 1)) / num_cols
+  } else {
+    full_text_w
+  }
+  if num_cols > 1 {
+    text_w = col_w
+  }
+
+  // Compute available height (needed for normAutofit and anchor offset)
+  let shape_h = px(t.cy, scale)
+  let b_ins = if body_props.b_ins >= 0 {
+    body_props.b_ins
+  } else {
+    default_t_inset
+  }
+  let pad_b = px(b_ins, scale)
+  let avail_h = shape_h - pad_t - pad_b
+
+  // Calculate total text height for vertical alignment + solve normAutofit shrink.
+  let np = paragraphs.length()
+  let (
+    fs,
+    lr,
+    total_text_h,
+    last_para_line_h,
+    last_para_font_sz,
+    last_para_spc_after,
+  ) = solve_text_autofit(
+    paragraphs, scale, theme, def_sz, def_line_h, init_fs, init_lr, do_wrap, col_w,
+    avail_h,
+  )
   // For vertical centering/bottom alignment, the trailing space of the last line
   // (line_height - font_size) and spc_after should not count toward the text extent.
   // The rendering places text at the baseline (font_size from line top), so the visual

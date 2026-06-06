@@ -140,6 +140,7 @@ const renderer = new PptxRenderer(options?);
 |--------|---------|------|
 | `renderShapeSvg(slideIdx, shapeIdx)` | `string` | 単一シェイプを SVG フラグメントとして描画。 |
 | `updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot)` | `string` | 位置/サイズ/回転を更新（EMU単位）。再描画SVGを返す。 |
+| `updateShapesTransform(slideIdx, items)` | `string` | 複数シェイプの transform を原子的に一括更新（1 undo 単位）。`OK:<count>` を返す。 |
 | `updateShapeText(slideIdx, shapeIdx, paraIdx, runIdx, text)` | `string` | テキスト内容を更新。再描画SVGを返す。 |
 | `updateShapeFill(slideIdx, shapeIdx, r, g, b)` | `string` | 塗りつぶし色を更新（0-255）。再描画SVGを返す。 |
 | `deleteShape(slideIdx, shapeIdx)` | `string` | シェイプを削除。グループ内シェイプは composite index で指定。 |
@@ -185,6 +186,56 @@ const renderer = new PptxRenderer(options?);
 | `deleteImage(slideIdx, shapeIdx)` | `string` | 画像シェイプを削除し、孤立メディアをクリーンアップ。`OK` を返す。 |
 
 対応 MIME タイプ: `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml`, `image/x-emf`, `image/x-wmf`。
+
+**Undo / Redo（編集履歴）:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `undo()` | `string` | 直近の編集（またはバッチ）を取り消す。JSON `{ slides, slideCount }`、または `ERROR:nothing to undo`。 |
+| `redo()` | `string` | 直近に取り消した編集をやり直す。JSON `{ slides, slideCount }`、または `ERROR:nothing to redo`。 |
+| `canUndo()` / `canRedo()` | `boolean` | undo / redo 可能かどうか。 |
+| `beginBatch()` / `endBatch()` | `void` | 複数編集を 1 つの undo 単位にまとめる（ネスト可）。 |
+| `clearHistory()` | `void` | 履歴を全消去（`loadPptx` 時にも自動クリア）。 |
+
+すべてのミューテーション編集メソッドが自動でチェックポイントを記録する。深さは `new PptxRenderer({ maxHistory: 50 })` で設定。詳細は [docs/editing-guide.md](docs/editing-guide.md#undo--redo)。
+
+**インライン文字編集:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `getTextLayout(slideIdx, shapeIdx)` | `string` | テキスト幾何の JSON（EMU）: box + 行 → run ボックス → 文字ボックス。キャレット/選択描画用。 |
+| `hitTestText(slideIdx, shapeIdx, xEmu, yEmu)` | `string` | クリック座標（EMU）→ JSON `{ paraIdx, runIdx, charOffset, paraOffset }`。 |
+| `replaceTextRange(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText)` | `string` | テキスト範囲を置換（段落レベルオフセット）。境界 run の書式を保持。`\n` は段落分割。undo 可能。 |
+
+ダブルクリックで直接タイプする `contentEditable` オーバーレイ向け。詳細は [docs/editing-guide.md](docs/editing-guide.md#inline-text-editing)。
+
+**Z-order（重なり順）:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `bringToFront(slideIdx, shapeIdx)` / `sendToBack(...)` | `string` | シェイプを最前面 / 最背面へ。`OK:<newShapeIdx>` を返す。 |
+| `bringForward(slideIdx, shapeIdx)` / `sendBackward(...)` | `string` | シェイプを1つ前面 / 背面へ（端では no-op）。`OK:<newShapeIdx>` を返す。 |
+
+z-order はシェイプ配列順（末尾＝最前面）。4つとも undo 可能。
+
+**コピー / ペースト（スライド跨ぎ）:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `getShapeSpec(slideIdx, shapeIdx)` | `string` | シェイプを移植可能な JSON スペックにコピー（画像は base64 で内包）。 |
+| `insertShapeSpec(slideIdx, spec, dxEmu?, dyEmu?)` | `string` | スペックをスライドに貼り付け（メディアを新 rId に再リンク）。`OK:<index>` を返す。undo 可能。 |
+
+別スライド/別プレゼンテーションへの貼り付けに対応。詳細は [docs/editing-guide.md](docs/editing-guide.md#copy--paste-cross-slide)。
+
+**テーブル編集:**
+
+| メソッド | 戻り値 | 説明 |
+|--------|---------|------|
+| `updateTableCellText(slideIdx, shapeIdx, row, col, text)` | `string` | テーブルセルのテキストを設定。再描画 SVG を返す。 |
+| `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | `string` | 行の追加 / 削除。 |
+| `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | `string` | 列の追加 / 削除。 |
+
+すべて undo 可能。結合セルは span 調整しない（v1）。詳細は [docs/editing-guide.md](docs/editing-guide.md#table-editing)。
 
 **ノート・コメント:**
 

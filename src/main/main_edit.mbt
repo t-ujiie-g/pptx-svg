@@ -5,26 +5,33 @@
 //   - delete_shape, add_shape, add_shape_text, duplicate_shape
 //   - update_shape_gradient_fill, update_shape_stroke
 //   - Text editing (E2.5): add/delete paragraph/run, style/font/color/align/decoration
+//   - History support (E6.1): restore_slide_ooxml
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 ///|
-/// Resolve a composite shape index (used by group children: parent*1000+child)
-/// to the containing array and the local index within it.
+/// Composite shape-index radix: a group child is addressed as
+/// `parent_composite * group_index_base + child_local` (so up to 999 children per
+/// level). Top-level shapes use indices `0..group_index_base-1`.
+let group_index_base : Int = 1000
+
+///|
+/// Resolve a composite shape index (used by group children) to the containing
+/// array and the local index within it (see `group_index_base`).
 /// Returns (shapes_array, local_index) or None if out of range.
 fn resolve_shape_location(
   slide : @ooxml.SlideData,
   composite_idx : Int,
 ) -> (Array[@ooxml.Shape], Int)? {
-  if composite_idx < 1000 {
+  if composite_idx < group_index_base {
     if composite_idx >= 0 && composite_idx < slide.shapes.length() {
       Some((slide.shapes, composite_idx))
     } else {
       None
     }
   } else {
-    let parent_composite = composite_idx / 1000
-    let child_local = composite_idx % 1000
+    let parent_composite = composite_idx / group_index_base
+    let child_local = composite_idx % group_index_base
     match resolve_shape_location(slide, parent_composite) {
       Some((parent_arr, parent_local)) =>
         match parent_arr[parent_local].kind {
@@ -312,6 +319,71 @@ pub fn update_shape_transform(
 }
 
 ///|
+/// Update several shapes' transforms atomically in a single call (E6.4).
+///
+/// `items_data` is `"shapeIdx,x,y,cx,cy,rot;..."` (all EMU; rot in 1/60000 deg).
+/// Every shape index is resolved and validated *before* any change is applied, so
+/// a bad index leaves the slide untouched (no partial application). Intended for
+/// multi-select move/align as one undo step. Returns "OK:<count>" or "ERROR:...".
+pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  ensure_slide_parsed(slide_idx)
+  let slide = g_slides.val[slide_idx]
+  // Pass 1: parse + validate every item, collecting (array, local_idx, transform).
+  let targets : Array[(Array[@ooxml.Shape], Int, @ooxml.ShapeTransform)] = []
+  let parts = split_string(items_data, ';')
+  let np = parts.length()
+  let mut i = 0
+  while i < np {
+    let part = parts[i]
+    i = i + 1
+    if part.is_empty() {
+      continue
+    }
+    let vals = split_string(part, ',')
+    if vals.length() < 6 {
+      return "ERROR:invalid transform item: " + part
+    }
+    let s_idx = @xml.parse_int(vals[0])
+    match resolve_shape_location(slide, s_idx) {
+      None => return "ERROR:shape index out of range: " + vals[0]
+      Some((arr, local_idx)) => {
+        let cur = arr[local_idx]
+        let t : @ooxml.ShapeTransform = {
+          x: @xml.parse_int(vals[1]),
+          y: @xml.parse_int(vals[2]),
+          cx: @xml.parse_int(vals[3]),
+          cy: @xml.parse_int(vals[4]),
+          rot: @xml.parse_int(vals[5]),
+          flip_h: cur.transform.flip_h,
+          flip_v: cur.transform.flip_v,
+        }
+        targets.push((arr, local_idx, t))
+      }
+    }
+  }
+  if targets.is_empty() {
+    return "ERROR:no transform items"
+  }
+  // Pass 2: apply (transform edits never change indices, so this is safe).
+  let nt = targets.length()
+  let mut j = 0
+  while j < nt {
+    let (arr, local_idx, t) = targets[j]
+    arr[local_idx] = { ..arr[local_idx], transform: t }
+    j = j + 1
+  }
+  g_modified.val[slide_idx] = true
+  "OK:" + int_to_str(nt)
+}
+
+///|
 /// Update a text run's content and return the shape's re-rendered SVG.
 pub fn update_shape_text(
   slide_idx : Int,
@@ -562,11 +634,11 @@ pub fn duplicate_shape(
       },
     }
     arr.push(dup)
-    let new_idx = if shape_idx < 1000 {
+    let new_idx = if shape_idx < group_index_base {
       g_slides.val[slide_idx].shapes.length() - 1
     } else {
-      let parent_composite = shape_idx / 1000
-      parent_composite * 1000 + (arr.length() - 1)
+      let parent_composite = shape_idx / group_index_base
+      parent_composite * group_index_base + (arr.length() - 1)
     }
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(new_idx)
@@ -897,4 +969,222 @@ pub fn update_text_run_decoration(
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
+}
+
+// ── History support (E6.1) ───────────────────────────────────────────────────
+
+///|
+/// Restore a slide's SlideData from a previously serialized OOXML slide XML.
+///
+/// Used by the TypeScript-layer Undo/Redo history (DocSnapshot): the history
+/// captures each modified slide's OOXML via `get_slide_ooxml`, and restoring a
+/// snapshot re-parses that XML back into `g_slides` here. Mirrors
+/// `update_slide_from_svg` (sets the cache directly, marks modified), but takes
+/// OOXML slide XML instead of SVG.
+///
+/// Runs the same full parse + resolve pipeline as `render_slide_svg`
+/// (`resolve_slide_data`): effective theme, chart shapes, placeholder
+/// inheritance, auto-content, background inheritance, and text-style defaults.
+/// Those steps are idempotent on already-serialized slide XML (they only fill
+/// missing values; auto-content only injects into empty placeholders), so the
+/// restored slide is visually identical to the live-edited one — Undo/Redo keeps
+/// full fidelity.
+///
+/// Returns "OK" or "ERROR:<message>".
+pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  if xml.is_empty() {
+    return "ERROR:empty xml"
+  }
+  let slide_num = slide_idx + 1
+  // Resolve the slide's .rels + layout/master/theme (mirror render_slide_svg).
+  let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
+  let rels_xml = @ffi.ffi_get_file(rels_path)
+  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
+  let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
+    g_slide_layout_paths.val[slide_idx]
+  } else {
+    ""
+  }
+  let layout_opt = if !layout_path.is_empty() {
+    get_layout(layout_path)
+  } else {
+    None
+  }
+  let master_path = if !layout_path.is_empty() {
+    find_master_for_layout(layout_path)
+  } else {
+    ""
+  }
+  let master_opt = if !master_path.is_empty() {
+    get_master(master_path)
+  } else {
+    None
+  }
+  let base_theme = if !master_path.is_empty() {
+    get_master_theme(master_path)
+  } else {
+    g_theme.val
+  }
+  let slide_data = resolve_slide_data(
+    slide_num, xml, rels, layout_opt, master_opt, layout_path, master_path, base_theme,
+  )
+  g_slides.val[slide_idx] = slide_data
+  g_modified.val[slide_idx] = true
+  g_parsed.val[slide_idx] = true
+  "OK"
+}
+
+// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
+// z-order = position in the containing shape array: `render_slide_svg` and
+// `serialize_slide` both emit shapes in array order, so document order = paint
+// order — the LAST element is front-most, the FIRST is back-most. Reordering
+// happens within the shape's containing array (slide.shapes, or a group's
+// children), and the new composite index is returned so the caller can re-select.
+
+///|
+/// Insert `item` at `idx`, shifting later elements right (in-place).
+fn[T] array_insert_at(arr : Array[T], idx : Int, item : T) -> Unit {
+  arr.push(item)
+  let mut i = arr.length() - 1
+  while i > idx {
+    arr[i] = arr[i - 1]
+    i = i - 1
+  }
+  arr[idx] = item
+}
+
+///|
+/// Composite index for a sibling at `local_idx` within the same container as `shape_idx`.
+fn sibling_composite_idx(shape_idx : Int, local_idx : Int) -> Int {
+  let base = if shape_idx < group_index_base {
+    0
+  } else {
+    shape_idx / group_index_base * group_index_base
+  }
+  base + local_idx
+}
+
+///|
+/// Move a shape to the front (top of the z-order = end of the array).
+/// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
+pub fn bring_to_front(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let sh = arr[local_idx]
+    array_remove_at(arr, local_idx)
+    arr.push(sh)
+    g_modified.val[slide_idx] = true
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, arr.length() - 1))
+  })
+}
+
+///|
+/// Move a shape to the back (bottom of the z-order = start of the array).
+/// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
+pub fn send_to_back(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let sh = arr[local_idx]
+    array_remove_at(arr, local_idx)
+    array_insert_at(arr, 0, sh)
+    g_modified.val[slide_idx] = true
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, 0))
+  })
+}
+
+///|
+/// Move a shape one step toward the front (swap with the next sibling).
+/// No-op if already front-most. Returns "OK:<new_composite_idx>".
+pub fn bring_forward(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let new_local = if local_idx < arr.length() - 1 {
+      let sh = arr[local_idx]
+      arr[local_idx] = arr[local_idx + 1]
+      arr[local_idx + 1] = sh
+      g_modified.val[slide_idx] = true
+      local_idx + 1
+    } else {
+      local_idx
+    }
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, new_local))
+  })
+}
+
+///|
+/// Move a shape one step toward the back (swap with the previous sibling).
+/// No-op if already back-most. Returns "OK:<new_composite_idx>".
+pub fn send_backward(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let new_local = if local_idx > 0 {
+      let sh = arr[local_idx]
+      arr[local_idx] = arr[local_idx - 1]
+      arr[local_idx - 1] = sh
+      g_modified.val[slide_idx] = true
+      local_idx - 1
+    } else {
+      local_idx
+    }
+    "OK:" + int_to_str(sibling_composite_idx(shape_idx, new_local))
+  })
+}
+
+// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
+// The shape's OOXML is the portable form. The TS layer extracts media/rels by
+// scanning the XML's rIds (see getShapeSpec), re-links them on paste, then calls
+// add_shape_from_ooxml on the target slide.
+
+///|
+/// Serialize a single shape to its OOXML fragment (for copy). Returns the XML, or
+/// "ERROR:<message>" (e.g. charts, which are preserved out-of-band, serialize to "").
+pub fn get_shape_ooxml(slide_idx : Int, shape_idx : Int) -> String {
+  with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    let xml = @serializer.serialize_shape(arr[local_idx])
+    if xml.is_empty() {
+      "ERROR:shape not serializable"
+    } else {
+      xml
+    }
+  })
+}
+
+///|
+/// Parse a shape OOXML fragment and append it to a slide, offset by (dx, dy) EMU
+/// (for paste). rIds in `shape_xml` must already point at the target slide's rels.
+/// Returns "OK:<shape_index>" or "ERROR:<message>".
+pub fn add_shape_from_ooxml(
+  slide_idx : Int,
+  shape_xml : String,
+  dx_emu : Int,
+  dy_emu : Int,
+) -> String {
+  let n = g_slide_count.val
+  if n == 0 {
+    return "ERROR:not initialized"
+  }
+  if slide_idx < 0 || slide_idx >= n {
+    return "ERROR:slide index out of range"
+  }
+  ensure_slide_parsed(slide_idx)
+  let shapes = @ooxml.parse_shapes_xml(shape_xml, g_theme.val)
+  if shapes.is_empty() {
+    return "ERROR:no shape parsed from spec"
+  }
+  let src = shapes[0]
+  let pasted = {
+    ..src,
+    transform: {
+      ..src.transform,
+      x: src.transform.x + dx_emu,
+      y: src.transform.y + dy_emu,
+    },
+  }
+  let slide = g_slides.val[slide_idx]
+  slide.shapes.push(pasted)
+  g_modified.val[slide_idx] = true
+  "OK:" + int_to_str(slide.shapes.length() - 1)
 }
