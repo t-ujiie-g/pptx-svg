@@ -1,26 +1,13 @@
 /**
- * EditToolbar — Shape editing controls (fill, stroke, actions)
- * TextPanel — Full text editing with paragraph management and run formatting
+ * TextPanel — full text editing for the selected shape: per-paragraph alignment
+ * and per-run text/bold/italic/underline/strike/super-sub/size/colour/font, plus
+ * add/delete paragraph & run. Rendered inside the PropertiesPanel "Text" section.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import type { ParagraphInfo, TextRun } from '../utils/svg';
 
 // ── Styles ──
-
-const toolbarStyle: React.CSSProperties = {
-  display: 'flex', gap: 6, alignItems: 'center',
-  padding: '8px 10px', background: '#f8f9fb', border: '1px solid #dde3ea',
-  borderRadius: 6, flexWrap: 'wrap', fontSize: 12,
-};
-
-const sepStyle: React.CSSProperties = {
-  width: 1, height: 20, background: '#dde3ea', margin: '0 2px',
-};
-
-const labelStyle: React.CSSProperties = {
-  fontWeight: 600, color: '#555', whiteSpace: 'nowrap', fontSize: 11,
-};
 
 const btnStyle: React.CSSProperties = {
   padding: '3px 8px', border: '1px solid #ccc', borderRadius: 4,
@@ -40,60 +27,6 @@ const selectStyle: React.CSSProperties = {
   padding: '2px 4px', border: '1px solid #ccc', borderRadius: 3,
   background: '#fff', fontSize: 11, cursor: 'pointer',
 };
-
-// ── ShapeToolbar (fill, stroke, duplicate, delete) ──
-
-interface ShapeToolbarProps {
-  shapeLabel: string;
-  fillHex: string;
-  onApplyFill: (hex: string) => void;
-  onApplyStroke: (hex: string, dash: string) => void;
-  onRemoveStroke: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}
-
-export function ShapeToolbar({
-  shapeLabel, fillHex,
-  onApplyFill, onApplyStroke, onRemoveStroke,
-  onDuplicate, onDelete,
-}: ShapeToolbarProps) {
-  const [fill, setFill] = useState(fillHex ? '#' + fillHex : '#4a90d9');
-  const [strokeColor, setStrokeColor] = useState('#000000');
-  const [strokeDash, setStrokeDash] = useState('');
-
-  useEffect(() => { if (fillHex) setFill('#' + fillHex); }, [fillHex]);
-
-  return (
-    <div style={toolbarStyle}>
-      <span style={labelStyle}>Fill</span>
-      <input type="color" value={fill} onChange={e => setFill(e.target.value)} style={colorInputStyle} />
-      <button style={btnStyle} onClick={() => onApplyFill(fill)}>Apply</button>
-
-      <span style={sepStyle} />
-
-      <span style={labelStyle}>Stroke</span>
-      <input type="color" value={strokeColor} onChange={e => setStrokeColor(e.target.value)} style={colorInputStyle} />
-      <select value={strokeDash} onChange={e => setStrokeDash(e.target.value)} style={selectStyle}>
-        <option value="">Solid</option>
-        <option value="dash">Dash</option>
-        <option value="dot">Dot</option>
-        <option value="dashDot">Dash-Dot</option>
-        <option value="lgDash">Long Dash</option>
-      </select>
-      <button style={btnStyle} onClick={() => onApplyStroke(strokeColor, strokeDash)}>Apply</button>
-      <button style={btnStyle} onClick={onRemoveStroke}>None</button>
-
-      <span style={sepStyle} />
-
-      <button style={btnStyle} onClick={onDuplicate}>Duplicate</button>
-      <button style={dangerBtnStyle} onClick={onDelete}>Delete</button>
-
-      <span style={sepStyle} />
-      <span style={{ color: '#888', fontSize: 11 }}>{shapeLabel}</span>
-    </div>
-  );
-}
 
 // ── TextPanel ──
 
