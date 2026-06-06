@@ -15,5 +15,11 @@ export const DEFAULT_STROKE_WIDTH = 12700;
 /** Default font size for addShapeText (18pt in hundredths). */
 export const DEFAULT_FONT_SIZE = 1800;
 
-/** Fixed width of the editing sidebar (px). */
-export const SIDEBAR_WIDTH = 400;
+/** Fill colour for newly inserted shapes (accent blue, RGB). */
+export const ACCENT_RGB: [number, number, number] = [74, 144, 217];
+
+/** Default text / line colour for new content (near-black, RGB). */
+export const INK_RGB: [number, number, number] = [34, 34, 34];
+
+/** Offset applied to a pasted shape so it doesn't cover the original (0.25in EMU). */
+export const PASTE_OFFSET = 228600;

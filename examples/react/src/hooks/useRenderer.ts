@@ -1,225 +1,222 @@
 /**
- * useRenderer — manages PptxRenderer lifecycle and all editing APIs.
+ * useRenderer — manages PptxRenderer lifecycle and all editing APIs (pptx-svg 0.6.0).
  *
- * Encapsulates all Wasm interaction so components only deal with
- * slide index, SVG strings, and high-level edit operations.
+ * Thin wrappers over every editing export so components deal only in
+ * slide/shape indices, EMU values, and result strings. Also tracks undo/redo
+ * availability so the UI can reflect it.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PptxRenderer } from 'pptx-svg';
+import type { ShapeSpec, TextLayout, TextHit, HistoryResult } from 'pptx-svg';
+
+export type { ShapeSpec, TextLayout, TextHit, HistoryResult };
+
+export interface HistoryState {
+  canUndo: boolean;
+  canRedo: boolean;
+}
 
 export function useRenderer() {
-  const rendererRef = useRef<PptxRenderer | null>(null);
-  const [status, setStatus] = useState('Loading WebAssembly module...');
+  const ref = useRef<PptxRenderer | null>(null);
+  const [status, setStatus] = useState('Loading WebAssembly module…');
   const [slide, setSlide] = useState(0);
   const [total, setTotal] = useState(0);
+  const [history, setHistory] = useState<HistoryState>({ canUndo: false, canRedo: false });
+
+  const r = () => ref.current;
 
   // ── Init ──
   useEffect(() => {
-    const renderer = new PptxRenderer();
-    rendererRef.current = renderer;
+    const renderer = new PptxRenderer({ logLevel: 'error', maxHistory: 100 });
+    ref.current = renderer;
     renderer.init()
-      .then(() => setStatus('Ready. Drop a .pptx file.'))
+      .then(() => setStatus('Ready — open a .pptx file to start editing.'))
       .catch(err => setStatus(`Init failed: ${err.message}`));
   }, []);
 
-  // ── Load PPTX ──
-  const loadFile = useCallback(async (file: File) => {
-    const renderer = rendererRef.current;
+  /** Refresh undo/redo availability into state (call after any mutation). */
+  const syncHistory = useCallback(() => {
+    const renderer = ref.current;
     if (!renderer) return;
-    setStatus(`Loading ${file.name}...`);
+    setHistory({ canUndo: renderer.canUndo(), canRedo: renderer.canRedo() });
+  }, []);
+
+  // ── Load ──
+  const loadFile = useCallback(async (file: File) => {
+    const renderer = ref.current;
+    if (!renderer) return;
+    setStatus(`Loading ${file.name}…`);
     try {
       const { slideCount } = await renderer.loadPptx(await file.arrayBuffer());
       setTotal(slideCount);
       setSlide(0);
-      setStatus(`Loaded "${file.name}" - ${slideCount} slide(s)`);
+      setHistory({ canUndo: false, canRedo: false });
+      setStatus(`Loaded “${file.name}” — ${slideCount} slide(s)`);
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);
     }
   }, []);
 
-  // ── Render SVG ──
-  const renderSlide = useCallback((idx: number): string => {
-    return rendererRef.current?.renderSlideSvg(idx) ?? 'ERROR: renderer not initialized';
-  }, []);
+  const renderSlide = useCallback((idx: number): string =>
+    r()?.renderSlideSvg(idx) ?? 'ERROR:renderer not initialized', []);
+
+  const getSlideOoxml = useCallback((idx: number): string =>
+    r()?.getSlideOoxml(idx) ?? 'ERROR:no renderer', []);
+
+  // ── History (E6.1) ──
+  const undo = useCallback((): string => r()?.undo() ?? 'ERROR:no renderer', []);
+  const redo = useCallback((): string => r()?.redo() ?? 'ERROR:no renderer', []);
+  const beginBatch = useCallback(() => r()?.beginBatch(), []);
+  const endBatch = useCallback(() => r()?.endBatch(), []);
 
   // ── Shape transform ──
-  const updateTransform = useCallback((slideIdx: number, shapeIdx: number,
-    x: number, y: number, cx: number, cy: number, rot: number): string => {
-    return rendererRef.current?.updateShapeTransform(slideIdx, shapeIdx, x, y, cx, cy, rot) ?? 'ERROR: no renderer';
-  }, []);
+  const updateTransform = useCallback((s: number, i: number, x: number, y: number, cx: number, cy: number, rot: number): string =>
+    r()?.updateShapeTransform(s, i, x, y, cx, cy, rot) ?? 'ERROR:no renderer', []);
 
-  // ── Text content ──
-  const updateText = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, ri: number, text: string): string => {
-    return rendererRef.current?.updateShapeText(slideIdx, shapeIdx, pi, ri, text) ?? 'ERROR: no renderer';
-  }, []);
+  const updateShapesTransform = useCallback((s: number,
+    items: Array<{ shapeIdx: number; x: number; y: number; cx: number; cy: number; rot: number }>): string =>
+    r()?.updateShapesTransform(s, items) ?? 'ERROR:no renderer', []);
 
-  // ── Fill ──
-  const updateFill = useCallback((slideIdx: number, shapeIdx: number,
-    r: number, g: number, b: number): string => {
-    return rendererRef.current?.updateShapeFill(slideIdx, shapeIdx, r, g, b) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Fill / stroke ──
+  const updateFill = useCallback((s: number, i: number, red: number, g: number, b: number): string =>
+    r()?.updateShapeFill(s, i, red, g, b) ?? 'ERROR:no renderer', []);
 
-  // ── Stroke ──
-  const updateStroke = useCallback((slideIdx: number, shapeIdx: number,
-    r: number, g: number, b: number, widthEmu?: number, dash?: string): string => {
-    return rendererRef.current?.updateShapeStroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash) ?? 'ERROR: no renderer';
-  }, []);
+  const updateGradientFill = useCallback((s: number, i: number, angle: number,
+    stops: Array<{ pos: number; r: number; g: number; b: number }>): string =>
+    r()?.updateShapeGradientFill(s, i, angle, stops) ?? 'ERROR:no renderer', []);
 
-  // ── Delete shape ──
-  const deleteShape = useCallback((slideIdx: number, shapeIdx: number): string => {
-    return rendererRef.current?.deleteShape(slideIdx, shapeIdx) ?? 'ERROR: no renderer';
-  }, []);
+  const updateStroke = useCallback((s: number, i: number, red: number, g: number, b: number, w?: number, dash?: string): string =>
+    r()?.updateShapeStroke(s, i, red, g, b, w, dash) ?? 'ERROR:no renderer', []);
 
-  // ── Add shape ──
-  const addShape = useCallback((slideIdx: number, geomType: string,
-    x: number, y: number, cx: number, cy: number,
-    fillR?: number, fillG?: number, fillB?: number): string => {
-    return rendererRef.current?.addShape(slideIdx, geomType, x, y, cx, cy, fillR, fillG, fillB) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Shape CRUD ──
+  const deleteShape = useCallback((s: number, i: number): string => r()?.deleteShape(s, i) ?? 'ERROR:no renderer', []);
+  const addShape = useCallback((s: number, geom: string, x: number, y: number, cx: number, cy: number, red?: number, g?: number, b?: number): string =>
+    r()?.addShape(s, geom, x, y, cx, cy, red, g, b) ?? 'ERROR:no renderer', []);
+  const duplicateShape = useCallback((s: number, i: number, dx?: number, dy?: number): string =>
+    r()?.duplicateShape(s, i, dx, dy) ?? 'ERROR:no renderer', []);
 
-  // ── Add text to shape ──
-  const addShapeText = useCallback((slideIdx: number, shapeIdx: number, text: string,
-    fontSize?: number, colorR?: number, colorG?: number, colorB?: number): string => {
-    return rendererRef.current?.addShapeText(slideIdx, shapeIdx, text, fontSize, colorR, colorG, colorB) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Z-order (E6.3) ──
+  const bringToFront = useCallback((s: number, i: number): string => r()?.bringToFront(s, i) ?? 'ERROR:no renderer', []);
+  const sendToBack = useCallback((s: number, i: number): string => r()?.sendToBack(s, i) ?? 'ERROR:no renderer', []);
+  const bringForward = useCallback((s: number, i: number): string => r()?.bringForward(s, i) ?? 'ERROR:no renderer', []);
+  const sendBackward = useCallback((s: number, i: number): string => r()?.sendBackward(s, i) ?? 'ERROR:no renderer', []);
 
-  // ── Duplicate shape ──
-  const duplicateShape = useCallback((slideIdx: number, shapeIdx: number,
-    dxEmu?: number, dyEmu?: number): string => {
-    return rendererRef.current?.duplicateShape(slideIdx, shapeIdx, dxEmu, dyEmu) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Copy / paste (E6.5) ──
+  const getShapeSpec = useCallback((s: number, i: number): string => r()?.getShapeSpec(s, i) ?? 'ERROR:no renderer', []);
+  const insertShapeSpec = useCallback((s: number, spec: string, dx?: number, dy?: number): string =>
+    r()?.insertShapeSpec(s, spec, dx, dy) ?? 'ERROR:no renderer', []);
 
-  // ── Text run formatting ──
-  const updateTextRunStyle = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, ri: number, bold: number, italic: number): string => {
-    return rendererRef.current?.updateTextRunStyle(slideIdx, shapeIdx, pi, ri, bold, italic) ?? 'ERROR: no renderer';
+  // ── Inline text geometry (E6.2) ──
+  const getTextLayout = useCallback((s: number, i: number): TextLayout | null => {
+    const raw = r()?.getTextLayout(s, i);
+    if (!raw || raw.startsWith('ERROR')) return null;
+    try { return JSON.parse(raw) as TextLayout; } catch { return null; }
   }, []);
+  const hitTestText = useCallback((s: number, i: number, x: number, y: number): TextHit | null => {
+    const raw = r()?.hitTestText(s, i, x, y);
+    if (!raw || raw.startsWith('ERROR')) return null;
+    try { return JSON.parse(raw) as TextHit; } catch { return null; }
+  }, []);
+  const replaceTextRange = useCallback((s: number, i: number, sp: number, sc: number, ep: number, ec: number, text: string): string =>
+    r()?.replaceTextRange(s, i, sp, sc, ep, ec, text) ?? 'ERROR:no renderer', []);
 
-  const updateTextRunFontSize = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, ri: number, fontSize: number): string => {
-    return rendererRef.current?.updateTextRunFontSize(slideIdx, shapeIdx, pi, ri, fontSize) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Text run / paragraph formatting ──
+  const addShapeText = useCallback((s: number, i: number, text: string, size?: number, red?: number, g?: number, b?: number): string =>
+    r()?.addShapeText(s, i, text, size, red, g, b) ?? 'ERROR:no renderer', []);
+  const updateText = useCallback((s: number, i: number, p: number, ri: number, text: string): string =>
+    r()?.updateShapeText(s, i, p, ri, text) ?? 'ERROR:no renderer', []);
+  const updateTextRunStyle = useCallback((s: number, i: number, p: number, ri: number, bold: number, italic: number): string =>
+    r()?.updateTextRunStyle(s, i, p, ri, bold, italic) ?? 'ERROR:no renderer', []);
+  const updateTextRunFontSize = useCallback((s: number, i: number, p: number, ri: number, size: number): string =>
+    r()?.updateTextRunFontSize(s, i, p, ri, size) ?? 'ERROR:no renderer', []);
+  const updateTextRunColor = useCallback((s: number, i: number, p: number, ri: number, red: number, g: number, b: number): string =>
+    r()?.updateTextRunColor(s, i, p, ri, red, g, b) ?? 'ERROR:no renderer', []);
+  const updateTextRunFont = useCallback((s: number, i: number, p: number, ri: number, font: string, ea?: string, cs?: string): string =>
+    r()?.updateTextRunFont(s, i, p, ri, font, ea, cs) ?? 'ERROR:no renderer', []);
+  const updateTextRunDecoration = useCallback((s: number, i: number, p: number, ri: number, ul: string, st: string, bl: number): string =>
+    r()?.updateTextRunDecoration(s, i, p, ri, ul, st, bl) ?? 'ERROR:no renderer', []);
+  const updateParagraphAlign = useCallback((s: number, i: number, p: number, align: string): string =>
+    r()?.updateParagraphAlign(s, i, p, align) ?? 'ERROR:no renderer', []);
+  const addParagraph = useCallback((s: number, i: number, text: string, align?: string): string =>
+    r()?.addParagraph(s, i, text, align) ?? 'ERROR:no renderer', []);
+  const deleteParagraph = useCallback((s: number, i: number, p: number): string =>
+    r()?.deleteParagraph(s, i, p) ?? 'ERROR:no renderer', []);
+  const addRun = useCallback((s: number, i: number, p: number, text: string): string =>
+    r()?.addRun(s, i, p, text) ?? 'ERROR:no renderer', []);
+  const deleteRun = useCallback((s: number, i: number, p: number, ri: number): string =>
+    r()?.deleteRun(s, i, p, ri) ?? 'ERROR:no renderer', []);
 
-  const updateTextRunColor = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, ri: number, r: number, g: number, b: number): string => {
-    return rendererRef.current?.updateTextRunColor(slideIdx, shapeIdx, pi, ri, r, g, b) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Table editing (E6.6) ──
+  const updateTableCellText = useCallback((s: number, i: number, row: number, col: number, text: string): string =>
+    r()?.updateTableCellText(s, i, row, col, text) ?? 'ERROR:no renderer', []);
+  const addTableRow = useCallback((s: number, i: number, after?: number): string => r()?.addTableRow(s, i, after) ?? 'ERROR:no renderer', []);
+  const deleteTableRow = useCallback((s: number, i: number, row: number): string => r()?.deleteTableRow(s, i, row) ?? 'ERROR:no renderer', []);
+  const addTableColumn = useCallback((s: number, i: number, after?: number, w?: number): string => r()?.addTableColumn(s, i, after, w) ?? 'ERROR:no renderer', []);
+  const deleteTableColumn = useCallback((s: number, i: number, col: number): string => r()?.deleteTableColumn(s, i, col) ?? 'ERROR:no renderer', []);
 
-  const updateTextRunFont = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, ri: number, fontFace: string, eaFont?: string, csFont?: string): string => {
-    return rendererRef.current?.updateTextRunFont(slideIdx, shapeIdx, pi, ri, fontFace, eaFont, csFont) ?? 'ERROR: no renderer';
-  }, []);
-
-  const updateTextRunDecoration = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, ri: number, underline: string, strike: string, baseline: number): string => {
-    return rendererRef.current?.updateTextRunDecoration(slideIdx, shapeIdx, pi, ri, underline, strike, baseline) ?? 'ERROR: no renderer';
-  }, []);
-
-  const updateParagraphAlign = useCallback((slideIdx: number, shapeIdx: number,
-    pi: number, align: string): string => {
-    return rendererRef.current?.updateParagraphAlign(slideIdx, shapeIdx, pi, align) ?? 'ERROR: no renderer';
-  }, []);
-
-  // ── Paragraph/run CRUD ──
-  const addParagraph = useCallback((slideIdx: number, shapeIdx: number,
-    text: string, align?: string): string => {
-    return rendererRef.current?.addParagraph(slideIdx, shapeIdx, text, align) ?? 'ERROR: no renderer';
-  }, []);
-
-  const deleteParagraph = useCallback((slideIdx: number, shapeIdx: number, pi: number): string => {
-    return rendererRef.current?.deleteParagraph(slideIdx, shapeIdx, pi) ?? 'ERROR: no renderer';
-  }, []);
-
-  const addRun = useCallback((slideIdx: number, shapeIdx: number, pi: number, text: string): string => {
-    return rendererRef.current?.addRun(slideIdx, shapeIdx, pi, text) ?? 'ERROR: no renderer';
-  }, []);
-
-  const deleteRun = useCallback((slideIdx: number, shapeIdx: number, pi: number, ri: number): string => {
-    return rendererRef.current?.deleteRun(slideIdx, shapeIdx, pi, ri) ?? 'ERROR: no renderer';
-  }, []);
-
-  // ── Image operations ──
-  const addImage = useCallback(async (slideIdx: number, data: Uint8Array, mime: string,
-    x: number, y: number, cx: number, cy: number): Promise<string> => {
-    const r = rendererRef.current;
-    if (!r) return 'ERROR: no renderer';
-    return r.addImage(slideIdx, data, mime, x, y, cx, cy);
-  }, []);
-
-  const replaceImage = useCallback(async (slideIdx: number, shapeIdx: number,
-    data: Uint8Array, mime: string): Promise<string> => {
-    const r = rendererRef.current;
-    if (!r) return 'ERROR: no renderer';
-    return r.replaceImage(slideIdx, shapeIdx, data, mime);
-  }, []);
-
-  const deleteImage = useCallback((slideIdx: number, shapeIdx: number): string => {
-    return rendererRef.current?.deleteImage(slideIdx, shapeIdx) ?? 'ERROR: no renderer';
-  }, []);
+  // ── Image ──
+  const addImage = useCallback(async (s: number, data: Uint8Array, mime: string, x: number, y: number, cx: number, cy: number): Promise<string> =>
+    r()?.addImage(s, data, mime, x, y, cx, cy) ?? 'ERROR:no renderer', []);
+  const replaceImage = useCallback(async (s: number, i: number, data: Uint8Array, mime: string): Promise<string> =>
+    r()?.replaceImage(s, i, data, mime) ?? 'ERROR:no renderer', []);
+  const deleteImage = useCallback((s: number, i: number): string => r()?.deleteImage(s, i) ?? 'ERROR:no renderer', []);
 
   // ── Slide management ──
-  const addSlide = useCallback(async (afterIdx?: number, sourceSlideIdx?: number) => {
-    const r = rendererRef.current;
-    if (!r) throw new Error('no renderer');
-    const result = await r.addSlide(afterIdx, sourceSlideIdx);
-    setTotal(result.slideCount);
-    return result;
-  }, []);
-
-  const deleteSlide = useCallback(async (slideIdx: number) => {
-    const r = rendererRef.current;
-    if (!r) throw new Error('no renderer');
-    const result = await r.deleteSlide(slideIdx);
-    setTotal(result.slideCount);
-    return result;
-  }, []);
-
-  const reorderSlides = useCallback(async (newOrder: number[]) => {
-    const r = rendererRef.current;
-    if (!r) throw new Error('no renderer');
-    const result = await r.reorderSlides(newOrder);
-    return result;
-  }, []);
+  const addSlide = useCallback(async (after?: number, source?: number) => {
+    const renderer = ref.current; if (!renderer) throw new Error('no renderer');
+    const res = await renderer.addSlide(after, source);
+    setTotal(res.slideCount); syncHistory();
+    return res;
+  }, [syncHistory]);
+  const deleteSlide = useCallback(async (idx: number) => {
+    const renderer = ref.current; if (!renderer) throw new Error('no renderer');
+    const res = await renderer.deleteSlide(idx);
+    setTotal(res.slideCount); syncHistory();
+    return res;
+  }, [syncHistory]);
+  const reorderSlides = useCallback(async (order: number[]) => {
+    const renderer = ref.current; if (!renderer) throw new Error('no renderer');
+    const res = await renderer.reorderSlides(order); syncHistory();
+    return res;
+  }, [syncHistory]);
 
   // ── Export ──
   const exportPptx = useCallback(async () => {
-    const renderer = rendererRef.current;
-    if (!renderer) throw new Error('renderer not initialized');
-    setStatus('Exporting...');
+    const renderer = ref.current; if (!renderer) throw new Error('no renderer');
+    setStatus('Exporting…');
     try {
       const buffer = await renderer.exportPptx();
-      const blob = new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      });
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'exported.pptx';
+      a.download = 'edited.pptx';
       a.click();
       URL.revokeObjectURL(a.href);
-      setStatus('Exported!');
+      setStatus('Exported edited.pptx');
     } catch (err) {
       setStatus(`Export error: ${(err as Error).message}`);
     }
   }, []);
 
   return {
-    status, setStatus,
-    slide, setSlide, total,
-    loadFile, renderSlide,
-    // Shape editing
-    updateTransform, updateText, updateFill, updateStroke,
-    deleteShape, addShape, addShapeText, duplicateShape,
-    // Text formatting
-    updateTextRunStyle, updateTextRunFontSize, updateTextRunColor,
+    status, setStatus, slide, setSlide, total, setTotal, history, syncHistory,
+    loadFile, renderSlide, getSlideOoxml,
+    undo, redo, beginBatch, endBatch,
+    updateTransform, updateShapesTransform,
+    updateFill, updateGradientFill, updateStroke,
+    deleteShape, addShape, duplicateShape,
+    bringToFront, sendToBack, bringForward, sendBackward,
+    getShapeSpec, insertShapeSpec,
+    getTextLayout, hitTestText, replaceTextRange,
+    addShapeText, updateText, updateTextRunStyle, updateTextRunFontSize, updateTextRunColor,
     updateTextRunFont, updateTextRunDecoration, updateParagraphAlign,
     addParagraph, deleteParagraph, addRun, deleteRun,
-    // Image
+    updateTableCellText, addTableRow, deleteTableRow, addTableColumn, deleteTableColumn,
     addImage, replaceImage, deleteImage,
-    // Slide management
     addSlide, deleteSlide, reorderSlides,
-    // Export
     exportPptx,
   };
 }
+
+export type RendererApi = ReturnType<typeof useRenderer>;
