@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
+
+Direct-manipulation editing release: completes the **E6 editing roadmap (P1–P6)** —
+Undo/Redo history, inline text editing, z-order, atomic multi-shape transform,
+cross-slide copy/paste, and table editing — plus an interactive browser demo
+(`web/editing.html`) exercising all of them.
 
 ### Features
 
