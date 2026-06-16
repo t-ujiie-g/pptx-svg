@@ -194,7 +194,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/ooxml/ooxml.mbt` | OOXML types (`SlideData`, `Shape`, etc.) + Color/HSL/modifier utilities |
 | `src/ooxml/ooxml_theme.mbt` | Theme parser + ColorMap + master/layout parsers |
 | `src/ooxml/ooxml_text.mbt` | Text body parsing (paragraphs, runs, bodyPr) |
-| `src/ooxml/ooxml_parse.mbt` | Shape/Slide/Fill parsing + rels + slide size |
+| `src/ooxml/ooxml_parse.mbt` | Shape/Slide/Fill parsing + rels + slide size + SmartArt cached-drawing parsing (`parse_diagram_drawing`/`parse_diagram_text_color`/`apply_diagram_text_color`) |
 | `src/ooxml/ooxml_chart.mbt` | ChartML parser (c:chartSpace → ChartData) |
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape rendering + public API |
 | `src/renderer/renderer_table.mbt` | Table SVG rendering (cell borders, merging, conditional formatting) |
@@ -207,7 +207,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
-| `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state |
+| `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state; post-parse resolution of charts (`resolve_chart_shapes`) and SmartArt diagrams (`resolve_diagram_shapes`) |
 | `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes); history (`restore_slide_ooxml`, E6.1); z-order (E6.3); multi-transform (E6.4); copy/paste (E6.5). Shared helpers: `with_shape`/`with_run`, `make_default_run`/`paragraph`, `array_remove_at`/`array_insert_at` |
 | `src/main/main_text_edit.mbt` | Inline text editing exports (E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range` + `split_para_runs` |
 | `src/main/main_table_edit.mbt` | Table editing exports (E6.6): `update_table_cell_text`, `add_table_row`/`column`, `delete_table_row`/`column` + `with_table` |

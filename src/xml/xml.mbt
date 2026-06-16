@@ -583,6 +583,33 @@ pub fn find_children(nodes : Array[XmlNode], tag : String) -> Array[XmlNode] {
 }
 
 ///|
+/// Find the first descendant Element (depth-first) whose tag equals `local` or
+/// ends with `":" + local`, i.e. matches the local name regardless of namespace
+/// prefix. Useful for elements whose prefix varies between producers (e.g.
+/// `dgm:relIds` vs `ext0:relIds`).
+pub fn find_descendant(nodes : Array[XmlNode], local_name : String) -> XmlNode? {
+  let suffix = ":" + local_name
+  let n = nodes.length()
+  let mut i = 0
+  while i < n {
+    match nodes[i] {
+      XmlNode::Element(t, _, _) => {
+        if t == local_name || str_ends_with(t, suffix) {
+          return Some(nodes[i])
+        }
+        match find_descendant(get_children(nodes[i]), local_name) {
+          Some(found) => return Some(found)
+          None => ()
+        }
+      }
+      _ => ()
+    }
+    i = i + 1
+  }
+  None
+}
+
+///|
 /// Get all Text content within a node (concatenates Text children).
 pub fn get_text_content(node : XmlNode) -> String {
   match node {
