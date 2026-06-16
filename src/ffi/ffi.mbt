@@ -40,6 +40,12 @@ pub fn ffi_warn(msg : String) -> Unit = "pptx_ffi" "warn"
 pub fn ffi_error(msg : String) -> Unit = "pptx_ffi" "error"
 
 ///|
+/// Get the current date as a locale-formatted short-date string (host's
+/// `new Date().toLocaleDateString()`). Used to fill auto-updating date
+/// placeholders (`<a:fld type="datetime1">`). Returns "" if unavailable.
+pub fn ffi_current_date() -> String = "pptx_ffi" "current_date"
+
+///|
 /// Math: sine (radians). Used by preset geometry guide formula evaluator.
 pub fn ffi_sin(x : Double) -> Double = "pptx_ffi" "math_sin"
 

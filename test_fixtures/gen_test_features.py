@@ -17,7 +17,7 @@ Slide categories:
   slides_07_charts        — 52-73 standard charts + 3D/trendline/errBars/composite/stacked
   slides_08_misc          — 74-88 notes, comments, SmartArt, OLE, media, OMML, transition, hidden, WMF, effects
   slides_09_chartex       — 89-94 ChartEx (patched by postprocess)
-  slides_10_regressions   — 96    regression fixtures (empty custGeom, fontRef text color)
+  slides_10_regressions   — 96-97 regression fixtures (empty custGeom, fontRef text color, hf field placeholders)
 """
 import os, sys
 

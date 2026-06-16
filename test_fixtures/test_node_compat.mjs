@@ -1577,6 +1577,29 @@ if (!existsSync(FEATURES_PATH)) {
   }
 }
 
+// ── Header/footer field placeholders (date / footer / slide number) ──────────
+// test_features.pptx slide 97 (index 96) carries dt/ftr/sldNum placeholders with
+// <a:fld> fields and a STALE cached slide number ("1"), mirroring sample.pptx s20.
+{
+  console.log('Test 63: header/footer field placeholders');
+  const renderer = new PptxRenderer({
+    logLevel: 'silent',
+    currentDate: '2026-06-15', // fixed string → locale-independent assertion
+  });
+  const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
+  await renderer.init(wasmBuf);
+  const buf = readFileSync(FEATURES_PATH);
+  await renderer.loadPptx(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  const svg = renderer.renderSlideSvg(96); // 0-based → slide 97
+  // Slide number reflects the actual index (97), not the cached "1".
+  assert(svg.includes('>97</tspan>'), 'slide number should render the actual index 97 (not cached 1)');
+  // Date field filled with the host-provided current date (verbatim string).
+  assert(svg.includes('2026-06-15'), 'date field should show the provided current date');
+  // Footer text preserved.
+  assert(svg.includes('moon-pptx'), 'footer text should render');
+  console.log('  OK: header/footer field placeholders');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

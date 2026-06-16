@@ -118,6 +118,7 @@ const renderer = new PptxRenderer(options?);
 | `measureText` | `(text, fontFace, fontSizePx) => number` | Canvas 2D | テキスト幅計測のカスタム関数。 |
 | `fontFallbacks` | `Record<string, string[]>` | (組み込み) | フォントフォールバックマッピング。組み込みデフォルトとマージされます。 |
 | `logLevel` | `'silent' \| 'error' \| 'warn' \| 'info' \| 'debug'` | `'error'` | コンソール出力の詳細度。 |
+| `currentDate` | `Date \| string \| () => Date \| string` | `toLocaleDateString()` | 自動更新の日付プレースホルダ（`<a:fld type="datetime1">`）に使う値。固定値を渡すと出力が決定的になります。 |
 
 **メソッド:**
 

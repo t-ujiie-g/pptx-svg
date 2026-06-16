@@ -4,7 +4,7 @@ import {
   loadFeatures, pptxExists, resetAssertions, finishAssertions,
 } from './_helpers.mjs';
 
-test("regressions (slide 96)", async () => {
+test("regressions (slides 96-97)", async () => {
   resetAssertions();
   if (!pptxExists('test_features.pptx')) {
     console.log('  SKIPPED: test_features.pptx not found');
@@ -51,6 +51,23 @@ test("regressions (slide 96)", async () => {
     assert('slide96 ValidCustGeom has fill 06A77D', slide96.includes('06A77D'));
     assert('slide96 ValidCustGeom has a:moveTo', hasTag(slide96, 'a:moveTo'));
     assert('slide96 ValidCustGeom has a:lnTo', hasTag(slide96, 'a:lnTo'));
+  }
+
+  // ── Slide 97: header/footer field placeholders (date / footer / slide num) ──
+  {
+    console.log('\n── test_features.pptx — Slide 97: header/footer fields ──');
+    const slide97 = textFiles.get('ppt/slides/slide97.xml');
+    assert('slide97 exists', !!slide97);
+    if (slide97) {
+      // Date + slide-number fields and footer placeholder must be preserved in
+      // OOXML (round-trip); the renderer fills the actual values at render time.
+      assert('slide97 has date field', slide97.includes('type="datetime1"'));
+      assert('slide97 has slide-number field', slide97.includes('type="slidenum"'));
+      assert('slide97 has dt placeholder', slide97.includes('type="dt"'));
+      assert('slide97 has ftr placeholder', slide97.includes('type="ftr"'));
+      assert('slide97 has sldNum placeholder', slide97.includes('type="sldNum"'));
+      assert('slide97 footer text preserved', slide97.includes('moon-pptx footer'));
+    }
   }
 
   finishAssertions();
