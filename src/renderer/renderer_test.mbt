@@ -651,6 +651,7 @@ test "roundtrip justify alignment" {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -737,6 +738,7 @@ fn make_bulleted_shape(indent : Int) -> @ooxml.Shape {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -848,6 +850,7 @@ fn make_rotated_text_shape(rot : Int) -> @ooxml.Shape {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -1348,6 +1351,7 @@ test "rendered SVG drops javascript: hyperlink target" {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -1612,6 +1616,7 @@ test "bullet inherits first run color when buClr is absent" {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -1809,6 +1814,7 @@ test "bullet font-size matches run when bu_size is unspecified" {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -1948,6 +1954,7 @@ fn tl_run(text : String) -> @ooxml.TextRun {
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -2122,4 +2129,100 @@ test "hit_test_layout on empty layout returns origin" {
   assert_eq(r, 0)
   assert_eq(c, 0)
   assert_eq(po, 0)
+}
+
+// ── Text decoration fidelity (underline color round-trip) ────────────────────
+
+///|
+/// An underline renders the decoration line; its style/color survive a
+/// render → parse round-trip (underline_color preserved). The CSS
+/// text-decoration-style/color are intentionally NOT emitted — browsers ignore
+/// them on SVG <text> — so the values live only in data-ooxml-* for export.
+test "underline style + color round-trip" {
+  let run : @ooxml.TextRun = {
+    text: "Underlined",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 1800,
+    color: @ooxml.Color::none(),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "wavy",
+    underline_color: { r: 255, g: 0, b: 0, alpha: 255 },
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let para : @ooxml.TextParagraph = {
+    runs: [run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    line_spacing: 0,
+    mar_l: -1,
+    indent: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 5000000,
+        cy: 2000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  assert_true(svg.contains("text-decoration=\"underline\""))
+  // CSS style/color are intentionally not emitted (browsers ignore them on SVG).
+  assert_false(svg.contains("text-decoration-style"))
+  // Round-trip: the underline color is preserved via data-ooxml-underline-color.
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  let pr = parsed.shapes[0].paragraphs[0].runs[0]
+  assert_eq(pr.underline, "wavy")
+  assert_eq(pr.underline_color.r, 255)
+  assert_eq(pr.underline_color.g, 0)
+  assert_eq(pr.underline_color.b, 0)
 }

@@ -435,6 +435,7 @@ fn default_text_run(
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -495,6 +496,16 @@ fn parse_run_props(
   let rpr_ch = @xml.get_children(rpr)
   let clr_raw = parse_solid_fill(rpr_ch, theme)
   let color = if clr_raw.is_none() { def_color } else { clr_raw }
+  // Underline color: a:uFill (CT_TextUnderlineFill) or a:uLn (CT_TextUnderlineLine).
+  // Color::none() means the underline follows the run's text color.
+  let underline_color = match @xml.find_child(rpr_ch, "a:uFill") {
+    Some(uf) => parse_solid_fill(@xml.get_children(uf), theme)
+    None =>
+      match @xml.find_child(rpr_ch, "a:uLn") {
+        Some(ul) => parse_solid_fill(@xml.get_children(ul), theme)
+        None => Color::none()
+      }
+  }
   let ff_raw = child_attr(rpr_ch, "a:latin", "typeface")
   let ff_resolved = resolve_font_theme(ff_raw, theme)
   let font_face = if ff_resolved.is_empty() {
@@ -557,6 +568,7 @@ fn parse_run_props(
     cs_font,
     sym_font,
     underline,
+    underline_color,
     strike,
     baseline,
     char_spacing,

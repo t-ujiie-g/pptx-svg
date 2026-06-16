@@ -112,3 +112,30 @@ sldnum_ph_xml = f"""
 """
 for xml in (footer_ph_xml, date_ph_xml, sldnum_ph_xml):
     spTree97.append(etree.fromstring(xml))
+
+# ── Slide 98: underline styles + underline color (a:uFill) + double strike ────
+# Underline color round-trip (R1): the underline value (u=) and a:uFill color are
+# parsed, round-tripped (data-ooxml-underline-color) and re-serialized to <a:uFill>.
+# (Decoration STYLE/COLOR are not drawn visually — browsers ignore
+# text-decoration-style/-color on SVG text — but must survive export.)
+slide98 = prs.slides.add_slide(blank)
+spTree98 = slide98.shapes._spTree
+
+# Each run: u="<variant>" with a red a:uFill underline color; one dblStrike run.
+deco_runs = (
+    '<a:r><a:rPr lang="en-US" sz="2000" u="dbl"><a:uFill><a:solidFill>'
+    '<a:srgbClr val="FF0000"/></a:solidFill></a:uFill></a:rPr><a:t>double </a:t></a:r>'
+    '<a:r><a:rPr lang="en-US" sz="2000" u="wavy"><a:uFill><a:solidFill>'
+    '<a:srgbClr val="00B050"/></a:solidFill></a:uFill></a:rPr><a:t>wavy </a:t></a:r>'
+    '<a:r><a:rPr lang="en-US" sz="2000" u="dotted"/><a:t>dotted </a:t></a:r>'
+    '<a:r><a:rPr lang="en-US" sz="2000" strike="dblStrike"/><a:t>dblstrike</a:t></a:r>'
+)
+deco_sp_xml = f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="9801" name="DecoText"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+  <p:spPr><a:xfrm><a:off x="457200" y="1371600"/><a:ext cx="8229600" cy="914400"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+  <p:txBody><a:bodyPr/><a:lstStyle/><a:p>{deco_runs}</a:p></p:txBody>
+</p:sp>
+"""
+spTree98.append(etree.fromstring(deco_sp_xml))

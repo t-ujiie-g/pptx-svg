@@ -741,17 +741,20 @@ fn render_run_tspan(
       span = span + ai("letter-spacing", ls_px)
     }
   }
-  // Text decorations
+  // Text decorations (underline / strikethrough).
+  // NOTE: only the decoration LINE renders here. Browsers ignore
+  // text-decoration-style / text-decoration-color on SVG <text> (verified), so
+  // underline variants (dbl/dotted/wavy) and underline color (a:uFill) cannot be
+  // shown via CSS — they would require drawing the decoration as explicit
+  // <line>/<path> geometry (run-box layout; see TODO R1). The style/color are
+  // still parsed and round-tripped (data-ooxml-underline-color) so they survive
+  // export.
   let mut deco = ""
   if !run.underline.is_empty() && run.underline != "none" {
     deco = "underline"
   }
   if run.strike == "sngStrike" || run.strike == "dblStrike" {
-    if deco.is_empty() {
-      deco = "line-through"
-    } else {
-      deco = deco + " line-through"
-    }
+    deco = if deco.is_empty() { "line-through" } else { deco + " line-through" }
   }
   if !deco.is_empty() {
     span = span + a("text-decoration", deco)
@@ -779,6 +782,14 @@ fn render_run_tspan(
     da("cs-font", run.cs_font) +
     da("sym-font", run.sym_font) +
     da("underline", run.underline) +
+    da(
+      "underline-color",
+      if run.underline_color.is_none() {
+        ""
+      } else {
+        run.underline_color.to_hex()
+      },
+    ) +
     da("strike", run.strike) +
     dai("baseline", run.baseline) +
     dai("char-spacing", run.char_spacing) +

@@ -572,7 +572,8 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     !run.hlink_mouse_over_rid.is_empty() ||
     !run.outline_color.is_none() ||
     !run.text_grad_fill.is_none() ||
-    !run.text_patt_fill.is_none()
+    !run.text_patt_fill.is_none() ||
+    !run.underline_color.is_none()
   if has_children {
     rpr = rpr + ">"
     // Text outline: a:ln
@@ -596,6 +597,13 @@ fn serialize_run_props(run : @ooxml.TextRun) -> String {
     // Text pattern fill: a:pattFill on a:rPr
     if !run.text_patt_fill.is_none() {
       rpr = rpr + serialize_pattern_fill(run.text_patt_fill)
+    }
+    // Underline fill color: a:uFill (after fills, before a:latin per schema)
+    if !run.underline_color.is_none() {
+      rpr = rpr +
+        "<a:uFill>" +
+        serialize_color(run.underline_color) +
+        "</a:uFill>"
     }
     if !run.font_face.is_empty() {
       rpr = rpr + "<a:latin typeface=\"" + xml_escape(run.font_face) + "\"/>"

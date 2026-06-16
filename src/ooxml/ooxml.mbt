@@ -887,6 +887,7 @@ pub(all) struct TextRun {
   cs_font : String // Complex Script typeface from <a:cs>; "" = use theme cs font
   sym_font : String // Symbol typeface from <a:sym>; "" = none
   underline : String // "sng", "dbl", "heavy", etc.; "" = none
+  underline_color : Color // a:uFill/a:uLn color; Color::none() = follow text color
   strike : String // "sngStrike", "dblStrike"; "" = none
   baseline : Int // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
   char_spacing : Int // character spacing in hundredths-of-a-point (spc attr); 0 = default
