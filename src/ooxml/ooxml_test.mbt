@@ -440,6 +440,33 @@ test "parse_slide captures endParaRPr into paragraph epr_* fields" {
 }
 
 ///|
+/// A run's underline style (u attr) and underline color (a:uFill) are parsed.
+test "parse_slide captures underline style and uFill color" {
+  let slide_xml =
+    #|<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="1" name="t"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+    #|      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="100" cy="100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+    #|      <p:txBody>
+    #|        <a:bodyPr/><a:lstStyle/>
+    #|        <a:p>
+    #|          <a:r><a:rPr lang="en-US" u="dbl"><a:uFill><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:uFill></a:rPr><a:t>Underlined</a:t></a:r>
+    #|        </a:p>
+    #|      </p:txBody>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = parse_slide(slide_xml, SlideSize::default(), ThemeData::default())
+  let run = slide.shapes[0].paragraphs[0].runs[0]
+  assert_eq(run.underline, "dbl")
+  assert_eq(run.underline_color.r, 255)
+  assert_eq(run.underline_color.g, 0)
+  assert_eq(run.underline_color.b, 0)
+}
+
+///|
 test "BlipFill::is_none considers svg_rid" {
   // Fully empty blip — is_none
   let bf0 = BlipFill::none()

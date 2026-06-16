@@ -4,7 +4,7 @@ import {
   loadFeatures, pptxExists, resetAssertions, finishAssertions,
 } from './_helpers.mjs';
 
-test("regressions (slides 96-97)", async () => {
+test("regressions (slides 96-98)", async () => {
   resetAssertions();
   if (!pptxExists('test_features.pptx')) {
     console.log('  SKIPPED: test_features.pptx not found');
@@ -67,6 +67,20 @@ test("regressions (slides 96-97)", async () => {
       assert('slide97 has ftr placeholder', slide97.includes('type="ftr"'));
       assert('slide97 has sldNum placeholder', slide97.includes('type="sldNum"'));
       assert('slide97 footer text preserved', slide97.includes('moon-pptx footer'));
+    }
+  }
+
+  // ── Slide 98: underline styles + underline color (a:uFill) + double strike ──
+  {
+    console.log('\n── test_features.pptx — Slide 98: text decoration fidelity ──');
+    const slide98 = textFiles.get('ppt/slides/slide98.xml');
+    assert('slide98 exists', !!slide98);
+    if (slide98) {
+      assert('slide98 has u="dbl"', slide98.includes('u="dbl"'));
+      assert('slide98 has u="wavy"', slide98.includes('u="wavy"'));
+      assert('slide98 has u="dotted"', slide98.includes('u="dotted"'));
+      assert('slide98 has underline color a:uFill', slide98.includes('<a:uFill>'));
+      assert('slide98 has dblStrike', slide98.includes('strike="dblStrike"'));
     }
   }
 

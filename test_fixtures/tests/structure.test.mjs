@@ -18,17 +18,17 @@ test("structure & master/layout/theme inheritance", async () => {
   assert('presentation.xml exists', !!prsXml);
 
   const slideCount = countSlideIds(prsXml ?? '');
-  assert('slide count = 97', slideCount === 97, `got ${slideCount}`);
+  assert('slide count = 98', slideCount === 98, `got ${slideCount}`);
 
   // Verify all slides exist
-  for (let i = 1; i <= 97; i++) {
+  for (let i = 1; i <= 98; i++) {
     const path = `ppt/slides/slide${i}.xml`;
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
   // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
-  for (let i = 1; i <= 97; i++) {
+  for (let i = 1; i <= 98; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
     const relsXml = textFiles.get(relsPath);
     assert(`slide${i} .rels exists`, !!relsXml);

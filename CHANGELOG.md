@@ -10,6 +10,10 @@
 - **Date / slide-number field placeholders** — `dt` / `sldNum` placeholders backed by an `<a:fld>` field now render the live value instead of the cached literal: the slide-number field always shows the **actual** slide index (previously it showed the stale cached `<a:t>`, e.g. "1" on every slide), and the date field is filled with the current date. The date source is configurable via the new `PptxRendererOptions.currentDate` (`Date | string | () => Date | string`; default `toLocaleDateString()`) so output can be made deterministic for snapshot tests / exports. Footer (`ftr`) placeholders keep their own text, inheriting the layout/master text only when empty. New FFI `current_date`.
   - _Note:_ header/footer text uses the master/template font (commonly Calibri); when that font is not installed, the browser/host substitutes a wider fallback (Helvetica/Arial), so footer text that fits on one line in PowerPoint may wrap. This is a font-metrics limitation, not a layout bug.
 
+- **Underline color round-trip (R1)** — underline color (`<a:uFill>` / `<a:uLn>`) is now parsed into the new `TextRun.underline_color` field, round-tripped via `data-ooxml-underline-color`, and serialized back to `<a:uFill>`, so it survives export. (The underline _style_ value `u="dbl"/wavy/…` was already preserved.)
+  - _Visual limitation:_ underline **style** (double/dotted/wavy) and **color** are not drawn — browsers ignore `text-decoration-style` / `text-decoration-color` on SVG `<text>` entirely (verified in Chromium via presentation attribute, CSS property, and CSS shorthand). Rendering them requires drawing the underline as explicit `<line>`/`<path>` geometry (needs per-run box layout); tracked in TODO R1. The plain underline / strikethrough line still renders via the `text-decoration` presentation attribute.
+  - Fixes a latent SVG-parser bug where `color_or_none` read the un-prefixed attribute name, so `outline-color` / 3D extrusion+contour colors / blip duotone colors were silently dropped on the SVG→model round-trip; they now round-trip correctly.
+
 ## 0.6.0
 
 Direct-manipulation editing release: completes the **E6 editing roadmap (P1–P6)** —

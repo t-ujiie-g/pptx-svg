@@ -484,6 +484,31 @@ test "restore round-trip: shape text survives parse_slide" {
   assert_eq(out, serialize_slide(slide2))
 }
 
+///|
+/// Underline style (u) and underline color (a:uFill) survive a
+/// parse → serialize round-trip.
+test "serialize round-trips underline style and uFill color" {
+  let xml =
+    #|<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="TextBox"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="500000" cy="300000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" u="wavy"><a:uFill><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:uFill></a:rPr><a:t>Wavy</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>
+  let slide = @ooxml.parse_slide(
+    xml,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
+  let out = serialize_slide(slide)
+  assert_true(out.contains("u=\"wavy\""))
+  assert_true(out.contains("<a:uFill>"))
+  assert_true(out.contains("FF0000"))
+  // Fixed point: re-parse + re-serialize is stable.
+  let slide2 = @ooxml.parse_slide(
+    out,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
+  assert_eq(out, serialize_slide(slide2))
+}
+
 // ── parse_shapes_xml round-trip (E6.5 copy/paste) ────────────────────────────
 
 ///|

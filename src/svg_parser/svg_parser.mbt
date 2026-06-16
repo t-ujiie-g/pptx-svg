@@ -19,9 +19,10 @@ fn parse_hex_color(s : String) -> @ooxml.Color {
 }
 
 ///|
-/// Parse a hex color from a data attribute, returning Color::none() if empty.
-fn color_or_none(node : @xml.XmlNode, attr : String) -> @ooxml.Color {
-  let v = get_data_attr(node, attr)
+/// Parse a hex color from a `data-ooxml-<name>` attribute, returning
+/// Color::none() if empty. `name` is the short suffix (e.g. "outline-color").
+fn color_or_none(node : @xml.XmlNode, name : String) -> @ooxml.Color {
+  let v = get_da(node, name)
   if v.is_empty() {
     @ooxml.Color::none()
   } else {
@@ -493,6 +494,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     cs_font,
                     sym_font,
                     underline,
+                    underline_color: color_or_none(run_node, "underline-color"),
                     strike,
                     baseline,
                     char_spacing,
@@ -523,6 +525,7 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     cs_font: "",
                     sym_font: "",
                     underline: "",
+                    underline_color: @ooxml.Color::none(),
                     strike: "",
                     baseline: 0,
                     char_spacing: 0,

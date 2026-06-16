@@ -135,6 +135,7 @@ fn make_default_run(
     cs_font: "",
     sym_font: "",
     underline: "",
+    underline_color: @ooxml.Color::none(),
     strike: "",
     baseline: 0,
     char_spacing: 0,
