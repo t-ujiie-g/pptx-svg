@@ -19,4 +19,5 @@ globalThis.pptx_ffi = {
   measure_text: () => 0.0,
   get_font_fallback: () => "",
   convert_emf: () => "",
+  current_date: () => "",
 };

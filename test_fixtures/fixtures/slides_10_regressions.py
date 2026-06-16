@@ -74,3 +74,41 @@ valid_custgeom_xml = f"""
 </p:sp>
 """
 spTree95.append(etree.fromstring(valid_custgeom_xml))
+
+# ── Slide 97: header/footer field placeholders (date / footer / slide number) ──
+# Reproduces sample.pptx slide 20: a slide carrying date (<a:fld type="datetime1">),
+# footer (ftr) and slide-number (<a:fld type="slidenum"> with a STALE cached "1")
+# placeholders. The renderer must (a) show the ACTUAL slide number, not the cached
+# "1", (b) fill the date field with the host-provided current date, and (c) keep
+# the footer text.
+slide97 = prs.slides.add_slide(blank)
+spTree97 = slide97.shapes._spTree
+
+footer_ph_xml = f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="9701" name="Footer Placeholder"/><p:cNvSpPr/>
+    <p:nvPr><p:ph type="ftr" idx="11"/></p:nvPr></p:nvSpPr>
+  <p:spPr><a:xfrm><a:off x="3124200" y="6356350"/><a:ext cx="2438400" cy="365125"/></a:xfrm></p:spPr>
+  <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr/><a:t>moon-pptx footer</a:t></a:r></a:p></p:txBody>
+</p:sp>
+"""
+date_ph_xml = f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="9702" name="Date Placeholder"/><p:cNvSpPr/>
+    <p:nvPr><p:ph type="dt" idx="10"/></p:nvPr></p:nvSpPr>
+  <p:spPr><a:xfrm><a:off x="457200" y="6356350"/><a:ext cx="2438400" cy="365125"/></a:xfrm></p:spPr>
+  <p:txBody><a:bodyPr/><a:lstStyle/><a:p>
+    <a:fld id="{{1F3B9E54-0000-4000-8000-000000000099}}" type="datetime1"><a:rPr/></a:fld></a:p></p:txBody>
+</p:sp>
+"""
+sldnum_ph_xml = f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="9703" name="Slide Number Placeholder"/><p:cNvSpPr/>
+    <p:nvPr><p:ph type="sldNum" idx="12"/></p:nvPr></p:nvSpPr>
+  <p:spPr><a:xfrm><a:off x="6553200" y="6356350"/><a:ext cx="2438400" cy="365125"/></a:xfrm></p:spPr>
+  <p:txBody><a:bodyPr/><a:lstStyle/><a:p>
+    <a:fld id="{{1F3B9E54-0000-4000-8000-000000000099}}" type="slidenum"><a:rPr/><a:t>1</a:t></a:fld></a:p></p:txBody>
+</p:sp>
+"""
+for xml in (footer_ph_xml, date_ph_xml, sldnum_ph_xml):
+    spTree97.append(etree.fromstring(xml))

@@ -564,8 +564,18 @@ fn has_no_text(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
 }
 
 ///|
-/// Inject auto-content text for empty dt/sldNum/ftr placeholders.
-/// slide_num is 1-indexed.
+/// Inject auto-content for date / footer / slide-number placeholders.
+/// `slide_num` is 1-indexed.
+///
+/// - `sldNum`: always reflect the actual slide index (the slide may cache a stale
+///   literal in `<a:fld><a:t>`, e.g. "1").
+/// - `dt`: show the current date (host-provided via FFI); falls back to a literal
+///   date in the layout/master placeholder when no host date is available.
+/// - `ftr`: keep the slide's own footer text; inject the layout/master text only
+///   when the slide left it empty.
+///
+/// The injected run preserves the existing field run's formatting (size/color
+/// from the master's otherStyle); runs with no size render at the generic default.
 fn inject_placeholder_auto_content(
   shapes : Array[@ooxml.Shape],
   slide_num : Int,
@@ -577,78 +587,50 @@ fn inject_placeholder_auto_content(
   while i < ns {
     let shape = shapes[i]
     let ph = shape.ph_type
-    if ph.is_empty() || !has_no_text(shape.paragraphs) {
+    if ph != "sldNum" && ph != "dt" && ph != "ftr" {
       i = i + 1
       continue
     }
-    // Only process dt/sldNum/ftr
+    // Resolve the replacement text (empty = keep the shape's existing content).
     let auto_text = if ph == "sldNum" {
       int_to_str(slide_num)
     } else if ph == "dt" {
-      // Try to get date text from layout/master placeholder
-      let ph_text = find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
-      ph_text
-    } else if ph == "ftr" {
-      // Try to get footer text from layout/master placeholder
+      let host_date = @ffi.ffi_current_date()
+      if !host_date.is_empty() {
+        host_date
+      } else {
+        find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
+      }
+    } else if has_no_text(shape.paragraphs) {
+      // ftr with no own text — inherit from layout/master.
       find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
     } else {
       ""
     }
     if !auto_text.is_empty() {
-      // Create a single paragraph with the auto text
-      let run : @ooxml.TextRun = {
-        text: auto_text,
-        bold: false,
-        italic: false,
-        font_size: 0,
-        color: @ooxml.Color::none(),
-        font_face: "",
-        ea_font: "",
-        cs_font: "",
-        sym_font: "",
-        underline: "",
-        strike: "",
-        baseline: 0,
-        char_spacing: 0,
-        kern: 0,
-        cap: "",
-        hlink_rid: "",
-        hlink_mouse_over_rid: "",
-        effects: @ooxml.EffectList::none(),
-        outline_color: @ooxml.Color::none(),
-        outline_w: 0,
-        text_grad_fill: @ooxml.GradientFill::none(),
-        text_patt_fill: @ooxml.PatternFill::none(),
-        bold_explicit: false,
-        math_xml: "",
+      shapes[i] = {
+        ..shape,
+        paragraphs: [replace_auto_content_text(shape.paragraphs, auto_text)],
       }
-      let para : @ooxml.TextParagraph = {
-        runs: [run],
-        align: "",
-        level: 0,
-        spc_before: 0,
-        spc_after: 0,
-        line_spacing: 0,
-        mar_l: 0,
-        indent: 0,
-        bullet: "",
-        bullet_auto: "",
-        bullet_none: false,
-        bullet_font: "",
-        bullet_size: 0,
-        bullet_color: @ooxml.Color::none(),
-        bullet_img_rid: "",
-        tab_stops: [],
-        rtl: false,
-        epr_font_size: 0,
-        epr_color: @ooxml.Color::none(),
-        epr_font_face: "",
-        epr_ea_font: "",
-      }
-      shapes[i] = { ..shape, paragraphs: [para] }
     }
     i = i + 1
   }
+}
+
+///|
+/// Build the replacement paragraph for an auto-content placeholder, preserving
+/// the formatting of the placeholder's existing first run (e.g. a cached
+/// slide-number field run carrying master styling) and swapping only its text.
+fn replace_auto_content_text(
+  paragraphs : Array[@ooxml.TextParagraph],
+  text : String,
+) -> @ooxml.TextParagraph {
+  for para in paragraphs {
+    if para.runs.length() > 0 {
+      return { ..para, runs: [{ ..para.runs[0], text, math_xml: "" }] }
+    }
+  }
+  make_default_paragraph(make_default_run(text))
 }
 
 ///|

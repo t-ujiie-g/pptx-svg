@@ -131,6 +131,13 @@ export interface PptxRendererOptions {
    * history (undo/redo become no-ops).
    */
   maxHistory?: number;
+  /**
+   * Date used to fill auto-updating date placeholders (`<a:fld type="datetime1">`).
+   * Provide a fixed value for reproducible output (e.g. snapshot tests / exports).
+   * Accepts a `Date`, a preformatted string, or a function returning either.
+   * Default: the current date formatted via `toLocaleDateString()`.
+   */
+  currentDate?: Date | string | (() => Date | string);
 }
 
 /**
@@ -343,9 +350,13 @@ export class PptxRenderer {
   /** Max retained undo steps. */
   private maxHistory: number;
 
+  /** Source for date-placeholder auto-content (see PptxRendererOptions.currentDate). */
+  private currentDateOption?: Date | string | (() => Date | string);
+
   constructor(options?: PptxRendererOptions) {
     this.log = createLogger(options?.logLevel ?? 'error');
     this.maxHistory = Math.max(0, options?.maxHistory ?? DEFAULT_MAX_HISTORY);
+    this.currentDateOption = options?.currentDate;
     if (options?.measureText) {
       this.measureTextFn = options.measureText;
     }
@@ -1814,6 +1825,7 @@ export class PptxRenderer {
           this.measureText(text, fontFace, fontSizePt),
         get_font_fallback: (font: string) => this.fontFallbackCache.get(font) ?? '',
         convert_emf: (path: string) => this.convertEmf(path),
+        current_date: () => this.currentDate(),
         math_sin:   (x: number) => Math.sin(x),
         math_cos:   (x: number) => Math.cos(x),
         math_atan2: (y: number, x: number) => Math.atan2(y, x),
@@ -1823,6 +1835,19 @@ export class PptxRenderer {
         make_closure: (f: Function, ctx: unknown) => f.bind(null, ctx),
       },
     };
+  }
+
+  /**
+   * Resolve the date string for auto-updating date placeholders. Honors the
+   * `currentDate` option (Date | string | factory); defaults to the locale
+   * short date. Returns "" only if a custom source explicitly yields it.
+   */
+  private currentDate(): string {
+    let v = this.currentDateOption;
+    if (typeof v === 'function') v = v();
+    if (v instanceof Date) return v.toLocaleDateString();
+    if (typeof v === 'string') return v;
+    return new Date().toLocaleDateString();
   }
 
   /** Convert an EMF/WMF file to an SVG data URI. Returns "" if conversion fails. */

@@ -118,6 +118,7 @@ const renderer = new PptxRenderer(options?);
 | `measureText` | `(text, fontFace, fontSizePx) => number` | Canvas 2D | Custom text width measurement. |
 | `fontFallbacks` | `Record<string, string[]>` | (built-in) | Custom font fallback mappings. Merged with built-in defaults. |
 | `logLevel` | `'silent' \| 'error' \| 'warn' \| 'info' \| 'debug'` | `'error'` | Console output verbosity. |
+| `currentDate` | `Date \| string \| () => Date \| string` | `toLocaleDateString()` | Value for auto-updating date placeholders (`<a:fld type="datetime1">`). Pass a fixed value for reproducible output. |
 
 **Methods:**
 
