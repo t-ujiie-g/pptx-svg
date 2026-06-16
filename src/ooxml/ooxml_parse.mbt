@@ -2,6 +2,10 @@
 //
 // Same package as ooxml.mbt — all types and helpers are shared.
 
+///|
+/// graphicData uri for a SmartArt (DrawingML diagram) graphicFrame.
+let diagram_graphic_uri : String = "http://schemas.openxmlformats.org/drawingml/2006/diagram"
+
 // ── Attribute helpers ─────────────────────────────────────────────────────────
 
 ///|
@@ -1384,6 +1388,28 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
     Some(n) => n
   }
   let gdata_ch = @xml.get_children(gdata_node)
+  // Check for SmartArt diagram (graphicData uri = .../diagram).
+  // The frame only references the data part; the actual laid-out shapes live in a
+  // cached drawing (ppt/drawings/drawingN.xml). Return a GroupShape placeholder
+  // with empty children and the raw graphicFrame preserved in ole_xml; main.mbt
+  // resolves the cached drawing later (needs FFI + rels access).
+  let gdata_uri = match @xml.get_attr(gdata_node, "uri") {
+    Some(v) => v
+    None => ""
+  }
+  if gdata_uri == diagram_graphic_uri {
+    let grp_data : GroupShapeData = {
+      ch_off_x: 0,
+      ch_off_y: 0,
+      ch_ext_cx: transform.cx,
+      ch_ext_cy: transform.cy,
+      children: [],
+    }
+    return {
+      ..Shape::default_with(ShapeKind::GroupShape(grp_data), transform),
+      ole_xml: @xml.serialize_node(gf),
+    }
+  }
   // Check for chart (c:chart) — external file via relationship
   // Return a placeholder ChartShape with empty data; main.mbt resolves the chart XML.
   match @xml.find_child(gdata_ch, "c:chart") {
@@ -2314,6 +2340,108 @@ fn parse_shapes_from_tree(
 /// `serialize_shape` is parsed back into `Shape` values here.
 pub fn parse_shapes_xml(xml : String, theme : ThemeData) -> Array[Shape] {
   parse_shapes_from_children(@xml.parse_xml(xml), theme)
+}
+
+///|
+/// Parse a SmartArt cached drawing (`ppt/drawings/drawingN.xml`) into shapes.
+/// The drawing uses the `dsp:` namespace (`dsp:drawing`/`dsp:spTree`/`dsp:sp`),
+/// whose elements map 1:1 onto their `p:` equivalents (the inner geometry/fill/
+/// text still uses the `a:` namespace). We remap the prefix and reuse the
+/// standard shape-tree parser.
+pub fn parse_diagram_drawing(xml : String, theme : ThemeData) -> Array[Shape] {
+  if xml.is_empty() {
+    return []
+  }
+  let remapped = @xml.str_replace_all(xml, "dsp:", "p:")
+  let nodes = @xml.parse_xml(remapped)
+  let shapes = match @xml.find_child(nodes, "p:drawing") {
+    None => []
+    Some(drawing) =>
+      match @xml.find_child(@xml.get_children(drawing), "p:spTree") {
+        None => []
+        Some(tree) => parse_shapes_from_tree(tree, theme)
+      }
+  }
+  // SmartArt nodes center their text vertically by default. A full PowerPoint
+  // cached drawing writes the anchor explicitly, but minimal drawings (some
+  // converters / older files) emit an empty <a:bodyPr/> which would otherwise
+  // top-align. Default any unset anchor on text-bearing diagram shapes to center.
+  apply_diagram_text_anchor(shapes)
+  shapes
+}
+
+///|
+/// Default the vertical text anchor to center for text-bearing diagram shapes
+/// whose anchor is unset (see `parse_diagram_drawing`). Recurses into groups.
+fn apply_diagram_text_anchor(shapes : Array[Shape]) -> Unit {
+  let mut i = 0
+  while i < shapes.length() {
+    match shapes[i].kind {
+      ShapeKind::GroupShape(grp) => apply_diagram_text_anchor(grp.children)
+      _ =>
+        if shapes[i].paragraphs.length() > 0 &&
+          shapes[i].body_props.anchor == "" {
+          shapes[i] = {
+            ..shapes[i],
+            body_props: { ..shapes[i].body_props, anchor: "ctr" },
+          }
+        }
+    }
+    i = i + 1
+  }
+}
+
+///|
+/// Resolve the SmartArt text color from a diagram colors part
+/// (`ppt/diagrams/colorsN.xml`). SmartArt cached drawings usually omit explicit
+/// run colors; PowerPoint derives them from the color style's text color list
+/// (`dgm:txLinClrLst` / `dgm:txClrLst` / `dgm:txEffectClrLst`). We take the first
+/// color from whichever list is present and resolve it against the theme. Returns
+/// `Color::none()` when no text color list is found.
+pub fn parse_diagram_text_color(xml : String, theme : ThemeData) -> Color {
+  if xml.is_empty() {
+    return Color::none()
+  }
+  let nodes = @xml.parse_xml(xml)
+  for tag in ["txLinClrLst", "txClrLst", "txEffectClrLst"] {
+    match @xml.find_descendant(nodes, tag) {
+      Some(lst) => {
+        let c = parse_color_from_children(@xml.get_children(lst), theme)
+        if !c.is_none() {
+          return c
+        }
+      }
+      None => ()
+    }
+  }
+  Color::none()
+}
+
+///|
+/// Apply a fallback text color to every run in `shapes` (recursing into groups)
+/// that has no explicit color. Used to bake SmartArt color-style text colors into
+/// the cached drawing's runs, which usually omit them.
+pub fn apply_diagram_text_color(shapes : Array[Shape], color : Color) -> Unit {
+  if color.is_none() {
+    return
+  }
+  for sh in shapes {
+    match sh.kind {
+      ShapeKind::GroupShape(grp) =>
+        apply_diagram_text_color(grp.children, color)
+      _ =>
+        for para in sh.paragraphs {
+          let runs = para.runs
+          let mut j = 0
+          while j < runs.length() {
+            if runs[j].color.is_none() {
+              runs[j] = { ..runs[j], color, }
+            }
+            j = j + 1
+          }
+        }
+    }
+  }
 }
 
 // ── Table style parsing ─────────────────────────────────────────────────────

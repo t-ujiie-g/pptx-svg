@@ -427,3 +427,29 @@ test "parse_xml deep nesting does not stack-overflow" {
   let nodes = parse_xml(full)
   assert_true(nodes.length() >= 1)
 }
+
+///|
+/// `find_descendant` matches a local name at any depth regardless of namespace
+/// prefix (used for diagram `relIds`/`dataModelExt` whose prefix varies).
+test "find_descendant matches local name regardless of prefix" {
+  let nodes = parse_xml(
+    "<root><a:wrap><ext0:relIds r:dm=\"rId2\" r:cs=\"rId5\"/></a:wrap></root>",
+  )
+  match find_descendant(nodes, "relIds") {
+    Some(ri) => assert_eq(get_attr(ri, "r:dm"), Some("rId2"))
+    None => fail("relIds not found")
+  }
+  // Exact (unprefixed) tag also matches
+  let plain = parse_xml("<root><dataModelExt relId=\"rIdX\"/></root>")
+  match find_descendant(plain, "dataModelExt") {
+    Some(ext) => assert_eq(get_attr(ext, "relId"), Some("rIdX"))
+    None => fail("dataModelExt not found")
+  }
+  // No match returns None
+  assert_true(
+    match find_descendant(nodes, "missing") {
+      None => true
+      Some(_) => false
+    },
+  )
+}

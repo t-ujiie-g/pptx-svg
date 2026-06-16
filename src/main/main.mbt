@@ -285,6 +285,125 @@ fn resolve_chart_shapes(
 }
 
 ///|
+/// Read an attribute off the first `<*:relIds>` descendant of a parsed
+/// SmartArt graphicFrame (e.g. `r:dm`, `r:cs`). Returns "" when absent.
+fn relids_attr(gf_nodes : Array[@xml.XmlNode], attr : String) -> String {
+  match @xml.find_descendant(gf_nodes, "relIds") {
+    Some(ri) =>
+      match @xml.get_attr(ri, attr) {
+        Some(v) => v
+        None => ""
+      }
+    None => ""
+  }
+}
+
+///|
+/// Resolve a SmartArt graphicFrame (preserved raw in `ole_xml`) into its cached
+/// drawing's shapes. Returns `[]` when any link in the chain is missing.
+///
+/// Resolution chain: graphicFrame `dgm:relIds/@r:dm` → slide rels → data part
+/// (`ppt/diagrams/dataN.xml`) → `dsp:dataModelExt/@relId` → data rels →
+/// cached drawing (`ppt/drawings/drawingN.xml`).
+fn resolve_diagram_children(
+  ole_xml : String,
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData,
+) -> Array[@ooxml.Shape] {
+  let gf_nodes = @xml.parse_xml(ole_xml)
+  let dm_rid = relids_attr(gf_nodes, "r:dm")
+  if dm_rid.is_empty() {
+    return []
+  }
+  let data_target = @ooxml.find_rel_target(rels, dm_rid)
+  if data_target.is_empty() {
+    return []
+  }
+  let data_path = resolve_rel_path("ppt/slides", data_target)
+  let data_xml = @ffi.ffi_get_file(data_path)
+  if data_xml.is_empty() {
+    return []
+  }
+  // dsp:dataModelExt/@relId → drawing rel in the data part's own rels.
+  let draw_rid = match
+    @xml.find_descendant(@xml.parse_xml(data_xml), "dataModelExt") {
+    Some(ext) =>
+      match @xml.get_attr(ext, "relId") {
+        Some(v) => v
+        None => ""
+      }
+    None => ""
+  }
+  if draw_rid.is_empty() {
+    return []
+  }
+  let data_rels = @ooxml.parse_rels(@ffi.ffi_get_file(rels_path_for(data_path)))
+  let draw_target = @ooxml.find_rel_target(data_rels, draw_rid)
+  if draw_target.is_empty() {
+    return []
+  }
+  let draw_path = resolve_rel_path(dir_of(data_path), draw_target)
+  let children = @ooxml.parse_diagram_drawing(
+    @ffi.ffi_get_file(draw_path),
+    theme,
+  )
+  if children.length() == 0 {
+    return []
+  }
+  // SmartArt cached drawings omit run colors; derive the text color from the
+  // diagram colors part (dgm:relIds/@r:cs) and fill it into uncolored runs.
+  let cs_rid = relids_attr(gf_nodes, "r:cs")
+  if !cs_rid.is_empty() {
+    let cs_target = @ooxml.find_rel_target(rels, cs_rid)
+    if !cs_target.is_empty() {
+      let cs_path = resolve_rel_path("ppt/slides", cs_target)
+      let txt_color = @ooxml.parse_diagram_text_color(
+        @ffi.ffi_get_file(cs_path),
+        theme,
+      )
+      @ooxml.apply_diagram_text_color(children, txt_color)
+    }
+  }
+  children
+}
+
+///|
+/// Walk shapes to find SmartArt diagram placeholders (GroupShape with empty
+/// children and the raw graphicFrame preserved in `ole_xml`) and resolve them by
+/// loading the cached drawing part and parsing its `dsp:` shapes.
+fn resolve_diagram_shapes(
+  shapes : Array[@ooxml.Shape],
+  rels : Array[@ooxml.Relationship],
+  theme : @ooxml.ThemeData,
+) -> Unit {
+  let n = shapes.length()
+  let mut i = 0
+  while i < n {
+    match shapes[i].kind {
+      @ooxml.ShapeKind::GroupShape(grp) =>
+        if grp.children.length() == 0 && !shapes[i].ole_xml.is_empty() {
+          let children = resolve_diagram_children(
+            shapes[i].ole_xml,
+            rels,
+            theme,
+          )
+          if children.length() > 0 {
+            shapes[i] = {
+              ..shapes[i],
+              kind: @ooxml.ShapeKind::GroupShape({ ..grp, children, }),
+            }
+          }
+        } else {
+          // Normal group: recurse into children.
+          resolve_diagram_shapes(grp.children, rels, theme)
+        }
+      _ => ()
+    }
+    i = i + 1
+  }
+}
+
+///|
 fn last_index_of(s : String, c : Char) -> Int {
   let len = s.length()
   let mut i = len - 1
@@ -826,6 +945,8 @@ fn resolve_slide_data(
   )
   // ── Resolve chart shapes: load chart XML and parse ChartML ──
   resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
+  // ── Resolve SmartArt diagrams: load cached drawing and parse dsp: shapes ──
+  resolve_diagram_shapes(slide_data.shapes, rels, effective_theme)
   // ── Placeholder inheritance: resolve transforms from layout/master ──
   resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
   // ── Placeholder auto-content: inject slide number/date/footer text ──

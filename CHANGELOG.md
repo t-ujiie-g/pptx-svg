@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- **SmartArt diagram rendering** — a bare `p:graphicFrame` whose `graphicData` uri is `.../diagram` (SmartArt) now renders its cached drawing instead of showing nothing. (Previously, SmartArt only rendered when wrapped in `mc:AlternateContent` — via the `mc:Fallback` shape group; a bare graphicFrame fell through to an empty shape.) The graphicFrame's `dgm:relIds/@r:dm` is followed to the diagram data part, then `dsp:dataModelExt/@relId` to the cached drawing (`ppt/drawings/drawingN.xml`); its `dsp:` shapes (which map 1:1 onto `p:` shapes — geometry, fills, line, effects, `dsp:style`/fontRef, text) are parsed into a group via `parse_diagram_drawing`. Cached drawings often omit run colors, so the text color is derived from the diagram colors part (`dgm:txLinClrLst`/`dgm:txClrLst`/`dgm:txEffectClrLst`) and applied to runs lacking an explicit color (`parse_diagram_text_color` + `apply_diagram_text_color`); text-bearing nodes with an unset `<a:bodyPr/>` anchor default to vertical center (SmartArt's default). The raw graphicFrame is preserved in `ole_xml` for round-trip export.
+  - _Known limitations vs. the SmartArt spec:_ (1) rendering uses the **cached drawing** only — the layout/algorithm engine (`diagramLayout`) is not run, so a SmartArt **without** a cached drawing part renders empty; (2) the color transform is applied as a **single uniform text color** (no per-node `fillClrLst`/`linClrLst`/`txClrLst` cycling — node fills/lines are taken as baked into the cached drawing); (3) the data model (`dgm:dataModel` pt/cxn lists) is not used for re-layout/editing — the diagram is treated as a static group.
+
 ## 0.6.0
 
 Direct-manipulation editing release: completes the **E6 editing roadmap (P1–P6)** —

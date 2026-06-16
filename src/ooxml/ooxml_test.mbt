@@ -1171,3 +1171,71 @@ test "parse_chartex_xml histogram no strDim" {
     },
   )
 }
+
+// ── SmartArt diagram (dsp:) cached-drawing parsing ──────────────────────────
+
+///|
+/// A SmartArt cached drawing (ppt/drawings/drawingN.xml) uses the `dsp:`
+/// namespace, which maps 1:1 onto `p:` shapes. `parse_diagram_drawing` should
+/// extract the laid-out shapes (geometry, fill, text) from the dsp:spTree.
+test "parse_diagram_drawing extracts dsp shapes" {
+  let xml =
+    #|<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    #|<dsp:spTree><dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr><dsp:grpSpPr/>
+    #|<dsp:sp modelId="{1}"><dsp:nvSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvSpPr/></dsp:nvSpPr>
+    #|<dsp:spPr><a:xfrm><a:off x="100" y="200"/><a:ext cx="1000" cy="800"/></a:xfrm>
+    #|<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></dsp:spPr>
+    #|<dsp:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US"/><a:t>Research</a:t></a:r></a:p></dsp:txBody></dsp:sp>
+    #|</dsp:spTree></dsp:drawing>
+  let shapes = parse_diagram_drawing(xml, ThemeData::default())
+  assert_eq(shapes.length(), 1)
+  // Geometry is a roundRect
+  assert_true(
+    match shapes[0].kind {
+      ShapeKind::AutoShape(ShapeGeom::RoundRect(_)) => true
+      _ => false
+    },
+  )
+  // Transform parsed from a:xfrm
+  assert_eq(shapes[0].transform.x, 100)
+  assert_eq(shapes[0].transform.cx, 1000)
+  // Text run extracted
+  assert_eq(shapes[0].paragraphs[0].runs[0].text, "Research")
+  // Empty <a:bodyPr/> defaults to center anchor for SmartArt text
+  assert_eq(shapes[0].body_props.anchor, "ctr")
+}
+
+///|
+/// SmartArt cached drawings usually omit run colors; the text color comes from
+/// the diagram colors part (dgm:txLinClrLst). `parse_diagram_text_color` should
+/// resolve the first text color, and `apply_diagram_text_color` should fill it
+/// into runs that lack an explicit color (leaving explicit ones untouched).
+test "diagram text color resolution + apply" {
+  let colors_xml =
+    #|<dgm:colorsDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+    #|<dgm:styleLbl name="node1"><dgm:txLinClrLst meth="repeat"><a:srgbClr val="FF0000"/></dgm:txLinClrLst></dgm:styleLbl>
+    #|</dgm:colorsDef>
+  let color = parse_diagram_text_color(colors_xml, ThemeData::default())
+  assert_eq(color.r, 255)
+  assert_eq(color.g, 0)
+  assert_eq(color.b, 0)
+  let draw_xml =
+    #|<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+    #|<dsp:spTree><dsp:grpSpPr/>
+    #|<dsp:sp modelId="{1}"><dsp:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></dsp:spPr>
+    #|<dsp:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>NoColor</a:t></a:r></a:p>
+    #|<a:p><a:r><a:rPr lang="en-US"><a:solidFill><a:srgbClr val="00FF00"/></a:solidFill></a:rPr><a:t>HasColor</a:t></a:r></a:p></dsp:txBody></dsp:sp>
+    #|</dsp:spTree></dsp:drawing>
+  let shapes = parse_diagram_drawing(draw_xml, ThemeData::default())
+  apply_diagram_text_color(shapes, color)
+  // First run had no color → filled with red
+  let r0 = shapes[0].paragraphs[0].runs[0].color
+  assert_eq(r0.r, 255)
+  assert_eq(r0.g, 0)
+  assert_eq(r0.b, 0)
+  // Second run had explicit green → left untouched
+  let r1 = shapes[0].paragraphs[1].runs[0].color
+  assert_eq(r1.r, 0)
+  assert_eq(r1.g, 255)
+  assert_eq(r1.b, 0)
+}
