@@ -837,7 +837,11 @@ test "bullet repositioning only applies to hanging indent" {
 /// Construct a minimal text shape with the given shape-level rotation.
 /// Uses noFill/noStroke so only the text itself is visible — matches the
 /// slide 6 regression where rotation wasn't applied to the text.
-fn make_rotated_text_shape(rot : Int) -> @ooxml.Shape {
+fn make_rotated_text_shape(
+  rot : Int,
+  flip_h? : Bool = false,
+  flip_v? : Bool = false,
+) -> @ooxml.Shape {
   let run : @ooxml.TextRun = {
     text: "Tilted",
     bold: false,
@@ -891,15 +895,7 @@ fn make_rotated_text_shape(rot : Int) -> @ooxml.Shape {
   {
     ..@ooxml.Shape::default_with(
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-      {
-        x: 700000,
-        y: 1500000,
-        cx: 1284515,
-        cy: 445828,
-        rot,
-        flip_h: false,
-        flip_v: false,
-      },
+      { x: 700000, y: 1500000, cx: 1284515, cy: 445828, rot, flip_h, flip_v },
     ),
     paragraphs: [para],
   }
@@ -927,6 +923,50 @@ test "shape xfrm rot rotates text, not only the shape rect" {
   assert_true(rotated_svg.contains("transform=\"rotate(5.00"))
   // Straight shape must not emit any rotate() transform.
   assert_false(straight_svg.contains("transform=\"rotate"))
+}
+
+///|
+test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
+  // Regression: flipH/flipV were dropped — only rotate() was emitted. The
+  // shape rect and its text must be mirrored with a negative-scale transform.
+  let theme = @ooxml.ThemeData::default()
+
+  // flipH: scale(-1,1) about the shape center.
+  let fh : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_rotated_text_shape(0, flip_h=true)],
+  }
+  let fh_svg = render_slide_svg(fh, [], 1, theme, [], [], [], [])
+  assert_true(fh_svg.contains("scale(-1,1)"))
+  // Both the rect and the text carry the mirror.
+  assert_true(fh_svg.contains("<text"))
+  assert_true(fh_svg.contains("<rect"))
+
+  // flipV: scale(1,-1).
+  let fv : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_rotated_text_shape(0, flip_v=true)],
+  }
+  let fv_svg = render_slide_svg(fv, [], 1, theme, [], [], [], [])
+  assert_true(fv_svg.contains("scale(1,-1)"))
+
+  // No flip → no scale() mirror.
+  let none : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_rotated_text_shape(0)],
+  }
+  let none_svg = render_slide_svg(none, [], 1, theme, [], [], [], [])
+  assert_false(none_svg.contains("scale(-1,1)"))
+  assert_false(none_svg.contains("scale(1,-1)"))
+
+  // flipH + rot: both rotate() and scale(-1,1) present, in that order.
+  let fhr : @ooxml.SlideData = {
+    ..make_empty_slide(),
+    shapes: [make_rotated_text_shape(300000, flip_h=true)],
+  }
+  let fhr_svg = render_slide_svg(fhr, [], 1, theme, [], [], [], [])
+  assert_true(fhr_svg.contains("rotate(5.00"))
+  assert_true(fhr_svg.contains("scale(-1,1)"))
 }
 
 // ── ChartEx rendering tests ──────────────────────────────────────────────────

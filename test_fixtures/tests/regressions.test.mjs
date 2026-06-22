@@ -1,7 +1,10 @@
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   assert, hasTag,
   loadFeatures, pptxExists, resetAssertions, finishAssertions,
+  FIXTURES_DIR, DIST_DIR,
 } from './_helpers.mjs';
 
 test("regressions (slides 96-98)", async () => {
@@ -82,6 +85,30 @@ test("regressions (slides 96-98)", async () => {
       assert('slide98 has underline color a:uFill', slide98.includes('<a:uFill>'));
       assert('slide98 has dblStrike', slide98.includes('strike="dblStrike"'));
     }
+  }
+
+  // ── Slide 99: flipH/flipV mirroring (issue #55) ─────────────────────────────
+  {
+    console.log('\n── test_features.pptx — Slide 99: flipH/flipV mirroring ──');
+    const slide99 = textFiles.get('ppt/slides/slide99.xml');
+    assert('slide99 exists', !!slide99);
+    if (slide99) {
+      // OOXML round-trip: the flip attributes survive in the slide XML.
+      assert('slide99 has flipH', slide99.includes('flipH="1"'));
+      assert('slide99 has flipV', slide99.includes('flipV="1"'));
+    }
+    // Rendering: the renderer must emit a negative-scale mirror for the flips
+    // (the actual issue #55 bug — flips were dropped, only rotate() was kept).
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const svg99 = r.renderSlideSvg(98); // 0-based → slide 99
+    assert('slide99 SVG mirrors flipH (scale(-1,1))', svg99.includes('scale(-1,1)'));
+    assert('slide99 SVG mirrors flipV (scale(1,-1))', svg99.includes('scale(1,-1)'));
   }
 
   finishAssertions();

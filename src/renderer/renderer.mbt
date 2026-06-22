@@ -562,10 +562,82 @@ fn rotation_transform(rot_60k : Int, cx : Int, cy : Int) -> String {
 }
 
 ///|
+/// Build the inner transform operations (rotation followed by mirror) without
+/// the surrounding ` transform="..."` wrapper. Returns "" when neither applies.
+/// OOXML applies flipH/flipV in the unrotated bounding box, then rotates about
+/// the shape center, so the SVG transform list is `rotate(...) <mirror>` (SVG
+/// applies the rightmost operation to coordinates first).
+fn transform_ops(
+  rot_60k : Int,
+  flip_h : Bool,
+  flip_v : Bool,
+  cx : Int,
+  cy : Int,
+) -> String {
+  let mut ops = ""
+  if rot_60k != 0 {
+    ops = "rotate(" +
+      format_rotation_deg(rot_60k) +
+      "," +
+      int_to_str(cx) +
+      "," +
+      int_to_str(cy) +
+      ")"
+  }
+  if flip_h || flip_v {
+    let sx = if flip_h { "-1" } else { "1" }
+    let sy = if flip_v { "-1" } else { "1" }
+    let mirror = "translate(" +
+      int_to_str(cx) +
+      "," +
+      int_to_str(cy) +
+      ") scale(" +
+      sx +
+      "," +
+      sy +
+      ") translate(" +
+      int_to_str(-cx) +
+      "," +
+      int_to_str(-cy) +
+      ")"
+    ops = if ops.is_empty() { mirror } else { ops + " " + mirror }
+  }
+  ops
+}
+
+///|
+/// Build SVG transform attribute combining rotation and flipH/flipV mirror,
+/// centered on (cx, cy). Returns "" when neither applies.
+fn transform_with_flip(
+  rot_60k : Int,
+  flip_h : Bool,
+  flip_v : Bool,
+  cx : Int,
+  cy : Int,
+) -> String {
+  let ops = transform_ops(rot_60k, flip_h, flip_v, cx, cy)
+  if ops.is_empty() {
+    ""
+  } else {
+    " transform=\"" + ops + "\""
+  }
+}
+
+///|
 fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
   let cx_p = px(t.x + t.cx / 2, scale)
   let cy_p = px(t.y + t.cy / 2, scale)
   rotation_transform(t.rot, cx_p, cy_p)
+}
+
+///|
+/// Like `rotation_attr` but also applies flipH/flipV mirroring. Used for shape
+/// geometry, images and text — anything that does not already account for flip
+/// by other means (lines/connectors swap their endpoints instead).
+fn transform_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
+  let cx_p = px(t.x + t.cx / 2, scale)
+  let cy_p = px(t.y + t.cy / 2, scale)
+  transform_with_flip(t.rot, t.flip_h, t.flip_v, cx_p, cy_p)
 }
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
@@ -1449,7 +1521,12 @@ pub fn render_shape(
   if cy_p <= 0 && !is_line {
     return ""
   }
+  // Pure rotation transform — used by lines/connectors, which encode flip by
+  // swapping their endpoints rather than mirroring the geometry.
   let rot = rotation_attr(t, scale)
+  // Rotation + flipH/flipV mirror — used by everything else (rect, ellipse,
+  // preset/custom geometry, images, picture borders).
+  let xform = transform_attr(t, scale)
 
   // Build data-ooxml-* attributes for the <g> wrapper
   let g_attrs = da("shape-type", shape_type_str(shape.kind)) +
@@ -1791,7 +1868,7 @@ pub fn render_shape(
           ai("ry", cy_p / 2) +
           fill +
           stroke +
-          rot +
+          xform +
           "/>"
         @ooxml.ShapeGeom::Line =>
           render_line_geom(
@@ -1819,9 +1896,11 @@ pub fn render_shape(
             rot,
           )
         @ooxml.ShapeGeom::Other(prst, avs) =>
-          render_preset_geom(prst, avs, cx_p, cy_p, x_p, y_p, fill, stroke, rot)
+          render_preset_geom(
+            prst, avs, cx_p, cy_p, x_p, y_p, fill, stroke, xform,
+          )
         @ooxml.ShapeGeom::Custom(data) =>
-          render_custom_geom(data, cx_p, cy_p, x_p, y_p, fill, stroke, rot)
+          render_custom_geom(data, cx_p, cy_p, x_p, y_p, fill, stroke, xform)
         _ => {
           // Rect / RoundRect
           let rx = match geom {
@@ -1839,7 +1918,7 @@ pub fn render_shape(
             ai("height", cy_p) +
             fill +
             stroke +
-            rot
+            xform
           if rx == "0" {
             base + "/>"
           } else {
@@ -1888,7 +1967,7 @@ pub fn render_shape(
             let clip_id = blip_clip_id("blipclip", slide_num, shape_idx)
             filter_defs +
             render_cropped_image_with_filter(
-              bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr,
+              bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, xform, filter_attr,
             )
           } else {
             filter_defs +
@@ -1901,7 +1980,7 @@ pub fn render_shape(
             a("href", href) +
             opacity +
             filter_attr +
-            rot +
+            xform +
             "/>"
           }
         }
@@ -1956,7 +2035,7 @@ pub fn render_shape(
         " fill=\"" +
         image_placeholder_fill +
         "\"" +
-        rot +
+        xform +
         "/>"
       if href.is_empty() {
         placeholder
@@ -1968,7 +2047,7 @@ pub fn render_shape(
           let clip_id = blip_clip_id("picclip", slide_num, shape_idx)
           filter_defs +
           render_cropped_image_with_filter(
-            bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, rot, filter_attr,
+            bf, href, x_p, y_p, cx_p, cy_p, clip_id, opacity, xform, filter_attr,
           )
         } else {
           filter_defs +
@@ -1981,7 +2060,7 @@ pub fn render_shape(
           a("href", href) +
           opacity +
           filter_attr +
-          rot +
+          xform +
           "/>"
         }
         // Render border if picture has a stroke (a:ln)
@@ -2000,7 +2079,7 @@ pub fn render_shape(
           " fill=\"none\"" +
           a("stroke", shape.stroke.to_css()) +
           a("stroke-width", sw_str) +
-          rot +
+          xform +
           "/>"
         } else {
           ""
@@ -2142,6 +2221,27 @@ fn render_group(
       "," +
       int_to_str(-ch_off_y) +
       ")"
+  }
+  // Group flip — mirror the whole group about its center, before any rotation.
+  if t.flip_h || t.flip_v {
+    let cx_p = px(t.cx / 2, scale)
+    let cy_p = px(t.cy / 2, scale)
+    let fsx = if t.flip_h { "-1" } else { "1" }
+    let fsy = if t.flip_v { "-1" } else { "1" }
+    transform_str = "translate(" +
+      int_to_str(off_x + cx_p) +
+      "," +
+      int_to_str(off_y + cy_p) +
+      ") scale(" +
+      fsx +
+      "," +
+      fsy +
+      ") translate(" +
+      int_to_str(-(off_x + cx_p)) +
+      "," +
+      int_to_str(-(off_y + cy_p)) +
+      ") " +
+      transform_str
   }
   // Group rotation
   if t.rot != 0 {
