@@ -139,3 +139,31 @@ deco_sp_xml = f"""
 </p:sp>
 """
 spTree98.append(etree.fromstring(deco_sp_xml))
+
+# ── Slide 99: flipH/flipV mirroring (issue #55) ───────────────────────────────
+# Regression: the renderer emitted rotate() but dropped flipH/flipV, so shapes
+# and their (mirrored) text rendered un-flipped vs PowerPoint. Each text box
+# below sets a flip on <a:xfrm>; the SVG must carry a negative-scale transform.
+slide99 = prs.slides.add_slide(blank)
+spTree99 = slide99.shapes._spTree
+
+flip_variants = (
+    ("FlipH", 'flipH="1"', 457200),
+    ("FlipV", 'flipV="1"', 3886200),
+    ("FlipHV", 'flipH="1" flipV="1"', 7315200),
+)
+for idx, (name, flip_attr, x) in enumerate(flip_variants):
+    sp_xml = f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="{9900 + idx}" name="{name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm {flip_attr}><a:off x="{x}" y="2743200"/><a:ext cx="2743200" cy="1371600"/></a:xfrm>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:solidFill><a:srgbClr val="DDEEFF"/></a:solidFill>
+  </p:spPr>
+  <p:txBody><a:bodyPr/><a:lstStyle/>
+    <a:p><a:r><a:rPr lang="en-US" sz="2400"/><a:t>{name}</a:t></a:r></a:p>
+  </p:txBody>
+</p:sp>
+"""
+    spTree99.append(etree.fromstring(sp_xml))

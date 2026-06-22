@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2
+
+### Bug Fixes
+
+- **flipH / flipV now applied when rendering ([#55](https://github.com/t-ujiie-g/pptx-svg/issues/55))** — a shape's `<a:xfrm flipH="1"/>` / `flipV="1"` was dropped during rendering: only the `rotate()` part of the transform was emitted, so shapes and their (mirrored) text rendered un-flipped vs. PowerPoint. The renderer now emits a negative-scale mirror (`scale(-1,1)` / `scale(1,-1)`) about the shape center for autoshape geometry (rect, ellipse, preset/custom geom), images, picture borders and text, composed with any rotation as `rotate(...) <mirror>` (OOXML applies flip in the unrotated frame, then rotates). Group shapes (`p:grpSp`) are likewise mirrored about their center. Lines/connectors were already correct (they encode flip by swapping endpoints) and are unchanged.
+
 ## 0.6.1
 
 ### Features

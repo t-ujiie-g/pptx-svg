@@ -1170,10 +1170,12 @@ fn render_text(
         h = h + a("glyph-orientation-vertical", "auto")
       }
     }
-    if bp_rot != 0 {
+    if bp_rot != 0 || t.flip_h || t.flip_v {
       let txt_cx = px(t.x + t.cx / 2, scale)
       let txt_cy = px(t.y + t.cy / 2, scale)
-      h = h + rotation_transform(bp_rot, txt_cx, txt_cy)
+      // Mirror text for flipH/flipV (matches PowerPoint), combined with any
+      // shape/body rotation so both pivot on the same center.
+      h = h + transform_with_flip(bp_rot, t.flip_h, t.flip_v, txt_cx, txt_cy)
     }
     h + ">"
   }
