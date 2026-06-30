@@ -12,6 +12,4 @@ keywords = [ ]
 
 description = "PPTX viewer/editor compiled to WebAssembly via MoonBit"
 
-options(
-  source: "src",
-)
+source = "src"
