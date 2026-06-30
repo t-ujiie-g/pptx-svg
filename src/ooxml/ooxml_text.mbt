@@ -454,6 +454,27 @@ fn default_text_run(
 }
 
 ///|
+/// Split a string on embedded LF (`\n`) characters. PowerPoint renders a raw
+/// newline inside `<a:t>` as a forced line break (same as `<a:br/>`), even
+/// though this is outside the strict OOXML text-run schema — some
+/// generators (e.g. python-pptx multi-line `text =` assignment) emit it.
+fn split_by_newline(s : String) -> Array[String] {
+  let parts : Array[String] = []
+  let len = s.length()
+  let mut start = 0
+  let mut i = 0
+  while i < len {
+    if s.get_char(i).unwrap() == '\n' {
+      parts.push(@xml.str_substring(s, start, i))
+      start = i + 1
+    }
+    i = i + 1
+  }
+  parts.push(@xml.str_substring(s, start, len))
+  parts
+}
+
+///|
 /// Parse run properties from <a:rPr> with defRPr fallback. Returns a TextRun (text field set to "").
 fn parse_run_props(
   rpr : @xml.XmlNode,
@@ -744,21 +765,34 @@ fn parse_text_body(
           Some(t_node) => @xml.get_text_content(t_node)
         }
         if !text.is_empty() {
-          let run = match @xml.find_child(r_ch, "a:rPr") {
+          let base_run = match @xml.find_child(r_ch, "a:rPr") {
             None =>
               default_text_run(
-                text, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+                "", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
                 def_font_face, def_ea_font,
               )
-            Some(rpr) => {
-              let rp = parse_run_props(
+            Some(rpr) =>
+              parse_run_props(
                 rpr, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
                 def_font_face, def_ea_font, theme,
               )
-              { ..rp, text, }
-            }
           }
-          runs.push(run)
+          if text.contains("\n") {
+            let segs = split_by_newline(text)
+            let ns = segs.length()
+            let mut si = 0
+            while si < ns {
+              if !segs[si].is_empty() {
+                runs.push({ ..base_run, text: segs[si] })
+              }
+              if si < ns - 1 {
+                runs.push({ ..base_run, text: "\n" })
+              }
+              si = si + 1
+            }
+          } else {
+            runs.push({ ..base_run, text, })
+          }
         }
       } else if child_tag == "m:oMath" || child_tag == "m:oMathPara" {
         // OMML math equation — preserve raw XML, extract plain text from m:t elements

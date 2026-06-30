@@ -403,16 +403,14 @@ fn render_table(
   let mut rhi = 0
   while rhi < nrows {
     let h = table.rows[rhi].height
-    if h > 0 {
-      row_heights_emu.push(h)
-    } else {
-      // Auto-size: compute max text height across all cells in this row
-      let row = table.rows[rhi]
-      let mut max_cell_h_emu = min_row_h_emu
-      let nc = row.cells.length()
-      let mut ci2 = 0
-      let mut col2 = 0
-      while ci2 < nc {
+    // PowerPoint treats a:tr/@h as a minimum row height — rows still grow to
+    // fit wrapped text, so always compute content height and take the max.
+    let row = table.rows[rhi]
+    let mut max_cell_h_emu = if h > 0 { h } else { min_row_h_emu }
+    let nc = row.cells.length()
+    let mut ci2 = 0
+    let mut col2 = 0
+    while ci2 < nc {
         let cell = row.cells[ci2]
         if !cell.h_merge && !cell.v_merge {
           let mar_t_emu = if cell.mar_t >= 0 {
@@ -515,8 +513,7 @@ fn render_table(
         col2 = col2 + gs3
         ci2 = ci2 + 1
       }
-      row_heights_emu.push(max_cell_h_emu)
-    }
+    row_heights_emu.push(max_cell_h_emu)
     rhi = rhi + 1
   }
   // Precompute row y-offsets in EMU

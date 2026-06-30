@@ -1,6 +1,6 @@
 name = "pptx-svg"
 
-version = "0.6.1"
+version = "0.6.3"
 
 readme = "README.md"
 
