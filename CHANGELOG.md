@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.3
+
+### Bug Fixes
+
+- **Table row no longer overlaps the next row when its content needs more lines than the authored row height** — `<a:tr h="...">` was previously rendered as a hard, fixed height. PowerPoint instead treats it as a *minimum*: a row still grows to fit wrapped/forced-break text taller than that height. The renderer now always computes each row's required content height and uses `max(authored_h, content_h)`, so a tall cell pushes the following rows down instead of overlapping them.
+- **Literal newline characters embedded inside a single `<a:t>` run now render as line breaks** — some generators (e.g. a python-pptx multi-line `text=` assignment) write a raw `\n` inside one run's text instead of separate `<a:br/>` elements. This was previously ignored by the wrap engine (treated as ordinary text), so the line wrapped at the wrong place and — compounding the row-height bug above — the row-height estimate undercounted the number of lines. `<a:t>` parsing now splits such runs on `\n`, inserting synthetic break runs (reusing the existing `<a:br/>` handling), so wrapping and row-height calculation are accurate.
+
 ## 0.6.2
 
 ### Bug Fixes
