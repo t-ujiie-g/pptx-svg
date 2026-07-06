@@ -409,6 +409,7 @@ fn render_run_with_tabs(
   fs : Int,
   rels : Array[@ooxml.Relationship],
   theme : @ooxml.ThemeData,
+  fill_ref : String,
 ) -> (String, Int) {
   if tab_stops.length() > 0 && contains_tab(display_text) {
     let parts = split_by_tab(display_text)
@@ -423,13 +424,16 @@ fn render_run_with_tabs(
         out = out + "</tspan><tspan" + ai("x", tab_x) + ai("y", cur_y) + ">"
         ti = ti + 1
       }
-      out = out + render_run_tspan(run, run_idx, part, scale, fs, rels, theme)
+      out = out +
+        render_run_tspan(run, run_idx, part, scale, fs, rels, theme, fill_ref)
       parti = parti + 1
     }
     (out, ti)
   } else {
     (
-      render_run_tspan(run, run_idx, display_text, scale, fs, rels, theme),
+      render_run_tspan(
+        run, run_idx, display_text, scale, fs, rels, theme, fill_ref,
+      ),
       tab_idx,
     )
   }
@@ -674,7 +678,65 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
 }
 
 ///|
+/// Fill def ID referenced by a text run's gradient/pattern fill, or "" when
+/// the run has neither. The matching def is emitted by render_run_fill_defs.
+fn run_text_fill_ref(
+  run : @ooxml.TextRun,
+  slide_num : Int,
+  shape_idx : Int,
+  para_idx : Int,
+  run_idx : Int,
+) -> String {
+  if !run.text_grad_fill.is_none() && run.text_grad_fill.stops.length() > 0 {
+    text_fill_id("tgrad-s", slide_num, shape_idx, para_idx, run_idx)
+  } else if !run.text_patt_fill.is_none() {
+    text_fill_id("tpatt-s", slide_num, shape_idx, para_idx, run_idx)
+  } else {
+    ""
+  }
+}
+
+///|
+/// Gradient/pattern defs for text-run fills (a:rPr/a:gradFill, a:pattFill),
+/// wrapped in <defs> ("" when no run has one). Def IDs come from
+/// run_text_fill_ref, so tspans reference them by construction; wrapped
+/// fragments of one run share a single def.
+fn render_run_fill_defs(
+  paragraphs : Array[@ooxml.TextParagraph],
+  slide_num : Int,
+  shape_idx : Int,
+) -> String {
+  let mut defs = ""
+  let mut pi = 0
+  while pi < paragraphs.length() {
+    let para = paragraphs[pi]
+    let mut ri = 0
+    while ri < para.runs.length() {
+      let run = para.runs[ri]
+      let fill_ref = run_text_fill_ref(run, slide_num, shape_idx, pi, ri)
+      if !fill_ref.is_empty() {
+        if !run.text_grad_fill.is_none() {
+          defs = defs + render_gradient_def(run.text_grad_fill, fill_ref)
+        } else {
+          defs = defs + render_pattern_def(run.text_patt_fill, fill_ref)
+        }
+      }
+      ri = ri + 1
+    }
+    pi = pi + 1
+  }
+  if defs.is_empty() {
+    ""
+  } else {
+    "<defs>" + defs + "</defs>"
+  }
+}
+
+///|
 /// Render a single text run as a <tspan> element.
+/// fill_ref: def ID of the run's gradient/pattern fill ("" = none); the def
+/// itself is emitted by render_text. Callers without a defs context (tables)
+/// pass "" and get the solid-color fallback.
 fn render_run_tspan(
   run : @ooxml.TextRun,
   ri : Int,
@@ -683,6 +745,7 @@ fn render_run_tspan(
   font_scale : Int,
   rels : Array[@ooxml.Relationship],
   theme : @ooxml.ThemeData,
+  fill_ref : String,
 ) -> String {
   let mut span = "<tspan"
   // Visual attributes
@@ -712,10 +775,17 @@ fn render_run_tspan(
   if !ff.is_empty() {
     span = span + a("font-family", ff + ", sans-serif")
   }
-  // Color: explicit color, or theme hlink/folHlink color for hyperlinks
-  // For text gradient fill, use the first stop color as fallback display
-  if !run.text_grad_fill.is_none() && run.text_grad_fill.stops.length() > 0 {
+  // Color: gradient/pattern fill def reference, explicit color, or theme
+  // hlink/folHlink color for hyperlinks. Without a def (fill_ref empty),
+  // gradient falls back to the first stop color and pattern to fgClr.
+  if !fill_ref.is_empty() {
+    span = span + a("fill", "url(#" + fill_ref + ")")
+  } else if !run.text_grad_fill.is_none() &&
+    run.text_grad_fill.stops.length() > 0 {
     span = span + a("fill", run.text_grad_fill.stops[0].color.to_css())
+  } else if !run.text_patt_fill.is_none() &&
+    !run.text_patt_fill.fg_color.is_none() {
+    span = span + a("fill", run.text_patt_fill.fg_color.to_css())
   } else if !run.color.is_none() {
     span = span + a("fill", run.color.to_css())
   } else if !run.hlink_rid.is_empty() && !theme.hlink.is_none() {
@@ -1030,6 +1100,9 @@ fn render_text(
       paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
     )
   }
+  let run_fill_defs_section = render_run_fill_defs(
+    paragraphs, slide_num, shape_idx,
+  )
   // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
   let l_ins = if body_props.l_ins >= 0 {
     body_props.l_ins
@@ -1554,6 +1627,7 @@ fn render_text(
               fs,
               rels,
               theme,
+              run_text_fill_ref(run, slide_num, shape_idx, pi, run_idx),
             )
             out = out + tab_svg
             tab_idx = new_ti
@@ -1599,6 +1673,7 @@ fn render_text(
             fs,
             rels,
             theme,
+            run_text_fill_ref(run, slide_num, shape_idx, pi, ri),
           )
           out = out + tab_svg
           tab_idx = new_ti
@@ -1614,7 +1689,7 @@ fn render_text(
       pi = pi + 1
     }
   }
-  img_bullets_svg + out + "</text>"
+  run_fill_defs_section + img_bullets_svg + out + "</text>"
 }
 
 // ── Text height estimation ──────────────────────────────────────────────────

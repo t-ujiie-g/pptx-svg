@@ -897,6 +897,21 @@ grad_xml71b = f"""<a:gradFill xmlns:a="{ns_a}">
 </a:gradFill>"""
 rpr71b.append(etree.fromstring(grad_xml71b))
 
+# Third text with pattern fill (a:pattFill in a:rPr)
+tb71c = slide71.shapes.add_textbox(Inches(0.5), Inches(6), Inches(8), Inches(1))
+tf71c = tb71c.text_frame
+p71c = tf71c.paragraphs[0]
+r71c = p71c.add_run()
+r71c.text = "Pattern Text"
+r71c.font.size = Pt(48)
+r71c.font.bold = True
+rpr71c = r71c._r.find(f'{{{ns_a}}}rPr')
+patt_xml71c = f"""<a:pattFill xmlns:a="{ns_a}" prst="ltDnDiag">
+  <a:fgClr><a:srgbClr val="1F4E79"/></a:fgClr>
+  <a:bgClr><a:srgbClr val="FFFFFF"/></a:bgClr>
+</a:pattFill>"""
+rpr71c.append(etree.fromstring(patt_xml71c))
+
 # ── Slide 72: Text warp (a:prstTxWarp) ──────────────────────────────────────
 slide72 = prs.slides.add_slide(blank)
 lbl72 = slide72.shapes.add_textbox(Inches(0.3), Inches(0.2), Inches(9), Inches(0.5))

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.4
+
+### Bug Fixes
+
+- **Text-run gradient/pattern fills now render visually ([#58](https://github.com/t-ujiie-g/pptx-svg/issues/58))** — a run's `a:rPr > a:gradFill` was previously approximated as a solid fill of the first gradient stop, and `a:rPr > a:pattFill` was not handled at all (the `<tspan>` inherited black). The renderer now emits a per-run `<linearGradient>`/`<radialGradient>`/`<pattern>` def (`tgrad-s{slide}-{shape}-{para}-{run}` / `tpatt-...`) in a `<defs>` block next to the shape's `<text>` and fills the tspan with `url(#...)`, matching PowerPoint. Table cell runs keep a solid-color fallback (first gradient stop for gradients, and now `fgClr` instead of black for patterns). Round-trip (`data-ooxml-tgrad-*` / `data-ooxml-tpatt-*`) is unchanged.
+- **Light/dark/narrow line-pattern presets now match GDI+ hatch density** — `ltDnDiag`/`dkDnDiag`/`ltUpDiag`/`dkUpDiag` and `ltHorz`/`dkHorz`/`ltVert`/`dkVert` drew one line per 8px tile (same spacing as the plain presets), which is half of PowerPoint's density — coarse enough to make pattern-filled *text* illegible. They now draw lines 4px apart (the GDI+ "50% closer than plain" definition), `narHorz`/`narVert` draw 2px apart ("75% closer"), and plain `horz`/`vert` drop a stray half-clipped extra line at the tile edge so plain (8px) / light (4px) / narrow (2px) are properly distinct.
+
 ## 0.6.3
 
 ### Bug Fixes

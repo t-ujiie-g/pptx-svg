@@ -723,6 +723,119 @@ test "roundtrip justify alignment" {
 }
 
 ///|
+test "text run gradient and pattern fill render as defs + url refs" {
+  let base_run : @ooxml.TextRun = {
+    text: "Grad",
+    bold: false,
+    bold_explicit: false,
+    italic: false,
+    font_size: 3600,
+    color: @ooxml.Color::none(),
+    font_face: "",
+    ea_font: "",
+    cs_font: "",
+    sym_font: "",
+    underline: "",
+    underline_color: @ooxml.Color::none(),
+    strike: "",
+    baseline: 0,
+    char_spacing: 0,
+    kern: 0,
+    cap: "",
+    hlink_rid: "",
+    hlink_mouse_over_rid: "",
+    effects: @ooxml.EffectList::none(),
+    outline_color: @ooxml.Color::none(),
+    outline_w: 0,
+    text_grad_fill: @ooxml.GradientFill::none(),
+    text_patt_fill: @ooxml.PatternFill::none(),
+    math_xml: "",
+  }
+  let grad_run = {
+    ..base_run,
+    text_grad_fill: {
+      ..@ooxml.GradientFill::none(),
+      stops: [
+        { pos: 0, color: @ooxml.parse_hex_color("1F4E79") },
+        { pos: 100000, color: @ooxml.parse_hex_color("2C9C9C") },
+      ],
+      angle: 5400000,
+    },
+  }
+  let patt_run = {
+    ..base_run,
+    text: "Patt",
+    text_patt_fill: {
+      prst: "ltDnDiag",
+      fg_color: @ooxml.parse_hex_color("1F4E79"),
+      bg_color: @ooxml.parse_hex_color("FFFFFF"),
+    },
+  }
+  let base_para : @ooxml.TextParagraph = {
+    runs: [grad_run, patt_run],
+    align: "",
+    level: 0,
+    spc_before: 0,
+    spc_after: 0,
+    line_spacing: 0,
+    mar_l: -1,
+    indent: 0,
+    bullet: "",
+    bullet_auto: "",
+    bullet_none: false,
+    bullet_font: "",
+    bullet_size: 0,
+    bullet_color: @ooxml.Color::none(),
+    bullet_img_rid: "",
+    tab_stops: [],
+    rtl: false,
+    epr_font_size: 0,
+    epr_color: @ooxml.Color::none(),
+    epr_font_face: "",
+    epr_ea_font: "",
+  }
+  let shape : @ooxml.Shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 5000000,
+        cy: 2000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    paragraphs: [base_para],
+  }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let svg = render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  // Gradient: def emitted with per-run ID and referenced by the tspan
+  assert_true(svg.contains("<linearGradient id=\"tgrad-s1-0-0-0\""))
+  assert_true(svg.contains("fill=\"url(#tgrad-s1-0-0-0)\""))
+  // Pattern: def emitted with per-run ID and referenced by the tspan
+  assert_true(svg.contains("<pattern id=\"tpatt-s1-0-0-1\""))
+  assert_true(svg.contains("fill=\"url(#tpatt-s1-0-0-1)\""))
+  // Round-trip: fills survive parse back from SVG
+  let parsed = @svg_parser.parse_svg_to_slide(svg)
+  let p_runs = parsed.shapes[0].paragraphs[0].runs
+  assert_eq(p_runs[0].text_grad_fill.stops.length(), 2)
+  assert_eq(p_runs[0].text_grad_fill.angle, 5400000)
+  assert_eq(p_runs[1].text_patt_fill.prst, "ltDnDiag")
+  assert_eq(p_runs[1].text_patt_fill.fg_color.to_hex(), "1F4E79")
+}
+
+///|
 /// Construct a text shape with a single bulleted paragraph for indent tests.
 /// marL = 457200 EMU (0.5"), bullet = "•", font_size = 1800 (18pt).
 fn make_bulleted_shape(indent : Int) -> @ooxml.Shape {
