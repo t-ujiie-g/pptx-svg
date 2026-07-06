@@ -238,6 +238,9 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide71 has Gradient Text', slide71.includes('Gradient Text'));
     assert('slide71 has FF0000 stop', slide71.includes('FF0000'));
     assert('slide71 has FFFF00 stop', slide71.includes('FFFF00'));
+    assert('slide71 has a:pattFill', slide71.includes('a:pattFill'));
+    assert('slide71 has ltDnDiag preset', slide71.includes('ltDnDiag'));
+    assert('slide71 has Pattern Text', slide71.includes('Pattern Text'));
   }
 
   // ── Slide 72: Text warp ─────────────────────────────────────────────────────

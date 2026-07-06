@@ -193,6 +193,37 @@ fn patt_svg_content(
   let h = int_to_str(sz / 2)
   let q = int_to_str(sz / 4)
   let q3 = int_to_str(sz * 3 / 4)
+  // Offsets for half-spaced ("light"/"dark", GDI+ 4px) parallel diagonals and
+  // eighth positions for "narrow" (GDI+ 2px) line variants
+  let nh = int_to_str(-(sz / 2))
+  let s3h = int_to_str(sz * 3 / 2)
+  let e1 = int_to_str(sz / 8)
+  let e3 = int_to_str(sz * 3 / 8)
+  let e5 = int_to_str(sz * 5 / 8)
+  let e7 = int_to_str(sz * 7 / 8)
+  // Half-spaced line sets shared by the lt/dk variants (sw = stroke width):
+  // main diagonal + two parallels shifted ±half tile (clipped at the tile
+  // edge, so the offset diagonal tiles seamlessly), or two lines at quarter
+  // positions for horizontal/vertical.
+  fn dn_diag_half(sw : String) -> String {
+    patt_line("0", "0", s, s, fg, sw) +
+    patt_line(nh, "0", h, s, fg, sw) +
+    patt_line(h, "0", s3h, s, fg, sw)
+  }
+
+  fn up_diag_half(sw : String) -> String {
+    patt_line(s, "0", "0", s, fg, sw) +
+    patt_line(s3h, "0", h, s, fg, sw) +
+    patt_line(h, "0", nh, s, fg, sw)
+  }
+
+  fn horz_half(sw : String) -> String {
+    patt_line("0", q, s, q, fg, sw) + patt_line("0", q3, s, q3, fg, sw)
+  }
+
+  fn vert_half(sw : String) -> String {
+    patt_line(q, "0", q, s, fg, sw) + patt_line(q3, "0", q3, s, fg, sw)
+  }
   // Background rect
   let br = "<rect width=\"" +
     s +
@@ -236,14 +267,16 @@ fn patt_svg_content(
     fr + patt_dot(h, q, "1", bg)
 
     // ── Diagonal lines ──
+    // lt/dk variants are half-spaced vs the plain preset (GDI+ hatch: 4px vs
+    // 8px); dk doubles the line width.
   } else if prst == "ltDnDiag" {
-    br + patt_line("0", "0", s, s, fg, "1")
+    br + dn_diag_half("1")
   } else if prst == "dkDnDiag" {
-    br + patt_line("0", "0", s, s, fg, "2")
+    br + dn_diag_half("2")
   } else if prst == "ltUpDiag" {
-    br + patt_line(s, "0", "0", s, fg, "1")
+    br + up_diag_half("1")
   } else if prst == "dkUpDiag" {
-    br + patt_line(s, "0", "0", s, fg, "2")
+    br + up_diag_half("2")
   } else if prst == "dnDiag" {
     br +
     patt_line("0", "0", s, s, fg, "1") +
@@ -264,22 +297,31 @@ fn patt_svg_content(
     br + patt_line(s, "0", h, h, fg, "1")
 
     // ── Horizontal / Vertical lines ──
+    // lt/dk = half-spaced (2 lines per tile), nar = quarter-spaced (4 lines)
   } else if prst == "ltHorz" {
-    br + patt_line("0", h, s, h, fg, "1")
+    br + horz_half("1")
   } else if prst == "dkHorz" {
-    br + patt_line("0", h, s, h, fg, "2")
+    br + horz_half("2")
   } else if prst == "ltVert" {
-    br + patt_line(h, "0", h, s, fg, "1")
+    br + vert_half("1")
   } else if prst == "dkVert" {
-    br + patt_line(h, "0", h, s, fg, "2")
+    br + vert_half("2")
   } else if prst == "horz" {
-    br + patt_line("0", h, s, h, fg, "1") + patt_line("0", "0", s, "0", fg, "1")
+    br + patt_line("0", h, s, h, fg, "1")
   } else if prst == "vert" {
-    br + patt_line(h, "0", h, s, fg, "1") + patt_line("0", "0", "0", s, fg, "1")
+    br + patt_line(h, "0", h, s, fg, "1")
   } else if prst == "narHorz" {
-    br + patt_line("0", q, s, q, fg, "1") + patt_line("0", q3, s, q3, fg, "1")
+    br +
+    patt_line("0", e1, s, e1, fg, "1") +
+    patt_line("0", e3, s, e3, fg, "1") +
+    patt_line("0", e5, s, e5, fg, "1") +
+    patt_line("0", e7, s, e7, fg, "1")
   } else if prst == "narVert" {
-    br + patt_line(q, "0", q, s, fg, "1") + patt_line(q3, "0", q3, s, fg, "1")
+    br +
+    patt_line(e1, "0", e1, s, fg, "1") +
+    patt_line(e3, "0", e3, s, fg, "1") +
+    patt_line(e5, "0", e5, s, fg, "1") +
+    patt_line(e7, "0", e7, s, fg, "1")
   } else if prst == "dashHorz" {
     br + patt_line("0", h, h, h, fg, "1")
   } else if prst == "dashVert" {

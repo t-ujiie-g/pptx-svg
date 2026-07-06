@@ -98,13 +98,20 @@ fn svg_id(
 }
 
 ///|
-/// Build a gradient definition ID. Negative shape_idx uses "-n" prefix.
-fn grad_id(slide_num : Int, shape_idx : Int) -> String {
+/// Shape index component for def IDs. Negative shape_idx (background shapes)
+/// uses "n" prefix to keep the ID free of double dashes.
+fn signed_idx_part(shape_idx : Int) -> String {
   if shape_idx >= 0 {
-    svg_id("grad-s", "-", slide_num, shape_idx)
+    int_to_str(shape_idx)
   } else {
-    "grad-s" + int_to_str(slide_num) + "-n" + int_to_str(-shape_idx)
+    "n" + int_to_str(-shape_idx)
   }
+}
+
+///|
+/// Build a gradient definition ID. Negative shape_idx uses "n" prefix.
+fn grad_id(slide_num : Int, shape_idx : Int) -> String {
+  "grad-s" + int_to_str(slide_num) + "-" + signed_idx_part(shape_idx)
 }
 
 ///|
@@ -120,6 +127,26 @@ fn stroke_grad_id(slide_num : Int, shape_idx : Int) -> String {
 ///|
 fn stroke_patt_id(slide_num : Int, shape_idx : Int) -> String {
   svg_id("spatt-s", "-", slide_num, shape_idx)
+}
+
+///|
+/// Fill definition ID for a text run's a:rPr gradient/pattern fill.
+/// prefix: "tgrad-s" (gradient) or "tpatt-s" (pattern).
+fn text_fill_id(
+  prefix : String,
+  slide_num : Int,
+  shape_idx : Int,
+  para_idx : Int,
+  run_idx : Int,
+) -> String {
+  prefix +
+  int_to_str(slide_num) +
+  "-" +
+  signed_idx_part(shape_idx) +
+  "-" +
+  int_to_str(para_idx) +
+  "-" +
+  int_to_str(run_idx)
 }
 
 ///|

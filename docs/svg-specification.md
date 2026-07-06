@@ -281,6 +281,8 @@ These attributes preserve text-run-level effects for round-trip. Prefixed `reff-
 | `data-ooxml-tpatt-prst` | string | Pattern preset |
 | `data-ooxml-tpatt-fg/bg` | string | Pattern colors |
 
+Visually, a run with a gradient/pattern fill gets `fill="url(#tgrad-s{slide}-{shape}-{para}-{run})"` (or `#tpatt-...`) referencing a `<linearGradient>`/`<radialGradient>`/`<pattern>` def emitted in a `<defs>` block next to the shape's `<text>` element. Table cell runs fall back to a solid color (first gradient stop / pattern `fgClr`). Round-trip parsing reads only the `data-ooxml-*` attributes, not the `fill` reference.
+
 ## Effects
 
 Set on the shape `<g>` element.

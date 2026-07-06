@@ -215,7 +215,7 @@ fn render_table_cell_text(
           }
           // Use render_run_tspan with segment text instead of full run text
           out = out +
-            render_run_tspan(run, run_idx, display, scale, -1, rels, theme)
+            render_run_tspan(run, run_idx, display, scale, -1, rels, theme, "")
         }
         si = si + 1
       }
