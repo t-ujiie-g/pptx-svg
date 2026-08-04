@@ -1,6 +1,6 @@
 name = "pptx-svg"
 
-version = "0.6.4"
+version = "0.6.5"
 
 readme = "README.md"
 
@@ -13,3 +13,7 @@ keywords = [ ]
 description = "PPTX viewer/editor compiled to WebAssembly via MoonBit"
 
 source = "src"
+
+preferred_target = "wasm-gc"
+
+supported_targets = [ "wasm-gc", "js" ]
