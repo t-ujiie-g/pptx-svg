@@ -302,8 +302,7 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
   }
   let len = s.length()
   let mut start = 0
-  let mut i = 0
-  while i <= len {
+  for i in 0..<=len {
     let at_end = i == len
     let is_semi = if at_end { false } else { s.get_char(i).unwrap() == ';' }
     if is_semi || at_end {
@@ -326,7 +325,6 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
       }
       start = i + 1
     }
-    i = i + 1
   }
   stops
 }
@@ -339,7 +337,7 @@ fn parse_grad_fill_from_g(g_node : @xml.XmlNode) -> @ooxml.GradientFill {
     return @ooxml.GradientFill::none()
   }
   let stops = parse_grad_stops(stops_str)
-  if stops.length() == 0 {
+  if stops.is_empty() {
     return @ooxml.GradientFill::none()
   }
   let angle = get_dai(g_node, "grad-angle")
@@ -390,7 +388,7 @@ fn parse_text_grad_fill(node : @xml.XmlNode) -> @ooxml.GradientFill {
     return @ooxml.GradientFill::none()
   }
   let stops = parse_grad_stops(stops_str)
-  if stops.length() == 0 {
+  if stops.is_empty() {
     return @ooxml.GradientFill::none()
   }
   let angle = get_dai(node, "tgrad-angle")
@@ -438,10 +436,7 @@ fn parse_text_patt_fill(node : @xml.XmlNode) -> @ooxml.PatternFill {
 fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] {
   let paras : Array[@ooxml.TextParagraph] = []
   let children = @xml.get_children(text_node)
-  let n = children.length()
-  let mut i = 0
-  while i < n {
-    let child = children[i]
+  for child in children {
     match child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "tspan" {
@@ -450,14 +445,12 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
           let level = get_dai(child, "para-lvl")
           let runs : Array[@ooxml.TextRun] = []
           let tspan_children = @xml.get_children(child)
-          let nc = tspan_children.length()
-          let mut j = 0
-          while j < nc {
-            match tspan_children[j] {
+          for tspan_child in tspan_children {
+            match tspan_child {
               @xml.XmlNode::Element(rtag, _, _) =>
                 if rtag == "tspan" {
                   // Run-level tspan
-                  let run_node = tspan_children[j]
+                  let run_node = tspan_child
                   let text = @xml.get_text_content(run_node)
                   let bold_s = get_da(run_node, "bold")
                   let bold = bold_s == "1"
@@ -543,7 +536,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   })
                 }
             }
-            j = j + 1
           }
           let bu_font = get_da(child, "bu-font")
           let bu_size = get_dai(child, "bu-size")
@@ -580,7 +572,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
         }
       _ => ()
     }
-    i = i + 1
   }
   paras
 }
@@ -686,17 +677,14 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   // Parse text from <text> children
   let children = @xml.get_children(g_node)
   let mut paragraphs : Array[@ooxml.TextParagraph] = []
-  let nc = children.length()
-  let mut i = 0
-  while i < nc {
-    match children[i] {
+  for child in children {
+    match child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "text" {
-          paragraphs = parse_text_from_svg(children[i])
+          paragraphs = parse_text_from_svg(child)
         }
       _ => ()
     }
-    i = i + 1
   }
 
   // Parse body props from data attributes
@@ -881,39 +869,33 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
 fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
   let children : Array[@ooxml.Shape] = []
   let g_children = @xml.get_children(group_g)
-  let n = g_children.length()
-  let mut i = 0
-  while i < n {
-    match g_children[i] {
+  for g_child in g_children {
+    match g_child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "g" {
           // Look inside: could be the transform <g> or a child shape <g>
-          let st = get_da(g_children[i], "shape-type")
+          let st = get_da(g_child, "shape-type")
           if !st.is_empty() {
-            children.push(parse_shape_from_g(g_children[i]))
+            children.push(parse_shape_from_g(g_child))
           } else {
             // This might be the inner transform <g> wrapping children
-            let inner_ch = @xml.get_children(g_children[i])
-            let ni = inner_ch.length()
-            let mut j = 0
-            while j < ni {
-              match inner_ch[j] {
+            let inner_ch = @xml.get_children(g_child)
+            for inner_child in inner_ch {
+              match inner_child {
                 @xml.XmlNode::Element(tag2, _, _) =>
                   if tag2 == "g" {
-                    let st2 = get_da(inner_ch[j], "shape-type")
+                    let st2 = get_da(inner_child, "shape-type")
                     if !st2.is_empty() {
-                      children.push(parse_shape_from_g(inner_ch[j]))
+                      children.push(parse_shape_from_g(inner_child))
                     }
                   }
                 _ => ()
               }
-              j = j + 1
             }
           }
         }
       _ => ()
     }
-    i = i + 1
   }
   children
 }
@@ -945,15 +927,13 @@ fn parse_adj_string(s : String) -> Array[Int] {
   let result : Array[Int] = []
   let mut start = 0
   let len = s.length()
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if s.get_char(i).unwrap() == ',' {
       if i > start {
         result.push(@xml.parse_int(@xml.str_substring(s, start, i)))
       }
       start = i + 1
     }
-    i = i + 1
   }
   if start < len {
     result.push(@xml.parse_int(@xml.str_substring(s, start, len)))
@@ -1006,20 +986,17 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
   // Parse shapes from <g data-ooxml-shape-type="..."> elements
   let shapes : Array[@ooxml.Shape] = []
   let svg_children = @xml.get_children(svg_node)
-  let n = svg_children.length()
-  let mut i = 0
-  while i < n {
-    match svg_children[i] {
+  for svg_child in svg_children {
+    match svg_child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "g" {
-          let st = get_da(svg_children[i], "shape-type")
+          let st = get_da(svg_child, "shape-type")
           if !st.is_empty() {
-            shapes.push(parse_shape_from_g(svg_children[i]))
+            shapes.push(parse_shape_from_g(svg_child))
           }
         }
       _ => ()
     }
-    i = i + 1
   }
 
   {

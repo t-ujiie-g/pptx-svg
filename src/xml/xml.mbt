@@ -26,13 +26,13 @@ pub enum XmlNode {
 
 ///|
 fn char_to_str(c : Char) -> String {
-  @ffi.ffi_char_code_to_str(Char::to_int(c))
+  @ffi.ffi_char_code_to_str(c.to_int())
 }
 
 ///|
 /// True if the character is in an astral plane (code > 0xFFFF, e.g. emoji).
 pub fn is_astral(c : Char) -> Bool {
-  Char::to_int(c) > 0xFFFF
+  c.to_int() > 0xFFFF
 }
 
 ///|
@@ -89,12 +89,10 @@ fn Parser::starts_with(self : Parser, s : String) -> Bool {
   if self.pos + slen > self.src.length() {
     return false
   }
-  let mut i = 0
-  while i < slen {
+  for i in 0..<slen {
     if self.src.get_char(self.pos + i).unwrap() != s.get_char(i).unwrap() {
       return false
     }
-    i = i + 1
   }
   true
 }
@@ -537,13 +535,10 @@ pub fn get_tag(node : XmlNode) -> String {
 pub fn get_attr(node : XmlNode, name : String) -> String? {
   match node {
     XmlNode::Element(_, attrs, _) => {
-      let n = attrs.length()
-      let mut i = 0
-      while i < n {
-        if attrs[i].name == name {
-          return Some(attrs[i].value)
+      for attr in attrs {
+        if attr.name == name {
+          return Some(attr.value)
         }
-        i = i + 1
       }
       None
     }
@@ -554,14 +549,11 @@ pub fn get_attr(node : XmlNode, name : String) -> String? {
 ///|
 /// Find the first direct child Element with the given tag.
 pub fn find_child(nodes : Array[XmlNode], tag : String) -> XmlNode? {
-  let n = nodes.length()
-  let mut i = 0
-  while i < n {
-    match nodes[i] {
-      XmlNode::Element(t, _, _) => if t == tag { return Some(nodes[i]) }
+  for node in nodes {
+    match node {
+      XmlNode::Element(t, _, _) => if t == tag { return Some(node) }
       _ => ()
     }
-    i = i + 1
   }
   None
 }
@@ -570,14 +562,11 @@ pub fn find_child(nodes : Array[XmlNode], tag : String) -> XmlNode? {
 /// Find all direct child Elements with the given tag.
 pub fn find_children(nodes : Array[XmlNode], tag : String) -> Array[XmlNode] {
   let result : Array[XmlNode] = []
-  let n = nodes.length()
-  let mut i = 0
-  while i < n {
-    match nodes[i] {
-      XmlNode::Element(t, _, _) => if t == tag { result.push(nodes[i]) }
+  for node in nodes {
+    match node {
+      XmlNode::Element(t, _, _) => if t == tag { result.push(node) }
       _ => ()
     }
-    i = i + 1
   }
   result
 }
@@ -589,22 +578,18 @@ pub fn find_children(nodes : Array[XmlNode], tag : String) -> Array[XmlNode] {
 /// `dgm:relIds` vs `ext0:relIds`).
 pub fn find_descendant(nodes : Array[XmlNode], local_name : String) -> XmlNode? {
   let suffix = ":" + local_name
-  let n = nodes.length()
-  let mut i = 0
-  while i < n {
-    match nodes[i] {
+  for node in nodes {
+    match node {
       XmlNode::Element(t, _, _) => {
         if t == local_name || str_ends_with(t, suffix) {
-          return Some(nodes[i])
+          return Some(node)
         }
-        match find_descendant(get_children(nodes[i]), local_name) {
-          Some(found) => return Some(found)
-          None => ()
+        if find_descendant(get_children(node), local_name) is Some(found) {
+          return Some(found)
         }
       }
       _ => ()
     }
-    i = i + 1
   }
   None
 }
@@ -616,14 +601,11 @@ pub fn get_text_content(node : XmlNode) -> String {
     XmlNode::Text(t) => t
     XmlNode::Element(_, _, children) => {
       let mut result = ""
-      let n = children.length()
-      let mut i = 0
-      while i < n {
-        match children[i] {
+      for child in children {
+        match child {
           XmlNode::Text(t) => result = result + t
           _ => ()
         }
-        i = i + 1
       }
       result
     }
@@ -644,10 +626,8 @@ pub fn find_path(nodes : Array[XmlNode], path : Array[String]) -> XmlNode? {
         Some(node)
       } else {
         let rest : Array[String] = []
-        let mut i = 1
-        while i < plen {
+        for i = 1; i < plen; i = i + 1 {
           rest.push(path[i])
-          i = i + 1
         }
         find_path(get_children(node), rest)
       }
@@ -669,7 +649,7 @@ pub fn parse_int(s : String) -> Int {
   }
   let mut result = 0
   while i < len {
-    let d = Char::to_int(s.get_char(i).unwrap()) - 48
+    let d = s.get_char(i).unwrap().to_int() - 48
     if d < 0 || d > 9 {
       break
     }
@@ -691,9 +671,8 @@ pub fn parse_hex_int(s : String) -> Int {
     return 0
   }
   let mut result = 0
-  let mut i = 0
-  while i < len {
-    let c = Char::to_int(s.get_char(i).unwrap())
+  for i in 0..<len {
+    let c = s.get_char(i).unwrap().to_int()
     let d = if c >= 48 && c <= 57 {
       c - 48 // '0'-'9'
     } else if c >= 65 && c <= 70 {
@@ -707,7 +686,6 @@ pub fn parse_hex_int(s : String) -> Int {
       break
     }
     result = result * 16 + d
-    i = i + 1
   }
   result
 }
@@ -751,7 +729,7 @@ pub fn str_suffix(s : String, from : Int) -> String {
   let mut i = from
   while i < len {
     let c = s.get_char(i).unwrap()
-    parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
+    parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
     i = i + char_step(c)
   }
   concat_balanced(parts)
@@ -771,25 +749,23 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
     // Try to match pat starting at i
     if i + plen <= slen {
       let mut matched = true
-      let mut k = 0
-      while k < plen {
+      for k = 0; k < plen; k = k + 1 {
         if s.get_char(i + k).unwrap() != pat.get_char(k).unwrap() {
           matched = false
           break
         }
-        k = k + 1
       }
       if matched {
         parts.push(repl)
         i = i + plen
       } else {
         let c = s.get_char(i).unwrap()
-        parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
+        parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
         i = i + char_step(c)
       }
     } else {
       let c = s.get_char(i).unwrap()
-      parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
+      parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
       i = i + char_step(c)
     }
   }
@@ -836,7 +812,7 @@ pub fn str_substring(s : String, from : Int, to : Int) -> String {
   let mut i = from
   while i < to {
     let c = s.get_char(i).unwrap()
-    parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
+    parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
     i = i + char_step(c)
   }
   concat_balanced(parts)
@@ -880,7 +856,7 @@ pub fn xml_escape(s : String) -> String {
     } else if c == '\'' {
       parts.push("&apos;")
     } else {
-      parts.push(@ffi.ffi_char_code_to_str(Char::to_int(c)))
+      parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
     }
     i = i + char_step(c)
   }
@@ -918,20 +894,15 @@ pub fn serialize_node(node : XmlNode) -> String {
     XmlNode::Text(s) => xml_escape(s)
     XmlNode::Element(tag, attrs, children) => {
       let mut out = "<" + tag
-      let mut i = 0
-      while i < attrs.length() {
-        let kv = attrs[i]
+      for kv in attrs {
         out = out + " " + kv.name + "=\"" + xml_escape(kv.value) + "\""
-        i = i + 1
       }
-      if children.length() == 0 {
+      if children.is_empty() {
         out + "/>"
       } else {
         out = out + ">"
-        let mut j = 0
-        while j < children.length() {
-          out = out + serialize_node(children[j])
-          j = j + 1
+        for child in children {
+          out = out + serialize_node(child)
         }
         out + "</" + tag + ">"
       }

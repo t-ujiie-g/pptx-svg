@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.5
+
+Maintenance release: MoonBit sources brought up to current idiomatic syntax, and
+the IDE's default-target check fixed. No user-visible behavior change — the public
+API, the SVG output format (`docs/svg-specification.md`) and the OOXML export are
+unchanged.
+
+### Fixes
+
+- **`moon check` / the VSCode MoonBit extension no longer report 25 spurious errors in `src/ffi/ffi.mbt`** — the toolchain's default target is the `native` backend, where a bare `pub fn f(s : String) -> String = "pptx_ffi" "…"` declaration is interpreted as a **C** stub and `String` is not a valid C stub type (`[4042] Invalid stub type`, plus `[0055] unannotated_ffi`). The project only ever builds `wasm-gc` (release) and `js` (tests), where the declarations have always been clean. `moon.mod` now declares `preferred_target = "wasm-gc"` and `supported_targets = [ "wasm-gc", "js" ]`, so a target-less `moon check` — which is what the language server runs — checks the backend the project actually targets. (Requires a VSCode window reload to pick up.)
+
+### Refactoring
+
+- **MoonBit sources modernized to current idiomatic syntax** (no behavior change — SVG and OOXML output are byte-identical across all fixture and real-world decks, and the full test suite is unchanged at 200 MoonBit + 257 Node assertions).
+  - **Loops**: 178 hand-rolled `let mut i = 0; while i < n { … i = i + 1 }` loops became `for x in xs` (84 sites) or range loops `for i in 0..<n` / `..<=` / `>..` / `>=..` (86 new sites, matching the style already used in `renderer_chart.mbt`). `while` count drops 269 → 91; the loops that remain are the ones that genuinely need manual control (body-local step size, `continue` that must skip the increment, or an index read after the loop).
+  - **Option handling**: 106 two-armed `match opt { Some(x) => … None => () }` blocks became `if opt is Some(x) { … }`, removing a level of nesting from the OOXML parsers (`ooxml_parse.mbt`, `ooxml_theme.mbt`, `ooxml_chart.mbt`) and the placeholder-inheritance code.
+  - **Emptiness checks**: all 74 remaining `.length() == 0` / `.length() > 0` comparisons became `.is_empty()` / `!….is_empty()`.
+  - **Method syntax**: `Char::to_int(c)` → `c.to_int()`.
+  - Net effect: ~700 fewer lines of MoonBit with the same semantics.
+  - Every converted loop was machine-audited afterwards: each new range loop's bound is provably invariant for the duration of the loop (a range is evaluated once, unlike a re-checked `while` condition), and no `for x in xs` body resizes the collection it iterates. `CLAUDE.md` gains a "MoonBit loop and Option style" section recording these rules and the cases that must stay `while`.
+
 ## 0.6.4
 
 ### Bug Fixes

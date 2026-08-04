@@ -92,24 +92,18 @@ fn parse_gradient_fill(
       let gf_ch = @xml.get_children(gf_node)
       // Parse gradient stops
       let stops : Array[GradientStop] = []
-      match @xml.find_child(gf_ch, "a:gsLst") {
-        None => ()
-        Some(gs_lst) => {
-          let gs_nodes = @xml.find_children(@xml.get_children(gs_lst), "a:gs")
-          let ngs = gs_nodes.length()
-          let mut gi = 0
-          while gi < ngs {
-            let pos = attr_int(gs_nodes[gi], "pos")
-            let color = parse_color_from_children(
-              @xml.get_children(gs_nodes[gi]),
-              theme,
-            )
-            stops.push({ pos, color })
-            gi = gi + 1
-          }
+      if @xml.find_child(gf_ch, "a:gsLst") is Some(gs_lst) {
+        let gs_nodes = @xml.find_children(@xml.get_children(gs_lst), "a:gs")
+        for gs_node in gs_nodes {
+          let pos = attr_int(gs_node, "pos")
+          let color = parse_color_from_children(
+            @xml.get_children(gs_node),
+            theme,
+          )
+          stops.push({ pos, color })
         }
       }
-      if stops.length() == 0 {
+      if stops.is_empty() {
         return GradientFill::none()
       }
       // Parse linear gradient: <a:lin ang="N" scaled="0|1"/>
@@ -123,26 +117,23 @@ fn parse_gradient_fill(
         Some(lin) => angle = attr_int(lin, "ang")
         None =>
           // Parse path gradient: <a:path path="circle|rect|shape">
-          match @xml.find_child(gf_ch, "a:path") {
-            Some(path_node) => {
-              angle = -1
-              path_type = match @xml.get_attr(path_node, "path") {
-                Some(v) => v
-                None => "circle"
-              }
-              // Parse <a:fillToRect l="N" t="N" r="N" b="N"/>
-              match
-                @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
-                Some(ftr) => {
-                  fill_to_l = attr_int(ftr, "l")
-                  fill_to_t = attr_int(ftr, "t")
-                  fill_to_r = attr_int(ftr, "r")
-                  fill_to_b = attr_int(ftr, "b")
-                }
-                None => ()
-              }
+          if @xml.find_child(gf_ch, "a:path") is Some(path_node) {
+            angle = -1
+            path_type = match @xml.get_attr(path_node, "path") {
+              Some(v) => v
+              None => "circle"
             }
-            None => ()
+            // Parse <a:fillToRect l="N" t="N" r="N" b="N"/>
+            match
+              @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
+              Some(ftr) => {
+                fill_to_l = attr_int(ftr, "l")
+                fill_to_t = attr_int(ftr, "t")
+                fill_to_r = attr_int(ftr, "r")
+                fill_to_b = attr_int(ftr, "b")
+              }
+              None => ()
+            }
           }
       }
       let tile_flip = match @xml.get_attr(gf_node, "tileFlip") {
@@ -216,7 +207,7 @@ fn parse_stroke(
       }
       let ln_ch = @xml.get_children(ln)
       // Empty <a:ln></a:ln> with no width and no children = no visible line
-      if ln_ch.length() == 0 && w == 0 {
+      if ln_ch.is_empty() && w == 0 {
         return StrokeProps::default()
       }
       let no_fill = match @xml.find_child(ln_ch, "a:noFill") {
@@ -250,96 +241,80 @@ fn parse_stroke(
           }
       }
       if dash.is_empty() {
-        match @xml.find_child(ln_ch, "a:custDash") {
-          None => ()
-          Some(cd) => {
-            // a:custDash contains a:ds children with d (dash) and sp (space) percentages
-            // Format: "custDash:d1,sp1;d2,sp2;..." (percentages of line width * 100)
-            let ds_nodes = @xml.find_children(@xml.get_children(cd), "a:ds")
-            let nds = ds_nodes.length()
-            let mut cd_str = cust_dash_prefix
-            let mut di = 0
-            while di < nds {
-              if di > 0 {
-                cd_str = cd_str + ";"
-              }
-              let d_val = attr_int(ds_nodes[di], "d")
-              let sp_val = attr_int(ds_nodes[di], "sp")
-              cd_str = cd_str +
-                @xml.int_to_str(d_val) +
-                "," +
-                @xml.int_to_str(sp_val)
-              di = di + 1
+        if @xml.find_child(ln_ch, "a:custDash") is Some(cd) {
+          // a:custDash contains a:ds children with d (dash) and sp (space) percentages
+          // Format: "custDash:d1,sp1;d2,sp2;..." (percentages of line width * 100)
+          let ds_nodes = @xml.find_children(@xml.get_children(cd), "a:ds")
+          let nds = ds_nodes.length()
+          let mut cd_str = cust_dash_prefix
+          for di in 0..<nds {
+            if di > 0 {
+              cd_str = cd_str + ";"
             }
-            if nds > 0 {
-              dash = cd_str
-            }
+            let d_val = attr_int(ds_nodes[di], "d")
+            let sp_val = attr_int(ds_nodes[di], "sp")
+            cd_str = cd_str +
+              @xml.int_to_str(d_val) +
+              "," +
+              @xml.int_to_str(sp_val)
+          }
+          if nds > 0 {
+            dash = cd_str
           }
         }
       }
       // Line join
       let mut join = ""
       let mut miter_limit = 0
-      match @xml.find_child(ln_ch, "a:round") {
-        Some(_) => join = "round"
-        None => ()
+      if @xml.find_child(ln_ch, "a:round") is Some(_) {
+        join = "round"
       }
       if join.is_empty() {
-        match @xml.find_child(ln_ch, "a:bevel") {
-          Some(_) => join = "bevel"
-          None => ()
+        if @xml.find_child(ln_ch, "a:bevel") is Some(_) {
+          join = "bevel"
         }
       }
       if join.is_empty() {
-        match @xml.find_child(ln_ch, "a:miter") {
-          Some(m) => {
-            join = "miter"
-            miter_limit = attr_int(m, "lim")
-          }
-          None => ()
+        if @xml.find_child(ln_ch, "a:miter") is Some(m) {
+          join = "miter"
+          miter_limit = attr_int(m, "lim")
         }
       }
       // Arrow head
       let mut head_type = ""
       let mut head_w = ""
       let mut head_len = ""
-      match @xml.find_child(ln_ch, "a:headEnd") {
-        Some(he) => {
-          head_type = match @xml.get_attr(he, "type") {
-            Some(v) => v
-            None => ""
-          }
-          head_w = match @xml.get_attr(he, "w") {
-            Some(v) => v
-            None => ""
-          }
-          head_len = match @xml.get_attr(he, "len") {
-            Some(v) => v
-            None => ""
-          }
+      if @xml.find_child(ln_ch, "a:headEnd") is Some(he) {
+        head_type = match @xml.get_attr(he, "type") {
+          Some(v) => v
+          None => ""
         }
-        None => ()
+        head_w = match @xml.get_attr(he, "w") {
+          Some(v) => v
+          None => ""
+        }
+        head_len = match @xml.get_attr(he, "len") {
+          Some(v) => v
+          None => ""
+        }
       }
       // Arrow tail
       let mut tail_type = ""
       let mut tail_w = ""
       let mut tail_len = ""
-      match @xml.find_child(ln_ch, "a:tailEnd") {
-        Some(te) => {
-          tail_type = match @xml.get_attr(te, "type") {
-            Some(v) => v
-            None => ""
-          }
-          tail_w = match @xml.get_attr(te, "w") {
-            Some(v) => v
-            None => ""
-          }
-          tail_len = match @xml.get_attr(te, "len") {
-            Some(v) => v
-            None => ""
-          }
+      if @xml.find_child(ln_ch, "a:tailEnd") is Some(te) {
+        tail_type = match @xml.get_attr(te, "type") {
+          Some(v) => v
+          None => ""
         }
-        None => ()
+        tail_w = match @xml.get_attr(te, "w") {
+          Some(v) => v
+          None => ""
+        }
+        tail_len = match @xml.get_attr(te, "len") {
+          Some(v) => v
+          None => ""
+        }
       }
       {
         color,
@@ -624,15 +599,12 @@ fn parse_first_color(children : Array[@xml.XmlNode]) -> Color {
 /// Parse a list of colors from children (for a:duotone which has 2 color elements).
 fn parse_color_list(children : Array[@xml.XmlNode]) -> Array[Color] {
   let colors : Array[Color] = []
-  let n = children.length()
-  let mut i = 0
-  while i < n {
-    match children[i] {
+  for child in children {
+    match child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "a:srgbClr" {
-          match @xml.get_attr(children[i], "val") {
-            Some(v) => colors.push(parse_hex_color(v))
-            None => ()
+          if @xml.get_attr(child, "val") is Some(v) {
+            colors.push(parse_hex_color(v))
           }
         } else if tag == "a:schemeClr" {
           // For duotone with scheme colors, use a placeholder (rare case)
@@ -640,7 +612,6 @@ fn parse_color_list(children : Array[@xml.XmlNode]) -> Array[Color] {
         }
       _ => ()
     }
-    i = i + 1
   }
   colors
 }
@@ -660,84 +631,58 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
   let mut duotone_2 = Color::none()
   let mut clr_from = Color::none()
   let mut clr_to = Color::none()
-  match @xml.find_child(bf_ch, "a:blip") {
-    None => ()
-    Some(blip) => {
-      rid = match @xml.get_attr(blip, "r:embed") {
-        Some(v) => v
-        None => ""
+  if @xml.find_child(bf_ch, "a:blip") is Some(blip) {
+    rid = match @xml.get_attr(blip, "r:embed") {
+      Some(v) => v
+      None => ""
+    }
+    let blip_ch = @xml.get_children(blip)
+    // Parse a:alphaModFix
+    if @xml.find_child(blip_ch, "a:alphaModFix") is Some(amf) {
+      alpha = attr_int(amf, "amt")
+    }
+    // Parse a:lum (brightness/contrast)
+    if @xml.find_child(blip_ch, "a:lum") is Some(lum) {
+      bright = attr_int(lum, "bright")
+      contrast = attr_int(lum, "contrast")
+    }
+    // Parse a:duotone — contains 2 color children
+    if @xml.find_child(blip_ch, "a:duotone") is Some(dt) {
+      let dt_ch = @xml.get_children(dt)
+      let colors = parse_color_list(dt_ch)
+      if colors.length() >= 2 {
+        duotone_1 = colors[0]
+        duotone_2 = colors[1]
       }
-      let blip_ch = @xml.get_children(blip)
-      // Parse a:alphaModFix
-      match @xml.find_child(blip_ch, "a:alphaModFix") {
-        Some(amf) => alpha = attr_int(amf, "amt")
-        None => ()
+    }
+    // Parse a:clrChange — from/to color
+    if @xml.find_child(blip_ch, "a:clrChange") is Some(cc) {
+      let cc_ch = @xml.get_children(cc)
+      if @xml.find_child(cc_ch, "a:clrFrom") is Some(from_node) {
+        clr_from = parse_first_color(@xml.get_children(from_node))
       }
-      // Parse a:lum (brightness/contrast)
-      match @xml.find_child(blip_ch, "a:lum") {
-        Some(lum) => {
-          bright = attr_int(lum, "bright")
-          contrast = attr_int(lum, "contrast")
-        }
-        None => ()
+      if @xml.find_child(cc_ch, "a:clrTo") is Some(to_node) {
+        clr_to = parse_first_color(@xml.get_children(to_node))
       }
-      // Parse a:duotone — contains 2 color children
-      match @xml.find_child(blip_ch, "a:duotone") {
-        Some(dt) => {
-          let dt_ch = @xml.get_children(dt)
-          let colors = parse_color_list(dt_ch)
-          if colors.length() >= 2 {
-            duotone_1 = colors[0]
-            duotone_2 = colors[1]
-          }
-        }
-        None => ()
-      }
-      // Parse a:clrChange — from/to color
-      match @xml.find_child(blip_ch, "a:clrChange") {
-        Some(cc) => {
-          let cc_ch = @xml.get_children(cc)
-          match @xml.find_child(cc_ch, "a:clrFrom") {
-            Some(from_node) =>
-              clr_from = parse_first_color(@xml.get_children(from_node))
-            None => ()
-          }
-          match @xml.find_child(cc_ch, "a:clrTo") {
-            Some(to_node) =>
-              clr_to = parse_first_color(@xml.get_children(to_node))
-            None => ()
-          }
-        }
-        None => ()
-      }
-      // Parse asvg:svgBlip from a:extLst
-      match @xml.find_child(blip_ch, "a:extLst") {
-        Some(ext_lst) => {
-          let exts = @xml.get_children(ext_lst)
-          let n = exts.length()
-          let mut i = 0
-          while i < n {
-            let ext_ch = @xml.get_children(exts[i])
-            // Look for asvg:svgBlip or any svgBlip tag
-            let m = ext_ch.length()
-            let mut j = 0
-            while j < m {
-              match ext_ch[j] {
-                @xml.XmlNode::Element(tag, _, _) =>
-                  if tag == "asvg:svgBlip" || tag == "a16:svgBlip" {
-                    svg_rid = match @xml.get_attr(ext_ch[j], "r:embed") {
-                      Some(v) => v
-                      None => ""
-                    }
-                  }
-                _ => ()
+    }
+    // Parse asvg:svgBlip from a:extLst
+    if @xml.find_child(blip_ch, "a:extLst") is Some(ext_lst) {
+      let exts = @xml.get_children(ext_lst)
+      for ext in exts {
+        let ext_ch = @xml.get_children(ext)
+        // Look for asvg:svgBlip or any svgBlip tag
+        for ext_node in ext_ch {
+          match ext_node {
+            @xml.XmlNode::Element(tag, _, _) =>
+              if tag == "asvg:svgBlip" || tag == "a16:svgBlip" {
+                svg_rid = match @xml.get_attr(ext_node, "r:embed") {
+                  Some(v) => v
+                  None => ""
+                }
               }
-              j = j + 1
-            }
-            i = i + 1
+            _ => ()
           }
         }
-        None => ()
       }
     }
   }
@@ -752,14 +697,11 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
   let mut src_t = 0
   let mut src_r = 0
   let mut src_b = 0
-  match @xml.find_child(bf_ch, "a:srcRect") {
-    Some(sr) => {
-      src_l = attr_int(sr, "l")
-      src_t = attr_int(sr, "t")
-      src_r = attr_int(sr, "r")
-      src_b = attr_int(sr, "b")
-    }
-    None => ()
+  if @xml.find_child(bf_ch, "a:srcRect") is Some(sr) {
+    src_l = attr_int(sr, "l")
+    src_t = attr_int(sr, "t")
+    src_r = attr_int(sr, "r")
+    src_b = attr_int(sr, "b")
   }
   // Parse a:tile element
   let mut tile_tx = 0
@@ -768,22 +710,19 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
   let mut tile_sy = 0
   let mut tile_flip = ""
   let mut tile_algn = ""
-  match @xml.find_child(bf_ch, "a:tile") {
-    Some(tile) => {
-      tile_tx = attr_int(tile, "tx")
-      tile_ty = attr_int(tile, "ty")
-      tile_sx = attr_int(tile, "sx")
-      tile_sy = attr_int(tile, "sy")
-      tile_flip = match @xml.get_attr(tile, "flip") {
-        Some(v) => v
-        None => ""
-      }
-      tile_algn = match @xml.get_attr(tile, "algn") {
-        Some(v) => v
-        None => ""
-      }
+  if @xml.find_child(bf_ch, "a:tile") is Some(tile) {
+    tile_tx = attr_int(tile, "tx")
+    tile_ty = attr_int(tile, "ty")
+    tile_sx = attr_int(tile, "sx")
+    tile_sy = attr_int(tile, "sy")
+    tile_flip = match @xml.get_attr(tile, "flip") {
+      Some(v) => v
+      None => ""
     }
-    None => ()
+    tile_algn = match @xml.get_attr(tile, "algn") {
+      Some(v) => v
+      None => ""
+    }
   }
   {
     rid,
@@ -858,25 +797,18 @@ fn parse_pattern_fill(
 fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
   let mut click_rid = ""
   let mut hover_rid = ""
-  match @xml.find_child(nv_ch, "p:cNvPr") {
-    None => ()
-    Some(cnvpr) => {
-      let cnvpr_ch = @xml.get_children(cnvpr)
-      match @xml.find_child(cnvpr_ch, "a:hlinkClick") {
-        None => ()
-        Some(hc) =>
-          click_rid = match @xml.get_attr(hc, "r:id") {
-            Some(v) => v
-            None => ""
-          }
+  if @xml.find_child(nv_ch, "p:cNvPr") is Some(cnvpr) {
+    let cnvpr_ch = @xml.get_children(cnvpr)
+    if @xml.find_child(cnvpr_ch, "a:hlinkClick") is Some(hc) {
+      click_rid = match @xml.get_attr(hc, "r:id") {
+        Some(v) => v
+        None => ""
       }
-      match @xml.find_child(cnvpr_ch, "a:hlinkHover") {
-        None => ()
-        Some(hh) =>
-          hover_rid = match @xml.get_attr(hh, "r:id") {
-            Some(v) => v
-            None => ""
-          }
+    }
+    if @xml.find_child(cnvpr_ch, "a:hlinkHover") is Some(hh) {
+      hover_rid = match @xml.get_attr(hh, "r:id") {
+        Some(v) => v
+        None => ""
       }
     }
   }
@@ -981,31 +913,22 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let mut ph_idx = -1
   let mut sh_link_rid = ""
   let mut sh_link_hover_rid = ""
-  match @xml.find_child(ch, "p:nvSpPr") {
-    None => ()
-    Some(nvsp) => {
-      let nvsp_ch = @xml.get_children(nvsp)
-      // Parse shape hyperlinks from p:cNvPr
-      let (lr, hr) = parse_cnvpr_links(nvsp_ch)
-      sh_link_rid = lr
-      sh_link_hover_rid = hr
-      match @xml.find_child(nvsp_ch, "p:nvPr") {
-        None => ()
-        Some(nvpr) => {
-          let nvpr_ch = @xml.get_children(nvpr)
-          match @xml.find_child(nvpr_ch, "p:ph") {
-            None => ()
-            Some(ph) => {
-              ph_type = match @xml.get_attr(ph, "type") {
-                Some(v) => v
-                None => "body"
-              }
-              ph_idx = match @xml.get_attr(ph, "idx") {
-                Some(v) => @xml.parse_int(v)
-                None => -1
-              }
-            }
-          }
+  if @xml.find_child(ch, "p:nvSpPr") is Some(nvsp) {
+    let nvsp_ch = @xml.get_children(nvsp)
+    // Parse shape hyperlinks from p:cNvPr
+    let (lr, hr) = parse_cnvpr_links(nvsp_ch)
+    sh_link_rid = lr
+    sh_link_hover_rid = hr
+    if @xml.find_child(nvsp_ch, "p:nvPr") is Some(nvpr) {
+      let nvpr_ch = @xml.get_children(nvpr)
+      if @xml.find_child(nvpr_ch, "p:ph") is Some(ph) {
+        ph_type = match @xml.get_attr(ph, "type") {
+          Some(v) => v
+          None => "body"
+        }
+        ph_idx = match @xml.get_attr(ph, "idx") {
+          Some(v) => @xml.parse_int(v)
+          None => -1
         }
       }
     }
@@ -1057,28 +980,25 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     !grad_fill.is_none() ||
     !blip_fill.is_none() ||
     !patt_fill.is_none()
-  match @xml.find_child(ch, "p:style") {
-    None => ()
-    Some(style_node) => {
-      let style_ch = @xml.get_children(style_node)
-      if !sppr_has_any_fill {
-        let (fr_idx, fr_scheme) = parse_style_ref(style_ch, "a:fillRef")
-        if fr_idx >= 1 && fr_scheme != "" {
-          let (c, gf, bf, pf) = resolve_fill_ref(fr_idx, fr_scheme, theme)
-          fill = c
-          grad_fill = gf
-          blip_fill = bf
-          patt_fill = pf
-        }
+  if @xml.find_child(ch, "p:style") is Some(style_node) {
+    let style_ch = @xml.get_children(style_node)
+    if !sppr_has_any_fill {
+      let (fr_idx, fr_scheme) = parse_style_ref(style_ch, "a:fillRef")
+      if fr_idx >= 1 && fr_scheme != "" {
+        let (c, gf, bf, pf) = resolve_fill_ref(fr_idx, fr_scheme, theme)
+        fill = c
+        grad_fill = gf
+        blip_fill = bf
+        patt_fill = pf
       }
-      if !has_ln_in_sppr {
-        let (lr_idx, lr_scheme) = parse_style_ref(style_ch, "a:lnRef")
-        if lr_idx >= 1 && lr_scheme != "" {
-          sp = resolve_ln_ref(lr_idx, lr_scheme, theme)
-        }
-      }
-      font_ref_color = parse_font_ref_color(style_ch, theme)
     }
+    if !has_ln_in_sppr {
+      let (lr_idx, lr_scheme) = parse_style_ref(style_ch, "a:lnRef")
+      if lr_idx >= 1 && lr_scheme != "" {
+        sp = resolve_ln_ref(lr_idx, lr_scheme, theme)
+      }
+    }
+    font_ref_color = parse_font_ref_color(style_ch, theme)
   }
   // Text
   let (paras, body_props, txt_lst_style) = match
@@ -1148,28 +1068,20 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
   let mut sh_link_rid = ""
   let mut sh_link_hover_rid = ""
   let mut has_media = false
-  match @xml.find_child(ch, "p:nvPicPr") {
-    None => ()
-    Some(nvpic) => {
-      let nvpic_ch = @xml.get_children(nvpic)
-      let links = parse_cnvpr_links(nvpic_ch)
-      sh_link_rid = links.0
-      sh_link_hover_rid = links.1
-      // Check p:nvPr for a:videoFile or a:audioFile
-      match @xml.find_child(nvpic_ch, "p:nvPr") {
-        None => ()
-        Some(nvpr) => {
-          let nvpr_ch = @xml.get_children(nvpr)
-          match @xml.find_child(nvpr_ch, "a:videoFile") {
-            Some(_) => has_media = true
-            None => ()
-          }
-          if !has_media {
-            match @xml.find_child(nvpr_ch, "a:audioFile") {
-              Some(_) => has_media = true
-              None => ()
-            }
-          }
+  if @xml.find_child(ch, "p:nvPicPr") is Some(nvpic) {
+    let nvpic_ch = @xml.get_children(nvpic)
+    let links = parse_cnvpr_links(nvpic_ch)
+    sh_link_rid = links.0
+    sh_link_hover_rid = links.1
+    // Check p:nvPr for a:videoFile or a:audioFile
+    if @xml.find_child(nvpic_ch, "p:nvPr") is Some(nvpr) {
+      let nvpr_ch = @xml.get_children(nvpr)
+      if @xml.find_child(nvpr_ch, "a:videoFile") is Some(_) {
+        has_media = true
+      }
+      if !has_media {
+        if @xml.find_child(nvpr_ch, "a:audioFile") is Some(_) {
+          has_media = true
         }
       }
     }
@@ -1276,60 +1188,57 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let mut bdr_tl_br_color = Color::none()
   let mut bdr_bl_tr_w = 0
   let mut bdr_bl_tr_color = Color::none()
-  match @xml.find_child(ch, "a:tcPr") {
-    None => ()
-    Some(tcpr) => {
-      let tcpr_ch = @xml.get_children(tcpr)
-      // Fill
-      let gf = parse_gradient_fill(tcpr_ch, theme)
-      if !gf.is_none() {
-        grad_fill = gf
-      } else {
-        fill = parse_solid_fill(tcpr_ch, theme)
-      }
-      // Margins
-      let ml = attr_int(tcpr, "marL")
-      let mr = attr_int(tcpr, "marR")
-      let mt = attr_int(tcpr, "marT")
-      let mb = attr_int(tcpr, "marB")
-      if ml > 0 {
-        mar_l = ml
-      }
-      if mr > 0 {
-        mar_r = mr
-      }
-      if mt > 0 {
-        mar_t = mt
-      }
-      if mb > 0 {
-        mar_b = mb
-      }
-      // Anchor
-      anchor = match @xml.get_attr(tcpr, "anchor") {
-        Some(v) => v
-        None => ""
-      }
-      // Borders (a:lnL, a:lnR, a:lnT, a:lnB)
-      let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
-      bdr_l_w = lw
-      bdr_l_color = lc
-      let (rw, rc) = parse_tc_border(tcpr_ch, "a:lnR", theme)
-      bdr_r_w = rw
-      bdr_r_color = rc
-      let (tw, tc_) = parse_tc_border(tcpr_ch, "a:lnT", theme)
-      bdr_t_w = tw
-      bdr_t_color = tc_
-      let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
-      bdr_b_w = bw
-      bdr_b_color = bc
-      // Diagonal borders
-      let (tlbr_w, tlbr_c) = parse_tc_border(tcpr_ch, "a:lnTlToBr", theme)
-      bdr_tl_br_w = tlbr_w
-      bdr_tl_br_color = tlbr_c
-      let (bltr_w, bltr_c) = parse_tc_border(tcpr_ch, "a:lnBlToTr", theme)
-      bdr_bl_tr_w = bltr_w
-      bdr_bl_tr_color = bltr_c
+  if @xml.find_child(ch, "a:tcPr") is Some(tcpr) {
+    let tcpr_ch = @xml.get_children(tcpr)
+    // Fill
+    let gf = parse_gradient_fill(tcpr_ch, theme)
+    if !gf.is_none() {
+      grad_fill = gf
+    } else {
+      fill = parse_solid_fill(tcpr_ch, theme)
     }
+    // Margins
+    let ml = attr_int(tcpr, "marL")
+    let mr = attr_int(tcpr, "marR")
+    let mt = attr_int(tcpr, "marT")
+    let mb = attr_int(tcpr, "marB")
+    if ml > 0 {
+      mar_l = ml
+    }
+    if mr > 0 {
+      mar_r = mr
+    }
+    if mt > 0 {
+      mar_t = mt
+    }
+    if mb > 0 {
+      mar_b = mb
+    }
+    // Anchor
+    anchor = match @xml.get_attr(tcpr, "anchor") {
+      Some(v) => v
+      None => ""
+    }
+    // Borders (a:lnL, a:lnR, a:lnT, a:lnB)
+    let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
+    bdr_l_w = lw
+    bdr_l_color = lc
+    let (rw, rc) = parse_tc_border(tcpr_ch, "a:lnR", theme)
+    bdr_r_w = rw
+    bdr_r_color = rc
+    let (tw, tc_) = parse_tc_border(tcpr_ch, "a:lnT", theme)
+    bdr_t_w = tw
+    bdr_t_color = tc_
+    let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
+    bdr_b_w = bw
+    bdr_b_color = bc
+    // Diagonal borders
+    let (tlbr_w, tlbr_c) = parse_tc_border(tcpr_ch, "a:lnTlToBr", theme)
+    bdr_tl_br_w = tlbr_w
+    bdr_tl_br_color = tlbr_c
+    let (bltr_w, bltr_c) = parse_tc_border(tcpr_ch, "a:lnBlToTr", theme)
+    bdr_bl_tr_w = bltr_w
+    bdr_bl_tr_color = bltr_c
   }
   {
     paragraphs,
@@ -1412,80 +1321,63 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   // Check for chart (c:chart) — external file via relationship
   // Return a placeholder ChartShape with empty data; main.mbt resolves the chart XML.
-  match @xml.find_child(gdata_ch, "c:chart") {
-    Some(cn) => {
-      let rid = match @xml.get_attr(cn, "r:id") {
-        Some(v) => v
-        None => ""
-      }
-      if !rid.is_empty() {
-        // Store rid in chart_xml field temporarily; main.mbt will resolve it.
-        let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
-        return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
-      }
+  if @xml.find_child(gdata_ch, "c:chart") is Some(cn) {
+    let rid = match @xml.get_attr(cn, "r:id") {
+      Some(v) => v
+      None => ""
     }
-    None => ()
+    if !rid.is_empty() {
+      // Store rid in chart_xml field temporarily; main.mbt will resolve it.
+      let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
+      return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
+    }
   }
   // Check for ChartEx (cx:chart) — Office 2016+ chart types
-  match @xml.find_child(gdata_ch, "cx:chart") {
-    Some(cn) => {
-      let rid = match @xml.get_attr(cn, "r:id") {
-        Some(v) => v
-        None => ""
-      }
-      if !rid.is_empty() {
-        // Prefix "cx:" to distinguish from classic c:chart during resolution
-        let chart_data : ChartData = {
-          ..ChartData::empty(),
-          chart_xml: "cx:" + rid,
-        }
-        return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
-      }
+  if @xml.find_child(gdata_ch, "cx:chart") is Some(cn) {
+    let rid = match @xml.get_attr(cn, "r:id") {
+      Some(v) => v
+      None => ""
     }
-    None => ()
+    if !rid.is_empty() {
+      // Prefix "cx:" to distinguish from classic c:chart during resolution
+      let chart_data : ChartData = {
+        ..ChartData::empty(),
+        chart_xml: "cx:" + rid,
+      }
+      return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
+    }
   }
   // Check for OLE object (p:oleObj)
-  match @xml.find_child(gdata_ch, "p:oleObj") {
-    Some(ole_obj) => {
-      // Extract fallback image r:id from p:pic inside oleObj
-      let mut img_rid = ""
-      match @xml.find_child(@xml.get_children(ole_obj), "p:pic") {
-        Some(pic) => {
-          let pic_ch = @xml.get_children(pic)
-          match @xml.find_child(pic_ch, "p:blipFill") {
-            Some(bf) => {
-              let bf_ch = @xml.get_children(bf)
-              match @xml.find_child(bf_ch, "a:blip") {
-                Some(blip) =>
-                  img_rid = match @xml.get_attr(blip, "r:embed") {
-                    Some(v) => v
-                    None => ""
-                  }
-                None => ()
-              }
-            }
-            None => ()
+  if @xml.find_child(gdata_ch, "p:oleObj") is Some(ole_obj) {
+    // Extract fallback image r:id from p:pic inside oleObj
+    let mut img_rid = ""
+    if @xml.find_child(@xml.get_children(ole_obj), "p:pic") is Some(pic) {
+      let pic_ch = @xml.get_children(pic)
+      if @xml.find_child(pic_ch, "p:blipFill") is Some(bf) {
+        let bf_ch = @xml.get_children(bf)
+        if @xml.find_child(bf_ch, "a:blip") is Some(blip) {
+          img_rid = match @xml.get_attr(blip, "r:embed") {
+            Some(v) => v
+            None => ""
           }
-        }
-        None => ()
-      }
-      // Serialize entire graphicFrame as ole_xml for round-trip
-      let ole_raw = @xml.serialize_node(gf)
-      if !img_rid.is_empty() {
-        // Render as Picture with the fallback image
-        return {
-          ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
-          ole_xml: ole_raw,
-        }
-      } else {
-        // No fallback image available; preserve OLE data as empty shape
-        return {
-          ..Shape::default_with(ShapeKind::Other, transform),
-          ole_xml: ole_raw,
         }
       }
     }
-    None => ()
+    // Serialize entire graphicFrame as ole_xml for round-trip
+    let ole_raw = @xml.serialize_node(gf)
+    if !img_rid.is_empty() {
+      // Render as Picture with the fallback image
+      return {
+        ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
+        ole_xml: ole_raw,
+      }
+    } else {
+      // No fallback image available; preserve OLE data as empty shape
+      return {
+        ..Shape::default_with(ShapeKind::Other, transform),
+        ole_xml: ole_raw,
+      }
+    }
   }
   // Check for table (a:tbl)
   let tbl = @xml.find_child(gdata_ch, "a:tbl")
@@ -1501,53 +1393,37 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       let mut last_col = false
       let mut band_row = false
       let mut band_col = false
-      match @xml.find_child(tbl_ch, "a:tblPr") {
-        None => ()
-        Some(tbl_pr) => {
-          style_id = match @xml.get_attr(tbl_pr, "tblStyleId") {
-            Some(v) => v
-            None => ""
-          }
-          first_row = attr_int(tbl_pr, "firstRow") == 1
-          last_row = attr_int(tbl_pr, "lastRow") == 1
-          first_col = attr_int(tbl_pr, "firstCol") == 1
-          last_col = attr_int(tbl_pr, "lastCol") == 1
-          band_row = attr_int(tbl_pr, "bandRow") == 1
-          band_col = attr_int(tbl_pr, "bandCol") == 1
+      if @xml.find_child(tbl_ch, "a:tblPr") is Some(tbl_pr) {
+        style_id = match @xml.get_attr(tbl_pr, "tblStyleId") {
+          Some(v) => v
+          None => ""
         }
+        first_row = attr_int(tbl_pr, "firstRow") == 1
+        last_row = attr_int(tbl_pr, "lastRow") == 1
+        first_col = attr_int(tbl_pr, "firstCol") == 1
+        last_col = attr_int(tbl_pr, "lastCol") == 1
+        band_row = attr_int(tbl_pr, "bandRow") == 1
+        band_col = attr_int(tbl_pr, "bandCol") == 1
       }
       // Parse column widths from <a:tblGrid>/<a:gridCol w="...">
       let col_widths : Array[Int] = []
-      match @xml.find_child(tbl_ch, "a:tblGrid") {
-        None => ()
-        Some(grid) => {
-          let gcols = @xml.find_children(@xml.get_children(grid), "a:gridCol")
-          let ng = gcols.length()
-          let mut gi = 0
-          while gi < ng {
-            col_widths.push(attr_int(gcols[gi], "w"))
-            gi = gi + 1
-          }
+      if @xml.find_child(tbl_ch, "a:tblGrid") is Some(grid) {
+        let gcols = @xml.find_children(@xml.get_children(grid), "a:gridCol")
+        for gcol in gcols {
+          col_widths.push(attr_int(gcol, "w"))
         }
       }
       // Parse rows from <a:tr>
       let tr_nodes = @xml.find_children(tbl_ch, "a:tr")
       let rows : Array[TableRow] = []
-      let ntr = tr_nodes.length()
-      let mut tri = 0
-      while tri < ntr {
-        let tr = tr_nodes[tri]
+      for tr in tr_nodes {
         let row_h = attr_int(tr, "h")
         let tc_nodes = @xml.find_children(@xml.get_children(tr), "a:tc")
         let cells : Array[TableCell] = []
-        let ntc = tc_nodes.length()
-        let mut tci = 0
-        while tci < ntc {
-          cells.push(parse_table_cell(tc_nodes[tci], theme))
-          tci = tci + 1
+        for tc_node in tc_nodes {
+          cells.push(parse_table_cell(tc_node, theme))
         }
         rows.push({ height: row_h, cells })
-        tri = tri + 1
       }
       let table_data : TableData = {
         col_widths,
@@ -1597,24 +1473,18 @@ fn shape_with_stroke(
 /// Parse adjustment values from a:avLst inside a:prstGeom.
 fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
   let avs : Array[Int] = []
-  match @xml.find_child(@xml.get_children(geom_node), "a:avLst") {
-    None => ()
-    Some(avlst) => {
-      let gds = @xml.find_children(@xml.get_children(avlst), "a:gd")
-      let n = gds.length()
-      let mut i = 0
-      while i < n {
-        // <a:gd name="adj1" fmla="val 50000"/>
-        let fmla = match @xml.get_attr(gds[i], "fmla") {
-          Some(v) => v
-          None => ""
-        }
-        // Extract value from "val NNNNN"
-        if fmla.length() > 4 {
-          let val_str = @xml.str_suffix(fmla, 4)
-          avs.push(@xml.parse_int(val_str))
-        }
-        i = i + 1
+  if @xml.find_child(@xml.get_children(geom_node), "a:avLst") is Some(avlst) {
+    let gds = @xml.find_children(@xml.get_children(avlst), "a:gd")
+    for gd in gds {
+      // <a:gd name="adj1" fmla="val 50000"/>
+      let fmla = match @xml.get_attr(gd, "fmla") {
+        Some(v) => v
+        None => ""
+      }
+      // Extract value from "val NNNNN"
+      if fmla.length() > 4 {
+        let val_str = @xml.str_suffix(fmla, 4)
+        avs.push(@xml.parse_int(val_str))
       }
     }
   }
@@ -1627,78 +1497,69 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
   let ch = @xml.get_children(node)
   let mut gdlst = ""
   // Parse a:avLst → guide formulas with "val" operator
-  match @xml.find_child(ch, "a:avLst") {
-    None => ()
-    Some(avlst_node) => {
-      let gds = @xml.find_children(@xml.get_children(avlst_node), "a:gd")
-      for i in 0..<gds.length() {
-        let name = match @xml.get_attr(gds[i], "name") {
-          Some(v) => v
-          None => continue
-        }
-        let fmla = match @xml.get_attr(gds[i], "fmla") {
-          Some(v) => v
-          None => "val 0"
-        }
-        if gdlst.length() > 0 {
-          gdlst = gdlst + ";"
-        }
-        gdlst = gdlst + name + "=" + fmla
+  if @xml.find_child(ch, "a:avLst") is Some(avlst_node) {
+    let gds = @xml.find_children(@xml.get_children(avlst_node), "a:gd")
+    for i in 0..<gds.length() {
+      let name = match @xml.get_attr(gds[i], "name") {
+        Some(v) => v
+        None => continue
       }
+      let fmla = match @xml.get_attr(gds[i], "fmla") {
+        Some(v) => v
+        None => "val 0"
+      }
+      if !gdlst.is_empty() {
+        gdlst = gdlst + ";"
+      }
+      gdlst = gdlst + name + "=" + fmla
     }
   }
   // Parse a:gdLst → guide formulas
-  match @xml.find_child(ch, "a:gdLst") {
-    None => ()
-    Some(gdlst_node) => {
-      let gds = @xml.find_children(@xml.get_children(gdlst_node), "a:gd")
-      for i in 0..<gds.length() {
-        let name = match @xml.get_attr(gds[i], "name") {
-          Some(v) => v
-          None => continue
-        }
-        let fmla = match @xml.get_attr(gds[i], "fmla") {
-          Some(v) => v
-          None => continue
-        }
-        if gdlst.length() > 0 {
-          gdlst = gdlst + ";"
-        }
-        gdlst = gdlst + name + "=" + fmla
+  if @xml.find_child(ch, "a:gdLst") is Some(gdlst_node) {
+    let gds = @xml.find_children(@xml.get_children(gdlst_node), "a:gd")
+    for i in 0..<gds.length() {
+      let name = match @xml.get_attr(gds[i], "name") {
+        Some(v) => v
+        None => continue
       }
+      let fmla = match @xml.get_attr(gds[i], "fmla") {
+        Some(v) => v
+        None => continue
+      }
+      if !gdlst.is_empty() {
+        gdlst = gdlst + ";"
+      }
+      gdlst = gdlst + name + "=" + fmla
     }
   }
   // Parse a:pathLst → compact path format
   let mut paths = ""
   let mut path_w = 0
   let mut path_h = 0
-  match @xml.find_child(ch, "a:pathLst") {
-    None => ()
-    Some(pathlst_node) => {
-      let path_nodes = @xml.find_children(
-        @xml.get_children(pathlst_node),
-        "a:path",
-      )
-      for pi in 0..<path_nodes.length() {
-        let pn = path_nodes[pi]
-        // Get path coordinate space (first path's values used)
-        if pi == 0 {
-          path_w = match @xml.get_attr(pn, "w") {
-            Some(v) => @xml.parse_int(v)
-            None => 0
-          }
-          path_h = match @xml.get_attr(pn, "h") {
-            Some(v) => @xml.parse_int(v)
-            None => 0
-          }
+  if @xml.find_child(ch, "a:pathLst") is Some(pathlst_node) {
+    let path_nodes = @xml.find_children(
+      @xml.get_children(pathlst_node),
+      "a:path",
+    )
+    for pi in 0..<path_nodes.length() {
+      let pn = path_nodes[pi]
+      // Get path coordinate space (first path's values used)
+      if pi == 0 {
+        path_w = match @xml.get_attr(pn, "w") {
+          Some(v) => @xml.parse_int(v)
+          None => 0
         }
-        let seg = parse_custom_path_segment(pn)
-        if seg.length() > 0 {
-          if paths.length() > 0 {
-            paths = paths + "|"
-          }
-          paths = paths + seg
+        path_h = match @xml.get_attr(pn, "h") {
+          Some(v) => @xml.parse_int(v)
+          None => 0
         }
+      }
+      let seg = parse_custom_path_segment(pn)
+      if !seg.is_empty() {
+        if !paths.is_empty() {
+          paths = paths + "|"
+        }
+        paths = paths + seg
       }
     }
   }
@@ -1707,59 +1568,50 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
   let mut rect_t = ""
   let mut rect_r = ""
   let mut rect_b = ""
-  match @xml.find_child(ch, "a:rect") {
-    None => ()
-    Some(rect_node) => {
-      rect_l = match @xml.get_attr(rect_node, "l") {
-        Some(v) => v
-        None => ""
-      }
-      rect_t = match @xml.get_attr(rect_node, "t") {
-        Some(v) => v
-        None => ""
-      }
-      rect_r = match @xml.get_attr(rect_node, "r") {
-        Some(v) => v
-        None => ""
-      }
-      rect_b = match @xml.get_attr(rect_node, "b") {
-        Some(v) => v
-        None => ""
-      }
+  if @xml.find_child(ch, "a:rect") is Some(rect_node) {
+    rect_l = match @xml.get_attr(rect_node, "l") {
+      Some(v) => v
+      None => ""
+    }
+    rect_t = match @xml.get_attr(rect_node, "t") {
+      Some(v) => v
+      None => ""
+    }
+    rect_r = match @xml.get_attr(rect_node, "r") {
+      Some(v) => v
+      None => ""
+    }
+    rect_b = match @xml.get_attr(rect_node, "b") {
+      Some(v) => v
+      None => ""
     }
   }
   // Parse a:cxnLst → connection points: "x,y,ang;x2,y2,ang2;..."
   let mut cxn_lst = ""
-  match @xml.find_child(ch, "a:cxnLst") {
-    None => ()
-    Some(cxn_node) => {
-      let cxns = @xml.find_children(@xml.get_children(cxn_node), "a:cxn")
-      for ci in 0..<cxns.length() {
-        let ang = match @xml.get_attr(cxns[ci], "ang") {
+  if @xml.find_child(ch, "a:cxnLst") is Some(cxn_node) {
+    let cxns = @xml.find_children(@xml.get_children(cxn_node), "a:cxn")
+    for ci in 0..<cxns.length() {
+      let ang = match @xml.get_attr(cxns[ci], "ang") {
+        Some(v) => v
+        None => "0"
+      }
+      let cxn_ch = @xml.get_children(cxns[ci])
+      let mut cx = "0"
+      let mut cy = "0"
+      if @xml.find_child(cxn_ch, "a:pos") is Some(pos) {
+        cx = match @xml.get_attr(pos, "x") {
           Some(v) => v
           None => "0"
         }
-        let cxn_ch = @xml.get_children(cxns[ci])
-        let mut cx = "0"
-        let mut cy = "0"
-        match @xml.find_child(cxn_ch, "a:pos") {
-          None => ()
-          Some(pos) => {
-            cx = match @xml.get_attr(pos, "x") {
-              Some(v) => v
-              None => "0"
-            }
-            cy = match @xml.get_attr(pos, "y") {
-              Some(v) => v
-              None => "0"
-            }
-          }
+        cy = match @xml.get_attr(pos, "y") {
+          Some(v) => v
+          None => "0"
         }
-        if cxn_lst.length() > 0 {
-          cxn_lst = cxn_lst + ";"
-        }
-        cxn_lst = cxn_lst + cx + "," + cy + "," + ang
       }
+      if !cxn_lst.is_empty() {
+        cxn_lst = cxn_lst + ";"
+      }
+      cxn_lst = cxn_lst + cx + "," + cy + "," + ang
     }
   }
   ShapeGeom::Custom({
@@ -1793,7 +1645,7 @@ fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
           Some(v) => v
           None => "0"
         }
-        if d.length() > 0 {
+        if !d.is_empty() {
           d = d + " "
         }
         d = d + "M " + x + " " + y
@@ -1809,7 +1661,7 @@ fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
           Some(v) => v
           None => "0"
         }
-        if d.length() > 0 {
+        if !d.is_empty() {
           d = d + " "
         }
         d = d + "L " + x + " " + y
@@ -1817,7 +1669,7 @@ fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
     } else if tag == "a:cubicBezTo" {
       let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
       if pts.length() >= 3 {
-        if d.length() > 0 {
+        if !d.is_empty() {
           d = d + " "
         }
         d = d + "C"
@@ -1836,7 +1688,7 @@ fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
     } else if tag == "a:quadBezTo" {
       let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
       if pts.length() >= 2 {
-        if d.length() > 0 {
+        if !d.is_empty() {
           d = d + " "
         }
         d = d + "Q"
@@ -1869,12 +1721,12 @@ fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
         Some(v) => v
         None => "0"
       }
-      if d.length() > 0 {
+      if !d.is_empty() {
         d = d + " "
       }
       d = d + "A " + wr + " " + hr + " " + st + " " + sw
     } else if tag == "a:close" {
-      if d.length() > 0 {
+      if !d.is_empty() {
         d = d + " "
       }
       d = d + "Z"
@@ -1910,49 +1762,37 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
   let mut st_idx = -1
   let mut end_id = -1
   let mut end_idx = -1
-  match @xml.find_child(ch, "p:nvCxnSpPr") {
-    None => ()
-    Some(nv) => {
-      let nv_ch = @xml.get_children(nv)
-      match @xml.find_child(nv_ch, "p:cNvCxnSpPr") {
-        None => ()
-        Some(cnv) => {
-          let cnv_ch = @xml.get_children(cnv)
-          match @xml.find_child(cnv_ch, "a:stCxn") {
-            None => ()
-            Some(st) => {
-              st_id = @xml.parse_int(
-                match @xml.get_attr(st, "id") {
-                  Some(v) => v
-                  None => "-1"
-                },
-              )
-              st_idx = @xml.parse_int(
-                match @xml.get_attr(st, "idx") {
-                  Some(v) => v
-                  None => "-1"
-                },
-              )
-            }
-          }
-          match @xml.find_child(cnv_ch, "a:endCxn") {
-            None => ()
-            Some(en) => {
-              end_id = @xml.parse_int(
-                match @xml.get_attr(en, "id") {
-                  Some(v) => v
-                  None => "-1"
-                },
-              )
-              end_idx = @xml.parse_int(
-                match @xml.get_attr(en, "idx") {
-                  Some(v) => v
-                  None => "-1"
-                },
-              )
-            }
-          }
-        }
+  if @xml.find_child(ch, "p:nvCxnSpPr") is Some(nv) {
+    let nv_ch = @xml.get_children(nv)
+    if @xml.find_child(nv_ch, "p:cNvCxnSpPr") is Some(cnv) {
+      let cnv_ch = @xml.get_children(cnv)
+      if @xml.find_child(cnv_ch, "a:stCxn") is Some(st) {
+        st_id = @xml.parse_int(
+          match @xml.get_attr(st, "id") {
+            Some(v) => v
+            None => "-1"
+          },
+        )
+        st_idx = @xml.parse_int(
+          match @xml.get_attr(st, "idx") {
+            Some(v) => v
+            None => "-1"
+          },
+        )
+      }
+      if @xml.find_child(cnv_ch, "a:endCxn") is Some(en) {
+        end_id = @xml.parse_int(
+          match @xml.get_attr(en, "id") {
+            Some(v) => v
+            None => "-1"
+          },
+        )
+        end_idx = @xml.parse_int(
+          match @xml.get_attr(en, "idx") {
+            Some(v) => v
+            None => "-1"
+          },
+        )
       }
     }
   }
@@ -2013,35 +1853,28 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
   let nodes = @xml.parse_xml(xml_str)
   let rels : Array[Relationship] = []
   // Find <Relationships> root
-  match @xml.find_child(nodes, "Relationships") {
-    None => ()
-    Some(root) => {
-      let ch = @xml.get_children(root)
-      let rel_nodes = @xml.find_children(ch, "Relationship")
-      let n = rel_nodes.length()
-      let mut i = 0
-      while i < n {
-        let rn = rel_nodes[i]
-        let id = match @xml.get_attr(rn, "Id") {
-          Some(v) => v
-          None => ""
-        }
-        let target = match @xml.get_attr(rn, "Target") {
-          Some(v) => v
-          None => ""
-        }
-        let type_ = match @xml.get_attr(rn, "Type") {
-          Some(v) => v
-          None => ""
-        }
-        let target_mode = match @xml.get_attr(rn, "TargetMode") {
-          Some(v) => v
-          None => ""
-        }
-        if !id.is_empty() {
-          rels.push({ id, target, type_, target_mode })
-        }
-        i = i + 1
+  if @xml.find_child(nodes, "Relationships") is Some(root) {
+    let ch = @xml.get_children(root)
+    let rel_nodes = @xml.find_children(ch, "Relationship")
+    for rn in rel_nodes {
+      let id = match @xml.get_attr(rn, "Id") {
+        Some(v) => v
+        None => ""
+      }
+      let target = match @xml.get_attr(rn, "Target") {
+        Some(v) => v
+        None => ""
+      }
+      let type_ = match @xml.get_attr(rn, "Type") {
+        Some(v) => v
+        None => ""
+      }
+      let target_mode = match @xml.get_attr(rn, "TargetMode") {
+        Some(v) => v
+        None => ""
+      }
+      if !id.is_empty() {
+        rels.push({ id, target, type_, target_mode })
       }
     }
   }
@@ -2051,13 +1884,10 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
 ///|
 /// Look up a relationship target by ID.
 pub fn find_rel_target(rels : Array[Relationship], id : String) -> String {
-  let n = rels.length()
-  let mut i = 0
-  while i < n {
-    if rels[i].id == id {
-      return rels[i].target
+  for rel in rels {
+    if rel.id == id {
+      return rel.target
     }
-    i = i + 1
   }
   ""
 }
@@ -2065,13 +1895,10 @@ pub fn find_rel_target(rels : Array[Relationship], id : String) -> String {
 ///|
 /// Look up a full Relationship by ID.
 pub fn find_rel(rels : Array[Relationship], id : String) -> Relationship? {
-  let n = rels.length()
-  let mut i = 0
-  while i < n {
-    if rels[i].id == id {
-      return Some(rels[i])
+  for rel in rels {
+    if rel.id == id {
+      return Some(rel)
     }
-    i = i + 1
   }
   None
 }
@@ -2270,56 +2097,46 @@ fn parse_shapes_from_children(
   theme : ThemeData,
 ) -> Array[Shape] {
   let shapes : Array[Shape] = []
-  let n = children.length()
-  let mut i = 0
-  while i < n {
-    match children[i] {
+  for child in children {
+    match child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "p:sp" {
-          shapes.push(parse_sp(children[i], theme))
+          shapes.push(parse_sp(child, theme))
         } else if tag == "p:pic" {
-          shapes.push(parse_pic(children[i], theme))
+          shapes.push(parse_pic(child, theme))
         } else if tag == "p:graphicFrame" {
-          shapes.push(parse_graphic_frame(children[i], theme))
+          shapes.push(parse_graphic_frame(child, theme))
         } else if tag == "p:grpSp" {
-          shapes.push(parse_grp_sp(children[i], theme))
+          shapes.push(parse_grp_sp(child, theme))
         } else if tag == "p:cxnSp" {
-          shapes.push(parse_cxn_sp(children[i], theme))
+          shapes.push(parse_cxn_sp(child, theme))
         } else if tag == "mc:AlternateContent" {
-          let ac_ch = @xml.get_children(children[i])
+          let ac_ch = @xml.get_children(child)
           let mut choice_xml = ""
           let mut fallback_node : @xml.XmlNode? = None
-          let mut j = 0
-          while j < ac_ch.length() {
-            match ac_ch[j] {
+          for ac_node in ac_ch {
+            match ac_node {
               @xml.XmlNode::Element(ac_tag, _, _) =>
                 if ac_tag == "mc:Choice" {
-                  choice_xml = @xml.serialize_node(ac_ch[j])
+                  choice_xml = @xml.serialize_node(ac_node)
                 } else if ac_tag == "mc:Fallback" {
-                  fallback_node = Some(ac_ch[j])
+                  fallback_node = Some(ac_node)
                 }
               _ => ()
             }
-            j = j + 1
           }
-          match fallback_node {
-            Some(fb) => {
-              let fb_shapes = parse_shapes_from_children(
-                @xml.get_children(fb),
-                theme,
-              )
-              let mut k = 0
-              while k < fb_shapes.length() {
-                shapes.push({ ..fb_shapes[k], mc_choice_xml: choice_xml })
-                k = k + 1
-              }
+          if fallback_node is Some(fb) {
+            let fb_shapes = parse_shapes_from_children(
+              @xml.get_children(fb),
+              theme,
+            )
+            for fb_shape in fb_shapes {
+              shapes.push({ ..fb_shape, mc_choice_xml: choice_xml })
             }
-            None => ()
           }
         }
       _ => ()
     }
-    i = i + 1
   }
   shapes
 }
@@ -2374,20 +2191,17 @@ pub fn parse_diagram_drawing(xml : String, theme : ThemeData) -> Array[Shape] {
 /// Default the vertical text anchor to center for text-bearing diagram shapes
 /// whose anchor is unset (see `parse_diagram_drawing`). Recurses into groups.
 fn apply_diagram_text_anchor(shapes : Array[Shape]) -> Unit {
-  let mut i = 0
-  while i < shapes.length() {
+  for i in 0..<shapes.length() {
     match shapes[i].kind {
       ShapeKind::GroupShape(grp) => apply_diagram_text_anchor(grp.children)
       _ =>
-        if shapes[i].paragraphs.length() > 0 &&
-          shapes[i].body_props.anchor == "" {
+        if !shapes[i].paragraphs.is_empty() && shapes[i].body_props.anchor == "" {
           shapes[i] = {
             ..shapes[i],
             body_props: { ..shapes[i].body_props, anchor: "ctr" },
           }
         }
     }
-    i = i + 1
   }
 }
 
@@ -2404,14 +2218,11 @@ pub fn parse_diagram_text_color(xml : String, theme : ThemeData) -> Color {
   }
   let nodes = @xml.parse_xml(xml)
   for tag in ["txLinClrLst", "txClrLst", "txEffectClrLst"] {
-    match @xml.find_descendant(nodes, tag) {
-      Some(lst) => {
-        let c = parse_color_from_children(@xml.get_children(lst), theme)
-        if !c.is_none() {
-          return c
-        }
+    if @xml.find_descendant(nodes, tag) is Some(lst) {
+      let c = parse_color_from_children(@xml.get_children(lst), theme)
+      if !c.is_none() {
+        return c
       }
-      None => ()
     }
   }
   Color::none()
@@ -2432,12 +2243,10 @@ pub fn apply_diagram_text_color(shapes : Array[Shape], color : Color) -> Unit {
       _ =>
         for para in sh.paragraphs {
           let runs = para.runs
-          let mut j = 0
-          while j < runs.length() {
+          for j in 0..<runs.length() {
             if runs[j].color.is_none() {
               runs[j] = { ..runs[j], color, }
             }
-            j = j + 1
           }
         }
     }
@@ -2466,53 +2275,39 @@ fn parse_table_style_cell(
   let mut bdr_t_color = Color::none()
   let mut bdr_b_color = Color::none()
   // Parse a:tcPr (cell properties within style)
-  match @xml.find_child(ch, "a:tcPr") {
-    None => ()
-    Some(tcpr) => {
-      let tcpr_ch = @xml.get_children(tcpr)
-      let gf = parse_gradient_fill(tcpr_ch, theme)
-      if !gf.is_none() {
-        grad_fill = gf
-      } else {
-        fill = parse_solid_fill(tcpr_ch, theme)
-      }
-      let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
-      bdr_l_w = lw
-      bdr_l_color = lc
-      let (rw, rc) = parse_tc_border(tcpr_ch, "a:lnR", theme)
-      bdr_r_w = rw
-      bdr_r_color = rc
-      let (tw, tc_) = parse_tc_border(tcpr_ch, "a:lnT", theme)
-      bdr_t_w = tw
-      bdr_t_color = tc_
-      let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
-      bdr_b_w = bw
-      bdr_b_color = bc
+  if @xml.find_child(ch, "a:tcPr") is Some(tcpr) {
+    let tcpr_ch = @xml.get_children(tcpr)
+    let gf = parse_gradient_fill(tcpr_ch, theme)
+    if !gf.is_none() {
+      grad_fill = gf
+    } else {
+      fill = parse_solid_fill(tcpr_ch, theme)
     }
+    let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
+    bdr_l_w = lw
+    bdr_l_color = lc
+    let (rw, rc) = parse_tc_border(tcpr_ch, "a:lnR", theme)
+    bdr_r_w = rw
+    bdr_r_color = rc
+    let (tw, tc_) = parse_tc_border(tcpr_ch, "a:lnT", theme)
+    bdr_t_w = tw
+    bdr_t_color = tc_
+    let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
+    bdr_b_w = bw
+    bdr_b_color = bc
   }
   // Parse a:tcTxBody → a:lstStyle / a:defRPr for font style
-  match @xml.find_child(ch, "a:tcTxBody") {
-    None => ()
-    Some(txb) => {
-      let txb_ch = @xml.get_children(txb)
-      // Look for a:lstStyle → a:defPPr → a:defRPr or direct a:p → a:pPr → a:defRPr
-      match @xml.find_child(txb_ch, "a:lstStyle") {
-        None => ()
-        Some(lst) => {
-          let lst_ch = @xml.get_children(lst)
-          // Check lvl1pPr
-          match @xml.find_child(lst_ch, "a:lvl1pPr") {
-            None => ()
-            Some(ppr) =>
-              match @xml.find_child(@xml.get_children(ppr), "a:defRPr") {
-                None => ()
-                Some(rpr) => {
-                  bold = attr_int(rpr, "b") == 1
-                  italic = attr_int(rpr, "i") == 1
-                  font_color = parse_solid_fill(@xml.get_children(rpr), theme)
-                }
-              }
-          }
+  if @xml.find_child(ch, "a:tcTxBody") is Some(txb) {
+    let txb_ch = @xml.get_children(txb)
+    // Look for a:lstStyle → a:defPPr → a:defRPr or direct a:p → a:pPr → a:defRPr
+    if @xml.find_child(txb_ch, "a:lstStyle") is Some(lst) {
+      let lst_ch = @xml.get_children(lst)
+      // Check lvl1pPr
+      if @xml.find_child(lst_ch, "a:lvl1pPr") is Some(ppr) {
+        if @xml.find_child(@xml.get_children(ppr), "a:defRPr") is Some(rpr) {
+          bold = attr_int(rpr, "b") == 1
+          italic = attr_int(rpr, "i") == 1
+          font_color = parse_solid_fill(@xml.get_children(rpr), theme)
         }
       }
     }
@@ -2550,10 +2345,7 @@ pub fn parse_table_styles(
     @xml.get_children(lst_node),
     "a:tblStyle",
   )
-  let ns = style_nodes.length()
-  let mut si = 0
-  while si < ns {
-    let sn = style_nodes[si]
+  for sn in style_nodes {
     let id = match @xml.get_attr(sn, "styleId") {
       Some(v) => v
       None => ""
@@ -2577,7 +2369,6 @@ pub fn parse_table_styles(
       first_col: parse("a:firstCol"),
       last_col: parse("a:lastCol"),
     })
-    si = si + 1
   }
   styles
 }

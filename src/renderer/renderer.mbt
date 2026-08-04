@@ -436,7 +436,7 @@ fn ascii_lower(s : String) -> String {
   let mut i = 0
   while i < len {
     let c = s.get_char(i).unwrap()
-    let code = Char::to_int(c)
+    let code = c.to_int()
     let mapped = if code >= 65 && code <= 90 { code + 32 } else { code }
     out = out + @ffi.ffi_char_code_to_str(mapped)
     i = i + @xml.char_step(c)
@@ -458,7 +458,7 @@ pub fn sanitize_url(url : String) -> String {
   let mut start = 0
   while start < len {
     let c = url.get_char(start).unwrap()
-    let code = Char::to_int(c)
+    let code = c.to_int()
     if code > 0x20 {
       break
     }
@@ -471,8 +471,7 @@ pub fn sanitize_url(url : String) -> String {
   // Find ':' before any '/', '?', '#' to detect a scheme
   let tlen = trimmed.length()
   let mut colon = -1
-  let mut j = 0
-  while j < tlen {
+  for j in 0..<tlen {
     let c = trimmed.get_char(j).unwrap()
     if c == ':' {
       colon = j
@@ -481,7 +480,6 @@ pub fn sanitize_url(url : String) -> String {
     if c == '/' || c == '?' || c == '#' {
       break
     }
-    j = j + 1
   }
   if colon < 0 {
     // No scheme: treat as relative URL or fragment — safe
@@ -732,9 +730,10 @@ fn resolve_image_href(
   if target.is_empty() {
     return ""
   }
-  match rel {
-    Some(r) => if r.target_mode == "External" { return sanitize_url(target) }
-    None => ()
+  if rel is Some(r) {
+    if r.target_mode == "External" {
+      return sanitize_url(target)
+    }
   }
   let img_path = resolve_image_path(target)
   let mime = mime_from_ext(img_path)
@@ -1017,13 +1016,11 @@ fn format_ratio_64(num : Int64, den : Int64) -> String {
 fn encode_adj_values(avs : Array[Int]) -> String {
   let n = avs.length()
   let mut out = ""
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     if i > 0 {
       out = out + ","
     }
     out = out + int_to_str(avs[i])
-    i = i + 1
   }
   out
 }
@@ -1498,13 +1495,11 @@ fn roman_convert(n : Int, lower : Bool) -> String {
   let mut result = ""
   let mut rem = n
   let n_pairs = vals.length()
-  let mut i = 0
-  while i < n_pairs {
+  for i in 0..<n_pairs {
     while rem >= vals[i] {
       result = result + (if lower { syml[i] } else { syms[i] })
       rem = rem - vals[i]
     }
-    i = i + 1
   }
   result
 }
@@ -1536,7 +1531,7 @@ pub fn render_shape(
   // Skip lines/connectors — cy=0 means horizontal line, not "auto-size"
   if !is_line &&
     (shape.body_props.auto_fit || t.cy == 0) &&
-    shape.paragraphs.length() > 0 {
+    !shape.paragraphs.is_empty() {
     let text_h = estimate_text_height(shape.paragraphs, scale, shape.body_props)
     if text_h > cy_p {
       cy_p = text_h
@@ -1589,12 +1584,12 @@ pub fn render_shape(
     dai("end-cxn-idx", shape.end_cxn_idx) +
     da("sh-link-rid", shape.sh_link_rid) +
     da("sh-link-hover-rid", shape.sh_link_hover_rid) +
-    (if shape.mc_choice_xml.length() > 0 {
+    (if !shape.mc_choice_xml.is_empty() {
       " data-ooxml-mc-choice=\"" + @xml.xml_escape(shape.mc_choice_xml) + "\""
     } else {
       ""
     }) +
-    (if shape.ole_xml.length() > 0 {
+    (if !shape.ole_xml.is_empty() {
       " data-ooxml-ole=\"" + @xml.xml_escape(shape.ole_xml) + "\""
     } else {
       ""
@@ -1792,13 +1787,13 @@ pub fn render_shape(
         dai("grp-ch-ext-cx", grp.ch_ext_cx) +
         dai("grp-ch-ext-cy", grp.ch_ext_cy)
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, avs)) =>
-        if avs.length() > 0 {
+        if !avs.is_empty() {
           da("cxn-adj", encode_adj_values(avs))
         } else {
           ""
         }
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Other(_, avs)) =>
-        if avs.length() > 0 {
+        if !avs.is_empty() {
           da("cxn-adj", encode_adj_values(avs))
         } else {
           ""
@@ -2292,8 +2287,7 @@ fn render_group(
   // Render child defs (gradient, pattern, arrow markers) and shapes in one pass
   let mut defs = ""
   let mut children_svg = ""
-  let mut ci = 0
-  while ci < nc {
+  for ci in 0..<nc {
     let child = grp.children[ci]
     let child_idx = shape_idx * group_child_idx_multiplier + ci
     if !child.grad_fill.is_none() {
@@ -2328,7 +2322,6 @@ fn render_group(
       render_shape(
         child, rels, slide_num, child_scale, child_idx, theme, table_styles,
       )
-    ci = ci + 1
   }
   let defs_section = if defs.is_empty() {
     ""
@@ -2448,14 +2441,14 @@ pub fn render_slide_svg(
     da("bg", slide.background.to_hex()) +
     dai("scale", scale) +
     (if slide.hidden { da("hidden", "1") } else { "" }) +
-    (if slide.transition_xml.length() > 0 {
+    (if !slide.transition_xml.is_empty() {
       " data-ooxml-transition-xml=\"" +
       @xml.xml_escape(slide.transition_xml) +
       "\""
     } else {
       ""
     }) +
-    (if slide.timing_xml.length() > 0 {
+    (if !slide.timing_xml.is_empty() {
       " data-ooxml-timing-xml=\"" + @xml.xml_escape(slide.timing_xml) + "\""
     } else {
       ""
@@ -2486,20 +2479,17 @@ pub fn render_slide_svg(
   }
   // Background shapes defs (master/layout non-placeholder shapes)
   let nbg = bg_shapes.length()
-  let mut bdi = 0
-  while bdi < nbg {
+  for bdi in 0..<nbg {
     let bs = bg_shapes[bdi]
     let bs_idx = -(bdi + 1)
     if !bs.grad_fill.is_none() {
       defs = defs +
         render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
     }
-    bdi = bdi + 1
   }
   // Slide shapes defs (gradient, pattern, arrows)
   let n = slide.shapes.length()
-  let mut di = 0
-  while di < n {
+  for di in 0..<n {
     let sh = slide.shapes[di]
     if !sh.grad_fill.is_none() {
       defs = defs + render_gradient_def(sh.grad_fill, grad_id(slide_num, di))
@@ -2553,7 +2543,6 @@ pub fn render_slide_svg(
           )
       }
     }
-    di = di + 1
   }
   let defs_section = if defs.is_empty() {
     ""
@@ -2576,7 +2565,7 @@ pub fn render_slide_svg(
   // Background blip fill (image)
   let bg_blip_svg = if !slide.bg_blip_fill.is_none() {
     let bf = slide.bg_blip_fill
-    let bg_resolve_rels = if bg_fill_rels.length() > 0 {
+    let bg_resolve_rels = if !bg_fill_rels.is_empty() {
       bg_fill_rels
     } else {
       rels
@@ -2613,8 +2602,7 @@ pub fn render_slide_svg(
   }
   // Render master/layout background shapes (non-placeholder)
   let mut bg_shapes_svg = ""
-  let mut bi = 0
-  while bi < nbg {
+  for bi in 0..<nbg {
     let bg_shape_rels = if bi < bg_shapes_rels.length() {
       bg_shapes_rels[bi]
     } else {
@@ -2630,12 +2618,10 @@ pub fn render_slide_svg(
         theme,
         table_styles,
       )
-    bi = bi + 1
   }
   // Render slide shapes
   let mut shapes_svg = ""
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     shapes_svg = shapes_svg +
       render_shape(
         slide.shapes[i],
@@ -2646,7 +2632,6 @@ pub fn render_slide_svg(
         theme,
         table_styles,
       )
-    i = i + 1
   }
   header +
   defs_section +

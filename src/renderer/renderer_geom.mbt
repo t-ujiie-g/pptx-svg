@@ -456,8 +456,7 @@ fn render_geom_paths(
   let len = paths.length()
   let mut start = 0
   let mut d = ""
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if paths.get_char(i).unwrap() == '|' {
       if i > start {
         let seg = @xml.str_substring(paths, start, i)
@@ -465,7 +464,6 @@ fn render_geom_paths(
       }
       start = i + 1
     }
-    i = i + 1
   }
   if start < len {
     let seg = @xml.str_substring(paths, start, len)
@@ -1685,14 +1683,12 @@ fn apply_adjustments(
   let adj_names : Array[String] = []
   let len = avlst_str.length()
   let mut start = 0
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     let c = avlst_str.get_char(i).unwrap()
     if c == ';' {
       parse_one_adj(env, avlst_str, start, i, adj_names)
       start = i + 1
     }
-    i = i + 1
   }
   if start < len {
     parse_one_adj(env, avlst_str, start, len, adj_names)
@@ -1741,13 +1737,11 @@ fn eval_guide_list(env : GuideEnv, gdlst_str : String) -> Unit {
   }
   let len = gdlst_str.length()
   let mut start = 0
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if gdlst_str.get_char(i).unwrap() == ';' {
       eval_one_guide(env, gdlst_str, start, i)
       start = i + 1
     }
-    i = i + 1
   }
   if start < len {
     eval_one_guide(env, gdlst_str, start, len)

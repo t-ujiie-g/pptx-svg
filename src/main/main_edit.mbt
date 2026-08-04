@@ -188,20 +188,16 @@ fn make_default_paragraph(
 fn[T] array_remove_at(arr : Array[T], idx : Int) -> Unit {
   let new_arr : Array[T] = []
   let len = arr.length()
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if i != idx {
       new_arr.push(arr[i])
     }
-    i = i + 1
   }
-  while arr.length() > 0 {
+  while !arr.is_empty() {
     let _ = arr.pop()
   }
-  let mut j = 0
-  while j < new_arr.length() {
-    arr.push(new_arr[j])
-    j = j + 1
+  for item in new_arr {
+    arr.push(item)
   }
 }
 
@@ -212,10 +208,7 @@ fn parse_gradient_stops(s : String) -> Array[@ooxml.GradientStop] {
     return stops
   }
   let parts = split_string(s, ';')
-  let np = parts.length()
-  let mut i = 0
-  while i < np {
-    let part = parts[i]
+  for part in parts {
     if !part.is_empty() {
       let vals = split_string(part, ',')
       if vals.length() >= 4 {
@@ -226,7 +219,6 @@ fn parse_gradient_stops(s : String) -> Array[@ooxml.GradientStop] {
         stops.push({ pos, color: ({ r, g, b, alpha: 255 } : @ooxml.Color) })
       }
     }
-    i = i + 1
   }
   stops
 }
@@ -236,13 +228,11 @@ fn split_string(s : String, sep : Char) -> Array[String] {
   let result : Array[String] = []
   let len = s.length()
   let mut start = 0
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if s.get_char(i).unwrap() == sep {
       result.push(substring(s, start, i))
       start = i + 1
     }
-    i = i + 1
   }
   if start <= len {
     result.push(substring(s, start, len))
@@ -374,11 +364,9 @@ pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
   }
   // Pass 2: apply (transform edits never change indices, so this is safe).
   let nt = targets.length()
-  let mut j = 0
-  while j < nt {
+  for j in 0..<nt {
     let (arr, local_idx, t) = targets[j]
     arr[local_idx] = { ..arr[local_idx], transform: t }
-    j = j + 1
   }
   g_modified.val[slide_idx] = true
   "OK:" + int_to_str(nt)

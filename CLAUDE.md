@@ -77,6 +77,17 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 **Watch integer truncation in `px(emu, scale)`.** `px` is integer division: small EMU values relative to `scale` (≈12700 for a 960px wide 16:9 slide) round down to 0. This matters for group children whose coordinates live in `chExt` space — if `chExt` is small (e.g. 10000 EMU mapped onto a multi-million-EMU group), `px(child_coord, outer_scale)` truncates every dimension to 0px and `render_shape`'s `cx_p <= 0` guard drops the shape, producing an empty `<g transform="..."></g>`. `render_group` works around this by computing a finer-grained `child_scale = min(scale·chExt_x/cx, scale·chExt_y/cy)` (Int64 internally), capped at the outer scale, and compensating with an `(cx·child_scale)/(chExt·scale)` factor inside the SVG `scale()` transform.
 
+## MoonBit loop and Option style
+
+The sources use current MoonBit idiom; match it in new code.
+
+- **Iterate collections with `for x in xs`**, not a manual index. When the index itself is needed, use a range loop: `for i in 0..<n`, `0..<=n`, `n>..0`, `n>=..0`.
+- **A range loop evaluates its bounds once**, unlike a re-checked `while` condition. If the body pushes to / removes from the collection it is iterating, keep the `while`.
+- **`while` is still correct** for loops with a body-local step (`i = i + char_step(c)` — the step is unavailable in a `for` header), for a `continue` that must *skip* the increment, and when the index is read after the loop.
+- **`if opt is Some(x) { … }`** instead of `match opt { Some(x) => … None => () }`.
+- **`xs.is_empty()` / `!xs.is_empty()`**, never `xs.length() == 0` / `> 0`.
+- Method-call syntax for stdlib conversions: `c.to_int()`, not `Char::to_int(c)`.
+
 ## MoonBit unit tests
 
 Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with FFI stubs.

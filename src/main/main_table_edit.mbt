@@ -59,8 +59,8 @@ pub fn update_table_cell_text(
       return "ERROR:column index out of range"
     }
     let cell = cells[col]
-    let run = if cell.paragraphs.length() > 0 &&
-      cell.paragraphs[0].runs.length() > 0 {
+    let run = if !cell.paragraphs.is_empty() &&
+      !cell.paragraphs[0].runs.is_empty() {
       { ..cell.paragraphs[0].runs[0], text, }
     } else {
       make_default_run(text)
@@ -82,12 +82,10 @@ pub fn add_table_row(
   with_table(slide_idx, shape_idx, fn(t) {
     let ncols = t.col_widths.length()
     let cells : Array[@ooxml.TableCell] = []
-    let mut c = 0
-    while c < ncols {
+    for _ in 0..<ncols {
       cells.push(@ooxml.TableCell::empty())
-      c = c + 1
     }
-    let height = if t.rows.length() > 0 {
+    let height = if !t.rows.is_empty() {
       let ref_idx = if after_row >= 0 && after_row < t.rows.length() {
         after_row
       } else {
@@ -147,9 +145,8 @@ pub fn add_table_column(
       default_table_col_width_emu
     }
     array_insert_at(t.col_widths, insert_at, width)
-    let mut r = 0
-    while r < t.rows.length() {
-      let cells = t.rows[r].cells
+    for row in t.rows {
+      let cells = row.cells
       // Clamp per row (defensive: rows should have one cell per grid column).
       let at = if insert_at > cells.length() {
         cells.length()
@@ -157,7 +154,6 @@ pub fn add_table_column(
         insert_at
       }
       array_insert_at(cells, at, @ooxml.TableCell::empty())
-      r = r + 1
     }
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(insert_at)
@@ -179,13 +175,11 @@ pub fn delete_table_column(
       return "ERROR:column index out of range"
     }
     array_remove_at(t.col_widths, col)
-    let mut r = 0
-    while r < t.rows.length() {
-      let cells = t.rows[r].cells
+    for row in t.rows {
+      let cells = row.cells
       if col < cells.length() {
         array_remove_at(cells, col)
       }
-      r = r + 1
     }
     g_modified.val[slide_idx] = true
     "OK"

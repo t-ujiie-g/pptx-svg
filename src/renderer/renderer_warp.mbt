@@ -115,16 +115,12 @@ fn flatten_warp_text(
   let mut first_italic = false
   let mut found_style = false
   let np = paragraphs.length()
-  let mut pi = 0
-  while pi < np {
+  for pi in 0..<np {
     let para = paragraphs[pi]
     if pi > 0 && !text.is_empty() {
       text = text + " "
     }
-    let nr = para.runs.length()
-    let mut ri = 0
-    while ri < nr {
-      let run = para.runs[ri]
+    for run in para.runs {
       if run.text != "\n" {
         let display = if run.cap == "all" {
           to_upper_ascii(run.text)
@@ -147,9 +143,7 @@ fn flatten_warp_text(
           found_style = true
         }
       }
-      ri = ri + 1
     }
-    pi = pi + 1
   }
   // Resolve font size
   let def_sz = px(default_font_size_emu, scale)

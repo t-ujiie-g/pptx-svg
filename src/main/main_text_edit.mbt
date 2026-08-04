@@ -13,11 +13,8 @@
 /// Total character length of a paragraph's concatenated run text.
 fn para_text_len(para : @ooxml.TextParagraph) -> Int {
   let mut total = 0
-  let nr = para.runs.length()
-  let mut i = 0
-  while i < nr {
-    total = total + para.runs[i].text.length()
-    i = i + 1
+  for run in para.runs {
+    total = total + run.text.length()
   }
   total
 }
@@ -32,11 +29,8 @@ fn split_para_runs(
 ) -> (Array[@ooxml.TextRun], Array[@ooxml.TextRun]) {
   let left : Array[@ooxml.TextRun] = []
   let right : Array[@ooxml.TextRun] = []
-  let nr = para.runs.length()
   let mut acc = 0
-  let mut i = 0
-  while i < nr {
-    let run = para.runs[i]
+  for run in para.runs {
     let len = run.text.length()
     let run_start = acc
     let run_end = acc + len
@@ -60,7 +54,6 @@ fn split_para_runs(
       }
     }
     acc = acc + len
-    i = i + 1
   }
   (left, right)
 }
@@ -75,36 +68,28 @@ fn[T] array_splice(
 ) -> Unit {
   let new_arr : Array[T] = []
   let len = arr.length()
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if i == start {
-      let mut k = 0
-      while k < items.length() {
-        new_arr.push(items[k])
-        k = k + 1
+      for item in items {
+        new_arr.push(item)
       }
     }
     if i < start || i > end_inclusive {
       new_arr.push(arr[i])
     }
-    i = i + 1
   }
   // start may equal len (append case): handled by the i == start check only when
   // start < len; for start == len, append items at the end.
   if start >= len {
-    let mut k = 0
-    while k < items.length() {
-      new_arr.push(items[k])
-      k = k + 1
+    for item in items {
+      new_arr.push(item)
     }
   }
-  while arr.length() > 0 {
+  while !arr.is_empty() {
     let _ = arr.pop()
   }
-  let mut j = 0
-  while j < new_arr.length() {
-    arr.push(new_arr[j])
-    j = j + 1
+  for item in new_arr {
+    arr.push(item)
   }
 }
 
@@ -198,9 +183,9 @@ pub fn replace_text_range(
     let (_, suffix) = split_para_runs(shape.paragraphs[ep], ec)
     // Insertion format template: the run at the caret, else first run, else default.
     let base_para = shape.paragraphs[sp]
-    let template : @ooxml.TextRun? = if prefix.length() > 0 {
+    let template : @ooxml.TextRun? = if !prefix.is_empty() {
       Some(prefix[prefix.length() - 1])
-    } else if base_para.runs.length() > 0 {
+    } else if !base_para.runs.is_empty() {
       Some(base_para.runs[0])
     } else {
       None
@@ -216,10 +201,8 @@ pub fn replace_text_range(
       dst : Array[@ooxml.TextRun],
       src : Array[@ooxml.TextRun],
     ) -> Unit {
-      let mut k = 0
-      while k < src.length() {
-        dst.push(src[k])
-        k = k + 1
+      for run in src {
+        dst.push(run)
       }
     }
 
@@ -244,14 +227,12 @@ pub fn replace_text_range(
       }
       new_paras.push({ ..base_para, runs: first_runs })
       // Middle paragraphs
-      let mut k = 1
-      while k < last {
+      for k in 1..<last {
         let mid_runs : Array[@ooxml.TextRun] = []
         if !segs[k].is_empty() {
           mid_runs.push(mk_run(segs[k]))
         }
         new_paras.push({ ..base_para, runs: mid_runs })
-        k = k + 1
       }
       // Last paragraph: segLast + suffix
       let last_runs : Array[@ooxml.TextRun] = []

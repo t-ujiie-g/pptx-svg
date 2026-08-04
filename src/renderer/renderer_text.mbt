@@ -53,7 +53,7 @@ fn to_upper_ascii(s : String) -> String {
   let mut i = 0
   while i < len {
     let c = s.get_char(i).unwrap()
-    let code = Char::to_int(c)
+    let code = c.to_int()
     if code >= ascii_lower_a && code <= ascii_lower_z {
       // a-z → A-Z
       result = result + @ffi.ffi_char_code_to_str(code - ascii_case_shift)
@@ -68,7 +68,7 @@ fn to_upper_ascii(s : String) -> String {
 ///|
 /// Check if a character is CJK (Chinese/Japanese/Korean).
 fn is_cjk(c : Char) -> Bool {
-  let code = Char::to_int(c)
+  let code = c.to_int()
   // CJK Unified Ideographs, CJK Compat Ideographs, Fullwidth forms, CJK Ext-B+
   (code >= 0x3000 && code <= 0x9FFF) ||
   (code >= 0xF900 && code <= 0xFAFF) ||
@@ -157,12 +157,10 @@ fn is_kinsoku_start_prohibited(c : Char) -> Bool {
 fn count_spaces(text : String) -> Int {
   let len = text.length()
   let mut count = 0
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if text.get_char(i).unwrap() == ' ' {
       count = count + 1
     }
-    i = i + 1
   }
   count
 }
@@ -214,10 +212,8 @@ fn measure_line_width(
   let mut accum = ""
   let mut accum_ff = ""
   let mut accum_fs : Double = 0.0
-  let nf = vline.length()
-  let mut fi = 0
-  while fi < nf {
-    let (run_idx, frag_text) = vline[fi]
+  for frag in vline {
+    let (run_idx, frag_text) = frag
     let run = para.runs[run_idx]
     let fs_px = run_fs_px(run, scale, def_sz, font_scale)
     let ff = run_font_face(run, theme)
@@ -238,7 +234,6 @@ fn measure_line_width(
       accum_ff = ff
       accum_fs = fs_px
     }
-    fi = fi + 1
   }
   if !accum.is_empty() {
     total_w = total_w + @ffi.ffi_measure_text(accum, accum_ff, accum_fs)
@@ -278,7 +273,7 @@ fn wrap_paragraph(
     }
     // Handle explicit line break runs (from <a:br>)
     if text == "\n" {
-      if cur_line.length() > 0 {
+      if !cur_line.is_empty() {
         lines.push(cur_line)
       } else {
         lines.push([])
@@ -324,7 +319,7 @@ fn wrap_paragraph(
       let candidate = run_accum + seg_text
       let candidate_w = @ffi.ffi_measure_text(candidate, ff, fs_px)
       let total_w = cur_width + candidate_w
-      if cur_line.length() > 0 && total_w > max_w && max_w > 0.0 {
+      if !cur_line.is_empty() && total_w > max_w && max_w > 0.0 {
         // Kinsoku: line-start-prohibited chars stay on current line
         let first_char = seg_text.get_char(0).unwrap()
         if is_kinsoku_start_prohibited(first_char) {
@@ -334,7 +329,7 @@ fn wrap_paragraph(
           continue
         }
         // Start new line — lock in accumulated width first
-        if cur_line.length() > 0 {
+        if !cur_line.is_empty() {
           lines.push(cur_line)
         }
         cur_line = []
@@ -348,10 +343,10 @@ fn wrap_paragraph(
     ri = ri + 1
   }
   // Lock in any remaining accumulated text
-  if cur_line.length() > 0 {
+  if !cur_line.is_empty() {
     lines.push(cur_line)
   }
-  if lines.length() == 0 {
+  if lines.is_empty() {
     lines.push([])
   }
   lines
@@ -411,13 +406,12 @@ fn render_run_with_tabs(
   theme : @ooxml.ThemeData,
   fill_ref : String,
 ) -> (String, Int) {
-  if tab_stops.length() > 0 && contains_tab(display_text) {
+  if !tab_stops.is_empty() && contains_tab(display_text) {
     let parts = split_by_tab(display_text)
     let nparts = parts.length()
     let mut out = ""
     let mut ti = tab_idx
-    let mut parti = 0
-    while parti < nparts {
+    for parti in 0..<nparts {
       let part = parts[parti]
       if parti > 0 && ti < tab_stops.length() {
         let tab_x = text_x + px(tab_stops[ti].pos, scale)
@@ -426,7 +420,6 @@ fn render_run_with_tabs(
       }
       out = out +
         render_run_tspan(run, run_idx, part, scale, fs, rels, theme, fill_ref)
-      parti = parti + 1
     }
     (out, ti)
   } else {
@@ -443,15 +436,12 @@ fn render_run_with_tabs(
 
 ///|
 fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
-  let nr = para.runs.length()
   let mut max_fs = 0
-  let mut i = 0
-  while i < nr {
-    let fs = para.runs[i].font_size
+  for run in para.runs {
+    let fs = run.font_size
     if fs > max_fs {
       max_fs = fs
     }
-    i = i + 1
   }
   // Empty paragraphs (no runs) carry their font size on endParaRPr so they
   // contribute the correct line height. Without this, an empty paragraph in a
@@ -525,18 +515,15 @@ fn para_baseline_shift_extra(
   scale : Int,
   def_sz : Int,
 ) -> (Int, Int) {
-  let nr = para.runs.length()
   let mut has_super = false
   let mut has_sub = false
-  let mut i = 0
-  while i < nr {
-    if para.runs[i].baseline > 0 {
+  for run in para.runs {
+    if run.baseline > 0 {
       has_super = true
     }
-    if para.runs[i].baseline < 0 {
+    if run.baseline < 0 {
       has_sub = true
     }
-    i = i + 1
   }
   if !has_super && !has_sub {
     return (0, 0)
@@ -687,7 +674,7 @@ fn run_text_fill_ref(
   para_idx : Int,
   run_idx : Int,
 ) -> String {
-  if !run.text_grad_fill.is_none() && run.text_grad_fill.stops.length() > 0 {
+  if !run.text_grad_fill.is_none() && !run.text_grad_fill.stops.is_empty() {
     text_fill_id("tgrad-s", slide_num, shape_idx, para_idx, run_idx)
   } else if !run.text_patt_fill.is_none() {
     text_fill_id("tpatt-s", slide_num, shape_idx, para_idx, run_idx)
@@ -707,11 +694,9 @@ fn render_run_fill_defs(
   shape_idx : Int,
 ) -> String {
   let mut defs = ""
-  let mut pi = 0
-  while pi < paragraphs.length() {
+  for pi in 0..<paragraphs.length() {
     let para = paragraphs[pi]
-    let mut ri = 0
-    while ri < para.runs.length() {
+    for ri in 0..<para.runs.length() {
       let run = para.runs[ri]
       let fill_ref = run_text_fill_ref(run, slide_num, shape_idx, pi, ri)
       if !fill_ref.is_empty() {
@@ -721,9 +706,7 @@ fn render_run_fill_defs(
           defs = defs + render_pattern_def(run.text_patt_fill, fill_ref)
         }
       }
-      ri = ri + 1
     }
-    pi = pi + 1
   }
   if defs.is_empty() {
     ""
@@ -781,7 +764,7 @@ fn render_run_tspan(
   if !fill_ref.is_empty() {
     span = span + a("fill", "url(#" + fill_ref + ")")
   } else if !run.text_grad_fill.is_none() &&
-    run.text_grad_fill.stops.length() > 0 {
+    !run.text_grad_fill.stops.is_empty() {
     span = span + a("fill", run.text_grad_fill.stops[0].color.to_css())
   } else if !run.text_patt_fill.is_none() &&
     !run.text_patt_fill.fg_color.is_none() {
@@ -927,7 +910,7 @@ fn render_run_tspan(
       ""
     }) +
     // OMML math equation raw XML for round-trip
-    (if run.math_xml.length() > 0 { da("math-xml", run.math_xml) } else { "" }) +
+    (if !run.math_xml.is_empty() { da("math-xml", run.math_xml) } else { "" }) +
     // CSS filter for text-level effects (shadow/glow visual rendering)
     render_text_effect_style(run.effects, scale)
   // Wrap in hyperlink if present
@@ -983,8 +966,7 @@ fn solve_text_autofit(
     last_para_line_h = 0
     last_para_font_sz = 0
     last_para_spc_after = 0
-    let mut ti = 0
-    while ti < np {
+    for ti in 0..<np {
       let para = paragraphs[ti]
       let nr = para.runs.length()
       let para_line_h = apply_autofit_scale(
@@ -1022,12 +1004,10 @@ fn solve_text_autofit(
         } else {
           // Count explicit line breaks (from <a:br>) to get visual line count
           let mut br_count = 0
-          let mut bri = 0
-          while bri < nr {
+          for bri in 0..<nr {
             if para.runs[bri].text == "\n" {
               br_count = br_count + 1
             }
-            bri = bri + 1
           }
           1 + br_count
         }
@@ -1044,7 +1024,6 @@ fn solve_text_autofit(
           0
         }
       }
-      ti = ti + 1
     }
     // Auto-shrink text to fit: apply normAutofit-like scaling when text overflows.
     // This handles both explicit normAutofit and implicit overflow in fixed-size text boxes.
@@ -1084,7 +1063,7 @@ fn render_text(
   slide_num : Int,
   shape_idx : Int,
 ) -> String {
-  if paragraphs.length() == 0 {
+  if paragraphs.is_empty() {
     return ""
   }
   // Warp text: delegate to warp renderer for non-trivial presets
@@ -1441,7 +1420,7 @@ fn render_text(
         // OOXML: when <a:buClr> is absent, the bullet inherits the first run's color.
         let bu_fill_color = if !para.bullet_color.is_none() {
           para.bullet_color
-        } else if para.runs.length() > 0 && !para.runs[0].color.is_none() {
+        } else if !para.runs.is_empty() && !para.runs[0].color.is_none() {
           para.runs[0].color
         } else {
           @ooxml.Color::none()
@@ -1528,7 +1507,7 @@ fn render_text(
           // Justify: calculate word-spacing for non-last lines
           let justify_ws_attr = if is_justify &&
             vli < nvl - 1 &&
-            vline.length() > 0 {
+            !vline.is_empty() {
             let avail_w = if vli == 0 {
               text_w - first_line_indent
             } else {
@@ -1561,10 +1540,8 @@ fn render_text(
               // No spaces: use letter-spacing as fallback
               let total_chars = {
                 let mut n = 0
-                let mut j = 0
-                while j < vline.length() {
-                  n = n + vline[j].1.length()
-                  j = j + 1
+                for frag in vline {
+                  n = n + frag.1.length()
                 }
                 n
               }
@@ -1610,10 +1587,8 @@ fn render_text(
               ">"
           }
           // Render fragments in this visual line
-          let nf = vline.length()
-          let mut fi = 0
-          while fi < nf {
-            let (run_idx, frag_text) = vline[fi]
+          for frag in vline {
+            let (run_idx, frag_text) = frag
             let run = para.runs[run_idx]
             let (tab_svg, new_ti) = render_run_with_tabs(
               run,
@@ -1631,7 +1606,6 @@ fn render_text(
             )
             out = out + tab_svg
             tab_idx = new_ti
-            fi = fi + 1
           }
           vli = vli + 1
         }
@@ -1714,8 +1688,7 @@ fn estimate_text_height(
   }
   let np = paragraphs.length()
   let mut total = 0
-  let mut i = 0
-  while i < np {
+  for i in 0..<np {
     let para = paragraphs[i]
     let plh = para_line_height(para, scale, def_line_h)
     let (bl_above, bl_below) = para_baseline_shift_extra(para, scale, def_sz)
@@ -1726,7 +1699,6 @@ fn estimate_text_height(
     if para.spc_after > 0 {
       total = total + px(para.spc_after, scale)
     }
-    i = i + 1
   }
   total + px(t_ins, scale) + px(b_ins, scale)
 }

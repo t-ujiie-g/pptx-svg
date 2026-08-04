@@ -1974,7 +1974,7 @@ fn parse_chart_num(s : String) -> Int {
       if c == '.' {
         found_dot = true
       } else if c >= '0' && c <= '9' && sig_digits < 8 {
-        mantissa = mantissa * 10 + (Char::to_int(c) - 48)
+        mantissa = mantissa * 10 + (c.to_int() - 48)
         sig_digits = sig_digits + 1
         if found_dot {
           mant_dec_digits = mant_dec_digits + 1
@@ -1998,7 +1998,7 @@ fn parse_chart_num(s : String) -> Int {
     while si < len {
       let c = s.get_char(si).unwrap()
       if c >= '0' && c <= '9' {
-        exp = exp * 10 + (Char::to_int(c) - 48)
+        exp = exp * 10 + (c.to_int() - 48)
       }
       si = si + 1
     }
@@ -2019,10 +2019,8 @@ fn parse_chart_num(s : String) -> Int {
         p = p + 1
       }
     } else {
-      let mut p = 0
-      while p < -shift {
+      for p = 0; p < -shift; p = p + 1 {
         result = result / 10
-        p = p + 1
       }
     }
     return if start == 1 { -result } else { result }
@@ -2045,7 +2043,7 @@ fn parse_chart_num(s : String) -> Int {
   while i < dot_pos {
     let c = s.get_char(i).unwrap()
     if c >= '0' && c <= '9' {
-      int_part = int_part * 10 + (Char::to_int(c) - 48)
+      int_part = int_part * 10 + (c.to_int() - 48)
     }
     i = i + 1
   }
@@ -2056,7 +2054,7 @@ fn parse_chart_num(s : String) -> Int {
   while i < len && dec_digits < 4 {
     let c = s.get_char(i).unwrap()
     if c >= '0' && c <= '9' {
-      dec_part = dec_part * 10 + (Char::to_int(c) - 48)
+      dec_part = dec_part * 10 + (c.to_int() - 48)
       dec_digits = dec_digits + 1
     }
     i = i + 1
@@ -2112,7 +2110,7 @@ fn mul_div(a : Int, b : Int, c : Int) -> Int {
 /// Handles "0%", "0.0%", "0.00%", "General", etc.
 fn format_chart_val(val : Int, num_fmt : String) -> String {
   // Check if percentage format
-  let is_pct = num_fmt.length() > 0 &&
+  let is_pct = !num_fmt.is_empty() &&
     ({
       let last = num_fmt.get_char(num_fmt.length() - 1).unwrap()
       last == '%'

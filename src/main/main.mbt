@@ -123,7 +123,7 @@ fn count_occurrences(text : String, pattern : String) -> Int {
 ///|
 fn match_at(text : String, pattern : String, pos : Int) -> Bool {
   let plen = pattern.length()
-  for j = 0; j < plen; j = j + 1 {
+  for j in 0..<plen {
     if text.get_char(pos + j).unwrap() != pattern.get_char(j).unwrap() {
       return false
     }
@@ -136,10 +136,7 @@ fn match_at(text : String, pattern : String, pos : Int) -> Bool {
 ///|
 /// Find the theme file path from presentation.xml.rels.
 fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
-  let n = rels.length()
-  let mut i = 0
-  while i < n {
-    let rel = rels[i]
+  for rel in rels {
     // Theme relationship type ends with "/theme"
     if @xml.str_ends_with(rel.type_, "/theme") {
       // Target is relative to ppt/ directory
@@ -149,7 +146,6 @@ fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
         return "ppt/" + rel.target
       }
     }
-    i = i + 1
   }
   ""
 }
@@ -162,10 +158,7 @@ fn load_master_theme(
   mrels : Array[@ooxml.Relationship],
 ) -> @ooxml.ThemeData {
   // Find theme rel in master rels
-  let n = mrels.length()
-  let mut i = 0
-  while i < n {
-    let rel = mrels[i]
+  for rel in mrels {
     if @xml.str_ends_with(rel.type_, "/theme") {
       // Resolve target relative to master's directory
       let slash = last_index_of(master_path, '/')
@@ -181,7 +174,6 @@ fn load_master_theme(
         return @ooxml.parse_theme(theme_xml)
       }
     }
-    i = i + 1
   }
   g_theme.val
 }
@@ -243,8 +235,7 @@ fn resolve_chart_shapes(
   theme : @ooxml.ThemeData,
 ) -> Unit {
   let n = shapes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     match shapes[i].kind {
       @ooxml.ShapeKind::ChartShape(cd) =>
         // chart_xml field temporarily holds the relationship ID
@@ -280,7 +271,6 @@ fn resolve_chart_shapes(
         resolve_chart_shapes(grp.children, rels, theme)
       _ => ()
     }
-    i = i + 1
   }
 }
 
@@ -347,7 +337,7 @@ fn resolve_diagram_children(
     @ffi.ffi_get_file(draw_path),
     theme,
   )
-  if children.length() == 0 {
+  if children.is_empty() {
     return []
   }
   // SmartArt cached drawings omit run colors; derive the text color from the
@@ -377,17 +367,16 @@ fn resolve_diagram_shapes(
   theme : @ooxml.ThemeData,
 ) -> Unit {
   let n = shapes.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     match shapes[i].kind {
       @ooxml.ShapeKind::GroupShape(grp) =>
-        if grp.children.length() == 0 && !shapes[i].ole_xml.is_empty() {
+        if grp.children.is_empty() && !shapes[i].ole_xml.is_empty() {
           let children = resolve_diagram_children(
             shapes[i].ole_xml,
             rels,
             theme,
           )
-          if children.length() > 0 {
+          if !children.is_empty() {
             shapes[i] = {
               ..shapes[i],
               kind: @ooxml.ShapeKind::GroupShape({ ..grp, children, }),
@@ -399,7 +388,6 @@ fn resolve_diagram_shapes(
         }
       _ => ()
     }
-    i = i + 1
   }
 }
 
@@ -438,13 +426,10 @@ fn find_rel_by_type_suffix(
   rels : Array[@ooxml.Relationship],
   type_suffix : String,
 ) -> String {
-  let n = rels.length()
-  let mut i = 0
-  while i < n {
-    if @xml.str_ends_with(rels[i].type_, type_suffix) {
-      return rels[i].target
+  for rel in rels {
+    if @xml.str_ends_with(rel.type_, type_suffix) {
+      return rel.target
     }
-    i = i + 1
   }
   ""
 }
@@ -452,13 +437,10 @@ fn find_rel_by_type_suffix(
 ///|
 /// Check if an array contains a string.
 fn array_contains(arr : Array[String], val : String) -> Bool {
-  let n = arr.length()
-  let mut i = 0
-  while i < n {
-    if arr[i] == val {
+  for s in arr {
+    if s == val {
       return true
     }
-    i = i + 1
   }
   false
 }
@@ -467,12 +449,10 @@ fn array_contains(arr : Array[String], val : String) -> Bool {
 /// Find index of a string in an array, or -1.
 fn array_index_of(arr : Array[String], val : String) -> Int {
   let n = arr.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     if arr[i] == val {
       return i
     }
-    i = i + 1
   }
   -1
 }
@@ -489,17 +469,14 @@ fn rels_path_for(path : String) -> String {
 /// Look up the master for a given layout path.
 fn find_master_for_layout(layout_path : String) -> String {
   let pairs = g_layout_to_master.val
-  let n = pairs.length()
-  let mut i = 0
-  while i < n {
-    let (lp, mp) = pairs[i]
+  for pair in pairs {
+    let (lp, mp) = pair
     if lp == layout_path {
       return mp
     }
-    i = i + 1
   }
   // Fallback: first master
-  if g_master_paths.val.length() > 0 {
+  if !g_master_paths.val.is_empty() {
     g_master_paths.val[0]
   } else {
     ""
@@ -558,13 +535,10 @@ fn find_master_path_for_layout(
   layout_to_master : Array[(String, String)],
   layout_path : String,
 ) -> String {
-  let n = layout_to_master.length()
-  let mut i = 0
-  while i < n {
-    if layout_to_master[i].0 == layout_path {
-      return layout_to_master[i].1
+  for pair in layout_to_master {
+    if pair.0 == layout_path {
+      return pair.1
     }
-    i = i + 1
   }
   ""
 }
@@ -577,13 +551,10 @@ fn find_master_clr_map(
   layout_path : String,
 ) -> @ooxml.ColorMap {
   let master_path = find_master_path_for_layout(layout_to_master, layout_path)
-  let mlen = masters.length()
-  let mut mi = 0
-  while mi < mlen {
-    if masters[mi].1 == master_path {
-      return masters[mi].0.clr_map
+  for master in masters {
+    if master.1 == master_path {
+      return master.0.clr_map
     }
-    mi = mi + 1
   }
   @ooxml.ColorMap::default()
 }
@@ -598,12 +569,10 @@ fn find_master_theme_for_layout(
 ) -> @ooxml.ThemeData {
   let master_path = find_master_path_for_layout(layout_to_master, layout_path)
   let n = master_paths.length()
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     if master_paths[i] == master_path {
       return master_themes[i]
     }
-    i = i + 1
   }
   g_theme.val
 }
@@ -640,7 +609,7 @@ pub fn initialize_pptx() -> String {
   let tbl_styles_xml = @ffi.ffi_get_file("ppt/tableStyles.xml")
   if !tbl_styles_xml.is_empty() {
     g_table_styles.val = @ooxml.parse_table_styles(tbl_styles_xml, g_theme.val)
-    if g_table_styles.val.length() > 0 {
+    if !g_table_styles.val.is_empty() {
       @ffi.ffi_log(
         "Table styles loaded: " + int_to_str(g_table_styles.val.length()),
       )
@@ -652,8 +621,7 @@ pub fn initialize_pptx() -> String {
   let layout_to_master : Array[(String, String)] = []
   let master_paths : Array[String] = []
   // For each slide, find its layout from the slide's .rels
-  let mut si = 0
-  while si < count {
+  for si = 0; si < count; si = si + 1 {
     let slide_num = si + 1
     let slide_rels_path = "ppt/slides/_rels/slide" +
       int_to_str(slide_num) +
@@ -674,12 +642,10 @@ pub fn initialize_pptx() -> String {
     if !layout_path.is_empty() && !array_contains(layout_paths, layout_path) {
       layout_paths.push(layout_path)
     }
-    si = si + 1
   }
   // For each unique layout, find its master from the layout's .rels
   let nlay = layout_paths.length()
-  let mut li = 0
-  while li < nlay {
+  for li in 0..<nlay {
     let lpath = layout_paths[li]
     let lrels_path = rels_path_for(lpath)
     let lrels_xml = @ffi.ffi_get_file(lrels_path)
@@ -698,15 +664,13 @@ pub fn initialize_pptx() -> String {
     if !mpath.is_empty() && !array_contains(master_paths, mpath) {
       master_paths.push(mpath)
     }
-    li = li + 1
   }
   // Parse all unique masters
   let masters : Array[(@ooxml.SlideMasterData, String)] = []
   let master_rels_arr : Array[Array[@ooxml.Relationship]] = []
   let master_themes : Array[@ooxml.ThemeData] = []
   let nmas = master_paths.length()
-  let mut mi = 0
-  while mi < nmas {
+  for mi in 0..<nmas {
     let mp = master_paths[mi]
     let mxml = @ffi.ffi_get_file(mp)
     // Parse master rels
@@ -738,15 +702,11 @@ pub fn initialize_pptx() -> String {
       masters.push((empty_master, mp))
       master_rels_arr.push(mrels)
     }
-    mi = mi + 1
   }
   // Parse all unique layouts
   let layouts : Array[(@ooxml.SlideLayoutData, String)] = []
   let layout_rels_arr : Array[Array[@ooxml.Relationship]] = []
-  let nlay2 = layout_paths.length()
-  let mut li2 = 0
-  while li2 < nlay2 {
-    let lp = layout_paths[li2]
+  for lp in layout_paths {
     let lxml = @ffi.ffi_get_file(lp)
     // Parse layout rels (needed for bg_shapes image resolution)
     let layout_rels_path = rels_path_for(lp)
@@ -790,7 +750,6 @@ pub fn initialize_pptx() -> String {
       layouts.push((empty_layout, lp))
       layout_rels_arr.push(cur_layout_rels)
     }
-    li2 = li2 + 1
   }
   // Store in globals
   g_slide_layout_paths.val = slide_layout_paths
@@ -806,8 +765,7 @@ pub fn initialize_pptx() -> String {
   let slides : Array[@ooxml.SlideData] = []
   let modified : Array[Bool] = []
   let parsed : Array[Bool] = []
-  let mut i = 0
-  while i < count {
+  for i = 0; i < count; i = i + 1 {
     slides.push({
       slide_size: g_slide_size.val,
       background: @ooxml.Color::none(),
@@ -821,7 +779,6 @@ pub fn initialize_pptx() -> String {
     })
     modified.push(false)
     parsed.push(false)
-    i = i + 1
   }
   g_slides.val = slides
   g_modified.val = modified
@@ -917,13 +874,10 @@ fn resolve_slide_data(
       None => base_theme
     }
     // Apply layout clrMapOvr if present
-    match layout_opt {
-      Some(layout) =>
-        match layout.clr_map_ovr {
-          Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-          None => ()
-        }
-      None => ()
+    if layout_opt is Some(layout) {
+      if layout.clr_map_ovr is Some(ovr) {
+        eff = @ooxml.apply_color_map(base_theme, ovr)
+      }
     }
     // Apply slide's own clrMapOvr if present
     let slide_nodes = @xml.parse_xml(slide_xml)
@@ -931,9 +885,8 @@ fn resolve_slide_data(
       Some(n) => @xml.get_children(n)
       None => []
     }
-    match @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) {
-      Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-      None => ()
+    if @ooxml.extract_clr_map_ovr_from_nodes(slide_root_ch) is Some(ovr) {
+      eff = @ooxml.apply_color_map(base_theme, ovr)
     }
     eff
   }
@@ -970,49 +923,43 @@ fn resolve_slide_data(
   if !slide_has_bg {
     // Try layout
     let mut inherited = false
-    match layout_opt {
-      Some(layout) => {
-        let layout_has_bg = !layout.background.is_none() ||
-          !layout.bg_grad.is_none() ||
-          !layout.bg_blip_fill.is_none() ||
-          !layout.bg_patt_fill.is_none()
-        if layout_has_bg {
-          bg = layout.background
-          bg_grad = layout.bg_grad
-          bg_blip_fill = layout.bg_blip_fill
-          bg_patt_fill = layout.bg_patt_fill
-          bg_fill_rels = if !layout_path.is_empty() {
-            get_layout_rels(layout_path)
+    if layout_opt is Some(layout) {
+      let layout_has_bg = !layout.background.is_none() ||
+        !layout.bg_grad.is_none() ||
+        !layout.bg_blip_fill.is_none() ||
+        !layout.bg_patt_fill.is_none()
+      if layout_has_bg {
+        bg = layout.background
+        bg_grad = layout.bg_grad
+        bg_blip_fill = layout.bg_blip_fill
+        bg_patt_fill = layout.bg_patt_fill
+        bg_fill_rels = if !layout_path.is_empty() {
+          get_layout_rels(layout_path)
+        } else {
+          rels
+        }
+        inherited = true
+      }
+    }
+    // Try master
+    if !inherited {
+      if master_opt is Some(master) {
+        let master_has_bg = !master.background.is_none() ||
+          !master.bg_grad.is_none() ||
+          !master.bg_blip_fill.is_none() ||
+          !master.bg_patt_fill.is_none()
+        if master_has_bg {
+          bg = master.background
+          bg_grad = master.bg_grad
+          bg_blip_fill = master.bg_blip_fill
+          bg_patt_fill = master.bg_patt_fill
+          bg_fill_rels = if !master_path.is_empty() {
+            get_master_rels(master_path)
           } else {
             rels
           }
           inherited = true
         }
-      }
-      None => ()
-    }
-    // Try master
-    if !inherited {
-      match master_opt {
-        Some(master) => {
-          let master_has_bg = !master.background.is_none() ||
-            !master.bg_grad.is_none() ||
-            !master.bg_blip_fill.is_none() ||
-            !master.bg_patt_fill.is_none()
-          if master_has_bg {
-            bg = master.background
-            bg_grad = master.bg_grad
-            bg_blip_fill = master.bg_blip_fill
-            bg_patt_fill = master.bg_patt_fill
-            bg_fill_rels = if !master_path.is_empty() {
-              get_master_rels(master_path)
-            } else {
-              rels
-            }
-            inherited = true
-          }
-        }
-        None => ()
       }
     }
     if !inherited && bg.is_none() {
@@ -1020,10 +967,7 @@ fn resolve_slide_data(
     }
   }
   // ── Apply text style defaults: layout first (more specific), then master ──
-  let ns = slide_data.shapes.length()
-  let mut shape_i = 0
-  while shape_i < ns {
-    let shape = slide_data.shapes[shape_i]
+  for shape in slide_data.shapes {
     // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
     // This applies to all shapes (both placeholders and free-standing text boxes)
     apply_inline_lst_style(shape)
@@ -1032,9 +976,8 @@ fn resolve_slide_data(
     // Master placeholder's lstStyle as second fallback
     apply_master_ph_text_defaults(shape, master_opt)
     // Master text styles (p:txStyles) as final fallback
-    match master_opt {
-      Some(master) => apply_text_defaults(shape, master.text_styles)
-      None => ()
+    if master_opt is Some(master) {
+      apply_text_defaults(shape, master.text_styles)
     }
     // endParaRPr as last-resort fallback for free textboxes whose runs
     // still lack color/font after placeholder inheritance.
@@ -1042,7 +985,6 @@ fn resolve_slide_data(
     // <p:style>/<a:fontRef> color as final default for any run that still
     // has no color (matches PowerPoint behavior for accent-styled shapes).
     apply_font_ref_fallback(shape)
-    shape_i = shape_i + 1
   }
   ignore(bg_fill_rels)
   {
@@ -1127,13 +1069,10 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
       None => base_theme
     }
-    match layout_opt {
-      Some(layout) =>
-        match layout.clr_map_ovr {
-          Some(ovr) => eff = @ooxml.apply_color_map(base_theme, ovr)
-          None => ()
-        }
-      None => ()
+    if layout_opt is Some(layout) {
+      if layout.clr_map_ovr is Some(ovr) {
+        eff = @ooxml.apply_color_map(base_theme, ovr)
+      }
     }
     eff
   }
@@ -1149,35 +1088,31 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
       // Check layout then master for bg fill rels
       let mut r = rels
       let mut found = false
-      match layout_opt {
-        Some(layout) =>
-          if !layout.background.is_none() ||
-            !layout.bg_grad.is_none() ||
-            !layout.bg_blip_fill.is_none() ||
-            !layout.bg_patt_fill.is_none() {
-            r = if !layout_path.is_empty() {
-              get_layout_rels(layout_path)
+      if layout_opt is Some(layout) {
+        if !layout.background.is_none() ||
+          !layout.bg_grad.is_none() ||
+          !layout.bg_blip_fill.is_none() ||
+          !layout.bg_patt_fill.is_none() {
+          r = if !layout_path.is_empty() {
+            get_layout_rels(layout_path)
+          } else {
+            rels
+          }
+          found = true
+        }
+      }
+      if !found {
+        if master_opt is Some(master) {
+          if !master.background.is_none() ||
+            !master.bg_grad.is_none() ||
+            !master.bg_blip_fill.is_none() ||
+            !master.bg_patt_fill.is_none() {
+            r = if !master_path.is_empty() {
+              get_master_rels(master_path)
             } else {
               rels
             }
-            found = true
           }
-        None => ()
-      }
-      if !found {
-        match master_opt {
-          Some(master) =>
-            if !master.background.is_none() ||
-              !master.bg_grad.is_none() ||
-              !master.bg_blip_fill.is_none() ||
-              !master.bg_patt_fill.is_none() {
-              r = if !master_path.is_empty() {
-                get_master_rels(master_path)
-              } else {
-                rels
-              }
-            }
-          None => ()
         }
       }
       r
@@ -1191,40 +1126,26 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
   } else {
     ([] : Array[@ooxml.Relationship])
   }
-  match master_opt {
-    Some(master) => {
-      let ms = master.shapes.length()
-      let mut mi = 0
-      while mi < ms {
-        let s = master.shapes[mi]
-        if s.ph_type.is_empty() {
-          bg_shapes.push(s)
-          bg_shapes_rels.push(m_rels)
-        }
-        mi = mi + 1
+  if master_opt is Some(master) {
+    for s in master.shapes {
+      if s.ph_type.is_empty() {
+        bg_shapes.push(s)
+        bg_shapes_rels.push(m_rels)
       }
     }
-    None => ()
   }
   let l_rels = if !layout_path.is_empty() {
     get_layout_rels(layout_path)
   } else {
     ([] : Array[@ooxml.Relationship])
   }
-  match layout_opt {
-    Some(layout) => {
-      let ls = layout.shapes.length()
-      let mut li = 0
-      while li < ls {
-        let s = layout.shapes[li]
-        if s.ph_type.is_empty() {
-          bg_shapes.push(s)
-          bg_shapes_rels.push(l_rels)
-        }
-        li = li + 1
+  if layout_opt is Some(layout) {
+    for s in layout.shapes {
+      if s.ph_type.is_empty() {
+        bg_shapes.push(s)
+        bg_shapes_rels.push(l_rels)
       }
     }
-    None => ()
   }
   // Render to SVG
   @renderer.render_slide_svg(
@@ -1295,14 +1216,12 @@ pub fn get_slide_ooxml(slide_idx : Int) -> String {
 pub fn get_modified_entries() -> String {
   let n = g_slide_count.val
   let mut result = ""
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     if g_modified.val[i] {
       let path = "ppt/slides/slide" + int_to_str(i + 1) + ".xml"
       let content = @serializer.serialize_slide(g_slides.val[i])
       result = result + path + "\t" + content + "\n"
     }
-    i = i + 1
   }
   result
 }

@@ -114,17 +114,13 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   let mut out = "<a:gradFill" + rot_attr + flip_attr + ">"
   // Gradient stops
   out = out + "<a:gsLst>"
-  let ns = gf.stops.length()
-  let mut si = 0
-  while si < ns {
-    let stop = gf.stops[si]
+  for stop in gf.stops {
     out = out +
       "<a:gs pos=\"" +
       int_to_str(stop.pos) +
       "\">" +
       serialize_color_inner(stop.color) +
       "</a:gs>"
-    si = si + 1
   }
   out = out + "</a:gsLst>"
   // Direction
@@ -394,10 +390,7 @@ fn serialize_text_body_inner(
 ) -> String {
   let mut out = "<" + wrapper + ">"
   out = out + serialize_body_pr(body_props) + "<a:lstStyle/>"
-  let np = paragraphs.length()
-  let mut pi = 0
-  while pi < np {
-    let para = paragraphs[pi]
+  for para in paragraphs {
     out = out + "<a:p>"
     // Paragraph properties
     let has_align = !para.align.is_empty()
@@ -413,7 +406,7 @@ fn serialize_text_body_inner(
       para.bullet_size != 0 ||
       !para.bullet_color.is_none() ||
       !para.bullet_img_rid.is_empty()
-    let has_tabs = para.tab_stops.length() > 0
+    let has_tabs = !para.tab_stops.is_empty()
     let has_rtl = para.rtl
     let has_ppr = has_align ||
       has_level ||
@@ -488,16 +481,12 @@ fn serialize_text_body_inner(
         // Tab stops
         if has_tabs {
           ppr = ppr + "<a:tabLst>"
-          let nt = para.tab_stops.length()
-          let mut ti = 0
-          while ti < nt {
-            let ts = para.tab_stops[ti]
+          for ts in para.tab_stops {
             ppr = ppr + "<a:tab pos=\"" + int_to_str(ts.pos) + "\""
             if !ts.algn.is_empty() {
               ppr = ppr + " algn=\"" + ts.algn + "\""
             }
             ppr = ppr + "/>"
-            ti = ti + 1
           }
           ppr = ppr + "</a:tabLst>"
         }
@@ -508,10 +497,9 @@ fn serialize_text_body_inner(
     }
     // Runs
     let nr = para.runs.length()
-    let mut ri = 0
-    while ri < nr {
+    for ri in 0..<nr {
       let run = para.runs[ri]
-      if run.math_xml.length() > 0 {
+      if !run.math_xml.is_empty() {
         // OMML math equation — emit preserved raw XML directly
         out = out + run.math_xml
       } else {
@@ -520,14 +508,12 @@ fn serialize_text_body_inner(
         out = out + "<a:t>" + xml_escape(run.text) + "</a:t>"
         out = out + "</a:r>"
       }
-      ri = ri + 1
     }
     // If no runs, emit an empty run to keep the paragraph
     if nr == 0 {
       out = out + "<a:endParaRPr lang=\"en-US\"/>"
     }
     out = out + "</a:p>"
-    pi = pi + 1
   }
   out + "</" + wrapper + ">"
 }
@@ -637,7 +623,7 @@ fn serialize_text_body(
   paragraphs : Array[@ooxml.TextParagraph],
   body_props : @ooxml.BodyProps,
 ) -> String {
-  if paragraphs.length() == 0 {
+  if paragraphs.is_empty() {
     return ""
   }
   serialize_text_body_inner(paragraphs, "p:txBody", body_props)
@@ -700,13 +686,12 @@ fn serialize_prst_geom(geom : @ooxml.ShapeGeom) -> String {
           }
         _ => []
       }
-      if avs.length() == 0 {
+      if avs.is_empty() {
         "<a:prstGeom prst=\"" + prst + "\"><a:avLst/></a:prstGeom>"
       } else {
         let mut out = "<a:prstGeom prst=\"" + prst + "\"><a:avLst>"
         let n = avs.length()
-        let mut i = 0
-        while i < n {
+        for i in 0..<n {
           let name = if i == 0 { "adj" } else { "adj" + int_to_str(i + 1) }
           out = out +
             "<a:gd name=\"" +
@@ -714,7 +699,6 @@ fn serialize_prst_geom(geom : @ooxml.ShapeGeom) -> String {
             "\" fmla=\"val " +
             int_to_str(avs[i]) +
             "\"/>"
-          i = i + 1
         }
         out + "</a:avLst></a:prstGeom>"
       }
@@ -729,14 +713,13 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
   // Serialize guide list → split into avLst and gdLst
   let mut avlst = "<a:avLst/>"
   let mut gdlst_out = ""
-  if data.gdlst.length() > 0 {
+  if !data.gdlst.is_empty() {
     let mut av_entries = ""
     let mut gd_entries = ""
     // Split by ";" and separate avLst (val formulas) from gdLst (others)
     let len = data.gdlst.length()
     let mut start = 0
-    let mut i = 0
-    while i <= len {
+    for i in 0..<=len {
       if i == len || data.gdlst.get_char(i).unwrap() == ';' {
         if i > start {
           let entry = @xml.str_substring(data.gdlst, start, i)
@@ -771,12 +754,11 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
         }
         start = i + 1
       }
-      i = i + 1
     }
-    if av_entries.length() > 0 {
+    if !av_entries.is_empty() {
       avlst = "<a:avLst>" + av_entries + "</a:avLst>"
     }
-    if gd_entries.length() > 0 {
+    if !gd_entries.is_empty() {
       gdlst_out = "<a:gdLst>" + gd_entries + "</a:gdLst>"
     }
   }
@@ -786,8 +768,7 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
   // Split paths by "|" for multiple sub-paths
   let plen = data.paths.length()
   let mut pstart = 0
-  let mut pi = 0
-  while pi <= plen {
+  for pi in 0..<=plen {
     if pi == plen || data.paths.get_char(pi).unwrap() == '|' {
       if pi > pstart {
         let seg = @xml.str_substring(data.paths, pstart, pi)
@@ -795,7 +776,6 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
       }
       pstart = pi + 1
     }
-    pi = pi + 1
   }
   out = out + "</a:pathLst>"
   // Serialize a:cxnLst if connection points are defined
@@ -804,8 +784,7 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
     // Parse "x,y,ang;x2,y2,ang2;..."
     let clen = data.cxn_lst.length()
     let mut cstart = 0
-    let mut ci = 0
-    while ci <= clen {
+    for ci in 0..<=clen {
       if ci == clen || data.cxn_lst.get_char(ci).unwrap() == ';' {
         if ci > cstart {
           let entry = @xml.str_substring(data.cxn_lst, cstart, ci)
@@ -842,7 +821,6 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
         }
         cstart = ci + 1
       }
-      ci = ci + 1
     }
     out = out + "</a:cxnLst>"
   }
@@ -1353,7 +1331,7 @@ fn serialize_table_cell(cell : @ooxml.TableCell) -> String {
   }
   out = out + ">"
   // Text body
-  if cell.paragraphs.length() > 0 {
+  if !cell.paragraphs.is_empty() {
     out = out + serialize_table_text_body(cell.paragraphs)
   } else {
     out = out +
@@ -1445,27 +1423,17 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   out = out + "/>"
   // Grid columns
   out = out + "<a:tblGrid>"
-  let ncols = table.col_widths.length()
-  let mut ci = 0
-  while ci < ncols {
-    out = out + "<a:gridCol w=\"" + int_to_str(table.col_widths[ci]) + "\"/>"
-    ci = ci + 1
+  for col_width in table.col_widths {
+    out = out + "<a:gridCol w=\"" + int_to_str(col_width) + "\"/>"
   }
   out = out + "</a:tblGrid>"
   // Rows
-  let nrows = table.rows.length()
-  let mut ri = 0
-  while ri < nrows {
-    let row = table.rows[ri]
+  for row in table.rows {
     out = out + "<a:tr h=\"" + int_to_str(row.height) + "\">"
-    let ncells = row.cells.length()
-    let mut cj = 0
-    while cj < ncells {
-      out = out + serialize_table_cell(row.cells[cj])
-      cj = cj + 1
+    for cell in row.cells {
+      out = out + serialize_table_cell(cell)
     }
     out = out + "</a:tr>"
-    ri = ri + 1
   }
   out = out + "</a:tbl>"
   out = out + "</a:graphicData></a:graphic>"
@@ -1495,11 +1463,8 @@ fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String 
   out = out + serialize_transform_with_extra(shape.transform, ch_extra)
   out = out + "</p:grpSpPr>"
   // Serialize child shapes
-  let nc = grp.children.length()
-  let mut i = 0
-  while i < nc {
-    out = out + serialize_shape(grp.children[i])
-    i = i + 1
+  for child in grp.children {
+    out = out + serialize_shape(child)
   }
   out + "</p:grpSp>"
 }
@@ -1534,11 +1499,11 @@ fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
 /// cross-slide copy/paste (E6.5). Charts return "" (preserved via chart_xml).
 pub fn serialize_shape(shape : @ooxml.Shape) -> String {
   // OLE objects: output the preserved graphicFrame XML directly
-  if shape.ole_xml.length() > 0 {
+  if !shape.ole_xml.is_empty() {
     return shape.ole_xml
   }
   let inner = serialize_shape_inner(shape)
-  if shape.mc_choice_xml.length() == 0 {
+  if shape.mc_choice_xml.is_empty() {
     inner
   } else {
     "<mc:AlternateContent>" +
@@ -1651,20 +1616,17 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out + "</a:xfrm>"
   out = out + "</p:grpSpPr>"
   // Shapes
-  let n = slide.shapes.length()
-  let mut i = 0
-  while i < n {
-    out = out + serialize_shape(slide.shapes[i])
-    i = i + 1
+  for shape in slide.shapes {
+    out = out + serialize_shape(shape)
   }
   out = out + "</p:spTree>"
   out = out + "</p:cSld>"
   out = out + "<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>"
   // Preserve transition and timing XML for round-trip
-  if slide.transition_xml.length() > 0 {
+  if !slide.transition_xml.is_empty() {
     out = out + slide.transition_xml
   }
-  if slide.timing_xml.length() > 0 {
+  if !slide.timing_xml.is_empty() {
     out = out + slide.timing_xml
   }
   out + "</p:sld>"
