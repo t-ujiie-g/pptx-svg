@@ -17,19 +17,15 @@ fn extract_math_text(node : @xml.XmlNode) -> String {
       if tag == "m:t" {
         // m:t contains the actual math text
         let mut t = ""
-        let mut i = 0
-        while i < children.length() {
-          t = t + extract_math_text(children[i])
-          i = i + 1
+        for child in children {
+          t = t + extract_math_text(child)
         }
         t
       } else {
         // Recurse into children
         let mut result = ""
-        let mut i = 0
-        while i < children.length() {
-          result = result + extract_math_text(children[i])
-          i = i + 1
+        for child in children {
+          result = result + extract_math_text(child)
         }
         result
       }
@@ -141,7 +137,7 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
             None => (-1, -1)
             Some(avl) => {
               let gds = @xml.find_children(@xml.get_children(avl), "a:gd")
-              let v1 = if gds.length() > 0 {
+              let v1 = if !gds.is_empty() {
                 // a:gd name="adj" fmla="val N" — extract N
                 let fmla = match @xml.get_attr(gds[0], "fmla") {
                   Some(f) => f
@@ -347,21 +343,15 @@ fn parse_para_props(
   }
   // Tab stops: <a:tabLst><a:tab pos="N" algn="l"/></a:tabLst>
   let tab_stops : Array[TabStop] = []
-  match @xml.find_child(ppr_ch, "a:tabLst") {
-    None => ()
-    Some(tl) => {
-      let tabs = @xml.find_children(@xml.get_children(tl), "a:tab")
-      let nt = tabs.length()
-      let mut ti = 0
-      while ti < nt {
-        let pos = attr_int(tabs[ti], "pos")
-        let algn = match @xml.get_attr(tabs[ti], "algn") {
-          Some(v) => v
-          None => ""
-        }
-        tab_stops.push({ pos, algn })
-        ti = ti + 1
+  if @xml.find_child(ppr_ch, "a:tabLst") is Some(tl) {
+    let tabs = @xml.find_children(@xml.get_children(tl), "a:tab")
+    for tab in tabs {
+      let pos = attr_int(tab, "pos")
+      let algn = match @xml.get_attr(tab, "algn") {
+        Some(v) => v
+        None => ""
       }
+      tab_stops.push({ pos, algn })
     }
   }
   (
@@ -462,13 +452,11 @@ fn split_by_newline(s : String) -> Array[String] {
   let parts : Array[String] = []
   let len = s.length()
   let mut start = 0
-  let mut i = 0
-  while i < len {
+  for i in 0..<len {
     if s.get_char(i).unwrap() == '\n' {
       parts.push(@xml.str_substring(s, start, i))
       start = i + 1
     }
-    i = i + 1
   }
   parts.push(@xml.str_substring(s, start, len))
   parts
@@ -663,10 +651,7 @@ fn parse_text_body(
     Some(ls) => parse_text_style_group(ls, theme)
   }
   let pnodes = @xml.find_children(ch, "a:p")
-  let np = pnodes.length()
-  let mut pi = 0
-  while pi < np {
-    let p = pnodes[pi]
+  for p in pnodes {
     let p_ch = @xml.get_children(p)
     let (
       align,
@@ -752,10 +737,7 @@ fn parse_text_body(
     // main_inherit.mbt, AFTER layout/master placeholder inheritance.
     // Iterate over all children to handle a:r (runs), a:fld (fields), and a:br (breaks)
     let runs : Array[TextRun] = []
-    let p_ch_len = p_ch.length()
-    let mut ri = 0
-    while ri < p_ch_len {
-      let child = p_ch[ri]
+    for child in p_ch {
       let child_tag = @xml.get_tag(child)
       // a:r (run) and a:fld (field, e.g. slide number) share the same structure
       if child_tag == "a:r" || child_tag == "a:fld" {
@@ -780,15 +762,13 @@ fn parse_text_body(
           if text.contains("\n") {
             let segs = split_by_newline(text)
             let ns = segs.length()
-            let mut si = 0
-            while si < ns {
+            for si in 0..<ns {
               if !segs[si].is_empty() {
                 runs.push({ ..base_run, text: segs[si] })
               }
               if si < ns - 1 {
                 runs.push({ ..base_run, text: "\n" })
               }
-              si = si + 1
             }
           } else {
             runs.push({ ..base_run, text, })
@@ -814,7 +794,6 @@ fn parse_text_body(
           ),
         )
       }
-      ri = ri + 1
     }
     // Capture endParaRPr values for this paragraph as last-resort fallbacks.
     // These are applied AFTER layout/master inheritance so that, for free
@@ -861,12 +840,10 @@ fn parse_text_body(
       epr_font_face,
       epr_ea_font,
     })
-    pi = pi + 1
   }
   // Apply lstStyle fallbacks to paragraphs missing explicit values
   let npara = paras.length()
-  let mut pai = 0
-  while pai < npara {
+  for pai in 0..<npara {
     let para = paras[pai]
     let lvl_idx = if para.level >= 0 && para.level < max_outline_levels {
       para.level
@@ -940,7 +917,6 @@ fn parse_text_body(
     if changed {
       paras[pai] = new_para
     }
-    pai = pai + 1
   }
   (paras, body_props, lst_style)
 }

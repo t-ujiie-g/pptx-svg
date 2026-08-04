@@ -166,15 +166,11 @@ fn layout_math_children(
 ) -> MathBox {
   let children = @xml.get_children(node)
   let boxes : Array[MathBox] = []
-  let n = children.length()
-  let mut i = 0
-  while i < n {
-    let child = children[i]
+  for child in children {
     let tag = @xml.get_tag(child)
     if !tag.is_empty() && tag != "m:rPr" && tag != "m:ctrlPr" {
       boxes.push(layout_math_node(child, fs, ff, color))
     }
-    i = i + 1
   }
   math_hbox(boxes)
 }
@@ -211,7 +207,7 @@ fn math_hbox(boxes : Array[MathBox]) -> MathBox {
   while i < n {
     let b = boxes[i]
     let dy = max_bl - b.baseline
-    if b.svg.length() > 0 {
+    if !b.svg.is_empty() {
       svg = svg + math_g(x, dy, b.svg)
     }
     x = x + b.w
@@ -289,14 +285,10 @@ fn layout_math_run(
   // Extract text from m:t child
   let mut text = ""
   let children = @xml.get_children(node)
-  let n = children.length()
-  let mut i = 0
-  while i < n {
-    let child = children[i]
+  for child in children {
     if @xml.get_tag(child) == "m:t" {
       text = text + @xml.get_text_content(child)
     }
-    i = i + 1
   }
   if text.is_empty() {
     return math_empty_box
@@ -460,12 +452,10 @@ fn layout_math_subsup(
     sup_y_clamped + sup_box.h,
   ]
   let mut total_h : Double = 0.0
-  let mut ci = 0
-  while ci < bottom_candidates.length() {
-    if bottom_candidates[ci] > total_h {
-      total_h = bottom_candidates[ci]
+  for bottom_candidate in bottom_candidates {
+    if bottom_candidate > total_h {
+      total_h = bottom_candidate
     }
-    ci = ci + 1
   }
   let svg = math_g(0.0, top_extra, base_box.svg) +
     math_g(base_box.w, sup_y_clamped, sup_box.svg) +
@@ -594,12 +584,10 @@ fn layout_math_nary(
     // Limits above and below operator
     let col_w_candidates = [op_w, sub_box.w, sup_box.w]
     let mut col_w : Double = 0.0
-    let mut ci = 0
-    while ci < col_w_candidates.length() {
-      if col_w_candidates[ci] > col_w {
-        col_w = col_w_candidates[ci]
+    for col_w_candidate in col_w_candidates {
+      if col_w_candidate > col_w {
+        col_w = col_w_candidate
       }
-      ci = ci + 1
     }
     let sup_y : Double = 0.0
     let op_y = sup_box.h + 1.0
@@ -711,8 +699,7 @@ fn layout_math_delim(
   let e_nodes = math_children(node, "m:e")
   let content_boxes : Array[MathBox] = []
   let ne = e_nodes.length()
-  let mut ei = 0
-  while ei < ne {
+  for ei in 0..<ne {
     if ei > 0 {
       // Add separator (comma by default)
       let sep_w = math_text_w(",", ff, fs)
@@ -722,7 +709,6 @@ fn layout_math_delim(
       content_boxes.push({ svg: sep_svg, w: sep_w, h: sep_h, baseline: sep_bl })
     }
     content_boxes.push(layout_math_children(e_nodes[ei], fs, ff, color))
-    ei = ei + 1
   }
   let content = math_hbox(content_boxes)
   // Scale delimiters to content height
@@ -977,10 +963,8 @@ fn layout_math_matrix(
     if nc > max_cols {
       max_cols = nc
     }
-    let mut ci = 0
-    while ci < nc {
-      row.push(layout_math_children(cells[ci], fs, ff, color))
-      ci = ci + 1
+    for cell in cells {
+      row.push(layout_math_children(cell, fs, ff, color))
     }
     cell_boxes.push(row)
     ri = ri + 1
@@ -1015,13 +999,11 @@ fn layout_math_matrix(
   let gap = fs * math_matrix_gap_ratio
   // Compute total size
   let mut total_w : Double = 0.0
-  let mut ci = 0
-  while ci < max_cols {
+  for ci = 0; ci < max_cols; ci = ci + 1 {
     total_w = total_w + col_widths[ci]
     if ci < max_cols - 1 {
       total_w = total_w + gap
     }
-    ci = ci + 1
   }
   let mut total_h : Double = 0.0
   ri = 0
@@ -1040,17 +1022,15 @@ fn layout_math_matrix(
     let row = cell_boxes[ri]
     let nc = row.length()
     let mut cur_x : Double = 0.0
-    let mut ci2 = 0
-    while ci2 < nc {
+    for ci2 in 0..<nc {
       let box_ = row[ci2]
       // Center horizontally in column, align baseline in row
       let cx = cur_x + (col_widths[ci2] - box_.w) / 2.0
       let cy = cur_y + (row_baselines[ri] - box_.baseline)
-      if box_.svg.length() > 0 {
+      if !box_.svg.is_empty() {
         svg = svg + math_g(cx, cy, box_.svg)
       }
       cur_x = cur_x + col_widths[ci2] + gap
-      ci2 = ci2 + 1
     }
     cur_y = cur_y + row_heights[ri] + gap
     ri = ri + 1
@@ -1128,14 +1108,10 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
     return false
   }
   let mut has_math = false
-  let mut i = 0
-  while i < np {
+  for i in 0..<np {
     let para = paragraphs[i]
-    let nr = para.runs.length()
-    let mut j = 0
-    while j < nr {
-      let run = para.runs[j]
-      if run.math_xml.length() > 0 {
+    for run in para.runs {
+      if !run.math_xml.is_empty() {
         has_math = true
       } else if !run.text.is_empty() {
         // Non-empty text run without math → mixed content
@@ -1144,12 +1120,10 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
         let mut k = 0
         let tlen = run.text.length()
         while k < tlen {
-          match run.text.get_char(k) {
-            Some(c) =>
-              if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
-                all_ws = false
-              }
-            None => ()
+          if run.text.get_char(k) is Some(c) {
+            if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+              all_ws = false
+            }
           }
           k = k + 1
         }
@@ -1157,9 +1131,7 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
           return false
         }
       }
-      j = j + 1
     }
-    i = i + 1
   }
   has_math
 }
@@ -1183,14 +1155,10 @@ fn render_math_text(
   let mut first_run_fs = 0
   let mut first_run_font = ""
   let mut found_first = false
-  let mut i = 0
-  while i < np {
+  for i in 0..<np {
     let para = paragraphs[i]
-    let nr = para.runs.length()
-    let mut j = 0
-    while j < nr {
-      let run = para.runs[j]
-      if run.math_xml.length() > 0 {
+    for run in para.runs {
+      if !run.math_xml.is_empty() {
         all_math_xml = run.math_xml
         if !found_first {
           first_run_color = run.color
@@ -1199,9 +1167,7 @@ fn render_math_text(
           found_first = true
         }
       }
-      j = j + 1
     }
-    i = i + 1
   }
   if all_math_xml.is_empty() {
     return ""
@@ -1227,16 +1193,13 @@ fn render_math_text(
   }
   // Parse the math XML
   let nodes = @xml.parse_xml(all_math_xml)
-  if nodes.length() == 0 {
+  if nodes.is_empty() {
     return ""
   }
   // Layout the math
   let boxes : Array[MathBox] = []
-  let nn = nodes.length()
-  let mut ni = 0
-  while ni < nn {
-    boxes.push(layout_math_node(nodes[ni], fs_px, ff, color_str))
-    ni = ni + 1
+  for node in nodes {
+    boxes.push(layout_math_node(node, fs_px, ff, color_str))
   }
   let math_box = math_hbox(boxes)
   if math_box.w <= 0.0 {

@@ -69,17 +69,11 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     def.hlink,
     def.fol_hlink,
   ]
-  match @xml.find_child(te_ch, "a:clrScheme") {
-    None => ()
-    Some(cs) => {
-      let cs_ch = @xml.get_children(cs)
-      let mut si = 0
-      while si < slot_tags.length() {
-        match parse_theme_color_node(cs_ch, slot_tags[si]) {
-          Some(c) => slot_colors[si] = c
-          None => ()
-        }
-        si = si + 1
+  if @xml.find_child(te_ch, "a:clrScheme") is Some(cs) {
+    let cs_ch = @xml.get_children(cs)
+    for si in 0..<slot_tags.length() {
+      if parse_theme_color_node(cs_ch, slot_tags[si]) is Some(c) {
+        slot_colors[si] = c
       }
     }
   }
@@ -100,52 +94,31 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   let mut minor_font = def.minor_font
   let mut major_ea_font = def.major_ea_font
   let mut minor_ea_font = def.minor_ea_font
-  match @xml.find_child(te_ch, "a:fontScheme") {
-    None => ()
-    Some(fs) => {
-      let fs_ch = @xml.get_children(fs)
-      match @xml.find_child(fs_ch, "a:majorFont") {
-        None => ()
-        Some(mj) => {
-          let mj_ch = @xml.get_children(mj)
-          match @xml.find_child(mj_ch, "a:latin") {
-            None => ()
-            Some(latin) =>
-              match @xml.get_attr(latin, "typeface") {
-                Some(v) => major_font = v
-                None => ()
-              }
-          }
-          match @xml.find_child(mj_ch, "a:ea") {
-            None => ()
-            Some(ea) =>
-              match @xml.get_attr(ea, "typeface") {
-                Some(v) => major_ea_font = v
-                None => ()
-              }
-          }
+  if @xml.find_child(te_ch, "a:fontScheme") is Some(fs) {
+    let fs_ch = @xml.get_children(fs)
+    if @xml.find_child(fs_ch, "a:majorFont") is Some(mj) {
+      let mj_ch = @xml.get_children(mj)
+      if @xml.find_child(mj_ch, "a:latin") is Some(latin) {
+        if @xml.get_attr(latin, "typeface") is Some(v) {
+          major_font = v
         }
       }
-      match @xml.find_child(fs_ch, "a:minorFont") {
-        None => ()
-        Some(mn) => {
-          let mn_ch = @xml.get_children(mn)
-          match @xml.find_child(mn_ch, "a:latin") {
-            None => ()
-            Some(latin) =>
-              match @xml.get_attr(latin, "typeface") {
-                Some(v) => minor_font = v
-                None => ()
-              }
-          }
-          match @xml.find_child(mn_ch, "a:ea") {
-            None => ()
-            Some(ea) =>
-              match @xml.get_attr(ea, "typeface") {
-                Some(v) => minor_ea_font = v
-                None => ()
-              }
-          }
+      if @xml.find_child(mj_ch, "a:ea") is Some(ea) {
+        if @xml.get_attr(ea, "typeface") is Some(v) {
+          major_ea_font = v
+        }
+      }
+    }
+    if @xml.find_child(fs_ch, "a:minorFont") is Some(mn) {
+      let mn_ch = @xml.get_children(mn)
+      if @xml.find_child(mn_ch, "a:latin") is Some(latin) {
+        if @xml.get_attr(latin, "typeface") is Some(v) {
+          minor_font = v
+        }
+      }
+      if @xml.find_child(mn_ch, "a:ea") is Some(ea) {
+        if @xml.get_attr(ea, "typeface") is Some(v) {
+          minor_ea_font = v
         }
       }
     }
@@ -158,13 +131,10 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   //  (whitespace between elements) are skipped.
   let fill_style_xmls : Array[String] = []
   let ln_style_xmls : Array[String] = []
-  match @xml.find_child(te_ch, "a:fmtScheme") {
-    None => ()
-    Some(fmt) => {
-      let fmt_ch = @xml.get_children(fmt)
-      collect_style_xmls(fmt_ch, "a:fillStyleLst", fill_style_xmls)
-      collect_style_xmls(fmt_ch, "a:lnStyleLst", ln_style_xmls)
-    }
+  if @xml.find_child(te_ch, "a:fmtScheme") is Some(fmt) {
+    let fmt_ch = @xml.get_children(fmt)
+    collect_style_xmls(fmt_ch, "a:fillStyleLst", fill_style_xmls)
+    collect_style_xmls(fmt_ch, "a:lnStyleLst", ln_style_xmls)
   }
   {
     dk1,
@@ -293,16 +263,11 @@ fn collect_style_xmls(
   list_tag : String,
   out : Array[String],
 ) -> Unit {
-  match @xml.find_child(parent_ch, list_tag) {
-    None => ()
-    Some(lst) => {
-      let lst_ch = @xml.get_children(lst)
-      let mut i = 0
-      while i < lst_ch.length() {
-        if @xml.get_tag(lst_ch[i]) != "" {
-          out.push(@xml.serialize_node(lst_ch[i]))
-        }
-        i = i + 1
+  if @xml.find_child(parent_ch, list_tag) is Some(lst) {
+    let lst_ch = @xml.get_children(lst)
+    for lst_node in lst_ch {
+      if @xml.get_tag(lst_node) != "" {
+        out.push(@xml.serialize_node(lst_node))
       }
     }
   }
@@ -444,15 +409,13 @@ pub fn parse_text_style_group(
 ) -> TextStyleGroup {
   let ch = @xml.get_children(node)
   let levels : Array[LevelTextDefaults] = []
-  let mut i = 0
-  while i < max_outline_levels {
+  for i = 0; i < max_outline_levels; i = i + 1 {
     let tag = "a:lvl" + @xml.int_to_str(i + 1) + "pPr"
     let lvl = match @xml.find_child(ch, tag) {
       None => LevelTextDefaults::empty()
       Some(ppr) => parse_level_defaults(ppr, theme)
     }
     levels.push(lvl)
-    i = i + 1
   }
   { levels, }
 }

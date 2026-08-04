@@ -33,7 +33,7 @@ fn render_table_cell_text(
   style_cell : @ooxml.TableStyleCell,
   cell_fill : @ooxml.Color,
 ) -> String {
-  if paragraphs.length() == 0 {
+  if paragraphs.is_empty() {
     return ""
   }
   // Use smaller default font size for table cells (10pt vs 18pt for shapes)
@@ -48,22 +48,19 @@ fn render_table_cell_text(
   let para_line_hs : Array[Int] = []
   let para_wrap_counts : Array[Int] = []
   let para_bul_mars : Array[Int] = []
-  let mut pi = 0
-  while pi < np {
+  for pi in 0..<np {
     let para = paragraphs[pi]
     // Line height from max run font size
     let mut max_run_sz = 0
     let nr = para.runs.length()
-    let mut ri = 0
-    while ri < nr {
-      let rsz = para.runs[ri].font_size
+    for run in para.runs {
+      let rsz = run.font_size
       if rsz > 0 {
         let rsp = px(rsz * @ooxml.emu_per_hundredth_pt, scale)
         if rsp > max_run_sz {
           max_run_sz = rsp
         }
       }
-      ri = ri + 1
     }
     let font_sz = if max_run_sz > 0 { max_run_sz } else { def_sz }
     let lh = if para.line_spacing > 0 {
@@ -90,12 +87,10 @@ fn render_table_cell_text(
     } else {
       para_wrap_counts.push(1)
     }
-    pi = pi + 1
   }
   // Total text height (all wrapped lines)
   let mut text_height = 0
-  let mut thi = 0
-  while thi < np {
+  for thi in 0..<np {
     text_height = text_height + para_line_hs[thi] * para_wrap_counts[thi]
     // Space before/after
     if paragraphs[thi].spc_before > 0 && thi > 0 {
@@ -104,7 +99,6 @@ fn render_table_cell_text(
     if paragraphs[thi].spc_after > 0 {
       text_height = text_height + px(paragraphs[thi].spc_after, scale)
     }
-    thi = thi + 1
   }
   // Vertical anchor offset (clamp to pad_t so text doesn't overflow above the cell)
   let y_raw = if anchor == "ctr" {
@@ -164,16 +158,13 @@ fn render_table_cell_text(
     } else {
       // Fallback: all segments on one line
       let segs : Array[(Int, String)] = []
-      let mut ri = 0
-      while ri < nr {
+      for ri in 0..<nr {
         segs.push((ri, para.runs[ri].text))
-        ri = ri + 1
       }
       [segs]
     }
     let nlines = wrapped.length()
-    let mut li = 0
-    while li < nlines {
+    for li in 0..<nlines {
       cur_y = cur_y + lh
       let line = wrapped[li]
       // Compute x position based on alignment
@@ -202,10 +193,8 @@ fn render_table_cell_text(
       }
       out = out + ">"
       // Render segments
-      let nseg = line.length()
-      let mut si = 0
-      while si < nseg {
-        let (run_idx, seg_text) = line[si]
+      for frag in line {
+        let (run_idx, seg_text) = frag
         if run_idx < nr {
           let run = para.runs[run_idx]
           let display = if run.cap == "all" {
@@ -217,10 +206,8 @@ fn render_table_cell_text(
           out = out +
             render_run_tspan(run, run_idx, display, scale, -1, rels, theme, "")
         }
-        si = si + 1
       }
       out = out + "</tspan>"
-      li = li + 1
     }
     // Space after
     if para.spc_after > 0 {
@@ -296,13 +283,10 @@ fn find_table_style(
   if style_id.is_empty() {
     return @ooxml.TableStyleDef::none()
   }
-  let n = table_styles.length()
-  let mut i = 0
-  while i < n {
-    if table_styles[i].id == style_id {
-      return table_styles[i]
+  for table_style in table_styles {
+    if table_style.id == style_id {
+      return table_style
     }
-    i = i + 1
   }
   @ooxml.TableStyleDef::none()
 }
@@ -386,11 +370,9 @@ fn render_table(
   let ncols = table.col_widths.length()
   let col_x_emu : Array[Int] = []
   let mut cx_accum = 0
-  let mut ci = 0
-  while ci < ncols {
+  for ci in 0..<ncols {
     col_x_emu.push(cx_accum)
     cx_accum = cx_accum + table.col_widths[ci]
-    ci = ci + 1
   }
   // Precompute row heights in EMU (auto-size rows with h=0)
   let nrows = table.rows.length()
@@ -400,8 +382,7 @@ fn render_table(
     line_height_numer /
     line_height_denom +
     default_cell_mar_tb * 2
-  let mut rhi = 0
-  while rhi < nrows {
+  for rhi in 0..<nrows {
     let h = table.rows[rhi].height
     // PowerPoint treats a:tr/@h as a minimum row height — rows still grow to
     // fit wrapped text, so always compute content height and take the max.
@@ -436,31 +417,26 @@ fn render_table(
         // Compute cell width from grid spans
         let gs = if cell.grid_span > 1 { cell.grid_span } else { 1 }
         let mut cell_w_emu = 0
-        let mut gsi = 0
-        while gsi < gs && col2 + gsi < ncols {
+        for gsi = 0; gsi < gs && col2 + gsi < ncols; gsi = gsi + 1 {
           cell_w_emu = cell_w_emu + table.col_widths[col2 + gsi]
-          gsi = gsi + 1
         }
         let content_w_emu = cell_w_emu - mar_l_emu - mar_r_emu
         // Estimate text height from paragraphs
         let np = cell.paragraphs.length()
         let mut text_h_emu = 0
-        let mut pi = 0
-        while pi < np {
+        for pi in 0..<np {
           let para = cell.paragraphs[pi]
           // Find max font size in this paragraph
           let mut max_fs_emu = 0
           let nr = para.runs.length()
-          let mut rri = 0
-          while rri < nr {
-            let rsz = para.runs[rri].font_size
+          for run in para.runs {
+            let rsz = run.font_size
             if rsz > 0 {
               let fs_emu = rsz * @ooxml.emu_per_hundredth_pt
               if fs_emu > max_fs_emu {
                 max_fs_emu = fs_emu
               }
             }
-            rri = rri + 1
           }
           if max_fs_emu == 0 {
             max_fs_emu = default_table_font_size_emu
@@ -493,7 +469,6 @@ fn render_table(
           if para.spc_after > 0 {
             text_h_emu = text_h_emu + para.spc_after
           }
-          pi = pi + 1
         }
         if np == 0 {
           text_h_emu = default_table_font_size_emu *
@@ -514,16 +489,13 @@ fn render_table(
       ci2 = ci2 + 1
     }
     row_heights_emu.push(max_cell_h_emu)
-    rhi = rhi + 1
   }
   // Precompute row y-offsets in EMU
   let row_y_emu : Array[Int] = []
   let mut ry_accum = 0
-  let mut ri2 = 0
-  while ri2 < nrows {
+  for ri2 in 0..<nrows {
     row_y_emu.push(ry_accum)
     ry_accum = ry_accum + row_heights_emu[ri2]
-    ri2 = ri2 + 1
   }
   // Look up table style definition
   let style = find_table_style(table.style_id, table_styles)
@@ -551,18 +523,14 @@ fn render_table(
       // Compute merged cell width (sum of grid_span columns)
       let span = cell.grid_span
       let mut merged_w_emu = 0
-      let mut si = 0
-      while si < span && col_idx + si < ncols {
+      for si = 0; si < span && col_idx + si < ncols; si = si + 1 {
         merged_w_emu = merged_w_emu + table.col_widths[col_idx + si]
-        si = si + 1
       }
       // Compute merged cell height (sum of row_span rows)
       let rspan = cell.row_span
       let mut merged_h_emu = 0
-      let mut sri = 0
-      while sri < rspan && ri + sri < nrows {
+      for sri = 0; sri < rspan && ri + sri < nrows; sri = sri + 1 {
         merged_h_emu = merged_h_emu + row_heights_emu[ri + sri]
-        sri = sri + 1
       }
       let cx_px = base_x + px(col_x_emu[col_idx], scale)
       let cw = px(merged_w_emu, scale)

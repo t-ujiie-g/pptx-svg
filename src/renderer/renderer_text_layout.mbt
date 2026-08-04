@@ -225,19 +225,16 @@ pub fn build_text_layout(
     // Per-run paragraph offset prefix + consumed tracker
     let run_para_off : Array[Int] = []
     let mut acc_off = 0
-    let mut ro = 0
-    while ro < nr {
+    for ro in 0..<nr {
       run_para_off.push(acc_off)
       acc_off = acc_off + para.runs[ro].text.length()
-      ro = ro + 1
     }
     let consumed : Array[Int] = Array::make(nr, 0)
 
     let wrap_w = if do_wrap { text_w - indent } else { no_wrap_width_px }
     let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
     let nvl = vlines.length()
-    let mut vli = 0
-    while vli < nvl {
+    for vli in 0..<nvl {
       if vli > 0 {
         cur_y = cur_y + p_line_h
       }
@@ -338,7 +335,6 @@ pub fn build_text_layout(
         h: p_line_h * scale,
         runs: run_boxes,
       })
-      vli = vli + 1
     }
     cur_y = cur_y + (p_line_h - p_font_sz) + bl_extra_below
     if para.spc_after > 0 {
@@ -362,8 +358,7 @@ pub fn text_layout_to_json(tl : TextLayout) -> String {
     int_to_str(tl.box_cy) +
     "},\"lines\":["
   let nl = tl.lines.length()
-  let mut li = 0
-  while li < nl {
+  for li in 0..<nl {
     let line = tl.lines[li]
     if li > 0 {
       s = s + ","
@@ -377,8 +372,7 @@ pub fn text_layout_to_json(tl : TextLayout) -> String {
       int_to_str(line.h) +
       ",\"runs\":["
     let nr = line.runs.length()
-    let mut ri = 0
-    while ri < nr {
+    for ri in 0..<nr {
       let rb = line.runs[ri]
       if ri > 0 {
         s = s + ","
@@ -398,20 +392,16 @@ pub fn text_layout_to_json(tl : TextLayout) -> String {
         int_to_str(rb.para_char_start) +
         ",\"chars\":["
       let nc = rb.chars.length()
-      let mut cj = 0
-      while cj < nc {
+      for cj in 0..<nc {
         let g = rb.chars[cj]
         if cj > 0 {
           s = s + ","
         }
         s = s + "{\"x\":" + int_to_str(g.x) + ",\"w\":" + int_to_str(g.w) + "}"
-        cj = cj + 1
       }
       s = s + "]}"
-      ri = ri + 1
     }
     s = s + "]}"
-    li = li + 1
   }
   s + "]}"
 }
@@ -431,14 +421,12 @@ pub fn hit_test_layout(
   }
   // Pick the line whose vertical band contains y, else the nearest by center.
   let mut line_idx = -1
-  let mut li = 0
-  while li < nl {
+  for li in 0..<nl {
     let l = tl.lines[li]
     if y_emu >= l.y && y_emu < l.y + l.h {
       line_idx = li
       break
     }
-    li = li + 1
   }
   if line_idx < 0 {
     if y_emu < tl.lines[0].y {
@@ -462,14 +450,12 @@ pub fn hit_test_layout(
       first.para_char_start,
     )
   }
-  let mut ri = 0
-  while ri < nr {
+  for ri in 0..<nr {
     let rb = line.runs[ri]
     if x_emu <= rb.x + rb.w {
       // Within this run: find the char by midpoint.
       let nc = rb.chars.length()
-      let mut ci = 0
-      while ci < nc {
+      for ci in 0..<nc {
         let g = rb.chars[ci]
         if x_emu < g.x + g.w / 2 {
           return (
@@ -479,7 +465,6 @@ pub fn hit_test_layout(
             rb.para_char_start + ci,
           )
         }
-        ci = ci + 1
       }
       // Past the last char of this run box.
       return (
@@ -489,7 +474,6 @@ pub fn hit_test_layout(
         rb.para_char_start + nc,
       )
     }
-    ri = ri + 1
   }
   // Past the line end → caret after the last run box.
   let last = line.runs[nr - 1]

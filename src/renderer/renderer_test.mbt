@@ -89,7 +89,7 @@ test "render_slide_svg with rect shape" {
   let svg_children = @xml.get_children(nodes[0])
   // Find a <g> with data-ooxml-shape-type
   let mut found_shape = false
-  for i = 0; i < svg_children.length(); i = i + 1 {
+  for i in 0..<svg_children.length() {
     if @xml.get_tag(svg_children[i]) == "g" {
       let st = @xml.get_attr(svg_children[i], "data-ooxml-shape-type")
       if !(st is None) {
@@ -129,10 +129,10 @@ test "render_slide_svg with ellipse" {
   let nodes = @xml.parse_xml(svg)
   let svg_children = @xml.get_children(nodes[0])
   let mut found_ellipse = false
-  for i = 0; i < svg_children.length(); i = i + 1 {
+  for i in 0..<svg_children.length() {
     if @xml.get_tag(svg_children[i]) == "g" {
       let children = @xml.get_children(svg_children[i])
-      for j = 0; j < children.length(); j = j + 1 {
+      for j in 0..<children.length() {
         if @xml.get_tag(children[j]) == "ellipse" {
           found_ellipse = true
         }
@@ -1692,12 +1692,10 @@ test "stripedRightArrow renders as multi-segment path" {
   assert_true(find_substring(svg, "<path") >= 0)
   // Three subpaths (3 stripes + body+head) → at least 3 `Z` close commands.
   let mut count = 0
-  let mut idx = 0
-  while idx < svg.length() {
+  for idx in 0..<svg.length() {
     if svg.get_char(idx).unwrap() == 'Z' {
       count = count + 1
     }
-    idx = idx + 1
   }
   assert_true(count >= 3)
 }
@@ -1735,17 +1733,15 @@ test "leftRightArrowCallout renders as preset path" {
   // preset for leftRightArrowCallout has 17 line segments. Count `L` chars
   // (followed by a digit or `-` to avoid matching `Lt;`/`<`).
   let mut count = 0
-  let mut idx = 0
-  while idx < svg.length() - 1 {
+  for idx = 0; idx < svg.length() - 1; idx = idx + 1 {
     if svg.get_char(idx).unwrap() == 'L' {
       let next = svg.get_char(idx + 1).unwrap()
-      let nc = Char::to_int(next)
+      let nc = next.to_int()
       let is_digit = nc >= 48 && nc <= 57
       if is_digit || next == '-' {
         count = count + 1
       }
     }
-    idx = idx + 1
   }
   assert_true(count > 4)
 }

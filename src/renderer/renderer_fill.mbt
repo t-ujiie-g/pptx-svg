@@ -13,10 +13,7 @@ let pattern_tile_sz : Int = 8 // default SVG <pattern> tile size in px
 fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
   // Build stop elements
   let mut stops_svg = ""
-  let ns = gf.stops.length()
-  let mut si = 0
-  while si < ns {
-    let stop = gf.stops[si]
+  for stop in gf.stops {
     // pos is 0..100000 (0.001% precision); emit as 0-1 SVG offset to preserve sub-percent stops.
     let offset = format_pct_decimal(stop.pos)
     let stop_opacity = if stop.color.alpha < 255 {
@@ -40,7 +37,6 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
       "\"" +
       stop_opacity +
       "/>"
-    si = si + 1
   }
   // tileFlip → SVG spreadMethod="reflect" (x, y, or xy all map to reflect)
   let spread_attr = if gf.tile_flip == "x" ||
@@ -105,13 +101,11 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
 fn grad_stops_attr(gf : @ooxml.GradientFill) -> String {
   let mut out = ""
   let ns = gf.stops.length()
-  let mut si = 0
-  while si < ns {
+  for si in 0..<ns {
     if si > 0 {
       out = out + ";"
     }
     out = out + int_to_str(gf.stops[si].pos) + "," + gf.stops[si].color.to_hex()
-    si = si + 1
   }
   out
 }

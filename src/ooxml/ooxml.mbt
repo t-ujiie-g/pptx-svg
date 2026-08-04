@@ -105,7 +105,7 @@ let ascii_f : Int = 102 // 'f'
 
 ///|
 fn hex_digit(c : Char) -> Int {
-  let v = Char::to_int(c)
+  let v = c.to_int()
   if v >= ascii_0 && v <= ascii_9 {
     v - ascii_0
   } else if v >= ascii_A && v <= ascii_F {
@@ -256,7 +256,7 @@ pub fn GradientFill::none() -> GradientFill {
 
 ///|
 pub fn GradientFill::is_none(self : GradientFill) -> Bool {
-  self.stops.length() == 0
+  self.stops.is_empty()
 }
 
 // ── Blip (image) fill ───────────────────────────────────────────────────
@@ -592,8 +592,7 @@ pub fn apply_color_modifiers(
   let mut alpha_val = color.alpha
   let mut lum_mod = -1
   let mut lum_off = 0
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     match modifier_nodes[i] {
       @xml.XmlNode::Element(tag, _, _) => {
         let val = attr_int(modifier_nodes[i], "val")
@@ -693,7 +692,6 @@ pub fn apply_color_modifiers(
       }
       _ => ()
     }
-    i = i + 1
   }
   // Apply lumMod/lumOff together (they work as a pair)
   if lum_mod >= 0 {
@@ -790,10 +788,8 @@ pub(all) struct TextStyleGroup {
 ///|
 pub fn TextStyleGroup::empty() -> TextStyleGroup {
   let levels : Array[LevelTextDefaults] = []
-  let mut i = 0
-  while i < max_outline_levels {
+  for _ in 0..<max_outline_levels {
     levels.push(LevelTextDefaults::empty())
-    i = i + 1
   }
   { levels, }
 }
@@ -1210,7 +1206,7 @@ pub fn parse_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
   } else if prst == "ellipse" || prst == "oval" {
     ShapeGeom::Ellipse
   } else if prst == "roundRect" {
-    let adj = if avlst.length() > 0 { avlst[0] } else { round_rect_default_adj }
+    let adj = if !avlst.is_empty() { avlst[0] } else { round_rect_default_adj }
     ShapeGeom::RoundRect(adj)
   } else if prst == "line" || prst == "straightConnector1" {
     ShapeGeom::Line

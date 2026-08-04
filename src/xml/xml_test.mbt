@@ -369,10 +369,8 @@ test "concat_balanced large input matches naive" {
   // 10000 single-char strings — naive concat would be O(N²) ≈ 50M ops.
   // concat_balanced should finish quickly and produce identical output.
   let parts : Array[String] = []
-  let mut i = 0
-  while i < 10000 {
+  for _ in 0..<10000 {
     parts.push("x")
-    i = i + 1
   }
   let result = concat_balanced(parts)
   assert_eq(result.length(), 10000)
@@ -388,11 +386,9 @@ test "parse_xml shallow nesting works" {
   // Nesting under the cap parses fully.
   let mut xml = ""
   let mut close = ""
-  let mut i = 0
-  while i < 100 {
+  for _ in 0..<100 {
     xml = xml + "<a>"
     close = "</a>" + close
-    i = i + 1
   }
   let full = xml + "X" + close
   let nodes = parse_xml(full)
@@ -415,11 +411,9 @@ test "parse_xml deep nesting does not stack-overflow" {
   // recurse 5000 times and blow the Wasm call stack.
   let mut xml = ""
   let mut close = ""
-  let mut i = 0
-  while i < 5000 {
+  for _ in 0..<5000 {
     xml = xml + "<a>"
     close = "</a>" + close
-    i = i + 1
   }
   let full = xml + "X" + close
   // Just verify it returns without panicking. Depth past the cap is

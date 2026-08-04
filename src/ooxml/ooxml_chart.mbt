@@ -436,9 +436,9 @@ fn extract_all_text(nodes : Array[@xml.XmlNode]) -> String {
             match p_ch[j] {
               @xml.XmlNode::Element(rtag, _, _) =>
                 if rtag == "a:r" {
-                  match @xml.find_child(@xml.get_children(p_ch[j]), "a:t") {
-                    None => ()
-                    Some(t) => result = result + @xml.get_text_content(t)
+                  if @xml.find_child(@xml.get_children(p_ch[j]), "a:t")
+                    is Some(t) {
+                    result = result + @xml.get_text_content(t)
                   }
                 }
               _ => ()
@@ -948,23 +948,16 @@ fn parse_series_title(ch : Array[@xml.XmlNode]) -> String {
   }
   let tx_ch = @xml.get_children(tx)
   // Try c:strRef/c:strCache first
-  match @xml.find_child(tx_ch, "c:strRef") {
-    Some(sr) => {
-      let sr_ch = @xml.get_children(sr)
-      match @xml.find_child(sr_ch, "c:strCache") {
-        Some(cache) => {
-          let pts = @xml.find_children(@xml.get_children(cache), "c:pt")
-          if pts.length() > 0 {
-            match @xml.find_child(@xml.get_children(pts[0]), "c:v") {
-              Some(v) => return @xml.get_text_content(v)
-              None => ()
-            }
-          }
+  if @xml.find_child(tx_ch, "c:strRef") is Some(sr) {
+    let sr_ch = @xml.get_children(sr)
+    if @xml.find_child(sr_ch, "c:strCache") is Some(cache) {
+      let pts = @xml.find_children(@xml.get_children(cache), "c:pt")
+      if !pts.is_empty() {
+        if @xml.find_child(@xml.get_children(pts[0]), "c:v") is Some(v) {
+          return @xml.get_text_content(v)
         }
-        None => ()
       }
     }
-    None => ()
   }
   // Try c:v directly
   match @xml.find_child(tx_ch, "c:v") {
@@ -977,46 +970,38 @@ fn parse_series_title(ch : Array[@xml.XmlNode]) -> String {
 /// Parse axis data source (c:cat, c:val, c:xVal, c:yVal children).
 fn parse_axis_data_source(ch : Array[@xml.XmlNode]) -> AxisDataSource {
   // Try c:numRef
-  match @xml.find_child(ch, "c:numRef") {
-    Some(nr) => {
-      let nr_ch = @xml.get_children(nr)
-      let formula = match @xml.find_child(nr_ch, "c:f") {
-        None => ""
-        Some(f) => @xml.get_text_content(f)
-      }
-      let cache = match @xml.find_child(nr_ch, "c:numCache") {
-        None => NumData::empty()
-        Some(nc) => parse_num_data(@xml.get_children(nc))
-      }
-      return NumSource(formula, cache)
+  if @xml.find_child(ch, "c:numRef") is Some(nr) {
+    let nr_ch = @xml.get_children(nr)
+    let formula = match @xml.find_child(nr_ch, "c:f") {
+      None => ""
+      Some(f) => @xml.get_text_content(f)
     }
-    None => ()
+    let cache = match @xml.find_child(nr_ch, "c:numCache") {
+      None => NumData::empty()
+      Some(nc) => parse_num_data(@xml.get_children(nc))
+    }
+    return NumSource(formula, cache)
   }
   // Try c:numLit
-  match @xml.find_child(ch, "c:numLit") {
-    Some(nl) => return NumSource("", parse_num_data(@xml.get_children(nl)))
-    None => ()
+  if @xml.find_child(ch, "c:numLit") is Some(nl) {
+    return NumSource("", parse_num_data(@xml.get_children(nl)))
   }
   // Try c:strRef
-  match @xml.find_child(ch, "c:strRef") {
-    Some(sr) => {
-      let sr_ch = @xml.get_children(sr)
-      let formula = match @xml.find_child(sr_ch, "c:f") {
-        None => ""
-        Some(f) => @xml.get_text_content(f)
-      }
-      let cache = match @xml.find_child(sr_ch, "c:strCache") {
-        None => StrData::empty()
-        Some(sc2) => parse_str_data(@xml.get_children(sc2))
-      }
-      return StrSource(formula, cache)
+  if @xml.find_child(ch, "c:strRef") is Some(sr) {
+    let sr_ch = @xml.get_children(sr)
+    let formula = match @xml.find_child(sr_ch, "c:f") {
+      None => ""
+      Some(f) => @xml.get_text_content(f)
     }
-    None => ()
+    let cache = match @xml.find_child(sr_ch, "c:strCache") {
+      None => StrData::empty()
+      Some(sc2) => parse_str_data(@xml.get_children(sc2))
+    }
+    return StrSource(formula, cache)
   }
   // Try c:strLit
-  match @xml.find_child(ch, "c:strLit") {
-    Some(sl) => return StrSource("", parse_str_data(@xml.get_children(sl)))
-    None => ()
+  if @xml.find_child(ch, "c:strLit") is Some(sl) {
+    return StrSource("", parse_str_data(@xml.get_children(sl)))
   }
   NoData
 }
@@ -1131,7 +1116,7 @@ fn parse_chart_axis(
     None => ""
     Some(title_node) => {
       let tc = @xml.get_children(title_node)
-      if tc.length() > 0 {
+      if !tc.is_empty() {
         extract_all_text(@xml.get_children(tc[0]))
       } else {
         ""
@@ -1413,14 +1398,11 @@ fn parse_cx_plot_area(
   let groups : Array[ChartGroup] = []
   let axes : Array[ChartAxis] = []
   // cx:plotAreaRegion contains cx:series
-  match @xml.find_child(pa_ch, "cx:plotAreaRegion") {
-    None => ()
-    Some(par) => {
-      let par_ch = @xml.get_children(par)
-      let ser_nodes = @xml.find_children(par_ch, "cx:series")
-      for i in 0..<ser_nodes.length() {
-        groups.push(parse_cx_series(ser_nodes[i], data_map, i, theme))
-      }
+  if @xml.find_child(pa_ch, "cx:plotAreaRegion") is Some(par) {
+    let par_ch = @xml.get_children(par)
+    let ser_nodes = @xml.find_children(par_ch, "cx:series")
+    for i in 0..<ser_nodes.length() {
+      groups.push(parse_cx_series(ser_nodes[i], data_map, i, theme))
     }
   }
   // cx:axis elements
@@ -1558,14 +1540,11 @@ fn parse_cx_subtotals(ch : Array[@xml.XmlNode]) -> Array[Int] {
     Some(n) => n
   }
   let lp_ch = @xml.get_children(lp)
-  match @xml.find_child(lp_ch, "cx:subtotals") {
-    None => ()
-    Some(st) => {
-      let st_ch = @xml.get_children(st)
-      let idx_nodes = @xml.find_children(st_ch, "cx:idx")
-      for i in 0..<idx_nodes.length() {
-        result.push(attr_int(idx_nodes[i], "val"))
-      }
+  if @xml.find_child(lp_ch, "cx:subtotals") is Some(st) {
+    let st_ch = @xml.get_children(st)
+    let idx_nodes = @xml.find_children(st_ch, "cx:idx")
+    for i in 0..<idx_nodes.length() {
+      result.push(attr_int(idx_nodes[i], "val"))
     }
   }
   result

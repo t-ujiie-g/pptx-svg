@@ -90,40 +90,35 @@ fn resolve_placeholder_inheritance(
       continue
     }
     // Try layout first
-    match layout_opt {
-      Some(layout) => {
-        let (got_t, got_bp) = try_inherit_from_source(
-          shapes,
-          i,
-          shapes[i],
-          layout.shapes,
-          needs_transform,
-          needs_body_props,
-        )
-        if got_t {
-          needs_transform = false
-        }
-        if got_bp {
-          needs_body_props = false
-        }
+    if layout_opt is Some(layout) {
+      let (got_t, got_bp) = try_inherit_from_source(
+        shapes,
+        i,
+        shapes[i],
+        layout.shapes,
+        needs_transform,
+        needs_body_props,
+      )
+      if got_t {
+        needs_transform = false
       }
-      None => ()
+      if got_bp {
+        needs_body_props = false
+      }
     }
     // Try master for anything still needed
     if needs_transform || needs_body_props {
-      match master_opt {
-        Some(master) =>
-          ignore(
-            try_inherit_from_source(
-              shapes,
-              i,
-              shapes[i],
-              master.shapes,
-              needs_transform,
-              needs_body_props,
-            ),
-          )
-        None => ()
+      if master_opt is Some(master) {
+        ignore(
+          try_inherit_from_source(
+            shapes,
+            i,
+            shapes[i],
+            master.shapes,
+            needs_transform,
+            needs_body_props,
+          ),
+        )
       }
     }
     i = i + 1
@@ -157,10 +152,7 @@ fn apply_text_style_to_runs(
   paragraphs : Array[@ooxml.TextParagraph],
   style : @ooxml.TextStyleGroup,
 ) -> Unit {
-  let np = paragraphs.length()
-  let mut pi = 0
-  while pi < np {
-    let para = paragraphs[pi]
+  for para in paragraphs {
     let lvl = para.level
     let lvl_idx = if lvl >= 0 && lvl < @ooxml.max_outline_levels {
       lvl
@@ -169,8 +161,7 @@ fn apply_text_style_to_runs(
     }
     let defaults = style.levels[lvl_idx]
     let nr = para.runs.length()
-    let mut ri = 0
-    while ri < nr {
+    for ri in 0..<nr {
       let run = para.runs[ri]
       let need_font_size = run.font_size == 0 && defaults.font_size > 0
       let need_color = run.color.is_none() && !defaults.color.is_none()
@@ -213,9 +204,7 @@ fn apply_text_style_to_runs(
         }
         para.runs[ri] = new_run
       }
-      ri = ri + 1
     }
-    pi = pi + 1
   }
 }
 
@@ -227,14 +216,11 @@ fn apply_ph_lst_style_defaults(
   shape : @ooxml.Shape,
   source_shapes : Array[@ooxml.Shape],
 ) -> Unit {
-  match find_placeholder(source_shapes, shape.ph_type, shape.ph_idx) {
-    None => ()
-    Some(ph) => {
-      let ph_style = ph.lst_style
-      apply_text_style_to_runs(shape.paragraphs, ph_style)
-      apply_para_alignment_from_style(shape.paragraphs, ph_style)
-      apply_para_spacing_from_style(shape.paragraphs, ph_style)
-    }
+  if find_placeholder(source_shapes, shape.ph_type, shape.ph_idx) is Some(ph) {
+    let ph_style = ph.lst_style
+    apply_text_style_to_runs(shape.paragraphs, ph_style)
+    apply_para_alignment_from_style(shape.paragraphs, ph_style)
+    apply_para_spacing_from_style(shape.paragraphs, ph_style)
   }
 }
 
@@ -247,9 +233,8 @@ fn apply_layout_text_defaults(
   if shape.ph_type.is_empty() {
     return
   }
-  match layout_opt {
-    None => ()
-    Some(layout) => apply_ph_lst_style_defaults(shape, layout.shapes)
+  if layout_opt is Some(layout) {
+    apply_ph_lst_style_defaults(shape, layout.shapes)
   }
 }
 
@@ -261,8 +246,7 @@ fn apply_para_alignment_from_style(
   style : @ooxml.TextStyleGroup,
 ) -> Unit {
   let np = paragraphs.length()
-  let mut pi = 0
-  while pi < np {
+  for pi in 0..<np {
     let para = paragraphs[pi]
     if para.align.is_empty() {
       let lvl_idx = if para.level >= 0 && para.level < @ooxml.max_outline_levels {
@@ -275,7 +259,6 @@ fn apply_para_alignment_from_style(
         paragraphs[pi] = { ..para, align, }
       }
     }
-    pi = pi + 1
   }
 }
 
@@ -288,8 +271,7 @@ fn apply_para_spacing_from_style(
   style : @ooxml.TextStyleGroup,
 ) -> Unit {
   let np = paragraphs.length()
-  let mut pi = 0
-  while pi < np {
+  for pi in 0..<np {
     let para = paragraphs[pi]
     let lvl_idx = if para.level >= 0 && para.level < @ooxml.max_outline_levels {
       para.level
@@ -383,7 +365,6 @@ fn apply_para_spacing_from_style(
     if changed {
       paragraphs[pi] = new_para
     }
-    pi = pi + 1
   }
 }
 
@@ -396,9 +377,8 @@ fn apply_master_ph_text_defaults(
   if shape.ph_type.is_empty() {
     return
   }
-  match master_opt {
-    None => ()
-    Some(master) => apply_ph_lst_style_defaults(shape, master.shapes)
+  if master_opt is Some(master) {
+    apply_ph_lst_style_defaults(shape, master.shapes)
   }
 }
 
@@ -478,8 +458,7 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
       fb_ea
     }
     let nr = para.runs.length()
-    let mut ri = 0
-    while ri < nr {
+    for ri in 0..<nr {
       let run = para.runs[ri]
       let need_fs = eff_fs > 0 && run.font_size == 0
       let need_clr = !eff_clr.is_none() && run.color.is_none()
@@ -510,7 +489,6 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
           },
         }
       }
-      ri = ri + 1
     }
   }
 }
@@ -528,13 +506,11 @@ fn apply_font_ref_fallback(shape : @ooxml.Shape) -> Unit {
   let fr_clr = shape.font_ref_color
   for para in shape.paragraphs {
     let nr = para.runs.length()
-    let mut ri = 0
-    while ri < nr {
+    for ri in 0..<nr {
       let run = para.runs[ri]
       if run.color.is_none() {
         para.runs[ri] = { ..run, color: fr_clr }
       }
-      ri = ri + 1
     }
   }
 }
@@ -548,17 +524,13 @@ fn has_no_text(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
   if np == 0 {
     return true
   }
-  let mut i = 0
-  while i < np {
+  for i in 0..<np {
     let nr = paragraphs[i].runs.length()
-    let mut j = 0
-    while j < nr {
+    for j in 0..<nr {
       if !paragraphs[i].runs[j].text.is_empty() {
         return false
       }
-      j = j + 1
     }
-    i = i + 1
   }
   true
 }
@@ -626,7 +598,7 @@ fn replace_auto_content_text(
   text : String,
 ) -> @ooxml.TextParagraph {
   for para in paragraphs {
-    if para.runs.length() > 0 {
+    if !para.runs.is_empty() {
       return { ..para, runs: [{ ..para.runs[0], text, math_xml: "" }] }
     }
   }
@@ -642,18 +614,13 @@ fn find_ph_text(
   master_opt : @ooxml.SlideMasterData?,
 ) -> String {
   // Try layout first
-  match layout_opt {
-    Some(layout) =>
-      match find_placeholder(layout.shapes, ph_type, ph_idx) {
-        Some(ph) => {
-          let text = extract_text(ph.paragraphs)
-          if !text.is_empty() {
-            return text
-          }
-        }
-        None => ()
+  if layout_opt is Some(layout) {
+    if find_placeholder(layout.shapes, ph_type, ph_idx) is Some(ph) {
+      let text = extract_text(ph.paragraphs)
+      if !text.is_empty() {
+        return text
       }
-    None => ()
+    }
   }
   // Try master
   match master_opt {
@@ -669,17 +636,11 @@ fn find_ph_text(
 ///|
 /// Extract plain text from paragraphs.
 fn extract_text(paragraphs : Array[@ooxml.TextParagraph]) -> String {
-  let np = paragraphs.length()
   let mut result = ""
-  let mut pi = 0
-  while pi < np {
-    let nr = paragraphs[pi].runs.length()
-    let mut ri = 0
-    while ri < nr {
-      result = result + paragraphs[pi].runs[ri].text
-      ri = ri + 1
+  for paragraph in paragraphs {
+    for run in paragraph.runs {
+      result = result + run.text
     }
-    pi = pi + 1
   }
   result
 }
