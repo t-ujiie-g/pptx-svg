@@ -1,4 +1,4 @@
-// pptx-svg: text geometry for inline editing (E6.2)
+// pptx-svg: text geometry for inline editing
 //
 // `build_text_layout` reproduces `render_text`'s line/run/char positioning as a
 // structured geometry (EMU) so the consumer can draw a caret / selection over the

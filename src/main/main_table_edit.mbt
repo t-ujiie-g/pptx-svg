@@ -1,4 +1,4 @@
-// pptx-svg: Table editing API (E6.6)
+// pptx-svg: Table editing API
 //
 // Cell text + row/column add/delete. Cells/rows/col_widths are mutable arrays in
 // the cached TableData, so edits happen in place. NOTE: merged cells

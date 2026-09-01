@@ -5,6 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
+# Typecheck (fast — run after every meaningful edit)
+moon check --target wasm-gc --deny-warn
+
 # Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~280KB)
 moon build --target wasm-gc --release
 
@@ -43,12 +46,12 @@ python3 -m http.server 8765 --directory .
 - MoonBit calls `ffi_get_file(path)` to pull individual files on demand
 - MoonBit exports (read-only): `initialize_pptx`, `get_slide_count`, `is_slide_hidden`, `get_slide_xml_raw`, `get_entry_list`, `render_slide_svg`, `update_slide_from_svg`, `get_slide_ooxml`, `get_modified_entries`
 - MoonBit exports (editing): `render_shape_svg`, `update_shape_transform`, `update_shape_text`, `update_shape_fill`, `delete_shape`, `add_shape`, `add_shape_text`, `duplicate_shape`, `update_shape_gradient_fill`, `update_shape_stroke`, `add_paragraph`, `delete_paragraph`, `add_run`, `delete_run`, `update_text_run_style`, `update_text_run_font_size`, `update_text_run_color`, `update_text_run_font`, `update_paragraph_align`, `update_text_run_decoration`, `add_picture_shape`, `replace_picture_rid`
-- MoonBit exports (history E6.1): `restore_slide_ooxml`
-- MoonBit exports (inline text editing E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range`
-- MoonBit exports (z-order E6.3): `bring_to_front`, `send_to_back`, `bring_forward`, `send_backward`
-- MoonBit exports (multi-transform E6.4): `update_shapes_transform`
-- MoonBit exports (copy/paste E6.5): `get_shape_ooxml`, `add_shape_from_ooxml`
-- MoonBit exports (table editing E6.6): `update_table_cell_text`, `add_table_row`, `delete_table_row`, `add_table_column`, `delete_table_column`
+- MoonBit exports (history): `restore_slide_ooxml`
+- MoonBit exports (inline text editing): `get_text_layout`, `hit_test_text`, `replace_text_range`
+- MoonBit exports (z-order): `bring_to_front`, `send_to_back`, `bring_forward`, `send_backward`
+- MoonBit exports (multi-transform): `update_shapes_transform`
+- MoonBit exports (copy/paste): `get_shape_ooxml`, `add_shape_from_ooxml`
+- MoonBit exports (table editing): `update_table_cell_text`, `add_table_row`, `delete_table_row`, `add_table_column`, `delete_table_column`
 - Full export list: see `src/main/moon.pkg`
 
 **Lazy slide parse (`g_slides` cache).** `initialize_pptx` fills `g_slides` with empty placeholders (`shapes: []`); the real parse + placeholder inheritance happens on the first `render_slide_svg(idx)`, which caches the resolved `SlideData` and sets `g_parsed[idx]`. Editing exports read `g_slides` directly, so any new editing export that reads the cache **must** route through `with_shape`/`with_run` (which call `ensure_slide_parsed`) or call `ensure_slide_parsed(slide_idx)` itself — otherwise it silently no-ops on a slide that was never rendered (this was the 0.5.10 bug). Don't add per-method `renderSlideSvg()` "ensure parsed" calls in the TS layer; the Wasm boundary is the single source of truth.
@@ -77,9 +80,9 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 **Watch integer truncation in `px(emu, scale)`.** `px` is integer division: small EMU values relative to `scale` (≈12700 for a 960px wide 16:9 slide) round down to 0. This matters for group children whose coordinates live in `chExt` space — if `chExt` is small (e.g. 10000 EMU mapped onto a multi-million-EMU group), `px(child_coord, outer_scale)` truncates every dimension to 0px and `render_shape`'s `cx_p <= 0` guard drops the shape, producing an empty `<g transform="..."></g>`. `render_group` works around this by computing a finer-grained `child_scale = min(scale·chExt_x/cx, scale·chExt_y/cy)` (Int64 internally), capped at the outer scale, and compensating with an `(cx·child_scale)/(chExt·scale)` factor inside the SVG `scale()` transform.
 
-## MoonBit loop and Option style
+## MoonBit idiom (current compiler)
 
-The sources use current MoonBit idiom; match it in new code.
+The sources track current MoonBit idiom; match it in new code.
 
 - **Iterate collections with `for x in xs`**, not a manual index. When the index itself is needed, use a range loop: `for i in 0..<n`, `0..<=n`, `n>..0`, `n>=..0`.
 - **A range loop evaluates its bounds once**, unlike a re-checked `while` condition. If the body pushes to / removes from the collection it is iterating, keep the `while`.
@@ -87,6 +90,11 @@ The sources use current MoonBit idiom; match it in new code.
 - **`if opt is Some(x) { … }`** instead of `match opt { Some(x) => … None => () }`.
 - **`xs.is_empty()` / `!xs.is_empty()`**, never `xs.length() == 0` / `> 0`.
 - Method-call syntax for stdlib conversions: `c.to_int()`, not `Char::to_int(c)`.
+- **Top-level declarations are separated by a `///|` block marker.** Each block is independent and order-irrelevant, so a refactor can move blocks one at a time. New top-level items get one too; `moon fmt` keeps them in place.
+
+**Don't guess an API — verify it.** The compiler moves faster than any snapshot of its docs, and a plausible-looking signature that no longer exists costs a build cycle. Check with `moon ide doc <name>` (or `moon ide outline`) before using an unfamiliar stdlib function, and reach for the `moonbit-orientation` / `moonbit-agent-guide` skills for language-level questions. Deprecated APIs already found this way: `unsafe_char_at` → `get_char`, `assert_eq!` → `assert_eq`.
+
+**`moon check` does not surface deprecation warnings** — they appear under `moon build` / `moon test`. A green `moon check --deny-warn` is not proof the tree is warning-free; the release build in the verification checklist is.
 
 ## MoonBit unit tests
 
@@ -211,7 +219,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape rendering + public API |
 | `src/renderer/renderer_table.mbt` | Table SVG rendering (cell borders, merging, conditional formatting) |
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) + shared helpers (`solve_text_autofit`, `run_fs_px`, `run_ff`, `wrap_paragraph`, `measure_line_width`) |
-| `src/renderer/renderer_text_layout.mbt` | Text geometry for inline editing (E6.2): `build_text_layout` / `text_layout_to_json` / `hit_test_layout` (EMU per-char boxes) |
+| `src/renderer/renderer_text_layout.mbt` | Text geometry for inline editing: `build_text_layout` / `text_layout_to_json` / `hit_test_layout` (EMU per-char boxes) |
 | `src/renderer/renderer_warp.mbt` | Text warp rendering (SVG `<textPath>` + transforms for prstTxWarp presets) |
 | `src/renderer/renderer_math.mbt` | OMML math rendering (fractions, radicals, integrals, matrices → SVG) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
@@ -220,9 +228,9 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state; post-parse resolution of charts (`resolve_chart_shapes`) and SmartArt diagrams (`resolve_diagram_shapes`) |
-| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes); history (`restore_slide_ooxml`, E6.1); z-order (E6.3); multi-transform (E6.4); copy/paste (E6.5). Shared helpers: `with_shape`/`with_run`, `make_default_run`/`paragraph`, `array_remove_at`/`array_insert_at` |
-| `src/main/main_text_edit.mbt` | Inline text editing exports (E6.2): `get_text_layout`, `hit_test_text`, `replace_text_range` + `split_para_runs` |
-| `src/main/main_table_edit.mbt` | Table editing exports (E6.6): `update_table_cell_text`, `add_table_row`/`column`, `delete_table_row`/`column` + `with_table` |
+| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes); history (`restore_slide_ooxml`); z-order; multi-transform; copy/paste. Shared helpers: `with_shape`/`with_run`, `make_default_run`/`paragraph`, `array_remove_at`/`array_insert_at` |
+| `src/main/main_text_edit.mbt` | Inline text editing exports: `get_text_layout`, `hit_test_text`, `replace_text_range` + `split_para_runs` |
+| `src/main/main_table_edit.mbt` | Table editing exports: `update_table_cell_text`, `add_table_row`/`column`, `delete_table_row`/`column` + `with_table` |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |
 | `src/main/moon.pkg` | Export list + `use-js-builtin-string: true` |
 | `lib/index.ts` | Library public API re-exports |
@@ -301,12 +309,23 @@ npm run test:node                           # Node.js integration tests pass
 
 ## Refactoring checklist
 
-When asked to "refactor" (リファクタリング), review against these five criteria and apply only low-risk, high-value changes — don't restructure working code for its own sake. If nothing needs doing, say so rather than forcing changes.
+When asked to "refactor" (リファクタリング), review against these six criteria and apply only low-risk, high-value changes — don't restructure working code for its own sake. If nothing needs doing, say so rather than forcing changes.
 
 1. **Constant management / no magic numbers.** Numeric literals with domain meaning (EMU sizes, font fallbacks, default depths, sentinels) get a named `let` in the constants block (`renderer.mbt` for renderer, module top for others). Re-used literals must be a single shared constant, not copies.
 2. **No duplication / dead code.** Identical logic in 2+ places → extract one shared helper (e.g. per-run font resolution → `run_fs_px`/`run_ff` in `renderer_text.mbt`, shared by `wrap_paragraph`/`measure_line_width`/`build_text_layout`). Remove unused params (don't paper over with `ignore(x)`), unreachable branches, and commented-out code.
 3. **File splitting.** Keep files cohesive and roughly under ~1500 lines where practical. Same-package MoonBit files (`src/main/*.mbt`, `src/renderer/*.mbt`) can be split purely for organization with zero API risk — prefer one file per concern (e.g. `main_text_edit.mbt` for inline-text exports). Don't split the giant pre-existing renderers (`renderer_chart.mbt`, `render_text`) without a strong reason — high risk.
 4. **Docs up to date.** After any change, sync `CLAUDE.md` (Key files table, FFI export list, data model), `docs/editing-guide.md`, `README.md`/`README.ja.md`, `CHANGELOG.md` (`## Unreleased`), and `TODO.md`. Version bumps in `package.json` are deferred to release (keep current; CHANGELOG accumulates under `## Unreleased`).
 5. **Test coverage.** Every behavior has a MoonBit unit test (pure functions, round-trip) and/or a Node integration test (`test_node_compat.mjs`). After refactoring, the full suite (`npm test`) must stay green with unchanged counts unless tests were intentionally added.
+6. **Comment hygiene.** See below.
+
+### Comment hygiene
+
+A comment must make sense to a reader who has never opened `TODO.md` and was not there when the code landed.
+
+- **No roadmap / phase codes in code comments.** `E6.1`, `E2.5`, `P3`, `Phase 2`, `see TODO R1` mean nothing to an outside reader and go stale as soon as `TODO.md` is reorganized. Name the *thing* instead — "History support", "cross-slide copy/paste", "run-box layout". Stable, findable references are fine and should stay: ECMA-376 § numbers, GitHub issue `#N`, browser-version constraints. `TODO.md` and `CHANGELOG.md` keep the codes; the code does not.
+- **Delete comments the code already says.** A comment restating the next line, narrating what was changed, or arguing the change to a reviewer is noise once merged. That history lives in git and `CHANGELOG.md`.
+- **Keep comments that carry a constraint the code cannot show.** Spec rules, sentinel meanings (`-1 = unset`), units (EMU, 1/60000 deg, hundredths-of-pt), the browser/compiler limitations in this file, and deliberate deviations ("browsers ignore `text-decoration-color` on SVG `<text>`") all stay. `///` doc comments on Wasm exports and public helpers stay mandatory.
+- **Keep comments short and non-repeating.** When several fields share one mechanism, explain it once above the group instead of repeating it per field. Trailing per-field comments in `ooxml.mbt` structs are the established convention here and stay — they carry units and sentinels — but they must be one short line, never a section marker or a paragraph wedged between fields.
+- **Section markers** (`// ── Title ────…`) label a block of related declarations; keep the title descriptive and the rule padded to the same column as its neighbours.
 
 After refactoring, run `npm test` and confirm rendering output is unchanged (the renderer/Node suites guard this).

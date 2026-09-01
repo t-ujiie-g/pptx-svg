@@ -2083,7 +2083,7 @@ test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
   assert_eq(find_substring(svg, "<path "), -1)
 }
 
-// ── build_text_layout geometry (E6.2) ────────────────────────────────────────
+// ── build_text_layout geometry ───────────────────────────────────────────────
 // The renderer-package FFI stub returns measure_text = 0.0, so per-char widths
 // collapse to 0; these tests assert the structural geometry (line/run/char counts
 // and char offsets), which is independent of measurement. Real x/w geometry is

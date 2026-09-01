@@ -1,4 +1,4 @@
-// pptx-svg: Inline text editing API (E6.2)
+// pptx-svg: Inline text editing API
 //
 // Wasm exports backing a PowerPoint/Google-Slides–style direct-typing experience
 // (double-click to edit, IME input) via a contentEditable overlay:

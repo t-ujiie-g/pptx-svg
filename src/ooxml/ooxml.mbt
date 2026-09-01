@@ -1,4 +1,4 @@
-// OOXML / PPTX parser — Phase 2
+// OOXML / PPTX types, color utilities, and parser entry points
 //
 // Extracts shape data from slide XML and .rels files.
 // All positions/sizes are in EMUs (English Metric Units).
@@ -1043,7 +1043,7 @@ pub(all) struct TableCell {
 
 ///|
 /// An empty table cell with parser defaults (no text, no merge, no fill/borders,
-/// default margins/anchor). Used when adding rows/columns (E6.6).
+/// default margins/anchor). Used when adding rows/columns.
 pub fn TableCell::empty() -> TableCell {
   {
     paragraphs: [],

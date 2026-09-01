@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Refactoring
+
+- **Comment hygiene pass** (no code change — comments only). Roadmap/phase codes (`E6.1`–`E6.6`, `E2.5`, `Phase 2`, `see TODO R1`) removed from source comments and section markers in `src/` and `lib/pptx-renderer.ts`; they only resolve against `TODO.md` and mean nothing to an outside reader. Each is replaced by what the block actually is ("History support", "Copy / paste — cross-slide", "run-box layout"). The codes stay in `TODO.md` and in this changelog, where they are a historical record.
+- **`CLAUDE.md`**: added a *Comment hygiene* criterion (#6) to the refactoring checklist, a `moon check --deny-warn` entry to the commands list, and notes on `///|` block markers, verifying APIs with `moon ide doc` instead of guessing, and the fact that deprecation warnings only surface under `moon build` / `moon test`.
+
 ## 0.6.5
 
 Maintenance release: MoonBit sources brought up to current idiomatic syntax, and

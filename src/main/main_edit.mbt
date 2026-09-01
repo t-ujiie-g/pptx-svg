@@ -4,8 +4,8 @@
 //   - render_shape_svg, update_shape_transform, update_shape_text, update_shape_fill
 //   - delete_shape, add_shape, add_shape_text, duplicate_shape
 //   - update_shape_gradient_fill, update_shape_stroke
-//   - Text editing (E2.5): add/delete paragraph/run, style/font/color/align/decoration
-//   - History support (E6.1): restore_slide_ooxml
+//   - Text editing: add/delete paragraph/run, style/font/color/align/decoration
+//   - History support: restore_slide_ooxml
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -310,7 +310,7 @@ pub fn update_shape_transform(
 }
 
 ///|
-/// Update several shapes' transforms atomically in a single call (E6.4).
+/// Update several shapes' transforms atomically in a single call.
 ///
 /// `items_data` is `"shapeIdx,x,y,cx,cy,rot;..."` (all EMU; rot in 1/60000 deg).
 /// Every shape index is resolved and validated *before* any change is applied, so
@@ -704,7 +704,7 @@ pub fn update_shape_stroke(
   })
 }
 
-// ── Text editing API (E2.5) ─────────────────────────────────────────────────
+// ── Text editing API ────────────────────────────────────────────────────────
 
 ///|
 /// Add a new paragraph to a shape. Creates a paragraph with a single run.
@@ -960,7 +960,7 @@ pub fn update_text_run_decoration(
   })
 }
 
-// ── History support (E6.1) ───────────────────────────────────────────────────
+// ── History support ──────────────────────────────────────────────────────────
 
 ///|
 /// Restore a slide's SlideData from a previously serialized OOXML slide XML.
@@ -1030,7 +1030,7 @@ pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
   "OK"
 }
 
-// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
+// ── Z-order ──────────────────────────────────────────────────────────────────
 // z-order = position in the containing shape array: `render_slide_svg` and
 // `serialize_slide` both emit shapes in array order, so document order = paint
 // order — the LAST element is front-most, the FIRST is back-most. Reordering
@@ -1122,7 +1122,7 @@ pub fn send_backward(slide_idx : Int, shape_idx : Int) -> String {
   })
 }
 
-// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
+// ── Copy / paste — cross-slide ───────────────────────────────────────────────
 // The shape's OOXML is the portable form. The TS layer extracts media/rels by
 // scanning the XML's rIds (see getShapeSpec), re-links them on paste, then calls
 // add_shape_from_ooxml on the target slide.
