@@ -1,4 +1,4 @@
-// OOXML / PPTX parser — Phase 2
+// OOXML / PPTX types, color utilities, and parser entry points
 //
 // Extracts shape data from slide XML and .rels files.
 // All positions/sizes are in EMUs (English Metric Units).
@@ -47,17 +47,17 @@ pub(all) struct Color {
 
 ///|
 pub fn Color::white() -> Color {
-  { r: 255, g: 255, b: 255, alpha: 255 }
+  { r: 255, g: 255, b: 255, alpha: 255, }
 }
 
 ///|
 pub fn Color::black() -> Color {
-  { r: 0, g: 0, b: 0, alpha: 255 }
+  { r: 0, g: 0, b: 0, alpha: 255, }
 }
 
 ///|
 pub fn Color::none() -> Color {
-  { r: -1, g: -1, b: -1, alpha: 255 }
+  { r: -1, g: -1, b: -1, alpha: 255, }
 }
 
 ///|
@@ -70,7 +70,7 @@ pub fn Color::is_none(self : Color) -> Bool {
 pub fn parse_hex_color(s : String) -> Color {
   if s.length() >= 8 {
     let a = parse_hex2(s, 0)
-    { r: parse_hex2(s, 2), g: parse_hex2(s, 4), b: parse_hex2(s, 6), alpha: a }
+    { r: parse_hex2(s, 2), g: parse_hex2(s, 4), b: parse_hex2(s, 6), alpha: a, }
   } else if s.length() >= 6 {
     {
       r: parse_hex2(s, 0),
@@ -332,7 +332,7 @@ pub(all) struct PatternFill {
 
 ///|
 pub fn PatternFill::none() -> PatternFill {
-  { prst: "", fg_color: Color::none(), bg_color: Color::none() }
+  { prst: "", fg_color: Color::none(), bg_color: Color::none(), }
 }
 
 ///|
@@ -375,16 +375,16 @@ pub fn ThemeData::default() -> ThemeData {
   {
     dk1: Color::black(),
     lt1: Color::white(),
-    dk2: { r: 68, g: 84, b: 106, alpha: 255 },
-    lt2: { r: 231, g: 230, b: 230, alpha: 255 },
-    accent1: { r: 68, g: 114, b: 196, alpha: 255 },
-    accent2: { r: 237, g: 125, b: 49, alpha: 255 },
-    accent3: { r: 165, g: 165, b: 165, alpha: 255 },
-    accent4: { r: 255, g: 192, b: 0, alpha: 255 },
-    accent5: { r: 91, g: 155, b: 213, alpha: 255 },
-    accent6: { r: 112, g: 173, b: 71, alpha: 255 },
-    hlink: { r: 5, g: 99, b: 193, alpha: 255 },
-    fol_hlink: { r: 149, g: 79, b: 163, alpha: 255 },
+    dk2: { r: 68, g: 84, b: 106, alpha: 255, },
+    lt2: { r: 231, g: 230, b: 230, alpha: 255, },
+    accent1: { r: 68, g: 114, b: 196, alpha: 255, },
+    accent2: { r: 237, g: 125, b: 49, alpha: 255, },
+    accent3: { r: 165, g: 165, b: 165, alpha: 255, },
+    accent4: { r: 255, g: 192, b: 0, alpha: 255, },
+    accent5: { r: 91, g: 155, b: 213, alpha: 255, },
+    accent6: { r: 112, g: 173, b: 71, alpha: 255, },
+    hlink: { r: 5, g: 99, b: 193, alpha: 255, },
+    fol_hlink: { r: 149, g: 79, b: 163, alpha: 255, },
     major_font: "Calibri Light",
     minor_font: "Calibri",
     major_ea_font: "",
@@ -550,7 +550,7 @@ fn hue_to_rgb(p : Int, q : Int, t_in : Int) -> Int {
 fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
   if s == 0 {
     let v = l * rgb_max / hsl_scale
-    return { r: v, g: v, b: v, alpha: 255 }
+    return { r: v, g: v, b: v, alpha: 255, }
   }
   let q = if l < hsl_half {
     l * (hsl_scale + s) / hsl_scale
@@ -570,7 +570,7 @@ fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
       v
     }
   }
-  { r: clamp(r), g: clamp(g), b: clamp(b), alpha: 255 }
+  { r: clamp(r), g: clamp(g), b: clamp(b), alpha: 255, }
 }
 
 // ── Color modifiers ─────────────────────────────────────────────────────────
@@ -729,7 +729,7 @@ pub fn apply_color_modifiers(
   } else if alpha_val > 255 {
     alpha_val = 255
   }
-  { r, g, b, alpha: alpha_val }
+  { r, g, b, alpha: alpha_val, }
 }
 
 // ── Master / Layout types ────────────────────────────────────────────────────
@@ -1043,7 +1043,7 @@ pub(all) struct TableCell {
 
 ///|
 /// An empty table cell with parser defaults (no text, no merge, no fill/borders,
-/// default margins/anchor). Used when adding rows/columns (E6.6).
+/// default margins/anchor). Used when adding rows/columns.
 pub fn TableCell::empty() -> TableCell {
   {
     paragraphs: [],
@@ -1285,7 +1285,7 @@ pub(all) struct InnerShadow {
 
 ///|
 pub fn InnerShadow::none() -> InnerShadow {
-  { blur_rad: 0, dist: 0, dir: 0, color: Color::none() }
+  { blur_rad: 0, dist: 0, dir: 0, color: Color::none(), }
 }
 
 ///|
@@ -1302,7 +1302,7 @@ pub(all) struct Glow {
 
 ///|
 pub fn Glow::none() -> Glow {
-  { rad: 0, color: Color::none() }
+  { rad: 0, color: Color::none(), }
 }
 
 ///|
@@ -1318,7 +1318,7 @@ pub(all) struct SoftEdge {
 
 ///|
 pub fn SoftEdge::none() -> SoftEdge {
-  { rad: 0 }
+  { rad: 0, }
 }
 
 ///|
@@ -1334,7 +1334,7 @@ pub(all) struct Blur {
 
 ///|
 pub fn Blur::none() -> Blur {
-  { rad: 0 }
+  { rad: 0, }
 }
 
 ///|
@@ -1354,7 +1354,7 @@ pub(all) struct PresetShadow {
 
 ///|
 pub fn PresetShadow::none() -> PresetShadow {
-  { prst: "", dist: 0, dir: 0, color: Color::none() }
+  { prst: "", dist: 0, dir: 0, color: Color::none(), }
 }
 
 ///|
@@ -1429,7 +1429,7 @@ pub(all) struct FillOverlay {
 
 ///|
 pub fn FillOverlay::none() -> FillOverlay {
-  { blend: "", color: Color::none() }
+  { blend: "", color: Color::none(), }
 }
 
 ///|
@@ -1488,7 +1488,7 @@ pub(all) struct Bevel {
 
 ///|
 pub fn Bevel::none() -> Bevel {
-  { w: 0, h: 0, prst: "" }
+  { w: 0, h: 0, prst: "", }
 }
 
 ///|
@@ -1541,7 +1541,7 @@ pub(all) struct Scene3d {
 
 ///|
 pub fn Scene3d::none() -> Scene3d {
-  { camera_prst: "", light_rig: "", light_dir: "" }
+  { camera_prst: "", light_rig: "", light_dir: "", }
 }
 
 ///|
@@ -1564,7 +1564,7 @@ pub(all) struct ShapeTransform {
 
 ///|
 pub fn ShapeTransform::default() -> ShapeTransform {
-  { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flip_h: false, flip_v: false }
+  { x: 0, y: 0, cx: 0, cy: 0, rot: 0, flip_h: false, flip_v: false, }
 }
 
 ///|
@@ -1742,7 +1742,7 @@ pub(all) struct SlideSize {
 ///|
 pub fn SlideSize::default() -> SlideSize {
   // Standard widescreen 10in x 7.5in
-  { cx: 9144000, cy: 6858000 }
+  { cx: 9144000, cy: 6858000, }
 }
 
 ///|

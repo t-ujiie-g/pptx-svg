@@ -338,7 +338,7 @@ export class PptxRenderer {
   /** Internal logger */
   private log: Logger;
 
-  // ── Undo/Redo history (E6.1) ───────────────────────────────────────────────
+  // ── Undo/Redo history ──────────────────────────────────────────────────────
   /** Past document states (top = most recent state before the current one). */
   private undoStack: DocSnapshot[] = [];
   /** Future document states for redo. */
@@ -516,7 +516,7 @@ export class PptxRenderer {
     );
   }
 
-  // ── Undo / Redo API (E6.1) ─────────────────────────────────────────────────
+  // ── Undo / Redo API ────────────────────────────────────────────────────────
 
   /**
    * Start a batch: all mutations until the matching {@link endBatch} collapse
@@ -842,7 +842,7 @@ export class PptxRenderer {
     return this.exports.update_shape_stroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash);
   }
 
-  // ── Text editing API (E2.5) ─────────────────────────────────────────────────
+  // ── Text editing API ────────────────────────────────────────────────────────
 
   /**
    * Add a new paragraph to a shape with a single text run.
@@ -947,7 +947,7 @@ export class PptxRenderer {
     return this.exports.update_text_run_decoration(slideIdx, shapeIdx, paraIdx, runIdx, underline, strike, baseline);
   }
 
-  // ── Inline text editing API (E6.2) ───────────────────────────────────────────
+  // ── Inline text editing API ──────────────────────────────────────────────────
 
   /**
    * Get the text geometry of a shape's text body for caret / selection rendering.
@@ -987,7 +987,7 @@ export class PptxRenderer {
     return this.exports.replace_text_range(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText);
   }
 
-  // ── Z-order API (E6.3) ───────────────────────────────────────────────────────
+  // ── Z-order API ──────────────────────────────────────────────────────────────
 
   /**
    * Move a shape to the front (top of the z-order).
@@ -1026,7 +1026,7 @@ export class PptxRenderer {
     return this.exports.send_backward(slideIdx, shapeIdx);
   }
 
-  // ── Copy / paste API (E6.5) ──────────────────────────────────────────────────
+  // ── Copy / paste API ─────────────────────────────────────────────────────────
 
   /**
    * Extract a shape as a portable, self-contained spec for copy/paste — including
@@ -1103,7 +1103,7 @@ export class PptxRenderer {
     });
   }
 
-  // ── Table editing API (E6.6) ─────────────────────────────────────────────────
+  // ── Table editing API ────────────────────────────────────────────────────────
 
   /**
    * Set a table cell's text (plain text, replacing the cell's contents). The new

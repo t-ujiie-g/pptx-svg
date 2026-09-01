@@ -54,10 +54,10 @@ fn try_inherit_from_source(
       let mut new_shape = shape
       let got_t = needs_transform && ph.transform.cx > 0 && ph.transform.cy > 0
       if got_t {
-        new_shape = { ..new_shape, transform: ph.transform }
+        new_shape = { ..new_shape, transform: ph.transform, }
       }
       if needs_body_props {
-        new_shape = { ..new_shape, body_props: ph.body_props }
+        new_shape = { ..new_shape, body_props: ph.body_props, }
       }
       shapes[idx] = new_shape
       (got_t, needs_body_props)
@@ -283,27 +283,27 @@ fn apply_para_spacing_from_style(
     let mut new_para = para
     // line_spacing: 0 = unset
     if para.line_spacing == 0 && defaults.line_spacing != 0 {
-      new_para = { ..new_para, line_spacing: defaults.line_spacing }
+      new_para = { ..new_para, line_spacing: defaults.line_spacing, }
       changed = true
     }
     // spc_before: 0 = unset
     if para.spc_before == 0 && defaults.spc_before != 0 {
-      new_para = { ..new_para, spc_before: defaults.spc_before }
+      new_para = { ..new_para, spc_before: defaults.spc_before, }
       changed = true
     }
     // spc_after: 0 = unset
     if para.spc_after == 0 && defaults.spc_after != 0 {
-      new_para = { ..new_para, spc_after: defaults.spc_after }
+      new_para = { ..new_para, spc_after: defaults.spc_after, }
       changed = true
     }
     // mar_l: -1 = unset
     if para.mar_l < 0 && defaults.mar_l >= 0 {
-      new_para = { ..new_para, mar_l: defaults.mar_l }
+      new_para = { ..new_para, mar_l: defaults.mar_l, }
       changed = true
     }
     // indent: 0 = unset
     if para.indent == 0 && defaults.indent != 0 {
-      new_para = { ..new_para, indent: defaults.indent }
+      new_para = { ..new_para, indent: defaults.indent, }
       changed = true
     }
     // Bullet: inherit from style only when the paragraph has no bullet specification at all.
@@ -314,7 +314,7 @@ fn apply_para_spacing_from_style(
     if !has_any_bullet_spec {
       if defaults.bullet_none {
         // Style explicitly disables bullets (a:buNone)
-        new_para = { ..new_para, bullet_none: true }
+        new_para = { ..new_para, bullet_none: true, }
         changed = true
       } else if !defaults.bullet_auto.is_empty() {
         // Style provides an auto-number bullet (a:buAutoNum)
@@ -509,7 +509,7 @@ fn apply_font_ref_fallback(shape : @ooxml.Shape) -> Unit {
     for ri in 0..<nr {
       let run = para.runs[ri]
       if run.color.is_none() {
-        para.runs[ri] = { ..run, color: fr_clr }
+        para.runs[ri] = { ..run, color: fr_clr, }
       }
     }
   }
@@ -599,7 +599,7 @@ fn replace_auto_content_text(
 ) -> @ooxml.TextParagraph {
   for para in paragraphs {
     if !para.runs.is_empty() {
-      return { ..para, runs: [{ ..para.runs[0], text, math_xml: "" }] }
+      return { ..para, runs: [{ ..para.runs[0], text, math_xml: "", }], }
     }
   }
   make_default_paragraph(make_default_run(text))

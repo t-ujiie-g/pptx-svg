@@ -105,7 +105,7 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
     }
   }
   let se_rad = get_dai(node, "eff-se-rad")
-  let se : @ooxml.SoftEdge = { rad: se_rad }
+  let se : @ooxml.SoftEdge = { rad: se_rad, }
   let refl_sta = get_dai(node, "eff-refl-sta")
   let refl = if refl_sta == 0 {
     @ooxml.Reflection::none()
@@ -124,7 +124,7 @@ fn parse_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
     }
   }
   let blur_rad = get_dai(node, "eff-blur-rad")
-  let bl : @ooxml.Blur = { rad: blur_rad }
+  let bl : @ooxml.Blur = { rad: blur_rad, }
   let ps_prst = get_da(node, "eff-ps-prst")
   let ps = if ps_prst.is_empty() {
     @ooxml.PresetShadow::none()
@@ -209,7 +209,7 @@ fn parse_run_effects_from_da(node : @xml.XmlNode) -> @ooxml.EffectList {
     }
   }
   let blur_rad = get_dai(node, "reff-blur-rad")
-  let bl : @ooxml.Blur = { rad: blur_rad }
+  let bl : @ooxml.Blur = { rad: blur_rad, }
   let ps_prst = get_da(node, "reff-ps-prst")
   let ps = if ps_prst.is_empty() {
     @ooxml.PresetShadow::none()
@@ -253,7 +253,7 @@ fn parse_scene_3d_from_da(node : @xml.XmlNode) -> @ooxml.Scene3d {
   if cam.is_empty() && rig.is_empty() {
     @ooxml.Scene3d::none()
   } else {
-    { camera_prst: cam, light_rig: rig, light_dir: rig_dir }
+    { camera_prst: cam, light_rig: rig, light_dir: rig_dir, }
   }
 }
 
@@ -279,8 +279,8 @@ fn parse_sp_3d_from_da(node : @xml.XmlNode) -> @ooxml.Shape3d {
     @ooxml.Shape3d::none()
   } else {
     {
-      bevel_t: { w: bt_w, h: bt_h, prst: bt_prst },
-      bevel_b: { w: bb_w, h: bb_h, prst: bb_prst },
+      bevel_t: { w: bt_w, h: bt_h, prst: bt_prst, },
+      bevel_b: { w: bb_w, h: bb_h, prst: bb_prst, },
       extrusion_h: ext_h,
       contour_w: cnt_w,
       extrusion_clr: color_or_none(node, "3d-ext-clr"),
@@ -320,7 +320,7 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
           let hex_str = @xml.str_substring(s, comma + 1, i)
           let pos = @xml.parse_int(pos_str)
           let color = @ooxml.parse_hex_color(hex_str)
-          stops.push({ pos, color })
+          stops.push({ pos, color, })
         }
       }
       start = i + 1
@@ -427,7 +427,7 @@ fn parse_text_patt_fill(node : @xml.XmlNode) -> @ooxml.PatternFill {
   } else {
     parse_hex_color(bg_hex)
   }
-  { prst, fg_color: fg, bg_color: bg }
+  { prst, fg_color: fg, bg_color: bg, }
 }
 
 // ── Text parsing from SVG ────────────────────────────────────────────────────
@@ -607,7 +607,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let stroke = parse_hex_color(stroke_hex)
   let flip_h = get_da(g_node, "flip-h") == "1"
   let flip_v = get_da(g_node, "flip-v") == "1"
-  let transform : @ooxml.ShapeTransform = { x, y, cx, cy, rot, flip_h, flip_v }
+  let transform : @ooxml.ShapeTransform = { x, y, cx, cy, rot, flip_h, flip_v, }
 
   // Determine shape kind
   let kind : @ooxml.ShapeKind = if shape_type == "picture" {
@@ -819,7 +819,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     } else {
       parse_hex_color(patt_bg_hex)
     }
-    { prst: patt_prst, fg_color: fg, bg_color: bg }
+    { prst: patt_prst, fg_color: fg, bg_color: bg, }
   }
   {
     kind,
@@ -972,7 +972,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
   let timing_xml = get_da(svg_node, "timing-xml")
 
   let slide_size : @ooxml.SlideSize = if slide_cx > 0 && slide_cy > 0 {
-    { cx: slide_cx, cy: slide_cy }
+    { cx: slide_cx, cy: slide_cy, }
   } else {
     @ooxml.SlideSize::default()
   }

@@ -1496,7 +1496,7 @@ fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
 ///|
 /// Serialize a single shape to its OOXML fragment (`<p:sp>` / `<p:pic>` /
 /// `<p:grpSp>` / …). Public so the editing layer can extract a shape spec for
-/// cross-slide copy/paste (E6.5). Charts return "" (preserved via chart_xml).
+/// cross-slide copy/paste. Charts return "" (preserved via chart_xml).
 pub fn serialize_shape(shape : @ooxml.Shape) -> String {
   // OLE objects: output the preserved graphicFrame XML directly
   if !shape.ole_xml.is_empty() {

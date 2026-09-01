@@ -232,7 +232,7 @@ fn resolve_slot(name : String, theme : ThemeData) -> Color {
 /// the theme's original colors. Aliasing for logical names (bg1/tx1/etc.) is
 /// performed dynamically in `resolve_scheme_color` against this `clr_map`.
 pub fn apply_color_map(theme : ThemeData, cmap : ColorMap) -> ThemeData {
-  { ..theme, clr_map: cmap }
+  { ..theme, clr_map: cmap, }
 }
 
 ///|
@@ -436,7 +436,7 @@ fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
     None => TextStyleGroup::empty()
     Some(os) => parse_text_style_group(os, theme)
   }
-  { title_style, body_style, other_style }
+  { title_style, body_style, other_style, }
 }
 
 // ── Slide master parser ──────────────────────────────────────────────────────
@@ -540,5 +540,5 @@ pub fn parse_slide_layout(
     }
   }
   let clr_map_ovr = extract_clr_map_ovr_from_nodes(root_ch)
-  { background, bg_grad, bg_blip_fill, bg_patt_fill, shapes, clr_map_ovr }
+  { background, bg_grad, bg_blip_fill, bg_patt_fill, shapes, clr_map_ovr, }
 }

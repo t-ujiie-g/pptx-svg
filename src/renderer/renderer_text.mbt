@@ -799,7 +799,7 @@ fn render_run_tspan(
   // text-decoration-style / text-decoration-color on SVG <text> (verified), so
   // underline variants (dbl/dotted/wavy) and underline color (a:uFill) cannot be
   // shown via CSS — they would require drawing the decoration as explicit
-  // <line>/<path> geometry (run-box layout; see TODO R1). The style/color are
+  // <line>/<path> geometry from the run-box layout. The style/color are
   // still parsed and round-tripped (data-ooxml-underline-color) so they survive
   // export.
   let mut deco = ""

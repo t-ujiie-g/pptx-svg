@@ -351,7 +351,7 @@ fn parse_para_props(
         Some(v) => v
         None => ""
       }
-      tab_stops.push({ pos, algn })
+      tab_stops.push({ pos, algn, })
     }
   }
   (
@@ -619,7 +619,7 @@ fn parse_run_effect_lst(
       }
       let bl = match @xml.find_child(eff_ch, "a:blur") {
         None => Blur::none()
-        Some(node) => { rad: attr_int(node, "rad") }
+        Some(node) => { rad: attr_int(node, "rad"), }
       }
       {
         outer_shadow: os,
@@ -764,10 +764,10 @@ fn parse_text_body(
             let ns = segs.length()
             for si in 0..<ns {
               if !segs[si].is_empty() {
-                runs.push({ ..base_run, text: segs[si] })
+                runs.push({ ..base_run, text: segs[si], })
               }
               if si < ns - 1 {
-                runs.push({ ..base_run, text: "\n" })
+                runs.push({ ..base_run, text: "\n", })
               }
             }
           } else {
@@ -783,7 +783,7 @@ fn parse_text_body(
           display, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
           def_font_face, def_ea_font,
         )
-        run = { ..run, math_xml: math_raw }
+        run = { ..run, math_xml: math_raw, }
         runs.push(run)
       } else if child_tag == "a:br" {
         // Line break — insert a newline run
@@ -855,7 +855,7 @@ fn parse_text_body(
     let mut new_para = para
     // Alignment fallback
     if para.align.is_empty() && !lst_def.align.is_empty() {
-      new_para = { ..new_para, align: lst_def.align }
+      new_para = { ..new_para, align: lst_def.align, }
       changed = true
     }
     // Bullet fallback: inherit buChar from lstStyle if paragraph has no explicit bullet
@@ -864,30 +864,30 @@ fn parse_text_body(
       !para.bullet_none &&
       para.bullet_img_rid.is_empty() &&
       !lst_def.bullet.is_empty() {
-      new_para = { ..new_para, bullet: lst_def.bullet }
+      new_para = { ..new_para, bullet: lst_def.bullet, }
       changed = true
       // Also inherit bullet_font/size/color from lstStyle if not set on paragraph
       if new_para.bullet_font.is_empty() && !lst_def.bullet_font.is_empty() {
-        new_para = { ..new_para, bullet_font: lst_def.bullet_font }
+        new_para = { ..new_para, bullet_font: lst_def.bullet_font, }
       }
       if new_para.bullet_size == 0 && lst_def.bullet_size != 0 {
-        new_para = { ..new_para, bullet_size: lst_def.bullet_size }
+        new_para = { ..new_para, bullet_size: lst_def.bullet_size, }
       }
       if new_para.bullet_color.is_none() && !lst_def.bullet_color.is_none() {
-        new_para = { ..new_para, bullet_color: lst_def.bullet_color }
+        new_para = { ..new_para, bullet_color: lst_def.bullet_color, }
       }
     } else if !para.bullet.is_empty() || !para.bullet_auto.is_empty() {
       // Paragraph has explicit bullet, but may still need font/size/color from lstStyle
       if para.bullet_font.is_empty() && !lst_def.bullet_font.is_empty() {
-        new_para = { ..new_para, bullet_font: lst_def.bullet_font }
+        new_para = { ..new_para, bullet_font: lst_def.bullet_font, }
         changed = true
       }
       if para.bullet_size == 0 && lst_def.bullet_size != 0 {
-        new_para = { ..new_para, bullet_size: lst_def.bullet_size }
+        new_para = { ..new_para, bullet_size: lst_def.bullet_size, }
         changed = true
       }
       if para.bullet_color.is_none() && !lst_def.bullet_color.is_none() {
-        new_para = { ..new_para, bullet_color: lst_def.bullet_color }
+        new_para = { ..new_para, bullet_color: lst_def.bullet_color, }
         changed = true
       }
     }
@@ -897,21 +897,21 @@ fn parse_text_body(
       para.bullet.is_empty() &&
       para.bullet_auto.is_empty() &&
       para.bullet_img_rid.is_empty() {
-      new_para = { ..new_para, bullet_none: true }
+      new_para = { ..new_para, bullet_none: true, }
       changed = true
     }
     // Line spacing fallback
     if para.line_spacing == 0 && lst_def.line_spacing != 0 {
-      new_para = { ..new_para, line_spacing: lst_def.line_spacing }
+      new_para = { ..new_para, line_spacing: lst_def.line_spacing, }
       changed = true
     }
     // Space before/after fallback
     if para.spc_before == 0 && lst_def.spc_before != 0 {
-      new_para = { ..new_para, spc_before: lst_def.spc_before }
+      new_para = { ..new_para, spc_before: lst_def.spc_before, }
       changed = true
     }
     if para.spc_after == 0 && lst_def.spc_after != 0 {
-      new_para = { ..new_para, spc_after: lst_def.spc_after }
+      new_para = { ..new_para, spc_after: lst_def.spc_after, }
       changed = true
     }
     if changed {

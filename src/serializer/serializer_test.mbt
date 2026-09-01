@@ -77,7 +77,7 @@ test "serialize_slide svg-only blip background omits r:embed" {
 
 ///|
 test "serialize_slide raster blip background keeps r:embed" {
-  let raster : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), rid: "rId7" }
+  let raster : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), rid: "rId7", }
   let slide : @ooxml.SlideData = {
     slide_size: @ooxml.SlideSize::default(),
     background: @ooxml.Color::white(),
@@ -167,7 +167,7 @@ test "serialize_slide shape with blur effect" {
         flip_v: false,
       },
     ),
-    effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200 } },
+    effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200, }, },
   }
   let slide : @ooxml.SlideData = {
     slide_size: @ooxml.SlideSize::default(),
@@ -251,7 +251,7 @@ test "serialize_slide shape with glow" {
     ),
     effects: {
       ..@ooxml.EffectList::none(),
-      glow: { rad: 228600, color: @ooxml.parse_hex_color("FFC000") },
+      glow: { rad: 228600, color: @ooxml.parse_hex_color("FFC000"), },
     },
   }
   let slide : @ooxml.SlideData = {
@@ -317,13 +317,21 @@ test "serialize_slide shape with preset shadow" {
 test "serialize_slide fill overlay" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    {
+      x: 0,
+      y: 0,
+      cx: 500000,
+      cy: 300000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
   )
   let shape = {
     ..shape,
     effects: {
       ..@ooxml.EffectList::none(),
-      fill_overlay: { blend: "mult", color: @ooxml.parse_hex_color("FF0000") },
+      fill_overlay: { blend: "mult", color: @ooxml.parse_hex_color("FF0000"), },
     },
   }
   let slide : @ooxml.SlideData = {
@@ -352,13 +360,24 @@ test "serialize_slide fill overlay" {
 test "serialize_slide fill overlay with alpha" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    {
+      x: 0,
+      y: 0,
+      cx: 500000,
+      cy: 300000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
   )
   let shape = {
     ..shape,
     effects: {
       ..@ooxml.EffectList::none(),
-      fill_overlay: { blend: "over", color: { r: 255, g: 0, b: 0, alpha: 128 } },
+      fill_overlay: {
+        blend: "over",
+        color: { r: 255, g: 0, b: 0, alpha: 128, },
+      },
     },
   }
   let slide : @ooxml.SlideData = {
@@ -383,7 +402,15 @@ test "serialize_slide fill overlay with alpha" {
 test "serialize_slide no effectLst when none" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    {
+      x: 0,
+      y: 0,
+      cx: 500000,
+      cy: 300000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
   )
   let slide : @ooxml.SlideData = {
     slide_size: @ooxml.SlideSize::default(),
@@ -401,7 +428,7 @@ test "serialize_slide no effectLst when none" {
   assert_true(!xml.contains("<a:effectLst>"))
 }
 
-// ── restore round-trip idempotency (E6.1 Undo/Redo) ──────────────────────────
+// ── restore round-trip idempotency (Undo/Redo) ───────────────────────────────
 // The Undo/Redo history captures a slide's OOXML via get_slide_ooxml and restores
 // it through restore_slide_ooxml (parse_slide → g_slides). This must be stable:
 // serialize → parse_slide → serialize should be a fixed point, so no data is lost
@@ -422,8 +449,8 @@ test "restore round-trip: serialize is idempotent after parse_slide" {
         flip_v: false,
       },
     ),
-    fill: { r: 200, g: 100, b: 50, alpha: 255 },
-    stroke: { r: 0, g: 0, b: 0, alpha: 255 },
+    fill: { r: 200, g: 100, b: 50, alpha: 255, },
+    stroke: { r: 0, g: 0, b: 0, alpha: 255, },
     stroke_w: 12700,
   }
   let shape2 : @ooxml.Shape = {
@@ -439,7 +466,7 @@ test "restore round-trip: serialize is idempotent after parse_slide" {
         flip_v: false,
       },
     ),
-    fill: { r: 30, g: 144, b: 255, alpha: 255 },
+    fill: { r: 30, g: 144, b: 255, alpha: 255, },
   }
   let slide : @ooxml.SlideData = {
     slide_size: @ooxml.SlideSize::default(),
@@ -509,7 +536,7 @@ test "serialize round-trips underline style and uFill color" {
   assert_eq(out, serialize_slide(slide2))
 }
 
-// ── parse_shapes_xml round-trip (E6.5 copy/paste) ────────────────────────────
+// ── parse_shapes_xml round-trip (copy/paste) ─────────────────────────────────
 
 ///|
 test "parse_shapes_xml round-trips a serialized shape" {
@@ -526,7 +553,7 @@ test "parse_shapes_xml round-trips a serialized shape" {
         flip_v: false,
       },
     ),
-    fill: { r: 200, g: 100, b: 50, alpha: 255 },
+    fill: { r: 200, g: 100, b: 50, alpha: 255, },
   }
   let xml = serialize_shape(shape)
   let shapes = @ooxml.parse_shapes_xml(xml, @ooxml.ThemeData::default())
@@ -543,7 +570,7 @@ test "parse_shapes_xml round-trips a serialized shape" {
   assert_true(is_rect)
 }
 
-// ── Table editing (E6.6) ─────────────────────────────────────────────────────
+// ── Table editing ────────────────────────────────────────────────────────────
 
 ///|
 test "TableCell::empty has parser defaults" {

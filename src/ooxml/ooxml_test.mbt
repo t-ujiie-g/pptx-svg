@@ -134,8 +134,8 @@ test "resolve_scheme_color basic" {
 test "apply_color_map preserves physical slot identity" {
   let theme : ThemeData = {
     ..ThemeData::default(),
-    dk1: ({ r: 0, g: 0, b: 0, alpha: 255 } : Color),
-    lt1: ({ r: 238, g: 238, b: 238, alpha: 255 } : Color),
+    dk1: ({ r: 0, g: 0, b: 0, alpha: 255, } : Color),
+    lt1: ({ r: 238, g: 238, b: 238, alpha: 255, } : Color),
   }
   let inverted : ColorMap = {
     bg1: "dk1",
@@ -348,7 +348,7 @@ test "Glow::none and is_none" {
   assert_true(gl.is_none())
   assert_eq(gl.rad, 0)
   assert_true(gl.color.is_none())
-  let gl2 : Glow = { rad: 228600, color: parse_hex_color("FFC000") }
+  let gl2 : Glow = { rad: 228600, color: parse_hex_color("FFC000"), }
   assert_true(!gl2.is_none())
   assert_eq(gl2.rad, 228600)
 }
@@ -358,7 +358,7 @@ test "SoftEdge::none and is_none" {
   let se = SoftEdge::none()
   assert_true(se.is_none())
   assert_eq(se.rad, 0)
-  let se2 : SoftEdge = { rad: 63500 }
+  let se2 : SoftEdge = { rad: 63500, }
   assert_true(!se2.is_none())
 }
 
@@ -388,7 +388,7 @@ test "Blur::none and is_none" {
   let b = Blur::none()
   assert_true(b.is_none())
   assert_eq(b.rad, 0)
-  let b2 : Blur = { rad: 50800 }
+  let b2 : Blur = { rad: 50800, }
   assert_true(!b2.is_none())
   assert_eq(b2.rad, 50800)
 }
@@ -472,15 +472,15 @@ test "BlipFill::is_none considers svg_rid" {
   let bf0 = BlipFill::none()
   assert_true(bf0.is_none())
   // Raster-only (r:embed) — not none
-  let bf_raster : BlipFill = { ..BlipFill::none(), rid: "rId7" }
+  let bf_raster : BlipFill = { ..BlipFill::none(), rid: "rId7", }
   assert_false(bf_raster.is_none())
   // SVG-only (asvg:svgBlip, no r:embed) — not none. This is the regression
   // fixed for cover-slide SVG logos: previously is_none() returned true and
   // the picture shape rendered as a placeholder rectangle.
-  let bf_svg : BlipFill = { ..BlipFill::none(), svg_rid: "rId8" }
+  let bf_svg : BlipFill = { ..BlipFill::none(), svg_rid: "rId8", }
   assert_false(bf_svg.is_none())
   // Both set — not none
-  let bf_both : BlipFill = { ..BlipFill::none(), rid: "rId7", svg_rid: "rId8" }
+  let bf_both : BlipFill = { ..BlipFill::none(), rid: "rId7", svg_rid: "rId8", }
   assert_false(bf_both.is_none())
 }
 
@@ -504,11 +504,11 @@ test "EffectList with single effect is not none" {
   // Only glow set
   let e2 : EffectList = {
     ..EffectList::none(),
-    glow: { rad: 100, color: parse_hex_color("FF0000") },
+    glow: { rad: 100, color: parse_hex_color("FF0000"), },
   }
   assert_true(!e2.is_none())
   // Only soft edge set
-  let e3 : EffectList = { ..EffectList::none(), soft_edge: { rad: 100 } }
+  let e3 : EffectList = { ..EffectList::none(), soft_edge: { rad: 100, }, }
   assert_true(!e3.is_none())
 }
 
@@ -780,7 +780,7 @@ test "parse_slide explicit fill wins over p:style/a:fillRef" {
 
 ///|
 test "EffectList with blur is not none" {
-  let e : EffectList = { ..EffectList::none(), blur: { rad: 76200 } }
+  let e : EffectList = { ..EffectList::none(), blur: { rad: 76200, }, }
   assert_true(!e.is_none())
   assert_eq(e.blur.rad, 76200)
 }
@@ -849,7 +849,7 @@ test "FillOverlay::none is none" {
 
 ///|
 test "FillOverlay with blend and color is not none" {
-  let fo : FillOverlay = { blend: "mult", color: parse_hex_color("FF0000") }
+  let fo : FillOverlay = { blend: "mult", color: parse_hex_color("FF0000"), }
   assert_true(!fo.is_none())
   assert_eq(fo.blend, "mult")
   assert_eq(fo.color.r, 255)
@@ -857,7 +857,7 @@ test "FillOverlay with blend and color is not none" {
 
 ///|
 test "FillOverlay with over blend (default)" {
-  let fo : FillOverlay = { blend: "over", color: parse_hex_color("0000FF") }
+  let fo : FillOverlay = { blend: "over", color: parse_hex_color("0000FF"), }
   assert_true(!fo.is_none())
   assert_eq(fo.blend, "over")
   assert_eq(fo.color.b, 255)
@@ -867,7 +867,7 @@ test "FillOverlay with over blend (default)" {
 test "EffectList with fill_overlay is not none" {
   let e : EffectList = {
     ..EffectList::none(),
-    fill_overlay: { blend: "screen", color: parse_hex_color("00FF00") },
+    fill_overlay: { blend: "screen", color: parse_hex_color("00FF00"), },
   }
   assert_true(!e.is_none())
   assert_eq(e.fill_overlay.blend, "screen")

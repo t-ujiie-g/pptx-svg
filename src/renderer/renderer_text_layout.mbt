@@ -1,4 +1,4 @@
-// pptx-svg: text geometry for inline editing (E6.2)
+// pptx-svg: text geometry for inline editing
 //
 // `build_text_layout` reproduces `render_text`'s line/run/char positioning as a
 // structured geometry (EMU) so the consumer can draw a caret / selection over the
@@ -197,7 +197,12 @@ pub fn build_text_layout(
     cur_y = cur_y + p_font_sz
     if nr == 0 {
       let top = cur_y - p_font_sz
-      lines.push({ para_idx: pi, y: top * scale, h: p_line_h * scale, runs: [] })
+      lines.push({
+        para_idx: pi,
+        y: top * scale,
+        h: p_line_h * scale,
+        runs: [],
+      })
       cur_y = cur_y + (p_line_h - p_font_sz)
       pi = pi + 1
       continue
