@@ -197,7 +197,12 @@ pub fn build_text_layout(
     cur_y = cur_y + p_font_sz
     if nr == 0 {
       let top = cur_y - p_font_sz
-      lines.push({ para_idx: pi, y: top * scale, h: p_line_h * scale, runs: [] })
+      lines.push({
+        para_idx: pi,
+        y: top * scale,
+        h: p_line_h * scale,
+        runs: [],
+      })
       cur_y = cur_y + (p_line_h - p_font_sz)
       pi = pi + 1
       continue

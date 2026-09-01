@@ -216,7 +216,7 @@ fn parse_gradient_stops(s : String) -> Array[@ooxml.GradientStop] {
         let r = @xml.parse_int(vals[1])
         let g = @xml.parse_int(vals[2])
         let b = @xml.parse_int(vals[3])
-        stops.push({ pos, color: ({ r, g, b, alpha: 255 } : @ooxml.Color) })
+        stops.push({ pos, color: ({ r, g, b, alpha: 255, } : @ooxml.Color), })
       }
     }
   }
@@ -366,7 +366,7 @@ pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
   let nt = targets.length()
   for j in 0..<nt {
     let (arr, local_idx, t) = targets[j]
-    arr[local_idx] = { ..arr[local_idx], transform: t }
+    arr[local_idx] = { ..arr[local_idx], transform: t, }
   }
   g_modified.val[slide_idx] = true
   "OK:" + int_to_str(nt)
@@ -400,7 +400,7 @@ pub fn update_shape_fill(
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     arr[local_idx] = {
       ..arr[local_idx],
-      fill: ({ r, g, b, alpha: 255 } : @ooxml.Color),
+      fill: ({ r, g, b, alpha: 255, } : @ooxml.Color),
     }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
@@ -463,12 +463,12 @@ pub fn add_shape(
   }
   let kind = @ooxml.ShapeKind::AutoShape(geom)
   let fill = if fill_r >= 0 && fill_g >= 0 && fill_b >= 0 {
-    ({ r: fill_r, g: fill_g, b: fill_b, alpha: 255 } : @ooxml.Color)
+    ({ r: fill_r, g: fill_g, b: fill_b, alpha: 255, } : @ooxml.Color)
   } else {
     @ooxml.Color::none()
   }
   let stroke = if geom_type == "line" {
-    ({ r: 0, g: 0, b: 0, alpha: 255 } : @ooxml.Color)
+    ({ r: 0, g: 0, b: 0, alpha: 255, } : @ooxml.Color)
   } else {
     @ooxml.Color::none()
   }
@@ -561,7 +561,7 @@ pub fn replace_picture_rid(
         arr[local_idx] = {
           ..shape,
           kind: @ooxml.ShapeKind::Picture(new_rid),
-          blip_fill: { ..shape.blip_fill, rid: new_rid },
+          blip_fill: { ..shape.blip_fill, rid: new_rid, },
         }
         g_modified.val[slide_idx] = true
         "OK"
@@ -586,7 +586,7 @@ pub fn add_shape_text(
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
     let color : @ooxml.Color = if color_r >= 0 && color_g >= 0 && color_b >= 0 {
-      { r: color_r, g: color_g, b: color_b, alpha: 255 }
+      { r: color_r, g: color_g, b: color_b, alpha: 255, }
     } else {
       @ooxml.Color::none()
     }
@@ -688,7 +688,7 @@ pub fn update_shape_stroke(
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let stroke_color = if r >= 0 && g >= 0 && b >= 0 {
-      ({ r, g, b, alpha: 255 } : @ooxml.Color)
+      ({ r, g, b, alpha: 255, } : @ooxml.Color)
     } else {
       @ooxml.Color::none()
     }
@@ -848,7 +848,7 @@ pub fn update_text_run_color(
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     let color : @ooxml.Color = if r >= 0 && g_ >= 0 && b >= 0 {
-      { r, g: g_, b, alpha: 255 }
+      { r, g: g_, b, alpha: 255, }
     } else {
       @ooxml.Color::none()
     }

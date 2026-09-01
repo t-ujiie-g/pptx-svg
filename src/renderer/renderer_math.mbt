@@ -33,7 +33,7 @@ priv struct MathBox {
 // ── Constants ───────────────────────────────────────────────────────────────
 
 ///|
-let math_empty_box : MathBox = { svg: "", w: 0.0, h: 0.0, baseline: 0.0 }
+let math_empty_box : MathBox = { svg: "", w: 0.0, h: 0.0, baseline: 0.0, }
 
 ///|
 let math_font_family : String = "Cambria Math, Cambria, serif"
@@ -213,7 +213,7 @@ fn math_hbox(boxes : Array[MathBox]) -> MathBox {
     x = x + b.w
     i = i + 1
   }
-  { svg, w: x, h: total_h, baseline: max_bl }
+  { svg, w: x, h: total_h, baseline: max_bl, }
 }
 
 // ── Recursive layout engine ─────────────────────────────────────────────────
@@ -297,7 +297,7 @@ fn layout_math_run(
   let h = fs * math_text_height_ratio
   let bl = fs * math_text_baseline_ratio
   let svg = math_text_svg(text, 0.0, bl, fs, ff, color)
-  { svg, w, h, baseline: bl }
+  { svg, w, h, baseline: bl, }
 }
 
 // ── m:f — Fraction ──────────────────────────────────────────────────────────
@@ -344,7 +344,7 @@ fn layout_math_frac(
     dts(math_frac_bar_thick) +
     "\"/>" +
     math_g(den_x, den_y, den_box.svg)
-  { svg, w: total_w, h: total_h, baseline }
+  { svg, w: total_w, h: total_h, baseline, }
 }
 
 // ── m:sSup — Superscript ────────────────────────────────────────────────────
@@ -379,7 +379,7 @@ fn layout_math_sup(
   }
   let svg = math_g(0.0, top_extra, base_box.svg) +
     math_g(base_box.w, sup_y_clamped, sup_box.svg)
-  { svg, w: total_w, h: total_h, baseline: base_box.baseline + top_extra }
+  { svg, w: total_w, h: total_h, baseline: base_box.baseline + top_extra, }
 }
 
 // ── m:sSub — Subscript ──────────────────────────────────────────────────────
@@ -410,7 +410,7 @@ fn layout_math_sub(
     base_box.h
   }
   let svg = base_box.svg + math_g(base_box.w, sub_y, sub_box.svg)
-  { svg, w: total_w, h: bottom, baseline: base_box.baseline }
+  { svg, w: total_w, h: bottom, baseline: base_box.baseline, }
 }
 
 // ── m:sSubSup — Subscript + Superscript ─────────────────────────────────────
@@ -460,7 +460,7 @@ fn layout_math_subsup(
   let svg = math_g(0.0, top_extra, base_box.svg) +
     math_g(base_box.w, sup_y_clamped, sup_box.svg) +
     math_g(base_box.w, sub_y, sub_box.svg)
-  { svg, w: total_w, h: total_h, baseline: base_box.baseline + top_extra }
+  { svg, w: total_w, h: total_h, baseline: base_box.baseline + top_extra, }
 }
 
 // ── m:rad — Radical (square root) ───────────────────────────────────────────
@@ -544,7 +544,7 @@ fn layout_math_rad(
   let deg_svg = if deg_box.w > 0.0 { math_g(0.0, 0.0, deg_box.svg) } else { "" }
   let content_x = deg_offset_x + rad_w + 1.0
   let svg = deg_svg + svg_path + math_g(content_x, content_y, content_box.svg)
-  { svg, w: total_w, h: total_h, baseline: content_y + content_box.baseline }
+  { svg, w: total_w, h: total_h, baseline: content_y + content_box.baseline, }
 }
 
 // ── m:nary — Large operator (integral, sum, product) ────────────────────────
@@ -619,7 +619,7 @@ fn layout_math_nary(
       op_svg +
       sub_svg +
       math_g(content_x, content_y, content_box.svg)
-    { svg, w: total_w, h: total_h, baseline }
+    { svg, w: total_w, h: total_h, baseline, }
   } else {
     // Sub/sup style (limits as sub/superscript of operator)
     let op_svg = math_text_svg(op_char, 0.0, op_bl, op_fs, ff, color)
@@ -657,7 +657,7 @@ fn layout_math_nary(
         },
         content_box.svg,
       )
-    { svg, w: total_w, h: total_h, baseline }
+    { svg, w: total_w, h: total_h, baseline, }
   }
 }
 
@@ -706,7 +706,7 @@ fn layout_math_delim(
       let sep_h = fs * math_text_height_ratio
       let sep_bl = fs * math_text_baseline_ratio
       let sep_svg = math_text_svg(",", 0.0, sep_bl, fs, ff, color)
-      content_boxes.push({ svg: sep_svg, w: sep_w, h: sep_h, baseline: sep_bl })
+      content_boxes.push({ svg: sep_svg, w: sep_w, h: sep_h, baseline: sep_bl, })
     }
     content_boxes.push(layout_math_children(e_nodes[ei], fs, ff, color))
   }
@@ -732,7 +732,7 @@ fn layout_math_delim(
     color,
   )
   let svg = beg_svg + math_g(beg_w, 0.0, content.svg) + end_svg
-  { svg, w: total_w, h: total_h, baseline }
+  { svg, w: total_w, h: total_h, baseline, }
 }
 
 // ── m:acc — Accent ──────────────────────────────────────────────────────────
@@ -804,7 +804,7 @@ fn layout_math_acc(
       dts(line_thick) +
       "\"/>" +
       math_g(0.0, content_y, content_box.svg)
-    return { svg, w: content_box.w, h: total_h, baseline }
+    return { svg, w: content_box.w, h: total_h, baseline, }
   }
   // Draw common accents as SVG paths for precise positioning.
   // SVG <text> y is the baseline, causing glyphs to float above — paths are more reliable.
@@ -840,7 +840,7 @@ fn layout_math_acc(
       dts(acc_thick) +
       "\" stroke-linejoin=\"miter\"/>" +
       math_g(0.0, content_y, content_box.svg)
-    return { svg, w: cw, h: total_h, baseline }
+    return { svg, w: cw, h: total_h, baseline, }
   }
   if is_tilde {
     // Draw ~ as SVG path: sinusoidal curve
@@ -876,7 +876,7 @@ fn layout_math_acc(
       dts(acc_thick) +
       "\"/>" +
       math_g(0.0, content_y, content_box.svg)
-    return { svg, w: cw, h: total_h, baseline }
+    return { svg, w: cw, h: total_h, baseline, }
   }
   if is_dot {
     // Draw dot as SVG circle
@@ -895,7 +895,7 @@ fn layout_math_acc(
       color +
       "\"/>" +
       math_g(0.0, content_y, content_box.svg)
-    return { svg, w: cw, h: total_h, baseline }
+    return { svg, w: cw, h: total_h, baseline, }
   }
   if is_diaeresis {
     // Draw diaeresis as two dots
@@ -924,7 +924,7 @@ fn layout_math_acc(
       color +
       "\"/>" +
       math_g(0.0, content_y, content_box.svg)
-    return { svg, w: cw, h: total_h, baseline }
+    return { svg, w: cw, h: total_h, baseline, }
   }
   // Fallback: use text-based accent with negative offset to bring glyph closer
   let acc_fs = fs * 0.7
@@ -935,7 +935,7 @@ fn layout_math_acc(
   let acc_x = (content_box.w - acc_w) / 2.0
   let acc_svg = math_text_svg(display_acc, acc_x, acc_region, acc_fs, ff, color)
   let svg = acc_svg + math_g(0.0, acc_region, content_box.svg)
-  { svg, w: content_box.w, h: total_h, baseline }
+  { svg, w: content_box.w, h: total_h, baseline, }
 }
 
 // ── m:m — Matrix ────────────────────────────────────────────────────────────
@@ -1036,7 +1036,7 @@ fn layout_math_matrix(
     ri = ri + 1
   }
   let baseline = total_h / 2.0 + fs * 0.3 // center baseline
-  { svg, w: total_w, h: total_h, baseline }
+  { svg, w: total_w, h: total_h, baseline, }
 }
 
 // ── m:bar — Over/under bar ──────────────────────────────────────────────────
@@ -1071,7 +1071,7 @@ fn layout_math_bar(
       "\" stroke-width=\"" +
       dts(bar_thick) +
       "\"/>"
-    { svg, w: content_box.w, h: total_h, baseline: content_box.baseline }
+    { svg, w: content_box.w, h: total_h, baseline: content_box.baseline, }
   } else {
     // Overbar (default)
     let bar_y = bar_thick
@@ -1151,7 +1151,7 @@ fn render_math_text(
   // Collect all math XML from runs
   let np = paragraphs.length()
   let mut all_math_xml = ""
-  let mut first_run_color : @ooxml.Color = { r: -1, g: 0, b: 0, alpha: 255 }
+  let mut first_run_color : @ooxml.Color = { r: -1, g: 0, b: 0, alpha: 255, }
   let mut first_run_fs = 0
   let mut first_run_font = ""
   let mut found_first = false

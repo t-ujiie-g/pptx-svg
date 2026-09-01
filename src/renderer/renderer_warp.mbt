@@ -110,7 +110,7 @@ fn flatten_warp_text(
   let mut text = ""
   let mut first_font_size = -1
   let mut first_ff = ""
-  let mut first_color = @ooxml.Color::{ r: -1, g: -1, b: -1, alpha: 255 }
+  let mut first_color = @ooxml.Color::{ r: -1, g: -1, b: -1, alpha: 255, }
   let mut first_bold = false
   let mut first_italic = false
   let mut found_style = false

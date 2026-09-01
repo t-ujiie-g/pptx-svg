@@ -100,7 +100,7 @@ fn parse_gradient_fill(
             @xml.get_children(gs_node),
             theme,
           )
-          stops.push({ pos, color })
+          stops.push({ pos, color, })
         }
       }
       if stops.is_empty() {
@@ -174,7 +174,7 @@ fn parse_xfrm_node(xfrm : @xml.XmlNode) -> ShapeTransform {
   let y = @xml.parse_int(child_attr(ch, "a:off", "y"))
   let cx = @xml.parse_int(child_attr(ch, "a:ext", "cx"))
   let cy = @xml.parse_int(child_attr(ch, "a:ext", "cy"))
-  { x, y, cx, cy, rot, flip_h: flip_h_s, flip_v: flip_v_s }
+  { x, y, cx, cy, rot, flip_h: flip_h_s, flip_v: flip_v_s, }
 }
 
 ///|
@@ -381,7 +381,7 @@ fn parse_inner_shadow(node : @xml.XmlNode, theme : ThemeData) -> InnerShadow {
 fn parse_glow(node : @xml.XmlNode, theme : ThemeData) -> Glow {
   let ch = @xml.get_children(node)
   let color = parse_color_from_children(ch, theme)
-  { rad: attr_int(node, "rad"), color }
+  { rad: attr_int(node, "rad"), color, }
 }
 
 ///|
@@ -407,7 +407,7 @@ fn parse_effect_lst(
       }
       let se = match @xml.find_child(eff_ch, "a:softEdge") {
         None => SoftEdge::none()
-        Some(node) => { rad: attr_int(node, "rad") }
+        Some(node) => { rad: attr_int(node, "rad"), }
       }
       let refl = match @xml.find_child(eff_ch, "a:reflection") {
         None => Reflection::none()
@@ -433,7 +433,7 @@ fn parse_effect_lst(
       }
       let bl = match @xml.find_child(eff_ch, "a:blur") {
         None => Blur::none()
-        Some(node) => { rad: attr_int(node, "rad") }
+        Some(node) => { rad: attr_int(node, "rad"), }
       }
       let ps = match @xml.find_child(eff_ch, "a:prstShdw") {
         None => PresetShadow::none()
@@ -460,7 +460,7 @@ fn parse_effect_lst(
           }
           let ch = @xml.get_children(node)
           let color = parse_solid_fill(ch, theme)
-          { blend, color }
+          { blend, color, }
         }
       }
       {
@@ -509,7 +509,7 @@ fn parse_scene_3d(sppr_ch : Array[@xml.XmlNode]) -> Scene3d {
           (cp, lr.0, lr.1)
         }
       }
-      { camera_prst: cam_prst, light_rig: rig, light_dir: rig_dir }
+      { camera_prst: cam_prst, light_rig: rig, light_dir: rig_dir, }
     }
   }
 }
@@ -531,7 +531,7 @@ fn parse_bevel(parent_ch : Array[@xml.XmlNode], tag : String) -> Bevel {
         Some(v) => v
         None => ""
       }
-      { w, h, prst }
+      { w, h, prst, }
     }
   }
 }
@@ -784,7 +784,7 @@ fn parse_pattern_fill(
         None => Color::white()
         Some(bg) => parse_color_from_children(@xml.get_children(bg), theme)
       }
-      { prst, fg_color, bg_color }
+      { prst, fg_color, bg_color, }
     }
   }
 }
@@ -1103,11 +1103,11 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     stroke_no_fill: sp.no_fill,
   }
   if !sh_link_rid.is_empty() || !sh_link_hover_rid.is_empty() {
-    s = { ..s, sh_link_rid, sh_link_hover_rid }
+    s = { ..s, sh_link_rid, sh_link_hover_rid, }
   }
   // For media shapes, preserve original XML for round-trip
   if has_media {
-    s = { ..s, ole_xml: @xml.serialize_node(pic) }
+    s = { ..s, ole_xml: @xml.serialize_node(pic), }
   }
   s
 }
@@ -1328,7 +1328,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
     }
     if !rid.is_empty() {
       // Store rid in chart_xml field temporarily; main.mbt will resolve it.
-      let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid }
+      let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid, }
       return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
     }
   }
@@ -1423,7 +1423,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         for tc_node in tc_nodes {
           cells.push(parse_table_cell(tc_node, theme))
         }
-        rows.push({ height: row_h, cells })
+        rows.push({ height: row_h, cells, })
       }
       let table_data : TableData = {
         col_widths,
@@ -1874,7 +1874,7 @@ pub fn parse_rels(xml_str : String) -> Array[Relationship] {
         None => ""
       }
       if !id.is_empty() {
-        rels.push({ id, target, type_, target_mode })
+        rels.push({ id, target, type_, target_mode, })
       }
     }
   }
@@ -1919,7 +1919,7 @@ pub fn parse_slide_size(prs_xml : String) -> SlideSize {
           let cx = attr_int(sz, "cx")
           let cy = attr_int(sz, "cy")
           if cx > 0 && cy > 0 {
-            { cx, cy }
+            { cx, cy, }
           } else {
             SlideSize::default()
           }
@@ -2131,7 +2131,7 @@ fn parse_shapes_from_children(
               theme,
             )
             for fb_shape in fb_shapes {
-              shapes.push({ ..fb_shape, mc_choice_xml: choice_xml })
+              shapes.push({ ..fb_shape, mc_choice_xml: choice_xml, })
             }
           }
         }
@@ -2198,7 +2198,7 @@ fn apply_diagram_text_anchor(shapes : Array[Shape]) -> Unit {
         if !shapes[i].paragraphs.is_empty() && shapes[i].body_props.anchor == "" {
           shapes[i] = {
             ..shapes[i],
-            body_props: { ..shapes[i].body_props, anchor: "ctr" },
+            body_props: { ..shapes[i].body_props, anchor: "ctr", },
           }
         }
     }

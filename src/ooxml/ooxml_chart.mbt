@@ -123,7 +123,7 @@ pub(all) struct ChartView3D {
 
 ///|
 pub fn ChartView3D::none() -> ChartView3D {
-  { rot_x: 15, rot_y: 20, depth_percent: 100, r_ang_ax: true, perspective: 30 }
+  { rot_x: 15, rot_y: 20, depth_percent: 100, r_ang_ax: true, perspective: 30, }
 }
 
 // ── Chart data types ────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ pub(all) struct NumData {
 
 ///|
 pub fn NumData::empty() -> NumData {
-  { format_code: "", points: [] }
+  { format_code: "", points: [], }
 }
 
 ///|
@@ -178,7 +178,7 @@ pub(all) struct StrData {
 
 ///|
 pub fn StrData::empty() -> StrData {
-  { points: [] }
+  { points: [], }
 }
 
 ///|
@@ -333,7 +333,7 @@ pub(all) struct ChartLegend {
 
 ///|
 pub fn ChartLegend::none() -> ChartLegend {
-  { position: "r", overlay: false, show: false }
+  { position: "r", overlay: false, show: false, }
 }
 
 ///|
@@ -379,7 +379,7 @@ pub fn parse_chart_xml(chart_xml : String, theme : ThemeData) -> ChartData {
   }
   // c:chart
   let chart_node = match @xml.find_child(cs_ch, "c:chart") {
-    None => return { ..ChartData::empty(), style, chart_xml }
+    None => return { ..ChartData::empty(), style, chart_xml, }
     Some(n) => n
   }
   let chart_ch = @xml.get_children(chart_node)
@@ -400,7 +400,7 @@ pub fn parse_chart_xml(chart_xml : String, theme : ThemeData) -> ChartData {
     None => ChartView3D::none()
     Some(v) => parse_view_3d(@xml.get_children(v))
   }
-  { groups, axes, title, legend, style, chart_xml, view_3d }
+  { groups, axes, title, legend, style, chart_xml, view_3d, }
 }
 
 ///|
@@ -758,7 +758,7 @@ fn parse_data_points(
     let dc = @xml.get_children(dpt_nodes[i])
     let idx = child_attr_int(dc, "c:idx")
     let sp_pr = parse_chart_sp_pr(dc, theme)
-    pts.push({ idx, sp_pr })
+    pts.push({ idx, sp_pr, })
   }
   pts
 }
@@ -1014,13 +1014,13 @@ fn parse_num_data(ch : Array[@xml.XmlNode]) -> NumData {
     Some(fc) => @xml.get_text_content(fc)
   }
   let points = parse_pt_list(ch)
-  { format_code, points }
+  { format_code, points, }
 }
 
 ///|
 /// Parse string cache data (c:strCache or c:strLit children).
 fn parse_str_data(ch : Array[@xml.XmlNode]) -> StrData {
-  { points: parse_pt_list(ch) }
+  { points: parse_pt_list(ch), }
 }
 
 ///|
@@ -1034,7 +1034,7 @@ fn parse_pt_list(ch : Array[@xml.XmlNode]) -> Array[ChartPoint] {
       None => ""
       Some(v) => @xml.get_text_content(v)
     }
-    pts.push({ idx, value })
+    pts.push({ idx, value, })
   }
   pts
 }
@@ -1069,7 +1069,7 @@ fn parse_chart_sp_pr_node(sppr : @xml.XmlNode, theme : ThemeData) -> ChartSpPr {
       (c, w)
     }
   }
-  { fill, grad_fill, patt_fill, stroke, stroke_w, no_fill }
+  { fill, grad_fill, patt_fill, stroke, stroke_w, no_fill, }
 }
 
 // ── Axis parsing ────────────────────────────────────────────────────────────
@@ -1171,7 +1171,7 @@ fn parse_chart_axis(
 fn parse_chart_legend(ch : Array[@xml.XmlNode]) -> ChartLegend {
   let pos = child_attr_val(ch, "c:legendPos")
   let overlay = child_attr_val(ch, "c:overlay") == "1"
-  { position: if pos.is_empty() { "r" } else { pos }, overlay, show: true }
+  { position: if pos.is_empty() { "r" } else { pos }, overlay, show: true, }
 }
 
 ///|
@@ -1241,7 +1241,7 @@ pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
         Some(v) => v
         None => "r"
       }
-      { position: pos, overlay: false, show: true }
+      { position: pos, overlay: false, show: true, }
     }
   }
   {
@@ -1301,7 +1301,7 @@ fn parse_cx_chart_data(cs_ch : Array[@xml.XmlNode]) -> Array[CxDataBlock] {
         _ => ()
       }
     }
-    result.push({ id, cats, vals })
+    result.push({ id, cats, vals, })
   }
   result
 }
@@ -1341,7 +1341,7 @@ fn parse_cx_num_dim(node : @xml.XmlNode) -> AxisDataSource {
         None => ""
       }
       let points = parse_cx_pt_list(@xml.get_children(lvl))
-      AxisDataSource::NumSource(formula, { format_code, points })
+      AxisDataSource::NumSource(formula, { format_code, points, })
     }
   }
 }
@@ -1354,7 +1354,7 @@ fn parse_cx_pt_list(ch : Array[@xml.XmlNode]) -> Array[ChartPoint] {
   for i in 0..<pt_nodes.length() {
     let idx = attr_int(pt_nodes[i], "idx")
     let value = @xml.get_text_content(pt_nodes[i])
-    pts.push({ idx, value })
+    pts.push({ idx, value, })
   }
   pts
 }
@@ -1440,7 +1440,7 @@ fn find_cx_data(data_map : Array[CxDataBlock], id : Int) -> CxDataBlock {
       return data_map[i]
     }
   }
-  { id: 0, cats: AxisDataSource::NoData, vals: AxisDataSource::NoData }
+  { id: 0, cats: AxisDataSource::NoData, vals: AxisDataSource::NoData, }
 }
 
 ///|
@@ -1508,7 +1508,7 @@ fn parse_cx_series(
     err_bars: ChartErrBars::none(),
     data_labels: ChartDataLabels::none(),
   }
-  { ..ChartGroup::default(chart_kind), series: [series], subtotals }
+  { ..ChartGroup::default(chart_kind), series: [series], subtotals, }
 }
 
 ///|
@@ -1526,7 +1526,7 @@ fn parse_cx_data_points(
       None => ChartSpPr::none()
       Some(sppr) => parse_chart_sp_pr_node(sppr, theme)
     }
-    pts.push({ idx, sp_pr: sp })
+    pts.push({ idx, sp_pr: sp, })
   }
   pts
 }

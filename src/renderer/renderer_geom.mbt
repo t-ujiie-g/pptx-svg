@@ -23,7 +23,7 @@ priv struct GuideEnv {
 
 ///|
 fn GuideEnv::new() -> GuideEnv {
-  { names: [], values: [] }
+  { names: [], values: [], }
 }
 
 ///|
@@ -497,9 +497,9 @@ fn get_preset_def(prst : String) -> PresetDef? {
       paths: "M l b L x1 t L r b Z",
     })
   } else if prst == "rtTriangle" {
-    Some({ avlst: "", gdlst: "", paths: "M l b L l t L r b Z" })
+    Some({ avlst: "", gdlst: "", paths: "M l b L l t L r b Z", })
   } else if prst == "diamond" {
-    Some({ avlst: "", gdlst: "", paths: "M wd2 t L r hd2 L wd2 b L l hd2 Z" })
+    Some({ avlst: "", gdlst: "", paths: "M wd2 t L r hd2 L wd2 b L l hd2 Z", })
   } else if prst == "parallelogram" {
     Some({
       avlst: "adj=25000",
@@ -642,9 +642,9 @@ fn get_preset_def(prst : String) -> PresetDef? {
     })
     // ── Flowchart shapes ──
   } else if prst == "flowChartProcess" {
-    Some({ avlst: "", gdlst: "", paths: "M l t L r t L r b L l b Z" })
+    Some({ avlst: "", gdlst: "", paths: "M l t L r t L r b L l b Z", })
   } else if prst == "flowChartDecision" {
-    Some({ avlst: "", gdlst: "", paths: "M wd2 t L r hd2 L wd2 b L l hd2 Z" })
+    Some({ avlst: "", gdlst: "", paths: "M wd2 t L r hd2 L wd2 b L l hd2 Z", })
   } else if prst == "flowChartTerminator" {
     Some({
       avlst: "",
@@ -706,9 +706,9 @@ fn get_preset_def(prst : String) -> PresetDef? {
       paths: "M wd2 t L r hd2 L wd2 b L l hd2 Z|M l hd2 L r hd2",
     })
   } else if prst == "flowChartMerge" {
-    Some({ avlst: "", gdlst: "", paths: "M l t L r t L wd2 b Z" })
+    Some({ avlst: "", gdlst: "", paths: "M l t L r t L wd2 b Z", })
   } else if prst == "flowChartExtract" {
-    Some({ avlst: "", gdlst: "", paths: "M wd2 t L r b L l b Z" })
+    Some({ avlst: "", gdlst: "", paths: "M wd2 t L r b L l b Z", })
   } else if prst == "flowChartDelay" {
     Some({
       avlst: "",
@@ -1289,7 +1289,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
     })
     // ── Action buttons ──
   } else if prst == "actionButtonBlank" {
-    Some({ avlst: "", gdlst: "", paths: "M l t L r t L r b L l b Z" })
+    Some({ avlst: "", gdlst: "", paths: "M l t L r t L r b L l b Z", })
   } else if prst == "actionButtonHome" {
     Some({
       avlst: "",

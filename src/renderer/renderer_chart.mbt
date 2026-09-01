@@ -148,7 +148,9 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
       let dr = c.r * 3 / 4
       let dg = c.g * 3 / 4
       let db = c.b * 3 / 4
-      colors.push(({ r: dr, g: dg, b: db, alpha: 255 } : @ooxml.Color).to_css())
+      colors.push(
+        ({ r: dr, g: dg, b: db, alpha: 255, } : @ooxml.Color).to_css(),
+      )
     } else {
       colors.push(chart_colors_fallback[6 + i])
     }

@@ -56,7 +56,7 @@ priv struct Parser {
 
 ///|
 fn Parser::new(src : String) -> Parser {
-  { src, pos: 0 }
+  { src, pos: 0, }
 }
 
 ///|
@@ -308,14 +308,14 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
               let q = self.peek_char()
               if q == '"' || q == '\'' {
                 let value = self.parse_attr_value()
-                attrs.push({ name, value })
+                attrs.push({ name, value, })
               } else {
                 let value = self.parse_name()
-                attrs.push({ name, value })
+                attrs.push({ name, value, })
               }
             }
           } else {
-            attrs.push({ name, value: "" })
+            attrs.push({ name, value: "", })
           }
         }
       }

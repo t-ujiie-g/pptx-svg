@@ -47,10 +47,10 @@ fn split_para_runs(
       let left_text = substring(run.text, 0, cut)
       let right_text = substring(run.text, cut, len)
       if !left_text.is_empty() {
-        left.push({ ..run, text: left_text })
+        left.push({ ..run, text: left_text, })
       }
       if !right_text.is_empty() {
-        right.push({ ..run, text: right_text })
+        right.push({ ..run, text: right_text, })
       }
     }
     acc = acc + len
@@ -192,7 +192,7 @@ pub fn replace_text_range(
     }
     fn mk_run(seg : String) -> @ooxml.TextRun {
       match template {
-        Some(tpl) => { ..tpl, text: seg }
+        Some(tpl) => { ..tpl, text: seg, }
         None => make_default_run(seg)
       }
     }
@@ -225,14 +225,14 @@ pub fn replace_text_range(
       if !segs[0].is_empty() {
         first_runs.push(mk_run(segs[0]))
       }
-      new_paras.push({ ..base_para, runs: first_runs })
+      new_paras.push({ ..base_para, runs: first_runs, })
       // Middle paragraphs
       for k in 1..<last {
         let mid_runs : Array[@ooxml.TextRun] = []
         if !segs[k].is_empty() {
           mid_runs.push(mk_run(segs[k]))
         }
-        new_paras.push({ ..base_para, runs: mid_runs })
+        new_paras.push({ ..base_para, runs: mid_runs, })
       }
       // Last paragraph: segLast + suffix
       let last_runs : Array[@ooxml.TextRun] = []
@@ -240,7 +240,7 @@ pub fn replace_text_range(
         last_runs.push(mk_run(segs[last]))
       }
       append_all(last_runs, suffix)
-      new_paras.push({ ..base_para, runs: last_runs })
+      new_paras.push({ ..base_para, runs: last_runs, })
     }
     array_splice(shape.paragraphs, sp, ep, new_paras)
     g_modified.val[slide_idx] = true

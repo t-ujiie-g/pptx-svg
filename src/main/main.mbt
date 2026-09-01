@@ -36,52 +36,52 @@
 //   g_layout_to_master   — (layout_path, master_path) mapping
 
 ///|
-let g_slide_count : Ref[Int] = { val: 0 }
+let g_slide_count : Ref[Int] = { val: 0, }
 
 ///|
-let g_slide_size : Ref[@ooxml.SlideSize] = { val: @ooxml.SlideSize::default() }
+let g_slide_size : Ref[@ooxml.SlideSize] = { val: @ooxml.SlideSize::default(), }
 
 ///|
-let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [] }
+let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [], }
 
 ///|
-let g_modified : Ref[Array[Bool]] = { val: [] }
+let g_modified : Ref[Array[Bool]] = { val: [], }
 
 ///|
-let g_parsed : Ref[Array[Bool]] = { val: [] }
+let g_parsed : Ref[Array[Bool]] = { val: [], }
 
 ///|
-let g_theme : Ref[@ooxml.ThemeData] = { val: @ooxml.ThemeData::default() }
+let g_theme : Ref[@ooxml.ThemeData] = { val: @ooxml.ThemeData::default(), }
 
 ///|
-let g_slide_layout_paths : Ref[Array[String]] = { val: [] }
+let g_slide_layout_paths : Ref[Array[String]] = { val: [], }
 
 ///|
-let g_layout_paths : Ref[Array[String]] = { val: [] }
+let g_layout_paths : Ref[Array[String]] = { val: [], }
 
 ///|
-let g_layouts : Ref[Array[(@ooxml.SlideLayoutData, String)]] = { val: [] }
+let g_layouts : Ref[Array[(@ooxml.SlideLayoutData, String)]] = { val: [], }
 
 ///|
-let g_master_paths : Ref[Array[String]] = { val: [] }
+let g_master_paths : Ref[Array[String]] = { val: [], }
 
 ///|
-let g_masters : Ref[Array[(@ooxml.SlideMasterData, String)]] = { val: [] }
+let g_masters : Ref[Array[(@ooxml.SlideMasterData, String)]] = { val: [], }
 
 ///|
-let g_layout_to_master : Ref[Array[(String, String)]] = { val: [] }
+let g_layout_to_master : Ref[Array[(String, String)]] = { val: [], }
 
 ///|
-let g_layout_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [] }
+let g_layout_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [], }
 
 ///|
-let g_master_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [] }
+let g_master_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [], }
 
 ///|
-let g_master_themes : Ref[Array[@ooxml.ThemeData]] = { val: [] }
+let g_master_themes : Ref[Array[@ooxml.ThemeData]] = { val: [], }
 
 ///|
-let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [] }
+let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [], }
 
 // ── Package-local string/int helpers ─────────────────────────────────────────
 

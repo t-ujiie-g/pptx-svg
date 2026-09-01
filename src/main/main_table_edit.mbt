@@ -65,7 +65,7 @@ pub fn update_table_cell_text(
     } else {
       make_default_run(text)
     }
-    cells[col] = { ..cell, paragraphs: [make_default_paragraph(run)] }
+    cells[col] = { ..cell, paragraphs: [make_default_paragraph(run)], }
     g_modified.val[slide_idx] = true
     render_shape_svg(slide_idx, shape_idx)
   })
@@ -95,7 +95,7 @@ pub fn add_table_row(
     } else {
       0
     }
-    let new_row : @ooxml.TableRow = { height, cells }
+    let new_row : @ooxml.TableRow = { height, cells, }
     let insert_at = clamp_insert_index(after_row, t.rows.length())
     array_insert_at(t.rows, insert_at, new_row)
     g_modified.val[slide_idx] = true

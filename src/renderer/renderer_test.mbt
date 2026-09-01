@@ -6,7 +6,7 @@ using @test {assert_eq}
 ///|
 fn make_empty_slide() -> @ooxml.SlideData {
   {
-    slide_size: { cx: 9144000, cy: 6858000 },
+    slide_size: { cx: 9144000, cy: 6858000, },
     background: @ooxml.Color::white(),
     bg_grad: @ooxml.GradientFill::none(),
     bg_blip_fill: @ooxml.BlipFill::none(),
@@ -44,7 +44,7 @@ test "render_slide_svg empty slide" {
 
 ///|
 test "render_slide_svg hidden slide" {
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), hidden: true }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), hidden: true, }
   let svg = render_slide_svg(
     slide,
     [],
@@ -73,7 +73,7 @@ test "render_slide_svg with rect shape" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -114,7 +114,7 @@ test "render_slide_svg with ellipse" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -175,7 +175,7 @@ test "render_group with small chExt renders children" {
   // Child in chExt-space units (4000 wide, 10000 tall)
   let child = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-    { x: 0, y: 0, cx: 4000, cy: 10000, rot: 0, flip_h: false, flip_v: false },
+    { x: 0, y: 0, cx: 4000, cy: 10000, rot: 0, flip_h: false, flip_v: false, },
   )
   let grp_data : @ooxml.GroupShapeData = {
     ch_off_x: 0,
@@ -194,7 +194,7 @@ test "render_group with small chExt renders children" {
     flip_h: false,
     flip_v: false,
   })
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [grp] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [grp], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -239,7 +239,7 @@ test "roundtrip empty slide" {
 
 ///|
 test "roundtrip hidden slide" {
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), hidden: true }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), hidden: true, }
   let svg = render_slide_svg(
     slide,
     [],
@@ -290,7 +290,7 @@ test "roundtrip shape transform" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -324,9 +324,9 @@ test "roundtrip shape with blur effect" {
         flip_v: false,
       },
     ),
-    effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200 } },
+    effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200, }, },
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -372,7 +372,7 @@ test "roundtrip shape with outer shadow" {
       },
     },
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -407,10 +407,10 @@ test "roundtrip shape with glow" {
     ),
     effects: {
       ..@ooxml.EffectList::none(),
-      glow: { rad: 228600, color: @ooxml.parse_hex_color("FFC000") },
+      glow: { rad: 228600, color: @ooxml.parse_hex_color("FFC000"), },
     },
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -442,9 +442,9 @@ test "roundtrip shape with soft edge" {
         flip_v: false,
       },
     ),
-    effects: { ..@ooxml.EffectList::none(), soft_edge: { rad: 63500 } },
+    effects: { ..@ooxml.EffectList::none(), soft_edge: { rad: 63500, }, },
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -476,7 +476,7 @@ test "roundtrip shape with solid fill" {
     ),
     fill: @ooxml.parse_hex_color("FF6633"),
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -512,7 +512,7 @@ test "roundtrip shape with stroke" {
     stroke_w: 25400,
     stroke_dash: "dash",
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -545,7 +545,7 @@ test "roundtrip ellipse geometry" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -589,7 +589,7 @@ test "roundtrip shape with preset shadow" {
       },
     },
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -610,17 +610,28 @@ test "roundtrip shape with preset shadow" {
 test "roundtrip fill overlay effect" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-    { x: 0, y: 0, cx: 500000, cy: 300000, rot: 0, flip_h: false, flip_v: false },
+    {
+      x: 0,
+      y: 0,
+      cx: 500000,
+      cy: 300000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
   )
   let shape = {
     ..shape,
     fill: @ooxml.parse_hex_color("0000FF"),
     effects: {
       ..@ooxml.EffectList::none(),
-      fill_overlay: { blend: "mult", color: @ooxml.parse_hex_color("80FF0000") },
+      fill_overlay: {
+        blend: "mult",
+        color: @ooxml.parse_hex_color("80FF0000"),
+      },
     },
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -704,7 +715,7 @@ test "roundtrip justify alignment" {
     ),
     paragraphs: [para],
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -756,8 +767,8 @@ test "text run gradient and pattern fill render as defs + url refs" {
     text_grad_fill: {
       ..@ooxml.GradientFill::none(),
       stops: [
-        { pos: 0, color: @ooxml.parse_hex_color("1F4E79") },
-        { pos: 100000, color: @ooxml.parse_hex_color("2C9C9C") },
+        { pos: 0, color: @ooxml.parse_hex_color("1F4E79"), },
+        { pos: 100000, color: @ooxml.parse_hex_color("2C9C9C"), },
       ],
       angle: 5400000,
     },
@@ -809,7 +820,7 @@ test "text run gradient and pattern fill render as defs + url refs" {
     ),
     paragraphs: [base_para],
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1008,7 +1019,7 @@ fn make_rotated_text_shape(
   {
     ..@ooxml.Shape::default_with(
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-      { x: 700000, y: 1500000, cx: 1284515, cy: 445828, rot, flip_h, flip_v },
+      { x: 700000, y: 1500000, cx: 1284515, cy: 445828, rot, flip_h, flip_v, },
     ),
     paragraphs: [para],
   }
@@ -1332,7 +1343,15 @@ test "render histogram chart reuses bar renderer" {
 test "roundtrip multiple shapes" {
   let shape1 = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
-    { x: 0, y: 0, cx: 200000, cy: 200000, rot: 0, flip_h: false, flip_v: false },
+    {
+      x: 0,
+      y: 0,
+      cx: 200000,
+      cy: 200000,
+      rot: 0,
+      flip_h: false,
+      flip_v: false,
+    },
   )
   let shape2 = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Ellipse),
@@ -1471,7 +1490,7 @@ test "rendered SVG escapes malicious ph_type in data attribute" {
     ),
     ph_type: "x\" onload=\"alert(1)",
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1558,7 +1577,7 @@ test "rendered SVG drops javascript: hyperlink target" {
     ),
     paragraphs: [para],
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let bad_rels : Array[@ooxml.Relationship] = [
     {
       id: "rId1",
@@ -1601,7 +1620,7 @@ test "roundRect default adj uses min(w,h) * 16667 / 100000" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1638,7 +1657,7 @@ test "roundRect custom adj round-trips" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1676,7 +1695,7 @@ test "stripedRightArrow renders as multi-segment path" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1717,7 +1736,7 @@ test "leftRightArrowCallout renders as preset path" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1759,7 +1778,7 @@ test "bullet inherits first run color when buClr is absent" {
     bold_explicit: false,
     italic: false,
     font_size: 0,
-    color: ({ r: 255, g: 255, b: 255, alpha: 255 } : @ooxml.Color), // white
+    color: ({ r: 255, g: 255, b: 255, alpha: 255, } : @ooxml.Color), // white
     font_face: "",
     ea_font: "",
     cs_font: "",
@@ -1818,7 +1837,7 @@ test "bullet inherits first run color when buClr is absent" {
     ),
     paragraphs: [para],
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1856,7 +1875,7 @@ test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
       flip_v: false,
     },
   )
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1929,7 +1948,7 @@ test "empty paragraph uses endParaRPr font size for autofit height" {
     paragraphs: [empty_para, empty_para, empty_para, empty_para],
     body_props,
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -1957,7 +1976,7 @@ test "bullet font-size matches run when bu_size is unspecified" {
     bold_explicit: false,
     italic: false,
     font_size: 1200, // 12 pt → 16 px at scale 9525
-    color: ({ r: 0, g: 0, b: 0, alpha: 255 } : @ooxml.Color),
+    color: ({ r: 0, g: 0, b: 0, alpha: 255, } : @ooxml.Color),
     font_face: "",
     ea_font: "",
     cs_font: "",
@@ -2016,7 +2035,7 @@ test "bullet font-size matches run when bu_size is unspecified" {
     ),
     paragraphs: [para],
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -2063,7 +2082,7 @@ test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
     ),
     fill: @ooxml.parse_hex_color("00B4D8"),
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
@@ -2300,7 +2319,7 @@ test "underline style + color round-trip" {
     cs_font: "",
     sym_font: "",
     underline: "wavy",
-    underline_color: { r: 255, g: 0, b: 0, alpha: 255 },
+    underline_color: { r: 255, g: 0, b: 0, alpha: 255, },
     strike: "",
     baseline: 0,
     char_spacing: 0,
@@ -2353,7 +2372,7 @@ test "underline style + color round-trip" {
     ),
     paragraphs: [para],
   }
-  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape] }
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
   let svg = render_slide_svg(
     slide,
     [],
