@@ -9,6 +9,12 @@ fn geom_env(w : Double, h : Double) -> GuideEnv {
 }
 
 ///|
+/// Parse and evaluate one formula into guide `name`.
+fn eval_formula(env : GuideEnv, name : String, fmla : String) -> Unit {
+  eval_guides(env, parse_guides(name + "=" + fmla))
+}
+
+///|
 fn near(a : Double, b : Double) -> Bool {
   let d = a - b
   d < 0.001 && d > -0.001
@@ -80,7 +86,14 @@ test "arcTo angles are visual angles on an ellipse" {
 test "W token scales a path from its own coordinate space" {
   let env = geom_env(200.0, 100.0)
   let d = render_geom_paths(
-    env, "W 21600 21600 M 0 0 L 21600 21600", 0, 0, 200.0, 100.0, 0.0, 0.0,
+    env,
+    parse_paths("W 21600 21600 M 0 0 L 21600 21600"),
+    0,
+    0,
+    200.0,
+    100.0,
+    0.0,
+    0.0,
   )
   assert_eq(d, "M0 0L200 100")
 }
@@ -106,4 +119,32 @@ test "wedgeRectCallout attaches the tail to the edge nearest the tip" {
   // Tip left of the box: the wedge leaves the left edge (x=0).
   let left = preset_path("wedgeRectCallout", [-80000, 0], 180, 129)
   assert_true(left.contains("L0 53.8L-54 64.5L0 21.5"))
+}
+
+///|
+test "formulas parse into typed operators with literal / guide operands" {
+  guard parse_formula("*/ w adj 100000")
+    is Some(MulDiv(Var("w"), Var("adj"), Lit(100000.0))) else {
+    fail("*/ did not parse to MulDiv")
+  }
+  assert_true(parse_formula("") is None)
+  assert_true(parse_formula("bogus 1 2") is Some(Unknown))
+  // Too few operands is not a valid "+-"
+  assert_true(parse_formula("+- a b") is Some(Unknown))
+}
+
+///|
+test "path parsing skips a command with missing operands" {
+  // "L 5" lacks its y operand: both tokens are skipped.
+  let cmds = parse_path("M 0 0 L 5")
+  assert_eq(cmds.length(), 1)
+  assert_true(cmds[0] is MoveTo(Lit(_), Lit(_)))
+}
+
+///|
+test "preset definitions are parsed once and cached" {
+  guard preset_geom("donut") is Some(first) else { fail("donut missing") }
+  guard preset_geom("donut") is Some(second) else { fail("donut missing") }
+  assert_true(physical_equal(first, second))
+  assert_true(preset_geom("noSuchPreset") is None)
 }
