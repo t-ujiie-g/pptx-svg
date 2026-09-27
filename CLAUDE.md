@@ -88,6 +88,7 @@ The sources track current MoonBit idiom; match it in new code.
 - **A range loop evaluates its bounds once**, unlike a re-checked `while` condition. If the body pushes to / removes from the collection it is iterating, keep the `while`.
 - **`while` is still correct** for loops with a body-local step (`i = i + char_step(c)` — the step is unavailable in a `for` header), for a `continue` that must *skip* the increment, and when the index is read after the loop.
 - **`if opt is Some(x) { … }`** instead of `match opt { Some(x) => … None => () }`.
+- **Dispatch on a string with `match`, not an `if s == "a" … else if` chain**: string-literal or-patterns (`"a" | "b" => …`), and array patterns to bind operands at the same time (`match tokens { ["cos", x, ang, ..] => … }`, `match tokens[i:] { ["M", x, y, ..] => … }`). A slice pattern also replaces a manual `i + n < len` arity check.
 - **`xs.is_empty()` / `!xs.is_empty()`**, never `xs.length() == 0` / `> 0`.
 - Method-call syntax for stdlib conversions: `c.to_int()`, not `Char::to_int(c)`.
 - **Top-level declarations are separated by a `///|` block marker.** Each block is independent and order-irrelevant, so a refactor can move blocks one at a time. New top-level items get one too; `moon fmt` keeps them in place.
