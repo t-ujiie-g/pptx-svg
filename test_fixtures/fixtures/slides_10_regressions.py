@@ -213,3 +213,20 @@ for idx, (name, adj1, adj2) in enumerate(issue62_wedges):
     spTree100.append(etree.fromstring(issue62_sp(
         10100 + idx, name, "wedgeRectCallout",
         457200 + idx * 2133600, 4114800, 1371600, 914400, av)))
+
+# ── Slide 101: presets generated from presetShapeDefinitions.xml ─────────────
+# Each preset is drawn from its ECMA-376 definition, including per-path fill
+# modes: arc (filled wedge + stroke-only arc), cube (shaded faces), chartPlus
+# (lines drawn over the box), bentConnector3 (stroke-only), actionButtonHome
+# (shaded icon), and star7 (absent from the old hand-written table).
+slide101 = prs.slides.add_slide(blank)
+spTree101 = slide101.shapes._spTree
+generated_presets = ("arc", "cube", "chartPlus", "bentConnector3", "actionButtonHome", "star7")
+for idx, prst in enumerate(generated_presets):
+    sp_xml = issue62_sp(10200 + idx, f"G_{prst}", prst,
+                        228600 + idx * 1447800, 1371600, 1188720, 868680)
+    sp = etree.fromstring(sp_xml)
+    # A visible outline so stroke-only paths render.
+    sp.find(f"{{{ns_p}}}spPr").append(etree.fromstring(
+        f'<a:ln xmlns:a="{ns_a}" w="19050"><a:solidFill><a:srgbClr val="1F3864"/></a:solidFill></a:ln>'))
+    spTree101.append(sp)

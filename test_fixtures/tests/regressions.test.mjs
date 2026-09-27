@@ -188,5 +188,38 @@ test("regressions (slides 96-98)", async () => {
     });
   }
 
+  // ── Slide 101: presets generated from presetShapeDefinitions.xml ──────────
+  {
+    console.log('\n── test_features.pptx — Slide 101: generated preset geometry ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const svg = r.renderSlideSvg(100);
+    const shapeSvg = (idx) => {
+      const start = svg.indexOf(`data-ooxml-shape-idx="${idx}"`);
+      const end = svg.indexOf(`data-ooxml-shape-idx="${idx + 1}"`);
+      return start < 0 ? '' : svg.slice(start, end < 0 ? undefined : end);
+    };
+    const presets = ['arc', 'cube', 'chartPlus', 'bentConnector3', 'actionButtonHome', 'star7'];
+    presets.forEach((prst, idx) => {
+      const s = shapeSvg(idx);
+      // An unknown preset falls back to <rect>; every generated one is a <path>.
+      assert(`slide101 ${prst} renders as a path, not the rect fallback`,
+        s.includes('<path d=') && !s.includes('<rect'));
+    });
+    assert('slide101 arc strokes only the arc (a fill="none" path)', shapeSvg(0).includes('fill="none" stroke="rgb('));
+    assert('slide101 arc wedge is filled without stroke', /fill="rgb\([^"]+\)" stroke="none"/.test(shapeSvg(0)));
+    assert('slide101 cube faces are shaded', shapeSvg(1).includes('fill-opacity="0.'));
+    const plus = shapeSvg(2);
+    assert('slide101 chartPlus lines are drawn after the box',
+      plus.lastIndexOf('fill="none"') > plus.indexOf('stroke="none"'));
+    assert('slide101 bentConnector3 is stroke-only', shapeSvg(3).includes('fill="none" stroke="rgb('));
+    assert('slide101 actionButtonHome icon is shaded', shapeSvg(4).includes('fill-opacity="0.'));
+  }
+
   finishAssertions();
 });

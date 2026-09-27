@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **All 182 ECMA-376 preset geometries, generated from `presetShapeDefinitions.xml`.** `src/renderer/renderer_geom_presets.mbt` is now produced by `scripts/gen_preset_geom.py` instead of being hand-written; previously ~140 presets were hand-approximated and 39 were missing (rendered as a plain rectangle when used on a `p:sp`), e.g. `star7`, `dodecagon`, `chartPlus`, `swooshArrow`, `leftCircularArrow`, `pieWedge`, the arrow callouts, `bentConnector*` / `curvedConnector*`. Non-standard names still resolve (`cross`, `cylinder`, `isosTriangle`, `horzScroll`, `vertScroll`).
+- **Per-path fill modes and stroke flags for presets.** `a:path fill="none"` sub-paths are stroked only (`arc`, brackets and braces, connectors, callout leader lines), `stroke="false"` ones are filled only, and `darken` / `darkenLess` / `lighten` / `lightenLess` shade the fill with a black / white overlay (`cube`, `can`, `bevel`, action-button icons, ribbons, curved arrows). Stroke-only sub-paths are drawn after the fills so `chartPlus` / `chartX` / `chartStar` keep their lines. A plain preset is still a single `<path>`.
+
+### Changed
+
+- **Preset text rectangles follow each preset's `a:rect`** instead of a hand-written subset (the rest used the whole shape), e.g. triangle text sits in the lower half and arrow text in the shaft. The Wasm grows ~59 KB (~17 KB gzipped) for the definition table.
+
 ### Fixed
 
 - **Preset geometries that rendered blank or distorted** (#62). `donut`, `cloudCallout`, `star12`, `circularArrow`, `uturnArrow`, `quadArrow`, `lightningBolt`, `sun`, `moon`, `cube` and `flowChartDocument` now draw the ECMA-376 outline, and `wedgeRectCallout` attaches its tail to the edge nearest the tip instead of always the bottom. The fixes are in the guide evaluator, and apply to every preset and to `a:custGeom`:
