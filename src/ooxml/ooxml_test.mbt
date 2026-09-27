@@ -9,7 +9,7 @@ using @test {assert_eq}
 
 ///|
 test "Color::white" {
-  let c = Color::white()
+  let c = @ooxml.Color::white()
   assert_eq(c.r, 255)
   assert_eq(c.g, 255)
   assert_eq(c.b, 255)
@@ -19,7 +19,7 @@ test "Color::white" {
 
 ///|
 test "Color::black" {
-  let c = Color::black()
+  let c = @ooxml.Color::black()
   assert_eq(c.r, 0)
   assert_eq(c.g, 0)
   assert_eq(c.b, 0)
@@ -27,7 +27,7 @@ test "Color::black" {
 
 ///|
 test "Color::none" {
-  let c = Color::none()
+  let c = @ooxml.Color::none()
   assert_true(c.is_none())
 }
 
@@ -35,7 +35,7 @@ test "Color::none" {
 
 ///|
 test "parse_hex_color 6-char" {
-  let c = parse_hex_color("FF8800")
+  let c = @ooxml.parse_hex_color("FF8800")
   assert_eq(c.r, 255)
   assert_eq(c.g, 136)
   assert_eq(c.b, 0)
@@ -44,7 +44,7 @@ test "parse_hex_color 6-char" {
 
 ///|
 test "parse_hex_color 8-char with alpha" {
-  let c = parse_hex_color("80FF0000")
+  let c = @ooxml.parse_hex_color("80FF0000")
   assert_eq(c.alpha, 128)
   assert_eq(c.r, 255)
   assert_eq(c.g, 0)
@@ -54,7 +54,7 @@ test "parse_hex_color 8-char with alpha" {
 ///|
 test "parse_hex_color short string" {
   // Falls back to black
-  let c = parse_hex_color("FFF")
+  let c = @ooxml.parse_hex_color("FFF")
   assert_eq(c.r, 0)
   assert_eq(c.g, 0)
   assert_eq(c.b, 0)
@@ -64,66 +64,66 @@ test "parse_hex_color short string" {
 
 ///|
 test "Color::to_hex roundtrip" {
-  let c = parse_hex_color("4488CC")
+  let c = @ooxml.parse_hex_color("4488CC")
   assert_eq(c.to_hex(), "4488CC")
   assert_eq(c.to_hex_rgb(), "4488CC")
 }
 
 ///|
 test "Color::to_hex with alpha" {
-  let c = parse_hex_color("80FF0000")
+  let c = @ooxml.parse_hex_color("80FF0000")
   assert_eq(c.to_hex(), "80FF0000")
   assert_eq(c.to_hex_rgb(), "FF0000")
 }
 
 ///|
 test "Color::to_hex none" {
-  assert_eq(Color::none().to_hex(), "none")
-  assert_eq(Color::none().to_hex_rgb(), "none")
+  assert_eq(@ooxml.Color::none().to_hex(), "none")
+  assert_eq(@ooxml.Color::none().to_hex_rgb(), "none")
 }
 
 ///|
 test "Color::to_css opaque" {
-  let c = parse_hex_color("FF0000")
+  let c = @ooxml.parse_hex_color("FF0000")
   assert_eq(c.to_css(), "rgb(255,0,0)")
 }
 
 ///|
 test "Color::to_css with alpha" {
-  let c = parse_hex_color("80FF0000")
+  let c = @ooxml.parse_hex_color("80FF0000")
   let css = c.to_css()
   assert_true(@xml.str_starts_with(css, "rgba(255,0,0,"))
 }
 
 ///|
 test "Color::to_css none" {
-  assert_eq(Color::none().to_css(), "none")
+  assert_eq(@ooxml.Color::none().to_css(), "none")
 }
 
 // ── alpha_to_css_str ────────────────────────────────────────────────────────
 
 ///|
 test "alpha_to_css_str" {
-  assert_eq(alpha_to_css_str(255), "1")
-  assert_eq(alpha_to_css_str(0), "0")
-  assert_eq(alpha_to_css_str(128), "0.50")
+  assert_eq(@ooxml.alpha_to_css_str(255), "1")
+  assert_eq(@ooxml.alpha_to_css_str(0), "0")
+  assert_eq(@ooxml.alpha_to_css_str(128), "0.50")
 }
 
 // ── resolve_scheme_color ────────────────────────────────────────────────────
 
 ///|
 test "resolve_scheme_color basic" {
-  let theme = ThemeData::default()
-  let dk1 = resolve_scheme_color("dk1", theme)
+  let theme = @ooxml.ThemeData::default()
+  let dk1 = @ooxml.resolve_scheme_color("dk1", theme)
   assert_false(dk1.is_none())
   // bg1 → lt1 alias
-  let bg1 = resolve_scheme_color("bg1", theme)
-  let lt1 = resolve_scheme_color("lt1", theme)
+  let bg1 = @ooxml.resolve_scheme_color("bg1", theme)
+  let lt1 = @ooxml.resolve_scheme_color("lt1", theme)
   assert_eq(bg1.r, lt1.r)
   assert_eq(bg1.g, lt1.g)
   assert_eq(bg1.b, lt1.b)
   // tx1 → dk1 alias
-  let tx1 = resolve_scheme_color("tx1", theme)
+  let tx1 = @ooxml.resolve_scheme_color("tx1", theme)
   assert_eq(tx1.r, dk1.r)
 }
 
@@ -132,12 +132,12 @@ test "resolve_scheme_color basic" {
 /// corrupt the theme's physical slots. Direct `<a:schemeClr val="dk1"/>` must
 /// still resolve to the original theme.dk1 (#000000), not the lt1 color.
 test "apply_color_map preserves physical slot identity" {
-  let theme : ThemeData = {
-    ..ThemeData::default(),
-    dk1: ({ r: 0, g: 0, b: 0, alpha: 255, } : Color),
-    lt1: ({ r: 238, g: 238, b: 238, alpha: 255, } : Color),
+  let theme : @ooxml.ThemeData = {
+    ..@ooxml.ThemeData::default(),
+    dk1: ({ r: 0, g: 0, b: 0, alpha: 255, } : @ooxml.Color),
+    lt1: ({ r: 238, g: 238, b: 238, alpha: 255, } : @ooxml.Color),
   }
-  let inverted : ColorMap = {
+  let inverted : @ooxml.ColorMap = {
     bg1: "dk1",
     tx1: "lt1",
     bg2: "dk2",
@@ -151,17 +151,17 @@ test "apply_color_map preserves physical slot identity" {
     hlink: "hlink",
     fol_hlink: "folHlink",
   }
-  let remapped = apply_color_map(theme, inverted)
+  let remapped = @ooxml.apply_color_map(theme, inverted)
   // dk1 / lt1 references stay anchored to the physical slots.
-  let dk1 = resolve_scheme_color("dk1", remapped)
+  let dk1 = @ooxml.resolve_scheme_color("dk1", remapped)
   assert_eq(dk1.r, 0)
-  let lt1 = resolve_scheme_color("lt1", remapped)
+  let lt1 = @ooxml.resolve_scheme_color("lt1", remapped)
   assert_eq(lt1.r, 238)
   // bg1 → dk1 (#000000) per the inverted clrMap.
-  let bg1 = resolve_scheme_color("bg1", remapped)
+  let bg1 = @ooxml.resolve_scheme_color("bg1", remapped)
   assert_eq(bg1.r, 0)
   // tx1 → lt1 (#EEEEEE) per the inverted clrMap.
-  let tx1 = resolve_scheme_color("tx1", remapped)
+  let tx1 = @ooxml.resolve_scheme_color("tx1", remapped)
   assert_eq(tx1.r, 238)
 }
 
@@ -169,8 +169,8 @@ test "apply_color_map preserves physical slot identity" {
 
 ///|
 test "apply_color_modifiers empty" {
-  let c = parse_hex_color("FF0000")
-  let result = apply_color_modifiers(c, [])
+  let c = @ooxml.parse_hex_color("FF0000")
+  let result = @ooxml.apply_color_modifiers(c, [])
   assert_eq(result.r, 255)
   assert_eq(result.g, 0)
   assert_eq(result.b, 0)
@@ -178,9 +178,9 @@ test "apply_color_modifiers empty" {
 
 ///|
 test "apply_color_modifiers alpha" {
-  let c = parse_hex_color("FF0000")
+  let c = @ooxml.parse_hex_color("FF0000")
   let nodes = @xml.parse_xml("<a:alpha val=\"50000\"/>")
-  let result = apply_color_modifiers(c, nodes)
+  let result = @ooxml.apply_color_modifiers(c, nodes)
   // alpha 50000/100000 * 255 ≈ 127-128
   assert_true(result.alpha < 130)
   assert_true(result.alpha > 125)
@@ -188,9 +188,9 @@ test "apply_color_modifiers alpha" {
 
 ///|
 test "apply_color_modifiers shade" {
-  let c = Color::white()
+  let c = @ooxml.Color::white()
   let nodes = @xml.parse_xml("<a:shade val=\"50000\"/>")
-  let result = apply_color_modifiers(c, nodes)
+  let result = @ooxml.apply_color_modifiers(c, nodes)
   // 255 * 50000/100000 = 127
   assert_eq(result.r, 127)
   assert_eq(result.g, 127)
@@ -199,9 +199,9 @@ test "apply_color_modifiers shade" {
 
 ///|
 test "apply_color_modifiers tint" {
-  let c = Color::black()
+  let c = @ooxml.Color::black()
   let nodes = @xml.parse_xml("<a:tint val=\"50000\"/>")
-  let result = apply_color_modifiers(c, nodes)
+  let result = @ooxml.apply_color_modifiers(c, nodes)
   // 255 - (255-0)*50000/100000 = 128 (integer rounding)
   assert_eq(result.r, 128)
   assert_eq(result.g, 128)
@@ -216,9 +216,9 @@ test "apply_color_modifiers hueOff is in correct degrees" {
   // Pure red (h=0). Apply hueOff val=60000 (= 1° offset). Result should be
   // *almost* red, not yellow/green. With the old buggy formula val/600*10
   // = 1000, the hue would jump to 100°, turning red into green.
-  let c = parse_hex_color("FF0000")
+  let c = @ooxml.parse_hex_color("FF0000")
   let nodes = @xml.parse_xml("<a:hueOff val=\"60000\"/>")
-  let result = apply_color_modifiers(c, nodes)
+  let result = @ooxml.apply_color_modifiers(c, nodes)
   // After 1° hue offset on red, R should still dominate by a large margin.
   assert_true(result.r > 250)
   assert_true(result.g < 10)
@@ -229,37 +229,40 @@ test "apply_color_modifiers hueOff is in correct degrees" {
 
 ///|
 test "parse_geom basic shapes" {
-  assert_eq(parse_geom("rect", []).to_prst(), "rect")
-  assert_eq(parse_geom("ellipse", []).to_prst(), "ellipse")
-  assert_eq(parse_geom("roundRect", []).to_prst(), "roundRect")
-  assert_eq(parse_geom("line", []).to_prst(), "line")
-  assert_eq(parse_geom("straightConnector1", []).to_prst(), "line")
+  assert_eq(@ooxml.parse_geom("rect", []).to_prst(), "rect")
+  assert_eq(@ooxml.parse_geom("ellipse", []).to_prst(), "ellipse")
+  assert_eq(@ooxml.parse_geom("roundRect", []).to_prst(), "roundRect")
+  assert_eq(@ooxml.parse_geom("line", []).to_prst(), "line")
+  assert_eq(@ooxml.parse_geom("straightConnector1", []).to_prst(), "line")
 }
 
 ///|
 test "parse_geom other" {
-  assert_eq(parse_geom("star5", []).to_prst(), "star5")
+  assert_eq(@ooxml.parse_geom("star5", []).to_prst(), "star5")
 }
 
 ///|
 test "parse_geom roundRect adj" {
   // Empty avlst → default 16667
-  match parse_geom("roundRect", []) {
-    ShapeGeom::RoundRect(adj) => assert_eq(adj, 16667)
+  match @ooxml.parse_geom("roundRect", []) {
+    @ooxml.ShapeGeom::RoundRect(adj) => assert_eq(adj, 16667)
     _ => fail("expected RoundRect")
   }
   // Author-specified adj preserved
-  match parse_geom("roundRect", [50000]) {
-    ShapeGeom::RoundRect(adj) => assert_eq(adj, 50000)
+  match @ooxml.parse_geom("roundRect", [50000]) {
+    @ooxml.ShapeGeom::RoundRect(adj) => assert_eq(adj, 50000)
     _ => fail("expected RoundRect")
   }
 }
 
 ///|
 test "parse_connector_geom" {
-  assert_eq(parse_connector_geom("straightConnector1", []).to_prst(), "line")
   assert_eq(
-    parse_connector_geom("bentConnector3", [50000]).to_prst(),
+    @ooxml.parse_connector_geom("straightConnector1", []).to_prst(),
+    "line",
+  )
+  assert_eq(
+    @ooxml.parse_connector_geom("bentConnector3", [50000]).to_prst(),
     "bentConnector3",
   )
 }
@@ -269,11 +272,14 @@ test "parse_connector_geom" {
 ///|
 test "parse_rels basic" {
   let xml = "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image1.png\"/></Relationships>"
-  let rels = parse_rels(xml)
+  let rels = @ooxml.parse_rels(xml)
   assert_eq(rels.length(), 2)
-  assert_eq(find_rel_target(rels, "rId1"), "../slideLayouts/slideLayout1.xml")
-  assert_eq(find_rel_target(rels, "rId2"), "../media/image1.png")
-  assert_eq(find_rel_target(rels, "rId99"), "")
+  assert_eq(
+    @ooxml.find_rel_target(rels, "rId1"),
+    "../slideLayouts/slideLayout1.xml",
+  )
+  assert_eq(@ooxml.find_rel_target(rels, "rId2"), "../media/image1.png")
+  assert_eq(@ooxml.find_rel_target(rels, "rId99"), "")
 }
 
 // ── parse_slide_size ────────────────────────────────────────────────────────
@@ -281,7 +287,7 @@ test "parse_rels basic" {
 ///|
 test "parse_slide_size standard" {
   let xml = "<p:presentation><p:sldSz cx=\"9144000\" cy=\"6858000\"/></p:presentation>"
-  let size = parse_slide_size(xml)
+  let size = @ooxml.parse_slide_size(xml)
   assert_eq(size.cx, 9144000)
   assert_eq(size.cy, 6858000)
 }
@@ -289,7 +295,7 @@ test "parse_slide_size standard" {
 ///|
 test "parse_slide_size widescreen" {
   let xml = "<p:presentation><p:sldSz cx=\"12192000\" cy=\"6858000\"/></p:presentation>"
-  let size = parse_slide_size(xml)
+  let size = @ooxml.parse_slide_size(xml)
   assert_eq(size.cx, 12192000)
 }
 
@@ -297,7 +303,7 @@ test "parse_slide_size widescreen" {
 
 ///|
 test "EffectList::none" {
-  let e = EffectList::none()
+  let e = @ooxml.EffectList::none()
   assert_true(e.is_none())
   assert_true(e.outer_shadow.is_none())
   assert_true(e.inner_shadow.is_none())
@@ -309,16 +315,16 @@ test "EffectList::none" {
 
 ///|
 test "OuterShadow::none and is_none" {
-  let os = OuterShadow::none()
+  let os = @ooxml.OuterShadow::none()
   assert_true(os.is_none())
   assert_eq(os.blur_rad, 0)
   assert_eq(os.dist, 0)
   assert_true(os.color.is_none())
-  let os2 : OuterShadow = {
+  let os2 : @ooxml.OuterShadow = {
     blur_rad: 152400,
     dist: 114300,
     dir: 5400000,
-    color: parse_hex_color("000000"),
+    color: @ooxml.parse_hex_color("000000"),
     sx: 0,
     sy: 0,
     algn: "ctr",
@@ -331,44 +337,47 @@ test "OuterShadow::none and is_none" {
 
 ///|
 test "InnerShadow::none and is_none" {
-  let ishdw = InnerShadow::none()
+  let ishdw = @ooxml.InnerShadow::none()
   assert_true(ishdw.is_none())
-  let ishdw2 : InnerShadow = {
+  let ishdw2 : @ooxml.InnerShadow = {
     blur_rad: 114300,
     dist: 76200,
     dir: 2700000,
-    color: parse_hex_color("000000"),
+    color: @ooxml.parse_hex_color("000000"),
   }
   assert_true(!ishdw2.is_none())
 }
 
 ///|
 test "Glow::none and is_none" {
-  let gl = Glow::none()
+  let gl = @ooxml.Glow::none()
   assert_true(gl.is_none())
   assert_eq(gl.rad, 0)
   assert_true(gl.color.is_none())
-  let gl2 : Glow = { rad: 228600, color: parse_hex_color("FFC000"), }
+  let gl2 : @ooxml.Glow = {
+    rad: 228600,
+    color: @ooxml.parse_hex_color("FFC000"),
+  }
   assert_true(!gl2.is_none())
   assert_eq(gl2.rad, 228600)
 }
 
 ///|
 test "SoftEdge::none and is_none" {
-  let se = SoftEdge::none()
+  let se = @ooxml.SoftEdge::none()
   assert_true(se.is_none())
   assert_eq(se.rad, 0)
-  let se2 : SoftEdge = { rad: 63500, }
+  let se2 : @ooxml.SoftEdge = { rad: 63500, }
   assert_true(!se2.is_none())
 }
 
 ///|
 test "Reflection::none and is_none" {
-  let r = Reflection::none()
+  let r = @ooxml.Reflection::none()
   assert_true(r.is_none())
   assert_eq(r.st_alpha, 0)
   assert_eq(r.end_alpha, 0)
-  let r2 : Reflection = {
+  let r2 : @ooxml.Reflection = {
     blur_rad: 6350,
     dist: 0,
     dir: 5400000,
@@ -385,10 +394,10 @@ test "Reflection::none and is_none" {
 
 ///|
 test "Blur::none and is_none" {
-  let b = Blur::none()
+  let b = @ooxml.Blur::none()
   assert_true(b.is_none())
   assert_eq(b.rad, 0)
-  let b2 : Blur = { rad: 50800, }
+  let b2 : @ooxml.Blur = { rad: 50800, }
   assert_true(!b2.is_none())
   assert_eq(b2.rad, 50800)
 }
@@ -420,7 +429,11 @@ test "parse_slide captures endParaRPr into paragraph epr_* fields" {
     #|    </p:sp>
     #|  </p:spTree></p:cSld>
     #|</p:sld>
-  let slide = parse_slide(slide_xml, SlideSize::default(), ThemeData::default())
+  let slide = @ooxml.parse_slide(
+    slide_xml,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
   let paras = slide.shapes[0].paragraphs
   assert_eq(paras.length(), 2)
   // Paragraph 0 has endParaRPr — epr_* fields should be populated.
@@ -458,7 +471,11 @@ test "parse_slide captures underline style and uFill color" {
     #|    </p:sp>
     #|  </p:spTree></p:cSld>
     #|</p:sld>
-  let slide = parse_slide(slide_xml, SlideSize::default(), ThemeData::default())
+  let slide = @ooxml.parse_slide(
+    slide_xml,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
   let run = slide.shapes[0].paragraphs[0].runs[0]
   assert_eq(run.underline, "dbl")
   assert_eq(run.underline_color.r, 255)
@@ -469,31 +486,35 @@ test "parse_slide captures underline style and uFill color" {
 ///|
 test "BlipFill::is_none considers svg_rid" {
   // Fully empty blip — is_none
-  let bf0 = BlipFill::none()
+  let bf0 = @ooxml.BlipFill::none()
   assert_true(bf0.is_none())
   // Raster-only (r:embed) — not none
-  let bf_raster : BlipFill = { ..BlipFill::none(), rid: "rId7", }
+  let bf_raster : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), rid: "rId7", }
   assert_false(bf_raster.is_none())
   // SVG-only (asvg:svgBlip, no r:embed) — not none. This is the regression
   // fixed for cover-slide SVG logos: previously is_none() returned true and
   // the picture shape rendered as a placeholder rectangle.
-  let bf_svg : BlipFill = { ..BlipFill::none(), svg_rid: "rId8", }
+  let bf_svg : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), svg_rid: "rId8", }
   assert_false(bf_svg.is_none())
   // Both set — not none
-  let bf_both : BlipFill = { ..BlipFill::none(), rid: "rId7", svg_rid: "rId8", }
+  let bf_both : @ooxml.BlipFill = {
+    ..@ooxml.BlipFill::none(),
+    rid: "rId7",
+    svg_rid: "rId8",
+  }
   assert_false(bf_both.is_none())
 }
 
 ///|
 test "EffectList with single effect is not none" {
   // Only outer shadow set
-  let e1 : EffectList = {
-    ..EffectList::none(),
+  let e1 : @ooxml.EffectList = {
+    ..@ooxml.EffectList::none(),
     outer_shadow: {
       blur_rad: 100,
       dist: 0,
       dir: 0,
-      color: parse_hex_color("000000"),
+      color: @ooxml.parse_hex_color("000000"),
       sx: 0,
       sy: 0,
       algn: "",
@@ -502,13 +523,16 @@ test "EffectList with single effect is not none" {
   }
   assert_true(!e1.is_none())
   // Only glow set
-  let e2 : EffectList = {
-    ..EffectList::none(),
-    glow: { rad: 100, color: parse_hex_color("FF0000"), },
+  let e2 : @ooxml.EffectList = {
+    ..@ooxml.EffectList::none(),
+    glow: { rad: 100, color: @ooxml.parse_hex_color("FF0000"), },
   }
   assert_true(!e2.is_none())
   // Only soft edge set
-  let e3 : EffectList = { ..EffectList::none(), soft_edge: { rad: 100, }, }
+  let e3 : @ooxml.EffectList = {
+    ..@ooxml.EffectList::none(),
+    soft_edge: { rad: 100, },
+  }
   assert_true(!e3.is_none())
 }
 
@@ -553,7 +577,7 @@ test "parse_theme captures fmtScheme fill/ln style lists" {
     #|    </a:fmtScheme>
     #|  </a:themeElements>
     #|</a:theme>
-  let theme = parse_theme(theme_xml)
+  let theme = @ooxml.parse_theme(theme_xml)
   // Two fill styles captured, one ln style captured.
   assert_eq(theme.fill_style_xmls.length(), 2)
   assert_eq(theme.ln_style_xmls.length(), 1)
@@ -600,7 +624,7 @@ test "parse_slide resolves p:style/a:fillRef via theme fmtScheme" {
     #|    </a:fmtScheme>
     #|  </a:themeElements>
     #|</a:theme>
-  let theme = parse_theme(theme_xml)
+  let theme = @ooxml.parse_theme(theme_xml)
   let slide_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -618,7 +642,7 @@ test "parse_slide resolves p:style/a:fillRef via theme fmtScheme" {
     #|    </p:sp>
     #|  </p:spTree></p:cSld>
     #|</p:sld>
-  let slide = parse_slide(slide_xml, SlideSize::default(), theme)
+  let slide = @ooxml.parse_slide(slide_xml, @ooxml.SlideSize::default(), theme)
   let shape = slide.shapes[0]
   // fillRef idx=2 → gradFill with phClr=accent1. Two gradient stops expected.
   assert_false(shape.grad_fill.is_none())
@@ -663,7 +687,7 @@ test "parse_slide resolves p:style/a:fontRef color via theme" {
     #|    <a:fmtScheme name="Test"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst/><a:bgFillStyleLst/></a:fmtScheme>
     #|  </a:themeElements>
     #|</a:theme>
-  let theme = parse_theme(theme_xml)
+  let theme = @ooxml.parse_theme(theme_xml)
   let slide_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -681,7 +705,7 @@ test "parse_slide resolves p:style/a:fontRef color via theme" {
     #|    </p:sp>
     #|  </p:spTree></p:cSld>
     #|</p:sld>
-  let slide = parse_slide(slide_xml, SlideSize::default(), theme)
+  let slide = @ooxml.parse_slide(slide_xml, @ooxml.SlideSize::default(), theme)
   let shape = slide.shapes[0]
   // fontRef → lt1 → FFFFFF (white)
   assert_eq(shape.font_ref_color.r, 255)
@@ -717,7 +741,11 @@ test "parse_slide captures lstStyle buAutoNum into level defaults" {
     #|    </p:sp>
     #|  </p:spTree></p:cSld>
     #|</p:sld>
-  let slide = parse_slide(slide_xml, SlideSize::default(), ThemeData::default())
+  let slide = @ooxml.parse_slide(
+    slide_xml,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
   let lst = slide.shapes[0].lst_style
   assert_eq(lst.levels[0].bullet_auto, "arabicPeriod")
   assert_eq(lst.levels[1].bullet_auto, "alphaLcPeriod")
@@ -752,7 +780,7 @@ test "parse_slide explicit fill wins over p:style/a:fillRef" {
     #|    </a:fmtScheme>
     #|  </a:themeElements>
     #|</a:theme>
-  let theme = parse_theme(theme_xml)
+  let theme = @ooxml.parse_theme(theme_xml)
   let slide_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -770,7 +798,7 @@ test "parse_slide explicit fill wins over p:style/a:fillRef" {
     #|    </p:sp>
     #|  </p:spTree></p:cSld>
     #|</p:sld>
-  let slide = parse_slide(slide_xml, SlideSize::default(), theme)
+  let slide = @ooxml.parse_slide(slide_xml, @ooxml.SlideSize::default(), theme)
   let shape = slide.shapes[0]
   // Explicit solidFill 0000FF wins, not the theme accent1 (FF0000).
   assert_eq(shape.fill.r, 0)
@@ -780,21 +808,24 @@ test "parse_slide explicit fill wins over p:style/a:fillRef" {
 
 ///|
 test "EffectList with blur is not none" {
-  let e : EffectList = { ..EffectList::none(), blur: { rad: 76200, }, }
+  let e : @ooxml.EffectList = {
+    ..@ooxml.EffectList::none(),
+    blur: { rad: 76200, },
+  }
   assert_true(!e.is_none())
   assert_eq(e.blur.rad, 76200)
 }
 
 ///|
 test "PresetShadow::none and is_none" {
-  let ps = PresetShadow::none()
+  let ps = @ooxml.PresetShadow::none()
   assert_true(ps.is_none())
   assert_eq(ps.prst, "")
-  let ps2 : PresetShadow = {
+  let ps2 : @ooxml.PresetShadow = {
     prst: "shdw1",
     dist: 38100,
     dir: 2700000,
-    color: parse_hex_color("000000"),
+    color: @ooxml.parse_hex_color("000000"),
   }
   assert_true(!ps2.is_none())
   assert_eq(ps2.prst, "shdw1")
@@ -802,38 +833,38 @@ test "PresetShadow::none and is_none" {
 
 ///|
 test "PresetShadow::blur_rad by preset" {
-  let ps1 : PresetShadow = {
+  let ps1 : @ooxml.PresetShadow = {
     prst: "shdw1",
     dist: 0,
     dir: 0,
-    color: Color::none(),
+    color: @ooxml.Color::none(),
   }
   assert_eq(ps1.blur_rad(), 38100) // standard offset shadow
-  let ps9 : PresetShadow = {
+  let ps9 : @ooxml.PresetShadow = {
     prst: "shdw9",
     dist: 0,
     dir: 0,
-    color: Color::none(),
+    color: @ooxml.Color::none(),
   }
   assert_eq(ps9.blur_rad(), 76200) // center shadow — larger blur
-  let ps17 : PresetShadow = {
+  let ps17 : @ooxml.PresetShadow = {
     prst: "shdw17",
     dist: 0,
     dir: 0,
-    color: Color::none(),
+    color: @ooxml.Color::none(),
   }
   assert_eq(ps17.blur_rad(), 57150) // below perspective
 }
 
 ///|
 test "EffectList with prst_shadow is not none" {
-  let e : EffectList = {
-    ..EffectList::none(),
+  let e : @ooxml.EffectList = {
+    ..@ooxml.EffectList::none(),
     prst_shadow: {
       prst: "shdw2",
       dist: 38100,
       dir: 5400000,
-      color: parse_hex_color("333333"),
+      color: @ooxml.parse_hex_color("333333"),
     },
   }
   assert_true(!e.is_none())
@@ -842,14 +873,17 @@ test "EffectList with prst_shadow is not none" {
 
 ///|
 test "FillOverlay::none is none" {
-  let fo = FillOverlay::none()
+  let fo = @ooxml.FillOverlay::none()
   assert_true(fo.is_none())
   assert_eq(fo.blend, "")
 }
 
 ///|
 test "FillOverlay with blend and color is not none" {
-  let fo : FillOverlay = { blend: "mult", color: parse_hex_color("FF0000"), }
+  let fo : @ooxml.FillOverlay = {
+    blend: "mult",
+    color: @ooxml.parse_hex_color("FF0000"),
+  }
   assert_true(!fo.is_none())
   assert_eq(fo.blend, "mult")
   assert_eq(fo.color.r, 255)
@@ -857,7 +891,10 @@ test "FillOverlay with blend and color is not none" {
 
 ///|
 test "FillOverlay with over blend (default)" {
-  let fo : FillOverlay = { blend: "over", color: parse_hex_color("0000FF"), }
+  let fo : @ooxml.FillOverlay = {
+    blend: "over",
+    color: @ooxml.parse_hex_color("0000FF"),
+  }
   assert_true(!fo.is_none())
   assert_eq(fo.blend, "over")
   assert_eq(fo.color.b, 255)
@@ -865,9 +902,9 @@ test "FillOverlay with over blend (default)" {
 
 ///|
 test "EffectList with fill_overlay is not none" {
-  let e : EffectList = {
-    ..EffectList::none(),
-    fill_overlay: { blend: "screen", color: parse_hex_color("00FF00"), },
+  let e : @ooxml.EffectList = {
+    ..@ooxml.EffectList::none(),
+    fill_overlay: { blend: "screen", color: @ooxml.parse_hex_color("00FF00"), },
   }
   assert_true(!e.is_none())
   assert_eq(e.fill_overlay.blend, "screen")
@@ -877,35 +914,35 @@ test "EffectList with fill_overlay is not none" {
 
 ///|
 test "GradientFill::none" {
-  assert_true(GradientFill::none().is_none())
+  assert_true(@ooxml.GradientFill::none().is_none())
 }
 
 ///|
 test "BlipFill::none" {
-  assert_true(BlipFill::none().is_none())
-  assert_false(BlipFill::none().has_crop())
+  assert_true(@ooxml.BlipFill::none().is_none())
+  assert_false(@ooxml.BlipFill::none().has_crop())
 }
 
 ///|
 test "PatternFill::none" {
-  assert_true(PatternFill::none().is_none())
+  assert_true(@ooxml.PatternFill::none().is_none())
 }
 
 // ── Shape3d / Scene3d / Bevel ───────────────────────────────────────────────
 
 ///|
 test "Shape3d::none" {
-  assert_true(Shape3d::none().is_none())
+  assert_true(@ooxml.Shape3d::none().is_none())
 }
 
 ///|
 test "Scene3d::none" {
-  assert_true(Scene3d::none().is_none())
+  assert_true(@ooxml.Scene3d::none().is_none())
 }
 
 ///|
 test "Bevel::none" {
-  assert_true(Bevel::none().is_none())
+  assert_true(@ooxml.Bevel::none().is_none())
 }
 
 // ── ChartEx parsing ─────────────────────────────────────────────────────────
@@ -949,7 +986,7 @@ test "parse_chartex_xml waterfall" {
     #|    </cx:plotArea>
     #|  </cx:chart>
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   assert_eq(chart.groups.length(), 1)
   assert_true(
     match chart.groups[0].chart_type {
@@ -993,7 +1030,7 @@ test "parse_chartex_xml funnel" {
     #|    <cx:legend pos="b"/>
     #|  </cx:chart>
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   assert_eq(chart.groups.length(), 1)
   assert_true(
     match chart.groups[0].chart_type {
@@ -1029,7 +1066,7 @@ test "parse_chartex_xml treemap" {
     #|    </cx:plotArea>
     #|  </cx:chart>
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   assert_eq(chart.title, "My Treemap")
   assert_true(
     match chart.groups[0].chart_type {
@@ -1054,7 +1091,7 @@ test "parse_chartex_xml all layout types" {
     let xml = "<?xml version=\"1.0\"?><cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData><cx:data id=\"0\"><cx:numDim type=\"val\"><cx:lvl><cx:pt idx=\"0\">10</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"" +
       lid +
       "\"><cx:dataId val=\"0\"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"
-    let chart = parse_chartex_xml(xml, ThemeData::default())
+    let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
     assert_eq(chart.groups.length(), 1)
     let kind_str = match chart.groups[0].chart_type {
       WaterfallChart => "WaterfallChart"
@@ -1092,7 +1129,7 @@ test "parse_chartex_xml sunburst" {
     #|    </cx:plotArea>
     #|  </cx:chart>
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   assert_true(
     match chart.groups[0].chart_type {
       SunburstChart => true
@@ -1136,7 +1173,7 @@ test "parse_chartex_xml waterfall values and multiple subtotals" {
     #|    </cx:plotArea>
     #|  </cx:chart>
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   // Multiple subtotals
   assert_eq(chart.groups[0].subtotals.length(), 2)
   assert_eq(chart.groups[0].subtotals[0], 2)
@@ -1157,7 +1194,7 @@ test "parse_chartex_xml empty chartSpace" {
     #|<?xml version="1.0"?>
     #|<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex">
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   assert_eq(chart.groups.length(), 0)
   assert_true(!chart.chart_xml.is_empty())
 }
@@ -1183,7 +1220,7 @@ test "parse_chartex_xml histogram no strDim" {
     #|    </cx:plotArea>
     #|  </cx:chart>
     #|</cx:chartSpace>
-  let chart = parse_chartex_xml(xml, ThemeData::default())
+  let chart = @ooxml.parse_chartex_xml(xml, @ooxml.ThemeData::default())
   assert_true(
     match chart.groups[0].chart_type {
       HistogramChart => true
@@ -1214,12 +1251,12 @@ test "parse_diagram_drawing extracts dsp shapes" {
     #|<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></dsp:spPr>
     #|<dsp:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="en-US"/><a:t>Research</a:t></a:r></a:p></dsp:txBody></dsp:sp>
     #|</dsp:spTree></dsp:drawing>
-  let shapes = parse_diagram_drawing(xml, ThemeData::default())
+  let shapes = @ooxml.parse_diagram_drawing(xml, @ooxml.ThemeData::default())
   assert_eq(shapes.length(), 1)
   // Geometry is a roundRect
   assert_true(
     match shapes[0].kind {
-      ShapeKind::AutoShape(ShapeGeom::RoundRect(_)) => true
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::RoundRect(_)) => true
       _ => false
     },
   )
@@ -1242,7 +1279,10 @@ test "diagram text color resolution + apply" {
     #|<dgm:colorsDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
     #|<dgm:styleLbl name="node1"><dgm:txLinClrLst meth="repeat"><a:srgbClr val="FF0000"/></dgm:txLinClrLst></dgm:styleLbl>
     #|</dgm:colorsDef>
-  let color = parse_diagram_text_color(colors_xml, ThemeData::default())
+  let color = @ooxml.parse_diagram_text_color(
+    colors_xml,
+    @ooxml.ThemeData::default(),
+  )
   assert_eq(color.r, 255)
   assert_eq(color.g, 0)
   assert_eq(color.b, 0)
@@ -1253,8 +1293,11 @@ test "diagram text color resolution + apply" {
     #|<dsp:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>NoColor</a:t></a:r></a:p>
     #|<a:p><a:r><a:rPr lang="en-US"><a:solidFill><a:srgbClr val="00FF00"/></a:solidFill></a:rPr><a:t>HasColor</a:t></a:r></a:p></dsp:txBody></dsp:sp>
     #|</dsp:spTree></dsp:drawing>
-  let shapes = parse_diagram_drawing(draw_xml, ThemeData::default())
-  apply_diagram_text_color(shapes, color)
+  let shapes = @ooxml.parse_diagram_drawing(
+    draw_xml,
+    @ooxml.ThemeData::default(),
+  )
+  @ooxml.apply_diagram_text_color(shapes, color)
   // First run had no color → filled with red
   let r0 = shapes[0].paragraphs[0].runs[0].color
   assert_eq(r0.r, 255)

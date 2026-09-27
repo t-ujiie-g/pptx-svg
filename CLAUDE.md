@@ -106,7 +106,7 @@ Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with
 
 **Test-only imports:** Use `import { ... } for "test"` in `moon.pkg` to add dependencies needed only by test files (e.g. svg_parser in renderer tests).
 
-**Adding tests:** Place test files in the same package directory as `<name>_test.mbt`. Use `assert_eq(actual, expected)` (not `assert_eq!` which is deprecated). For snapshot testing use `inspect!(value, content="expected")`.
+**Adding tests:** Place test files in the same package directory as `<name>_test.mbt`. These are black-box tests: refer to the package under test by its qualified name (`@renderer.render_slide_svg`, `@ooxml.Color::white()`), exactly as for any other imported package — an unqualified reference triggers warning 0025 `test_unqualified_package`, which only `moon test` reports. Use `assert_eq(actual, expected)` (not `assert_eq!` which is deprecated). For snapshot testing use `inspect!(value, content="expected")`.
 
 ## Browser compatibility and string constants
 
