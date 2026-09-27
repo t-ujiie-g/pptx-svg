@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.6.6
+
+Preset geometry release: every ECMA-376 preset shape is now drawn from its
+specification definition (#62), including per-path fills, shading and strokes,
+and `a:custGeom` honours the same per-path attributes. Preset shapes' SVG output
+changes accordingly — a preset may now render as several `<path>` elements, text
+sits in each preset's text rectangle, and `data-ooxml-cust-paths` gains optional
+`W` / `F` / `S` tokens (`docs/svg-specification.md`). The public API is unchanged.
+The Wasm grows to ~400 KB (~145 KB gzipped). Releases are now published with npm
+trusted publishing.
 
 ### Added
 
