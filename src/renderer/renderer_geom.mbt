@@ -11,6 +11,10 @@
 /// OOXML angles are in 60000ths of a degree.
 let ooxml_angle_to_rad : Double = 3.14159265358979323846 / 10800000.0
 
+///|
+/// 180° in OOXML angle units.
+let half_circle_angle : Double = 10800000.0
+
 // ── Guide variable storage ───────────────────────────────────────────────────
 
 ///|
@@ -48,8 +52,29 @@ fn GuideEnv::resolve(self : GuideEnv, token : String) -> Double {
       return self.values[i]
     }
   }
-  // Then try parsing as literal integer
-  parse_double(token)
+  // Then a literal integer; an undefined guide name evaluates to 0
+  if is_int_literal(token) {
+    parse_double(token)
+  } else {
+    0.0
+  }
+}
+
+///|
+/// True if `s` is an optionally negative decimal integer literal.
+fn is_int_literal(s : String) -> Bool {
+  let n = s.length()
+  let start = if n > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
+  if start >= n {
+    return false
+  }
+  for i in start..<n {
+    let c = s.get_char(i).unwrap()
+    if c < '0' || c > '9' {
+      return false
+    }
+  }
+  true
 }
 
 ///|
@@ -63,6 +88,8 @@ fn GuideEnv::init_builtins(self : GuideEnv, w : Double, h : Double) -> Unit {
   self.set("t", 0.0)
   self.set("r", w)
   self.set("b", h)
+  self.set("hc", w / 2.0)
+  self.set("vc", h / 2.0)
   // Half dimensions
   self.set("wd2", w / 2.0)
   self.set("hd2", h / 2.0)
@@ -80,6 +107,7 @@ fn GuideEnv::init_builtins(self : GuideEnv, w : Double, h : Double) -> Unit {
   self.set("hd10", h / 10.0)
   self.set("wd12", w / 12.0)
   self.set("hd12", h / 12.0)
+  self.set("wd32", w / 32.0)
   // Short side
   let ss = if w < h { w } else { h }
   self.set("ss", ss)
@@ -147,6 +175,14 @@ fn eval_formula(env : GuideEnv, name : String, fmla : String) -> Unit {
   } else if op == "+-" && nt >= 4 {
     // a + b - c
     env.resolve(tokens[1]) + env.resolve(tokens[2]) - env.resolve(tokens[3])
+  } else if op == "+/" && nt >= 4 {
+    // (a + b) / c
+    let c = env.resolve(tokens[3])
+    if c == 0.0 {
+      0.0
+    } else {
+      (env.resolve(tokens[1]) + env.resolve(tokens[2])) / c
+    }
   } else if op == "*/" && nt >= 4 {
     // a * b / c
     let c = env.resolve(tokens[3])
@@ -211,19 +247,19 @@ fn eval_formula(env : GuideEnv, name : String, fmla : String) -> Unit {
     let c = env.resolve(tokens[3])
     @ffi.ffi_sqrt(a * a + b * b + c * c)
   } else if op == "sin" && nt >= 3 {
-    // sin(angle) * distance — angle in 60000ths of degree
-    let ang = env.resolve(tokens[1]) * ooxml_angle_to_rad
-    let dist = env.resolve(tokens[2])
+    // "sin x y" = x * sin(y) — y in 60000ths of a degree (ECMA-376 §20.1.9.11)
+    let dist = env.resolve(tokens[1])
+    let ang = env.resolve(tokens[2]) * ooxml_angle_to_rad
     @ffi.ffi_sin(ang) * dist
   } else if op == "cos" && nt >= 3 {
-    // cos(angle) * distance
-    let ang = env.resolve(tokens[1]) * ooxml_angle_to_rad
-    let dist = env.resolve(tokens[2])
+    // "cos x y" = x * cos(y)
+    let dist = env.resolve(tokens[1])
+    let ang = env.resolve(tokens[2]) * ooxml_angle_to_rad
     @ffi.ffi_cos(ang) * dist
   } else if op == "tan" && nt >= 3 {
-    // tan(angle) * distance
-    let ang = env.resolve(tokens[1]) * ooxml_angle_to_rad
-    let dist = env.resolve(tokens[2])
+    // "tan x y" = x * tan(y)
+    let dist = env.resolve(tokens[1])
+    let ang = env.resolve(tokens[2]) * ooxml_angle_to_rad
     let cos_v = @ffi.ffi_cos(ang)
     if cos_v == 0.0 {
       0.0
@@ -264,6 +300,7 @@ fn eval_formula(env : GuideEnv, name : String, fmla : String) -> Unit {
 ///  A wR hR stAng swAng = arcTo (OOXML format, converted to SVG arc)
 ///  C x1 y1 x2 y2 x3 y3 = cubicBezTo
 ///  Q x1 y1 x2 y2 = quadBezTo
+///  W pw ph = this path's own coordinate space (a:path w/h), overriding path_w/path_h
 fn render_geom_path(
   env : GuideEnv,
   path_cmds : String,
@@ -279,14 +316,20 @@ fn render_geom_path(
   let mut d = ""
   let mut i = 0
   // Scale factors if path has its own coordinate space
-  let sx = if path_w > 0.0 { shape_w / path_w } else { 1.0 }
-  let sy = if path_h > 0.0 { shape_h / path_h } else { 1.0 }
+  let mut sx = if path_w > 0.0 { shape_w / path_w } else { 1.0 }
+  let mut sy = if path_h > 0.0 { shape_h / path_h } else { 1.0 }
   // Current position for arcTo endpoint calculation
   let mut cur_x = 0.0
   let mut cur_y = 0.0
   while i < nt {
     let cmd = tokens[i]
-    if cmd == "M" && i + 2 < nt {
+    if cmd == "W" && i + 2 < nt {
+      let pw = parse_double(tokens[i + 1])
+      let ph = parse_double(tokens[i + 2])
+      sx = if pw > 0.0 { shape_w / pw } else { 1.0 }
+      sy = if ph > 0.0 { shape_h / ph } else { 1.0 }
+      i = i + 3
+    } else if cmd == "M" && i + 2 < nt {
       let x = env.resolve(tokens[i + 1]) * sx
       let y = env.resolve(tokens[i + 2]) * sy
       cur_x = x
@@ -407,19 +450,32 @@ fn arcto_svg(
   if wr <= 0.0 || hr <= 0.0 {
     return ("", cur_x, cur_y)
   }
-  let st_rad = st_ang * ooxml_angle_to_rad
-  let sw_rad = sw_ang * ooxml_angle_to_rad
-  let end_rad = st_rad + sw_rad
-  // Compute end point relative to current position
-  // Current pos is on the ellipse at angle stAng
-  // End pos is on the ellipse at angle stAng + swAng
-  let dx = wr * (@ffi.ffi_cos(end_rad) - @ffi.ffi_cos(st_rad))
-  let dy = hr * (@ffi.ffi_sin(end_rad) - @ffi.ffi_sin(st_rad))
-  let end_x = cur_x + dx
-  let end_y = cur_y + dy
-  // SVG arc flags
+  // SVG draws nothing for an arc whose endpoints coincide (SVG 1.1 §F.6.2),
+  // so a sweep over 180° (up to a full 360° ellipse) is emitted as two halves.
   let abs_sw = if sw_ang < 0.0 { -sw_ang } else { sw_ang }
-  let large_arc = if abs_sw > 10800000.0 { "1" } else { "0" }
+  if abs_sw > half_circle_angle {
+    let half = sw_ang / 2.0
+    let (s1, x1, y1) = arcto_svg(
+      cur_x, cur_y, wr, hr, st_ang, half, x_off, y_off,
+    )
+    let (s2, x2, y2) = arcto_svg(
+      x1,
+      y1,
+      wr,
+      hr,
+      st_ang + half,
+      half,
+      x_off,
+      y_off,
+    )
+    return (s1 + s2, x2, y2)
+  }
+  // The current point lies on the ellipse at stAng; the end point at stAng + swAng.
+  let (sx, sy) = ellipse_point(wr, hr, st_ang)
+  let (ex, ey) = ellipse_point(wr, hr, st_ang + sw_ang)
+  let end_x = cur_x + ex - sx
+  let end_y = cur_y + ey - sy
+  // The split above keeps every emitted arc within 180°, so large-arc is 0.
   let sweep = if sw_ang > 0.0 { "1" } else { "0" }
   let ox = x_off.to_double()
   let oy = y_off.to_double()
@@ -427,15 +483,32 @@ fn arcto_svg(
     dts(wr) +
     " " +
     dts(hr) +
-    " 0 " +
-    large_arc +
-    " " +
+    " 0 0 " +
     sweep +
     " " +
     dts(end_x + ox) +
     " " +
     dts(end_y + oy)
   (s, end_x, end_y)
+}
+
+///|
+/// Point on an ellipse centred at the origin at OOXML angle `ang`.
+///  arcTo angles are visual: the direction of the ray from the centre, not the
+///  ellipse's parametric angle (ECMA-376 §20.1.9.3). The two agree only on a
+///  circle or at multiples of 90°.
+fn ellipse_point(wr : Double, hr : Double, ang : Double) -> (Double, Double) {
+  let rad = ang * ooxml_angle_to_rad
+  let c = @ffi.ffi_cos(rad)
+  let s = @ffi.ffi_sin(rad)
+  let hc = hr * c
+  let ws = wr * s
+  let d = @ffi.ffi_sqrt(hc * hc + ws * ws)
+  if d == 0.0 {
+    (0.0, 0.0)
+  } else {
+    (wr * hc / d, hr * ws / d)
+  }
 }
 
 // ── Multiple path support ────────────────────────────────────────────────────
@@ -518,7 +591,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
     // Use cos/sin with pre-computed angles in 60000ths
     Some({
       avlst: "",
-      gdlst: "cx1=cos 20520000 wd2;cy1=sin 20520000 hd2;cx2=cos 3240000 wd2;cy2=sin 3240000 hd2;cx3=cos 7560000 wd2;cy3=sin 7560000 hd2;cx4=cos 11880000 wd2;cy4=sin 11880000 hd2;vx1=+- wd2 cx1 0;vy1=+- hd2 cy1 0;vx2=+- wd2 cx2 0;vy2=+- hd2 cy2 0;vx3=+- wd2 cx3 0;vy3=+- hd2 cy3 0;vx4=+- wd2 cx4 0;vy4=+- hd2 cy4 0",
+      gdlst: "cx1=cos wd2 20520000;cy1=sin hd2 20520000;cx2=cos wd2 3240000;cy2=sin hd2 3240000;cx3=cos wd2 7560000;cy3=sin hd2 7560000;cx4=cos wd2 11880000;cy4=sin hd2 11880000;vx1=+- wd2 cx1 0;vy1=+- hd2 cy1 0;vx2=+- wd2 cx2 0;vy2=+- hd2 cy2 0;vx3=+- wd2 cx3 0;vy3=+- hd2 cy3 0;vx4=+- wd2 cx4 0;vy4=+- hd2 cy4 0",
       paths: "M wd2 t L vx1 vy1 L vx2 vy2 L vx3 vy3 L vx4 vy4 Z",
     })
   } else if prst == "hexagon" {
@@ -549,19 +622,19 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "donut" {
     Some({
       avlst: "adj=25000",
-      gdlst: "a=pin 0 adj 50000;dr=*/ ss a 100000;iwd2=+- wd2 0 dr;ihd2=+- hd2 0 dr",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z|M iwd2 hd2 A iwd2 ihd2 0 -21600000 Z",
+      gdlst: "a=pin 0 adj 50000;dr=*/ ss a 100000;iwd2=+- wd2 0 dr;ihd2=+- hd2 0 dr;idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z M dr vc A iwd2 ihd2 cd2 -5400000 A iwd2 ihd2 cd4 -5400000 A iwd2 ihd2 0 -5400000 A iwd2 ihd2 3cd4 -5400000 Z",
     })
   } else if prst == "noSmoking" {
     Some({
       avlst: "adj=18750",
-      gdlst: "a=pin 0 adj 50000;dr=*/ ss a 100000;iwd2=+- wd2 0 dr;ihd2=+- hd2 0 dr",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z",
+      gdlst: "a=pin 0 adj 50000;dr=*/ ss a 100000;iwd2=+- wd2 0 dr;ihd2=+- hd2 0 dr;ang=at2 w h;ct=cos ihd2 ang;st=sin iwd2 ang;m=mod ct st 0;n=*/ iwd2 ihd2 m;drd2=*/ dr 1 2;dang=at2 n drd2;dang2=*/ dang 2 1;swAng=+- -10800000 dang2 0;t3=at2 w h;stAng1=+- t3 0 dang;stAng2=+- stAng1 0 cd2;ct1=cos ihd2 stAng1;st1=sin iwd2 stAng1;m1=mod ct1 st1 0;n1=*/ iwd2 ihd2 m1;dx1=cos n1 stAng1;dy1=sin n1 stAng1;x1=+- hc dx1 0;y1=+- vc dy1 0;x2=+- hc 0 dx1;y2=+- vc 0 dy1;idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z M x1 y1 A iwd2 ihd2 stAng1 swAng Z M x2 y2 A iwd2 ihd2 stAng2 swAng Z",
     })
   } else if prst == "blockArc" {
     Some({
       avlst: "adj1=10800000;adj2=0;adj3=25000",
-      gdlst: "a3=pin 0 adj3 50000;dr=*/ ss a3 100000;iwd2=+- wd2 0 dr;ihd2=+- hd2 0 dr;sa=*/ adj1 1 1;ea=*/ adj2 1 1;csa=cos sa wd2;ssa=sin sa hd2;cea=cos ea wd2;sea=sin ea hd2;x1=+- wd2 csa 0;y1=+- hd2 ssa 0;x2=+- wd2 cea 0;y2=+- hd2 sea 0;icsa=cos sa iwd2;issa=sin sa ihd2;icea=cos ea iwd2;isea=sin ea ihd2;ix1=+- wd2 icsa 0;iy1=+- hd2 issa 0;ix2=+- wd2 icea 0;iy2=+- hd2 isea 0;sw=+- ea 0 sa",
+      gdlst: "a3=pin 0 adj3 50000;dr=*/ ss a3 100000;iwd2=+- wd2 0 dr;ihd2=+- hd2 0 dr;sa=*/ adj1 1 1;ea=*/ adj2 1 1;csa=cos wd2 sa;ssa=sin hd2 sa;cea=cos wd2 ea;sea=sin hd2 ea;x1=+- wd2 csa 0;y1=+- hd2 ssa 0;x2=+- wd2 cea 0;y2=+- hd2 sea 0;icsa=cos iwd2 sa;issa=sin ihd2 sa;icea=cos iwd2 ea;isea=sin ihd2 ea;ix1=+- wd2 icsa 0;iy1=+- hd2 issa 0;ix2=+- wd2 icea 0;iy2=+- hd2 isea 0;sw=+- ea 0 sa",
       paths: "M x1 y1 A wd2 hd2 sa sw L ix2 iy2 A iwd2 ihd2 ea 0 Z",
     })
     // ── Block arrows ──
@@ -605,8 +678,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "quadArrow" {
     Some({
       avlst: "adj1=22500;adj2=22500;adj3=22500",
-      gdlst: "a1=pin 0 adj1 50000;a2=pin 0 adj2 50000;a3=pin 0 adj3 50000;dx=*/ w a2 100000;dy=*/ h a2 100000;dh=*/ w a1 200000;dv=*/ h a1 200000;ah=*/ w a3 100000;av=*/ h a3 100000;x1=+- wd2 0 dh;x2=+- wd2 dh 0;y1=+- hd2 0 dv;y2=+- hd2 dv 0;xe=+- r 0 dx;ye=+- b 0 dy",
-      paths: "M wd2 t L r dy L x2 dy L x2 y1 L xe y1 L xe hd2 L r hd2|M xe hd2 L xe y2 L x2 y2 L x2 ye L wd2 b L l ye L x1 ye L x1 y2 L dx y2 L dx hd2|M l hd2 L dx y1 L x1 y1 L x1 dy L wd2 t Z",
+      gdlst: "a2=pin 0 adj2 50000;maxAdj1=*/ a2 2 1;a1=pin 0 adj1 maxAdj1;q1=+- 100000 0 maxAdj1;maxAdj3=*/ q1 1 2;a3=pin 0 adj3 maxAdj3;x1=*/ ss a3 100000;dx2=*/ ss a2 100000;x2=+- hc 0 dx2;x5=+- hc dx2 0;dx3=*/ ss a1 200000;x3=+- hc 0 dx3;x4=+- hc dx3 0;x6=+- r 0 x1;y2=+- vc 0 dx2;y5=+- vc dx2 0;y3=+- vc 0 dx3;y4=+- vc dx3 0;y6=+- b 0 x1;il=*/ dx3 x1 dx2;ir=+- r 0 il",
+      paths: "M l vc L x1 y2 L x1 y3 L x3 y3 L x3 x1 L x2 x1 L hc t L x5 x1 L x4 x1 L x4 y3 L x6 y3 L x6 y2 L r vc L x6 y5 L x6 y4 L x4 y4 L x4 y6 L x5 y6 L hc b L x2 y6 L x3 y6 L x3 y4 L x1 y4 L x1 y5 Z",
     })
     // ── Stars ──
   } else if prst == "star4" {
@@ -621,7 +694,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
     // adj controls inner radius (default 19098 = ~38.2% of half-size)
     Some({
       avlst: "adj=19098",
-      gdlst: "a=pin 0 adj 50000;swd2=*/ wd2 a 50000;shd2=*/ hd2 a 50000;co1=cos 20520000 wd2;so1=sin 20520000 hd2;co2=cos 3240000 wd2;so2=sin 3240000 hd2;co3=cos 7560000 wd2;so3=sin 7560000 hd2;co4=cos 11880000 wd2;so4=sin 11880000 hd2;ox1=+- wd2 co1 0;oy1=+- hd2 so1 0;ox2=+- wd2 co2 0;oy2=+- hd2 so2 0;ox3=+- wd2 co3 0;oy3=+- hd2 so3 0;ox4=+- wd2 co4 0;oy4=+- hd2 so4 0;ci1=cos 18360000 swd2;si1=sin 18360000 shd2;ci2=cos 1080000 swd2;si2=sin 1080000 shd2;ci3=cos 5400000 swd2;si3=sin 5400000 shd2;ci4=cos 9720000 swd2;si4=sin 9720000 shd2;ci5=cos 14040000 swd2;si5=sin 14040000 shd2;ix1=+- wd2 ci1 0;iy1=+- hd2 si1 0;ix2=+- wd2 ci2 0;iy2=+- hd2 si2 0;ix3=+- wd2 ci3 0;iy3=+- hd2 si3 0;ix4=+- wd2 ci4 0;iy4=+- hd2 si4 0;ix5=+- wd2 ci5 0;iy5=+- hd2 si5 0",
+      gdlst: "a=pin 0 adj 50000;swd2=*/ wd2 a 50000;shd2=*/ hd2 a 50000;co1=cos wd2 20520000;so1=sin hd2 20520000;co2=cos wd2 3240000;so2=sin hd2 3240000;co3=cos wd2 7560000;so3=sin hd2 7560000;co4=cos wd2 11880000;so4=sin hd2 11880000;ox1=+- wd2 co1 0;oy1=+- hd2 so1 0;ox2=+- wd2 co2 0;oy2=+- hd2 so2 0;ox3=+- wd2 co3 0;oy3=+- hd2 so3 0;ox4=+- wd2 co4 0;oy4=+- hd2 so4 0;ci1=cos swd2 18360000;si1=sin shd2 18360000;ci2=cos swd2 1080000;si2=sin shd2 1080000;ci3=cos swd2 5400000;si3=sin shd2 5400000;ci4=cos swd2 9720000;si4=sin shd2 9720000;ci5=cos swd2 14040000;si5=sin shd2 14040000;ix1=+- wd2 ci1 0;iy1=+- hd2 si1 0;ix2=+- wd2 ci2 0;iy2=+- hd2 si2 0;ix3=+- wd2 ci3 0;iy3=+- hd2 si3 0;ix4=+- wd2 ci4 0;iy4=+- hd2 si4 0;ix5=+- wd2 ci5 0;iy5=+- hd2 si5 0",
       paths: "M wd2 t L ix1 iy1 L ox1 oy1 L ix2 iy2 L ox2 oy2 L ix3 iy3 L ox3 oy3 L ix4 iy4 L ox4 oy4 L ix5 iy5 Z",
     })
   } else if prst == "star6" {
@@ -660,8 +733,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "flowChartDocument" {
     Some({
       avlst: "",
-      gdlst: "y1=*/ h 17 20;cy1=*/ h 19 20",
-      paths: "M l t L r t L r y1 C r cy1 wd2 b wd2 y1 C wd2 cy1 l b l y1 Z",
+      gdlst: "y1=*/ h 17322 21600;y2=*/ h 20172 21600",
+      paths: "W 21600 21600 M 0 0 L 21600 0 L 21600 17322 C 10800 17322 10800 23922 0 20172 Z",
     })
   } else if prst == "flowChartInputOutput" {
     Some({
@@ -696,8 +769,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "flowChartConnector" {
     Some({
       avlst: "",
-      gdlst: "",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z",
+      gdlst: "idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z",
     })
   } else if prst == "flowChartSort" {
     Some({
@@ -719,8 +792,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "wedgeRectCallout" {
     Some({
       avlst: "adj1=-20833;adj2=62500",
-      gdlst: "a1=*/ w adj1 100000;a2=*/ h adj2 100000;x1=+- wd2 a1 0;y1=+- hd2 a2 0;dx1=+- wd2 0 wd8;dx2=+- wd2 wd8 0",
-      paths: "M l t L r t L r b L dx2 b L x1 y1 L dx1 b L l b Z",
+      gdlst: "dxPos=*/ w adj1 100000;dyPos=*/ h adj2 100000;xPos=+- hc dxPos 0;yPos=+- vc dyPos 0;dx=+- xPos 0 hc;dy=+- yPos 0 vc;dq=*/ dxPos h w;ady=abs dyPos;adq=abs dq;dz=+- ady 0 adq;xg1=?: dxPos 7 2;xg2=?: dxPos 10 5;x1=*/ w xg1 12;x2=*/ w xg2 12;yg1=?: dyPos 7 2;yg2=?: dyPos 10 5;y1=*/ h yg1 12;y2=*/ h yg2 12;t1=?: dxPos l xPos;xl=?: dz l t1;t2=?: dyPos x1 xPos;xt=?: dz t2 x1;t3=?: dxPos xPos r;xr=?: dz r t3;t4=?: dyPos xPos x1;xb=?: dz t4 x1;t5=?: dxPos y1 yPos;yl=?: dz y1 t5;t6=?: dyPos t yPos;yt=?: dz t6 t;t7=?: dxPos yPos y1;yr=?: dz y1 t7;t8=?: dyPos yPos b;yb=?: dz t8 b",
+      paths: "M l t L x1 t L xt yt L x2 t L r t L r y1 L xr yr L r y2 L r b L x2 b L xb yb L x1 b L l b L l y2 L xl yl L l y1 Z",
     })
   } else if prst == "wedgeRoundRectCallout" {
     Some({
@@ -731,8 +804,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "wedgeEllipseCallout" {
     Some({
       avlst: "adj1=-20833;adj2=62500",
-      gdlst: "a1=*/ w adj1 100000;a2=*/ h adj2 100000;x1=+- wd2 a1 0;y1=+- hd2 a2 0",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z|M wd2 b L x1 y1 L wd2 b",
+      gdlst: "dxPos=*/ w adj1 100000;dyPos=*/ h adj2 100000;xPos=+- hc dxPos 0;yPos=+- vc dyPos 0;sdx=*/ dxPos h 1;sdy=*/ dyPos w 1;pang=at2 sdx sdy;stAng=+- pang 660000 0;enAng=+- pang 0 660000;dx1=cos wd2 stAng;dy1=sin hd2 stAng;x1=+- hc dx1 0;y1=+- vc dy1 0;dx2=cos wd2 enAng;dy2=sin hd2 enAng;x2=+- hc dx2 0;y2=+- vc dy2 0;stAng1=at2 dx1 dy1;enAng1=at2 dx2 dy2;swAng1=+- enAng1 0 stAng1;swAng2=+- swAng1 21600000 0;swAng=?: swAng1 swAng1 swAng2;idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M xPos yPos L x1 y1 A wd2 hd2 stAng1 swAng Z",
     })
     // ── Decorative / other ──
   } else if prst == "heart" {
@@ -746,26 +819,26 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "lightningBolt" {
     Some({
       avlst: "",
-      gdlst: "x1=*/ w 4269 21600;y1=*/ h 3 21;x2=*/ w 8640 21600;y2=*/ h 8 21;x3=*/ w 5765 21600;y3=*/ h 9 21;x4=*/ w 12960 21600;y4=*/ h 13 21;x5=*/ w 8323 21600;y5=*/ h 14 21;x6=*/ w 14400 21600;y6=*/ h 17 21;x7=*/ w 4320 21600",
-      paths: "M x1 t L x2 y2 L x3 y3 L x4 y4 L x5 y5 L r y6 L x7 b L x5 y5 L x1 y3 L x3 y2 Z",
+      gdlst: "x1=*/ w 5022 21600;x3=*/ w 8472 21600;x4=*/ w 8757 21600;x5=*/ w 10012 21600;x8=*/ w 12860 21600;x9=*/ w 13917 21600;x11=*/ w 16577 21600;y1=*/ h 3890 21600;y2=*/ h 6080 21600;y4=*/ h 7437 21600;y6=*/ h 9705 21600;y7=*/ h 12007 21600;y10=*/ h 14277 21600;y11=*/ h 14915 21600",
+      paths: "W 21600 21600 M 8472 0 L 12860 6080 L 11050 6797 L 16577 12007 L 14767 12877 L 21600 21600 L 10012 14915 L 12222 13987 L 5022 9705 L 7602 8382 L 0 3890 Z",
     })
   } else if prst == "sun" {
     Some({
       avlst: "adj=25000",
-      gdlst: "a=pin 12500 adj 46875;cir=*/ ss a 100000;ir=+- wd2 0 cir;ib=+- hd2 0 cir;or2=+- wd2 cir 0;ob2=+- hd2 cir 0",
-      paths: "M wd2 t L or2 ib L r hd2 L or2 ob2 L wd2 b L ir ob2 L l hd2 L ir ib Z|M ir hd2 A cir cir 10800000 21600000 Z",
+      gdlst: "a=pin 12500 adj 46875;g0=+- 50000 0 a;g1=*/ g0 30274 32768;g2=*/ g0 12540 32768;g3=+- g1 50000 0;g4=+- g2 50000 0;g5=+- 50000 0 g1;g6=+- 50000 0 g2;g7=*/ g0 23170 32768;g8=+- 50000 g7 0;g9=+- 50000 0 g7;g10=*/ g5 3 4;g11=*/ g6 3 4;g12=+- g10 3662 0;g13=+- g11 3662 0;g14=+- g11 12500 0;g15=+- 100000 0 g10;g16=+- 100000 0 g12;g17=+- 100000 0 g13;g18=+- 100000 0 g14;ox1=*/ w 18436 21600;oy1=*/ h 3163 21600;ox2=*/ w 3163 21600;oy2=*/ h 18436 21600;x8=*/ w g8 100000;x9=*/ w g9 100000;x10=*/ w g10 100000;x12=*/ w g12 100000;x13=*/ w g13 100000;x14=*/ w g14 100000;x15=*/ w g15 100000;x16=*/ w g16 100000;x17=*/ w g17 100000;x18=*/ w g18 100000;x19=*/ w a 100000;wR=*/ w g0 100000;hR=*/ h g0 100000;y8=*/ h g8 100000;y9=*/ h g9 100000;y10=*/ h g10 100000;y12=*/ h g12 100000;y13=*/ h g13 100000;y14=*/ h g14 100000;y15=*/ h g15 100000;y16=*/ h g16 100000;y17=*/ h g17 100000;y18=*/ h g18 100000",
+      paths: "M r vc L x15 y18 L x15 y14 Z M ox1 oy1 L x16 y13 L x17 y12 Z M hc t L x18 y10 L x14 y10 Z M ox2 oy1 L x13 y12 L x12 y13 Z M l vc L x10 y14 L x10 y18 Z M ox2 oy2 L x12 y17 L x13 y16 Z M hc b L x14 y15 L x18 y15 Z M ox1 oy2 L x17 y16 L x16 y17 Z M x19 vc A wR hR cd2 21600000 Z",
     })
   } else if prst == "moon" {
     Some({
       avlst: "adj=50000",
-      gdlst: "a=pin 0 adj 87500;x1=*/ w a 100000",
-      paths: "M r t C x1 hd4 x1 hd2 C x1 hd2 x1 b r b A wd2 hd2 0 -10800000 Z",
+      gdlst: "a=pin 0 adj 87500;g0=*/ ss a 100000;g0w=*/ g0 w ss;g1=+- ss 0 g0;g2=*/ g0 g0 g1;g3=*/ ss ss g1;g4=*/ g3 2 1;g5=+- g4 0 g2;g6=+- g5 0 g0;g6w=*/ g6 w ss;g7=*/ g5 1 2;g8=+- g7 0 g0;dy1=*/ g8 hd2 ss;g10h=+- vc 0 dy1;g11h=+- vc dy1 0;g12=*/ g0 9598 32768;g12w=*/ g12 w ss;g13=+- ss 0 g12;q1=*/ ss ss 1;q2=*/ g13 g13 1;q3=+- q1 0 q2;q4=sqrt q3;dy4=*/ q4 hd2 ss;g15h=+- vc 0 dy4;g16h=+- vc dy4 0;g17w=+- g6w 0 g0w;g18w=*/ g17w 1 2;dx2p=+- g0w g18w w;dx2=*/ dx2p -1 1;dy2=*/ hd2 -1 1;stAng1=at2 dx2 dy2;enAngp1=at2 dx2 hd2;enAng1=+- enAngp1 0 21600000;swAng1=+- enAng1 0 stAng1",
+      paths: "M r b A w hd2 cd4 cd2 A g18w dy1 stAng1 swAng1 Z",
     })
   } else if prst == "smileyFace" {
     Some({
       avlst: "adj=4653",
-      gdlst: "a=pin -4653 adj 4653;ey=*/ h 3 4;cx1=*/ w 3 10;cx2=*/ w 7 10;ey2=+- ey 0 hd10;er=*/ w 3 20;sy=+- ey 0 hd10;sdy=*/ h a 100000;sy1=+- ey sdy 0;sy2=+- ey sdy 0",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z|M cx1 ey A er er 0 21600000 Z|M cx2 ey A er er 0 21600000 Z|M cx1 sy1 C cx1 sy2 cx2 sy2 cx2 sy1",
+      gdlst: "a=pin -4653 adj 4653;x1=*/ w 4969 21699;x2=*/ w 6215 21600;x3=*/ w 13135 21600;x4=*/ w 16640 21600;y1=*/ h 7570 21600;y3=*/ h 16515 21600;dy2=*/ h a 100000;y2=+- y3 0 dy2;y4=+- y3 dy2 0;dy3=*/ h a 50000;y5=+- y4 dy3 0;idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0;wR=*/ w 1125 21600;hR=*/ h 1125 21600",
+      paths: "M l vc A wd2 hd2 cd2 21600000 Z|M x2 y1 A wR hR cd2 21600000 M x3 y1 A wR hR cd2 21600000|M x1 y2 Q hc y5 x4 y2|M l vc A wd2 hd2 cd2 21600000 Z",
     })
   } else if prst == "foldedCorner" {
     Some({
@@ -794,8 +867,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "cube" {
     Some({
       avlst: "adj=25000",
-      gdlst: "a=pin 0 adj 100000;dx=*/ w a 100000;y1=*/ h a 100000;dx1=+- r 0 dx",
-      paths: "M l y1 L dx t L r t L r b L dx1 b L l b Z|M l y1 L dx y1 L dx t|M dx y1 L r b",
+      gdlst: "a=pin 0 adj 100000;y1=*/ ss a 100000;y4=+- b 0 y1;y2=*/ y4 1 2;y3=+/ y1 b 2;x4=+- r 0 y1;x2=*/ x4 1 2;x3=+/ y1 r 2",
+      paths: "M l y1 L x4 y1 L x4 b L l b Z|M x4 y1 L r t L r y4 L x4 b Z|M l y1 L y1 t L r t L x4 y1 Z|M l y1 L y1 t L r t L r y4 L x4 b L l b Z M l y1 L x4 y1 L r t M x4 y1 L x4 b",
     })
   } else if prst == "ribbon" {
     Some({
@@ -864,9 +937,9 @@ fn get_preset_def(prst : String) -> PresetDef? {
     })
   } else if prst == "mathDivide" {
     Some({
-      avlst: "adj1=23520;adj2=5765;adj3=11760",
-      gdlst: "a1=pin 0 adj1 100000;a2=pin 0 adj2 100000;a3=pin 0 adj3 100000;dy1=*/ h a1 200000;y1=+- hd2 0 dy1;y2=+- hd2 dy1 0;dr=*/ ss a2 200000;dy2=*/ h a3 100000;y3=+- y1 0 dy2;y4=+- y2 dy2 0",
-      paths: "M l y1 L r y1 L r y2 L l y2 Z|M wd2 y3 A dr dr 0 21600000 Z|M wd2 y4 A dr dr 0 21600000 Z",
+      avlst: "adj1=23520;adj2=5880;adj3=11760",
+      gdlst: "a1=pin 1000 adj1 36745;ma1=+- 0 0 a1;ma3h=+/ 73490 ma1 4;ma3w=*/ 36745 w h;maxAdj3=min ma3h ma3w;a3=pin 1000 adj3 maxAdj3;m4a3=*/ -4 a3 1;maxAdj2=+- 73490 m4a3 a1;a2=pin 0 adj2 maxAdj2;dy1=*/ h a1 200000;yg=*/ h a2 100000;rad=*/ h a3 100000;dx1=*/ w 73490 200000;y3=+- vc 0 dy1;y4=+- vc dy1 0;a=+- yg rad 0;y2=+- y3 0 a;y1=+- y2 0 rad;y5=+- b 0 y1;x1=+- hc 0 dx1;x3=+- hc dx1 0;x2=+- hc 0 rad",
+      paths: "M hc y1 A rad rad 3cd4 21600000 Z M hc y5 A rad rad cd4 21600000 Z M x1 y3 L x3 y3 L x3 y4 L x1 y4 Z",
     })
   } else if prst == "mathEqual" {
     Some({
@@ -921,13 +994,13 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "pie" || prst == "arc" {
     Some({
       avlst: "adj1=0;adj2=16200000",
-      gdlst: "sa=*/ adj1 1 1;ea=*/ adj2 1 1;sw=+- ea 0 sa;csa=cos sa wd2;ssa=sin sa hd2;cea=cos ea wd2;sea=sin ea hd2;x1=+- wd2 csa 0;y1=+- hd2 ssa 0;x2=+- wd2 cea 0;y2=+- hd2 sea 0",
+      gdlst: "sa=*/ adj1 1 1;ea=*/ adj2 1 1;sw=+- ea 0 sa;csa=cos wd2 sa;ssa=sin hd2 sa;cea=cos wd2 ea;sea=sin hd2 ea;x1=+- wd2 csa 0;y1=+- hd2 ssa 0;x2=+- wd2 cea 0;y2=+- hd2 sea 0",
       paths: "M wd2 hd2 L x1 y1 A wd2 hd2 sa sw L wd2 hd2 Z",
     })
   } else if prst == "chord" {
     Some({
       avlst: "adj1=2700000;adj2=16200000",
-      gdlst: "sa=*/ adj1 1 1;ea=*/ adj2 1 1;sw=+- ea 0 sa;csa=cos sa wd2;ssa=sin sa hd2;cea=cos ea wd2;sea=sin ea hd2;x1=+- wd2 csa 0;y1=+- hd2 ssa 0;x2=+- wd2 cea 0;y2=+- hd2 sea 0",
+      gdlst: "sa=*/ adj1 1 1;ea=*/ adj2 1 1;sw=+- ea 0 sa;csa=cos wd2 sa;ssa=sin hd2 sa;cea=cos wd2 ea;sea=sin hd2 ea;x1=+- wd2 csa 0;y1=+- hd2 ssa 0;x2=+- wd2 cea 0;y2=+- hd2 sea 0",
       paths: "M x1 y1 A wd2 hd2 sa sw Z",
     })
   } else if prst == "decagon" {
@@ -960,7 +1033,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
     // adj controls inner radius (tooth valley depth)
     Some({
       avlst: "adj=75000",
-      gdlst: "a=pin 10000 adj 99000;ir=*/ wd2 a 100000;irh=*/ hd2 a 100000;c00=cos 20700000 wd2;s00=sin 20700000 hd2;mx=+- wd2 c00 0;my=+- hd2 s00 0;ci0=cos 900000 ir;si0=sin 900000 irh;px0=+- wd2 ci0 0;py0=+- hd2 si0 0;co1=cos 2700000 wd2;so1=sin 2700000 hd2;qx1=+- wd2 co1 0;qy1=+- hd2 so1 0;ci1=cos 4500000 ir;si1=sin 4500000 irh;px1=+- wd2 ci1 0;py1=+- hd2 si1 0;co2=cos 6300000 wd2;so2=sin 6300000 hd2;qx2=+- wd2 co2 0;qy2=+- hd2 so2 0;ci2=cos 8100000 ir;si2=sin 8100000 irh;px2=+- wd2 ci2 0;py2=+- hd2 si2 0;co3=cos 9900000 wd2;so3=sin 9900000 hd2;qx3=+- wd2 co3 0;qy3=+- hd2 so3 0;ci3=cos 11700000 ir;si3=sin 11700000 irh;px3=+- wd2 ci3 0;py3=+- hd2 si3 0;co4=cos 13500000 wd2;so4=sin 13500000 hd2;qx4=+- wd2 co4 0;qy4=+- hd2 so4 0;ci4=cos 15300000 ir;si4=sin 15300000 irh;px4=+- wd2 ci4 0;py4=+- hd2 si4 0;co5=cos 17100000 wd2;so5=sin 17100000 hd2;qx5=+- wd2 co5 0;qy5=+- hd2 so5 0;ci5=cos 18900000 ir;si5=sin 18900000 irh;px5=+- wd2 ci5 0;py5=+- hd2 si5 0;hr=*/ wd2 30000 100000;hrh=*/ hd2 30000 100000;hx=+- wd2 hr 0",
+      gdlst: "a=pin 10000 adj 99000;ir=*/ wd2 a 100000;irh=*/ hd2 a 100000;c00=cos wd2 20700000;s00=sin hd2 20700000;mx=+- wd2 c00 0;my=+- hd2 s00 0;ci0=cos ir 900000;si0=sin irh 900000;px0=+- wd2 ci0 0;py0=+- hd2 si0 0;co1=cos wd2 2700000;so1=sin hd2 2700000;qx1=+- wd2 co1 0;qy1=+- hd2 so1 0;ci1=cos ir 4500000;si1=sin irh 4500000;px1=+- wd2 ci1 0;py1=+- hd2 si1 0;co2=cos wd2 6300000;so2=sin hd2 6300000;qx2=+- wd2 co2 0;qy2=+- hd2 so2 0;ci2=cos ir 8100000;si2=sin irh 8100000;px2=+- wd2 ci2 0;py2=+- hd2 si2 0;co3=cos wd2 9900000;so3=sin hd2 9900000;qx3=+- wd2 co3 0;qy3=+- hd2 so3 0;ci3=cos ir 11700000;si3=sin irh 11700000;px3=+- wd2 ci3 0;py3=+- hd2 si3 0;co4=cos wd2 13500000;so4=sin hd2 13500000;qx4=+- wd2 co4 0;qy4=+- hd2 so4 0;ci4=cos ir 15300000;si4=sin irh 15300000;px4=+- wd2 ci4 0;py4=+- hd2 si4 0;co5=cos wd2 17100000;so5=sin hd2 17100000;qx5=+- wd2 co5 0;qy5=+- hd2 so5 0;ci5=cos ir 18900000;si5=sin irh 18900000;px5=+- wd2 ci5 0;py5=+- hd2 si5 0;hr=*/ wd2 30000 100000;hrh=*/ hd2 30000 100000;hx=+- wd2 hr 0",
       paths: "M mx my A wd2 hd2 20700000 1800000 L px0 py0 A ir irh 900000 1800000 L qx1 qy1 A wd2 hd2 2700000 1800000 L px1 py1 A ir irh 4500000 1800000 L qx2 qy2 A wd2 hd2 6300000 1800000 L px2 py2 A ir irh 8100000 1800000 L qx3 qy3 A wd2 hd2 9900000 1800000 L px3 py3 A ir irh 11700000 1800000 L qx4 qy4 A wd2 hd2 13500000 1800000 L px4 py4 A ir irh 15300000 1800000 L qx5 qy5 A wd2 hd2 17100000 1800000 L px5 py5 A ir irh 18900000 1800000 Z|M hx hd2 A hr hrh 0 21600000 Z",
     })
   } else if prst == "gear9" {
@@ -968,7 +1041,7 @@ fn get_preset_def(prst : String) -> PresetDef? {
     // Each tooth sector = 40°, tooth top = 20° arc, valley = 20° arc
     Some({
       avlst: "adj=75000",
-      gdlst: "a=pin 10000 adj 99000;ir=*/ wd2 a 100000;irh=*/ hd2 a 100000;c00=cos 21000000 wd2;s00=sin 21000000 hd2;mx=+- wd2 c00 0;my=+- hd2 s00 0;ci0=cos 600000 ir;si0=sin 600000 irh;px0=+- wd2 ci0 0;py0=+- hd2 si0 0;co1=cos 1800000 wd2;so1=sin 1800000 hd2;qx1=+- wd2 co1 0;qy1=+- hd2 so1 0;ci1=cos 3000000 ir;si1=sin 3000000 irh;px1=+- wd2 ci1 0;py1=+- hd2 si1 0;co2=cos 4200000 wd2;so2=sin 4200000 hd2;qx2=+- wd2 co2 0;qy2=+- hd2 so2 0;ci2=cos 5400000 ir;si2=sin 5400000 irh;px2=+- wd2 ci2 0;py2=+- hd2 si2 0;co3=cos 6600000 wd2;so3=sin 6600000 hd2;qx3=+- wd2 co3 0;qy3=+- hd2 so3 0;ci3=cos 7800000 ir;si3=sin 7800000 irh;px3=+- wd2 ci3 0;py3=+- hd2 si3 0;co4=cos 9000000 wd2;so4=sin 9000000 hd2;qx4=+- wd2 co4 0;qy4=+- hd2 so4 0;ci4=cos 10200000 ir;si4=sin 10200000 irh;px4=+- wd2 ci4 0;py4=+- hd2 si4 0;co5=cos 11400000 wd2;so5=sin 11400000 hd2;qx5=+- wd2 co5 0;qy5=+- hd2 so5 0;ci5=cos 12600000 ir;si5=sin 12600000 irh;px5=+- wd2 ci5 0;py5=+- hd2 si5 0;co6=cos 13800000 wd2;so6=sin 13800000 hd2;qx6=+- wd2 co6 0;qy6=+- hd2 so6 0;ci6=cos 15000000 ir;si6=sin 15000000 irh;px6=+- wd2 ci6 0;py6=+- hd2 si6 0;co7=cos 16200000 wd2;so7=sin 16200000 hd2;qx7=+- wd2 co7 0;qy7=+- hd2 so7 0;ci7=cos 17400000 ir;si7=sin 17400000 irh;px7=+- wd2 ci7 0;py7=+- hd2 si7 0;co8=cos 18600000 wd2;so8=sin 18600000 hd2;qx8=+- wd2 co8 0;qy8=+- hd2 so8 0;ci8=cos 19800000 ir;si8=sin 19800000 irh;px8=+- wd2 ci8 0;py8=+- hd2 si8 0;hr=*/ wd2 25000 100000;hrh=*/ hd2 25000 100000;hx=+- wd2 hr 0",
+      gdlst: "a=pin 10000 adj 99000;ir=*/ wd2 a 100000;irh=*/ hd2 a 100000;c00=cos wd2 21000000;s00=sin hd2 21000000;mx=+- wd2 c00 0;my=+- hd2 s00 0;ci0=cos ir 600000;si0=sin irh 600000;px0=+- wd2 ci0 0;py0=+- hd2 si0 0;co1=cos wd2 1800000;so1=sin hd2 1800000;qx1=+- wd2 co1 0;qy1=+- hd2 so1 0;ci1=cos ir 3000000;si1=sin irh 3000000;px1=+- wd2 ci1 0;py1=+- hd2 si1 0;co2=cos wd2 4200000;so2=sin hd2 4200000;qx2=+- wd2 co2 0;qy2=+- hd2 so2 0;ci2=cos ir 5400000;si2=sin irh 5400000;px2=+- wd2 ci2 0;py2=+- hd2 si2 0;co3=cos wd2 6600000;so3=sin hd2 6600000;qx3=+- wd2 co3 0;qy3=+- hd2 so3 0;ci3=cos ir 7800000;si3=sin irh 7800000;px3=+- wd2 ci3 0;py3=+- hd2 si3 0;co4=cos wd2 9000000;so4=sin hd2 9000000;qx4=+- wd2 co4 0;qy4=+- hd2 so4 0;ci4=cos ir 10200000;si4=sin irh 10200000;px4=+- wd2 ci4 0;py4=+- hd2 si4 0;co5=cos wd2 11400000;so5=sin hd2 11400000;qx5=+- wd2 co5 0;qy5=+- hd2 so5 0;ci5=cos ir 12600000;si5=sin irh 12600000;px5=+- wd2 ci5 0;py5=+- hd2 si5 0;co6=cos wd2 13800000;so6=sin hd2 13800000;qx6=+- wd2 co6 0;qy6=+- hd2 so6 0;ci6=cos ir 15000000;si6=sin irh 15000000;px6=+- wd2 ci6 0;py6=+- hd2 si6 0;co7=cos wd2 16200000;so7=sin hd2 16200000;qx7=+- wd2 co7 0;qy7=+- hd2 so7 0;ci7=cos ir 17400000;si7=sin irh 17400000;px7=+- wd2 ci7 0;py7=+- hd2 si7 0;co8=cos wd2 18600000;so8=sin hd2 18600000;qx8=+- wd2 co8 0;qy8=+- hd2 so8 0;ci8=cos ir 19800000;si8=sin irh 19800000;px8=+- wd2 ci8 0;py8=+- hd2 si8 0;hr=*/ wd2 25000 100000;hrh=*/ hd2 25000 100000;hx=+- wd2 hr 0",
       paths: "M mx my A wd2 hd2 21000000 1200000 L px0 py0 A ir irh 600000 1200000 L qx1 qy1 A wd2 hd2 1800000 1200000 L px1 py1 A ir irh 3000000 1200000 L qx2 qy2 A wd2 hd2 4200000 1200000 L px2 py2 A ir irh 5400000 1200000 L qx3 qy3 A wd2 hd2 6600000 1200000 L px3 py3 A ir irh 7800000 1200000 L qx4 qy4 A wd2 hd2 9000000 1200000 L px4 py4 A ir irh 10200000 1200000 L qx5 qy5 A wd2 hd2 11400000 1200000 L px5 py5 A ir irh 12600000 1200000 L qx6 qy6 A wd2 hd2 13800000 1200000 L px6 py6 A ir irh 15000000 1200000 L qx7 qy7 A wd2 hd2 16200000 1200000 L px7 py7 A ir irh 17400000 1200000 L qx8 qy8 A wd2 hd2 18600000 1200000 L px8 py8 A ir irh 19800000 1200000 Z|M hx hd2 A hr hrh 0 21600000 Z",
     })
   } else if prst == "funnel" {
@@ -1015,36 +1088,32 @@ fn get_preset_def(prst : String) -> PresetDef? {
     // 10-pointed star: outer at 5 points, inner at 5 between
     Some({
       avlst: "adj=38268",
-      gdlst: "a=pin 0 adj 50000;swd2=*/ wd2 a 50000;shd2=*/ hd2 a 50000;co0=cos 16200000 wd2;so0=sin 16200000 hd2;co1=cos 19800000 wd2;so1=sin 19800000 hd2;co2=cos 1800000 wd2;so2=sin 1800000 hd2;co3=cos 5400000 wd2;so3=sin 5400000 hd2;co4=cos 9000000 wd2;so4=sin 9000000 hd2;ox0=+- wd2 co0 0;oy0=+- hd2 so0 0;ox1=+- wd2 co1 0;oy1=+- hd2 so1 0;ox2=+- wd2 co2 0;oy2=+- hd2 so2 0;ox3=+- wd2 co3 0;oy3=+- hd2 so3 0;ox4=+- wd2 co4 0;oy4=+- hd2 so4 0;ci0=cos 18000000 swd2;si0=sin 18000000 shd2;ci1=cos 21600000 swd2;si1=sin 21600000 shd2;ci2=cos 3600000 swd2;si2=sin 3600000 shd2;ci3=cos 7200000 swd2;si3=sin 7200000 shd2;ci4=cos 10800000 swd2;si4=sin 10800000 shd2;ix0=+- wd2 ci0 0;iy0=+- hd2 si0 0;ix1=+- wd2 ci1 0;iy1=+- hd2 si1 0;ix2=+- wd2 ci2 0;iy2=+- hd2 si2 0;ix3=+- wd2 ci3 0;iy3=+- hd2 si3 0;ix4=+- wd2 ci4 0;iy4=+- hd2 si4 0",
+      gdlst: "a=pin 0 adj 50000;swd2=*/ wd2 a 50000;shd2=*/ hd2 a 50000;co0=cos wd2 16200000;so0=sin hd2 16200000;co1=cos wd2 19800000;so1=sin hd2 19800000;co2=cos wd2 1800000;so2=sin hd2 1800000;co3=cos wd2 5400000;so3=sin hd2 5400000;co4=cos wd2 9000000;so4=sin hd2 9000000;ox0=+- wd2 co0 0;oy0=+- hd2 so0 0;ox1=+- wd2 co1 0;oy1=+- hd2 so1 0;ox2=+- wd2 co2 0;oy2=+- hd2 so2 0;ox3=+- wd2 co3 0;oy3=+- hd2 so3 0;ox4=+- wd2 co4 0;oy4=+- hd2 so4 0;ci0=cos swd2 18000000;si0=sin shd2 18000000;ci1=cos swd2 21600000;si1=sin shd2 21600000;ci2=cos swd2 3600000;si2=sin shd2 3600000;ci3=cos swd2 7200000;si3=sin shd2 7200000;ci4=cos swd2 10800000;si4=sin shd2 10800000;ix0=+- wd2 ci0 0;iy0=+- hd2 si0 0;ix1=+- wd2 ci1 0;iy1=+- hd2 si1 0;ix2=+- wd2 ci2 0;iy2=+- hd2 si2 0;ix3=+- wd2 ci3 0;iy3=+- hd2 si3 0;ix4=+- wd2 ci4 0;iy4=+- hd2 si4 0",
       paths: "M ox0 oy0 L ix0 iy0 L ox1 oy1 L ix1 iy1 L ox2 oy2 L ix2 iy2 L ox3 oy3 L ix3 iy3 L ox4 oy4 L ix4 iy4 Z",
     })
   } else if prst == "star12" {
-    // 12-pointed star
     Some({
       avlst: "adj=37500",
-      gdlst: "a=pin 0 adj 50000;dx=*/ wd2 a 50000;dy=*/ hd2 a 50000;x1=+- wd2 0 dx;x2=+- wd2 dx 0;y1=+- hd2 0 dy;y2=+- hd2 dy 0;dxa=*/ wd2 8660 10000;dya=*/ hd2 8660 10000;xa=+- wd2 0 dxa;xb=+- wd2 dxa 0;ya=+- hd2 0 dya;yb=+- hd2 dya 0;idxa=*/ dx 8660 10000;idya=*/ dy 8660 10000;ix1=+- wd2 0 idxa;ix2=+- wd2 idxa 0;iy1=+- hd2 0 idya;iy2=+- hd2 idya 0",
-      paths: "M wd2 t L ix2 iy1 L xb ya L x2 y1 L r hd2 L x2 y2 L xb yb L ix2 iy2 L wd2 b L ix1 iy2 L xa yb L x1 y2 L l hd2 L x1 y1 L xa ya L ix1 iy1 Z",
+      gdlst: "a=pin 0 adj 50000;dx1=cos wd2 1800000;dy1=sin hd2 3600000;x1=+- hc 0 dx1;x3=*/ w 3 4;x4=+- hc dx1 0;y1=+- vc 0 dy1;y3=*/ h 3 4;y4=+- vc dy1 0;iwd2=*/ wd2 a 50000;ihd2=*/ hd2 a 50000;sdx1=cos iwd2 900000;sdx2=cos iwd2 2700000;sdx3=cos iwd2 4500000;sdy1=sin ihd2 4500000;sdy2=sin ihd2 2700000;sdy3=sin ihd2 900000;sx1=+- hc 0 sdx1;sx2=+- hc 0 sdx2;sx3=+- hc 0 sdx3;sx4=+- hc sdx3 0;sx5=+- hc sdx2 0;sx6=+- hc sdx1 0;sy1=+- vc 0 sdy1;sy2=+- vc 0 sdy2;sy3=+- vc 0 sdy3;sy4=+- vc sdy3 0;sy5=+- vc sdy2 0;sy6=+- vc sdy1 0;yAdj=+- vc 0 ihd2",
+      paths: "M l vc L sx1 sy3 L x1 hd4 L sx2 sy2 L wd4 y1 L sx3 sy1 L hc t L sx4 sy1 L x3 y1 L sx5 sy2 L x4 hd4 L sx6 sy3 L r vc L sx6 sy4 L x4 y3 L sx5 sy5 L x3 y4 L sx4 sy6 L hc b L sx3 sy6 L wd4 y4 L sx2 sy5 L x1 y3 L sx1 sy4 Z",
     })
   } else if prst == "star16" {
-    // 16-pointed star
     Some({
       avlst: "adj=37500",
-      gdlst: "a=pin 0 adj 50000;dx=*/ wd2 a 50000;dy=*/ hd2 a 50000;x1=+- wd2 0 dx;x2=+- wd2 dx 0;y1=+- hd2 0 dy;y2=+- hd2 dy 0;dxa=*/ wd2 9239 10000;dya=*/ hd2 9239 10000;xa=+- wd2 0 dxa;xb=+- wd2 dxa 0;ya=+- hd2 0 dya;yb=+- hd2 dya 0;dxb=*/ wd2 7071 10000;dyb=*/ hd2 7071 10000;xc=+- wd2 0 dxb;xd=+- wd2 dxb 0;yc=+- hd2 0 dyb;yd=+- hd2 dyb 0;dxc=*/ wd2 3827 10000;dyc=*/ hd2 3827 10000;xe=+- wd2 0 dxc;xf=+- wd2 dxc 0;ye=+- hd2 0 dyc;yf=+- hd2 dyc 0;idx=*/ dx 9239 10000;idy=*/ dy 9239 10000;ix1=+- wd2 0 idx;ix2=+- wd2 idx 0;iy1=+- hd2 0 idy;iy2=+- hd2 idy 0;idc=*/ dx 7071 10000;idd=*/ dy 7071 10000;ixc=+- wd2 0 idc;ixd=+- wd2 idc 0;iyc=+- hd2 0 idd;iyd=+- hd2 idd 0;ide=*/ dx 3827 10000;idf=*/ dy 3827 10000;ixe=+- wd2 0 ide;ixf=+- wd2 ide 0;iye=+- hd2 0 idf;iyf=+- hd2 idf 0",
-      paths: "M wd2 t L ixf iye L xf ye L ix2 iy1 L xb ya L ix2 iy1 L r hd2 L ix2 iy2 L xb yb L ixf iyf L xf yf L ix2 iy2 L wd2 b L ixe iyf L xe yf L ix1 iy2 L xa yb L ix1 iy2 L l hd2 L ix1 iy1 L xa ya L ixe iye L xe ye L ix1 iy1 Z",
+      gdlst: "a=pin 0 adj 50000;dx1=*/ wd2 92388 100000;dx2=*/ wd2 70711 100000;dx3=*/ wd2 38268 100000;dy1=*/ hd2 92388 100000;dy2=*/ hd2 70711 100000;dy3=*/ hd2 38268 100000;x1=+- hc 0 dx1;x2=+- hc 0 dx2;x3=+- hc 0 dx3;x4=+- hc dx3 0;x5=+- hc dx2 0;x6=+- hc dx1 0;y1=+- vc 0 dy1;y2=+- vc 0 dy2;y3=+- vc 0 dy3;y4=+- vc dy3 0;y5=+- vc dy2 0;y6=+- vc dy1 0;iwd2=*/ wd2 a 50000;ihd2=*/ hd2 a 50000;sdx1=*/ iwd2 98079 100000;sdx2=*/ iwd2 83147 100000;sdx3=*/ iwd2 55557 100000;sdx4=*/ iwd2 19509 100000;sdy1=*/ ihd2 98079 100000;sdy2=*/ ihd2 83147 100000;sdy3=*/ ihd2 55557 100000;sdy4=*/ ihd2 19509 100000;sx1=+- hc 0 sdx1;sx2=+- hc 0 sdx2;sx3=+- hc 0 sdx3;sx4=+- hc 0 sdx4;sx5=+- hc sdx4 0;sx6=+- hc sdx3 0;sx7=+- hc sdx2 0;sx8=+- hc sdx1 0;sy1=+- vc 0 sdy1;sy2=+- vc 0 sdy2;sy3=+- vc 0 sdy3;sy4=+- vc 0 sdy4;sy5=+- vc sdy4 0;sy6=+- vc sdy3 0;sy7=+- vc sdy2 0;sy8=+- vc sdy1 0;idx=cos iwd2 2700000;idy=sin ihd2 2700000;il=+- hc 0 idx;it=+- vc 0 idy;ir=+- hc idx 0;ib=+- vc idy 0;yAdj=+- vc 0 ihd2",
+      paths: "M l vc L sx1 sy4 L x1 y3 L sx2 sy3 L x2 y2 L sx3 sy2 L x3 y1 L sx4 sy1 L hc t L sx5 sy1 L x4 y1 L sx6 sy2 L x5 y2 L sx7 sy3 L x6 y3 L sx8 sy4 L r vc L sx8 sy5 L x6 y4 L sx7 sy6 L x5 y5 L sx6 sy7 L x4 y6 L sx5 sy8 L hc b L sx4 sy8 L x3 y6 L sx3 sy7 L x2 y5 L sx2 sy6 L x1 y4 L sx1 sy5 Z",
     })
   } else if prst == "star24" {
-    // 24-pointed star — simplified as 24-gon with alternating radii
     Some({
       avlst: "adj=37500",
-      gdlst: "a=pin 0 adj 50000;ir=*/ wd2 a 50000;ihr=*/ hd2 a 50000",
-      paths: "M wd2 t L ir hd2 A wd2 hd2 16200000 21600000 Z",
+      gdlst: "a=pin 0 adj 50000;dx1=cos wd2 900000;dx2=cos wd2 1800000;dx3=cos wd2 2700000;dx4=val wd4;dx5=cos wd2 4500000;dy1=sin hd2 4500000;dy2=sin hd2 3600000;dy3=sin hd2 2700000;dy4=val hd4;dy5=sin hd2 900000;x1=+- hc 0 dx1;x2=+- hc 0 dx2;x3=+- hc 0 dx3;x4=+- hc 0 dx4;x5=+- hc 0 dx5;x6=+- hc dx5 0;x7=+- hc dx4 0;x8=+- hc dx3 0;x9=+- hc dx2 0;x10=+- hc dx1 0;y1=+- vc 0 dy1;y2=+- vc 0 dy2;y3=+- vc 0 dy3;y4=+- vc 0 dy4;y5=+- vc 0 dy5;y6=+- vc dy5 0;y7=+- vc dy4 0;y8=+- vc dy3 0;y9=+- vc dy2 0;y10=+- vc dy1 0;iwd2=*/ wd2 a 50000;ihd2=*/ hd2 a 50000;sdx1=*/ iwd2 99144 100000;sdx2=*/ iwd2 92388 100000;sdx3=*/ iwd2 79335 100000;sdx4=*/ iwd2 60876 100000;sdx5=*/ iwd2 38268 100000;sdx6=*/ iwd2 13053 100000;sdy1=*/ ihd2 99144 100000;sdy2=*/ ihd2 92388 100000;sdy3=*/ ihd2 79335 100000;sdy4=*/ ihd2 60876 100000;sdy5=*/ ihd2 38268 100000;sdy6=*/ ihd2 13053 100000;sx1=+- hc 0 sdx1;sx2=+- hc 0 sdx2;sx3=+- hc 0 sdx3;sx4=+- hc 0 sdx4;sx5=+- hc 0 sdx5;sx6=+- hc 0 sdx6;sx7=+- hc sdx6 0;sx8=+- hc sdx5 0;sx9=+- hc sdx4 0;sx10=+- hc sdx3 0;sx11=+- hc sdx2 0;sx12=+- hc sdx1 0;sy1=+- vc 0 sdy1;sy2=+- vc 0 sdy2;sy3=+- vc 0 sdy3;sy4=+- vc 0 sdy4;sy5=+- vc 0 sdy5;sy6=+- vc 0 sdy6;sy7=+- vc sdy6 0;sy8=+- vc sdy5 0;sy9=+- vc sdy4 0;sy10=+- vc sdy3 0;sy11=+- vc sdy2 0;sy12=+- vc sdy1 0;idx=cos iwd2 2700000;idy=sin ihd2 2700000;il=+- hc 0 idx;it=+- vc 0 idy;ir=+- hc idx 0;ib=+- vc idy 0;yAdj=+- vc 0 ihd2",
+      paths: "M l vc L sx1 sy6 L x1 y5 L sx2 sy5 L x2 y4 L sx3 sy4 L x3 y3 L sx4 sy3 L x4 y2 L sx5 sy2 L x5 y1 L sx6 sy1 L hc t L sx7 sy1 L x6 y1 L sx8 sy2 L x7 y2 L sx9 sy3 L x8 y3 L sx10 sy4 L x9 y4 L sx11 sy5 L x10 y5 L sx12 sy6 L r vc L sx12 sy7 L x10 y6 L sx11 sy8 L x9 y7 L sx10 sy9 L x8 y8 L sx9 sy10 L x7 y9 L sx8 sy11 L x6 y10 L sx7 sy12 L hc b L sx6 sy12 L x5 y10 L sx5 sy11 L x4 y9 L sx4 sy10 L x3 y8 L sx3 sy9 L x2 y7 L sx2 sy8 L x1 y6 L sx1 sy7 Z",
     })
   } else if prst == "star32" {
-    // 32-pointed star — simplified as circle with spikes
     Some({
       avlst: "adj=37500",
-      gdlst: "a=pin 0 adj 50000;ir=*/ wd2 a 50000;ihr=*/ hd2 a 50000",
-      paths: "M wd2 t L ir hd2 A wd2 hd2 16200000 21600000 Z",
+      gdlst: "a=pin 0 adj 50000;dx1=*/ wd2 98079 100000;dx2=*/ wd2 92388 100000;dx3=*/ wd2 83147 100000;dx4=cos wd2 2700000;dx5=*/ wd2 55557 100000;dx6=*/ wd2 38268 100000;dx7=*/ wd2 19509 100000;dy1=*/ hd2 98079 100000;dy2=*/ hd2 92388 100000;dy3=*/ hd2 83147 100000;dy4=sin hd2 2700000;dy5=*/ hd2 55557 100000;dy6=*/ hd2 38268 100000;dy7=*/ hd2 19509 100000;x1=+- hc 0 dx1;x2=+- hc 0 dx2;x3=+- hc 0 dx3;x4=+- hc 0 dx4;x5=+- hc 0 dx5;x6=+- hc 0 dx6;x7=+- hc 0 dx7;x8=+- hc dx7 0;x9=+- hc dx6 0;x10=+- hc dx5 0;x11=+- hc dx4 0;x12=+- hc dx3 0;x13=+- hc dx2 0;x14=+- hc dx1 0;y1=+- vc 0 dy1;y2=+- vc 0 dy2;y3=+- vc 0 dy3;y4=+- vc 0 dy4;y5=+- vc 0 dy5;y6=+- vc 0 dy6;y7=+- vc 0 dy7;y8=+- vc dy7 0;y9=+- vc dy6 0;y10=+- vc dy5 0;y11=+- vc dy4 0;y12=+- vc dy3 0;y13=+- vc dy2 0;y14=+- vc dy1 0;iwd2=*/ wd2 a 50000;ihd2=*/ hd2 a 50000;sdx1=*/ iwd2 99518 100000;sdx2=*/ iwd2 95694 100000;sdx3=*/ iwd2 88192 100000;sdx4=*/ iwd2 77301 100000;sdx5=*/ iwd2 63439 100000;sdx6=*/ iwd2 47140 100000;sdx7=*/ iwd2 29028 100000;sdx8=*/ iwd2 9802 100000;sdy1=*/ ihd2 99518 100000;sdy2=*/ ihd2 95694 100000;sdy3=*/ ihd2 88192 100000;sdy4=*/ ihd2 77301 100000;sdy5=*/ ihd2 63439 100000;sdy6=*/ ihd2 47140 100000;sdy7=*/ ihd2 29028 100000;sdy8=*/ ihd2 9802 100000;sx1=+- hc 0 sdx1;sx2=+- hc 0 sdx2;sx3=+- hc 0 sdx3;sx4=+- hc 0 sdx4;sx5=+- hc 0 sdx5;sx6=+- hc 0 sdx6;sx7=+- hc 0 sdx7;sx8=+- hc 0 sdx8;sx9=+- hc sdx8 0;sx10=+- hc sdx7 0;sx11=+- hc sdx6 0;sx12=+- hc sdx5 0;sx13=+- hc sdx4 0;sx14=+- hc sdx3 0;sx15=+- hc sdx2 0;sx16=+- hc sdx1 0;sy1=+- vc 0 sdy1;sy2=+- vc 0 sdy2;sy3=+- vc 0 sdy3;sy4=+- vc 0 sdy4;sy5=+- vc 0 sdy5;sy6=+- vc 0 sdy6;sy7=+- vc 0 sdy7;sy8=+- vc 0 sdy8;sy9=+- vc sdy8 0;sy10=+- vc sdy7 0;sy11=+- vc sdy6 0;sy12=+- vc sdy5 0;sy13=+- vc sdy4 0;sy14=+- vc sdy3 0;sy15=+- vc sdy2 0;sy16=+- vc sdy1 0;idx=cos iwd2 2700000;idy=sin ihd2 2700000;il=+- hc 0 idx;it=+- vc 0 idy;ir=+- hc idx 0;ib=+- vc idy 0;yAdj=+- vc 0 ihd2",
+      paths: "M l vc L sx1 sy8 L x1 y7 L sx2 sy7 L x2 y6 L sx3 sy6 L x3 y5 L sx4 sy5 L x4 y4 L sx5 sy4 L x5 y3 L sx6 sy3 L x6 y2 L sx7 sy2 L x7 y1 L sx8 sy1 L hc t L sx9 sy1 L x8 y1 L sx10 sy2 L x9 y2 L sx11 sy3 L x10 y3 L sx12 sy4 L x11 y4 L sx13 sy5 L x12 y5 L sx14 sy6 L x13 y6 L sx15 sy7 L x14 y7 L sx16 sy8 L r vc L sx16 sy9 L x14 y8 L sx15 sy10 L x13 y9 L sx14 sy11 L x12 y10 L sx13 sy12 L x11 y11 L sx12 sy13 L x10 y12 L sx11 sy14 L x9 y13 L sx10 sy15 L x8 y14 L sx9 sy16 L hc b L sx8 sy16 L x7 y14 L sx7 sy15 L x6 y13 L sx6 sy14 L x5 y12 L sx5 sy13 L x4 y11 L sx4 sy12 L x3 y10 L sx3 sy11 L x2 y9 L sx2 sy10 L x1 y8 L sx1 sy9 Z",
     })
     // ── Remaining flowchart shapes ──
   } else if prst == "flowChartAlternateProcess" {
@@ -1080,8 +1149,8 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "flowChartMagneticTape" {
     Some({
       avlst: "",
-      gdlst: "y1=*/ h 9 10",
-      paths: "M wd2 b L r b L r y1 A wd2 hd2 0 -21600000 Z",
+      gdlst: "idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0;ang1=at2 w h",
+      paths: "M hc b A wd2 hd2 cd4 cd4 A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 ang1 L r ib L r b Z",
     })
   } else if prst == "flowChartOnlineStorage" {
     Some({
@@ -1110,14 +1179,14 @@ fn get_preset_def(prst : String) -> PresetDef? {
   } else if prst == "flowChartSummingJunction" {
     Some({
       avlst: "",
-      gdlst: "dxa=*/ wd2 7071 10000;dya=*/ hd2 7071 10000;xa=+- wd2 0 dxa;xb=+- wd2 dxa 0;ya=+- hd2 0 dya;yb=+- hd2 dya 0",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z|M xa ya L xb yb|M xb ya L xa yb",
+      gdlst: "idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z|M il it L ir ib M ir it L il ib|M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z",
     })
   } else if prst == "flowChartOr" {
     Some({
       avlst: "",
-      gdlst: "",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z|M wd2 t L wd2 b|M l hd2 L r hd2",
+      gdlst: "idx=cos wd2 2700000;idy=sin hd2 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z|M hc t L hc b M l vc L r vc|M l vc A wd2 hd2 cd2 cd4 A wd2 hd2 3cd4 cd4 A wd2 hd2 0 cd4 A wd2 hd2 cd4 cd4 Z",
     })
   } else if prst == "flowChartCollate" {
     Some({
@@ -1127,11 +1196,10 @@ fn get_preset_def(prst : String) -> PresetDef? {
     })
     // ── Remaining callouts ──
   } else if prst == "cloudCallout" {
-    // Cloud callout — simplified as rounded cloud with pointer
     Some({
       avlst: "adj1=-20833;adj2=62500",
-      gdlst: "a1=*/ w adj1 100000;a2=*/ h adj2 100000;x1=+- wd2 a1 0;y1=+- hd2 a2 0;cr=*/ ss 1 6",
-      paths: "M l hd2 A wd2 hd2 10800000 21600000 Z|M wd2 b L x1 y1 L wd2 b",
+      gdlst: "dxPos=*/ w adj1 100000;dyPos=*/ h adj2 100000;xPos=+- hc dxPos 0;yPos=+- vc dyPos 0;ht=cat2 hd2 dxPos dyPos;wt=sat2 wd2 dxPos dyPos;g2=cat2 wd2 ht wt;g3=sat2 hd2 ht wt;g4=+- hc g2 0;g5=+- vc g3 0;g6=+- g4 0 xPos;g7=+- g5 0 yPos;g8=mod g6 g7 0;g9=*/ ss 6600 21600;g10=+- g8 0 g9;g11=*/ g10 1 3;g12=*/ ss 1800 21600;g13=+- g11 g12 0;g14=*/ g13 g6 g8;g15=*/ g13 g7 g8;g16=+- g14 xPos 0;g17=+- g15 yPos 0;g18=*/ ss 4800 21600;g19=*/ g11 2 1;g20=+- g18 g19 0;g21=*/ g20 g6 g8;g22=*/ g20 g7 g8;g23=+- g21 xPos 0;g24=+- g22 yPos 0;g25=*/ ss 1200 21600;g26=*/ ss 600 21600;x23=+- xPos g26 0;x24=+- g16 g25 0;x25=+- g23 g12 0;il=*/ w 2977 21600;it=*/ h 3262 21600;ir=*/ w 17087 21600;ib=*/ h 17337 21600;g27=*/ w 67 21600;g28=*/ h 21577 21600;g29=*/ w 21582 21600;g30=*/ h 1235 21600;pang=at2 dxPos dyPos",
+      paths: "W 43200 43200 M 3900 14370 A 6753 9190 -11429249 7426832 A 5333 7267 -8646143 5396714 A 4365 5945 -8748475 5983381 A 4857 6595 -7859164 7034504 A 5333 7273 -4722533 6541615 A 6775 9220 -2776035 7816140 A 5785 7867 37501 6842000 A 6752 9215 1347096 6910353 A 7720 10543 3974558 4542661 A 4360 5918 -16496525 8804134 A 4345 5945 -14809710 9151131 Z|M x23 yPos A g26 g26 0 21600000 Z|M x24 g17 A g25 g25 0 21600000 Z|M x25 g24 A g12 g12 0 21600000 Z|W 43200 43200 M 4693 26177 A 4345 5945 5204520 1585770 M 6928 34899 A 4360 5918 4416628 686848 M 16478 39090 A 6752 9215 8257449 844866 M 28827 34751 A 6752 9215 387196 959901 M 34129 22954 A 5785 7867 -4217541 4255042 M 41798 15354 A 5333 7273 1819082 1665090 M 38324 5426 A 4857 6595 -824660 891534 M 29078 3952 A 4857 6595 -8950887 1091722 M 22141 4720 A 4365 5945 -9809656 1061181 M 14000 5192 A 6753 9190 -4002417 739161 M 4127 15789 A 6753 9190 9459261 711490",
     })
   } else if prst == "borderCallout1" || prst == "callout1" {
     Some({
@@ -1195,17 +1263,16 @@ fn get_preset_def(prst : String) -> PresetDef? {
       paths: "M x1 b C t l t wd2 wd2 t L wd2 y1 L l y1 L wd2 b L r y1 L wd2 y1 C wd2 t r t r wd2 L x2 b Z",
     })
   } else if prst == "circularArrow" {
-    // Simplified circular arrow — rendered as arc with arrowhead
     Some({
-      avlst: "",
-      gdlst: "ir=*/ ss 3 8;or=*/ ss 1 2;y1=+- hd2 0 or;x1=+- wd2 or 0",
-      paths: "M wd2 y1 A or or 16200000 18900000 L x1 hd2",
+      avlst: "adj1=12500;adj2=1142319;adj3=20457681;adj4=10800000;adj5=12500",
+      gdlst: "a5=pin 0 adj5 25000;maxAdj1=*/ a5 2 1;a1=pin 0 adj1 maxAdj1;enAng=pin 1 adj3 21599999;stAng=pin 0 adj4 21599999;th=*/ ss a1 100000;thh=*/ ss a5 100000;th2=*/ th 1 2;rw1=+- wd2 th2 thh;rh1=+- hd2 th2 thh;rw2=+- rw1 0 th;rh2=+- rh1 0 th;rw3=+- rw2 th2 0;rh3=+- rh2 th2 0;wtH=sin rw3 enAng;htH=cos rh3 enAng;dxH=cat2 rw3 htH wtH;dyH=sat2 rh3 htH wtH;xH=+- hc dxH 0;yH=+- vc dyH 0;rI=min rw2 rh2;u1=*/ dxH dxH 1;u2=*/ dyH dyH 1;u3=*/ rI rI 1;u4=+- u1 0 u3;u5=+- u2 0 u3;u6=*/ u4 u5 u1;u7=*/ u6 1 u2;u8=+- 1 0 u7;u9=sqrt u8;u10=*/ u4 1 dxH;u11=*/ u10 1 dyH;u12=+/ 1 u9 u11;u13=at2 1 u12;u14=+- u13 21600000 0;u15=?: u13 u13 u14;u16=+- u15 0 enAng;u17=+- u16 21600000 0;u18=?: u16 u16 u17;u19=+- u18 0 cd2;u20=+- u18 0 21600000;u21=?: u19 u20 u18;maxAng=abs u21;aAng=pin 0 adj2 maxAng;ptAng=+- enAng aAng 0;wtA=sin rw3 ptAng;htA=cos rh3 ptAng;dxA=cat2 rw3 htA wtA;dyA=sat2 rh3 htA wtA;xA=+- hc dxA 0;yA=+- vc dyA 0;wtE=sin rw1 stAng;htE=cos rh1 stAng;dxE=cat2 rw1 htE wtE;dyE=sat2 rh1 htE wtE;xE=+- hc dxE 0;yE=+- vc dyE 0;dxG=cos thh ptAng;dyG=sin thh ptAng;xG=+- xH dxG 0;yG=+- yH dyG 0;dxB=cos thh ptAng;dyB=sin thh ptAng;xB=+- xH 0 dxB 0;yB=+- yH 0 dyB 0;sx1=+- xB 0 hc;sy1=+- yB 0 vc;sx2=+- xG 0 hc;sy2=+- yG 0 vc;rO=min rw1 rh1;x1O=*/ sx1 rO rw1;y1O=*/ sy1 rO rh1;x2O=*/ sx2 rO rw1;y2O=*/ sy2 rO rh1;dxO=+- x2O 0 x1O;dyO=+- y2O 0 y1O;dO=mod dxO dyO 0;q1=*/ x1O y2O 1;q2=*/ x2O y1O 1;DO=+- q1 0 q2;q3=*/ rO rO 1;q4=*/ dO dO 1;q5=*/ q3 q4 1;q6=*/ DO DO 1;q7=+- q5 0 q6;q8=max q7 0;sdelO=sqrt q8;ndyO=*/ dyO -1 1;sdyO=?: ndyO -1 1;q9=*/ sdyO dxO 1;q10=*/ q9 sdelO 1;q11=*/ DO dyO 1;dxF1=+/ q11 q10 q4;q12=+- q11 0 q10;dxF2=*/ q12 1 q4;adyO=abs dyO;q13=*/ adyO sdelO 1;q14=*/ DO dxO -1;dyF1=+/ q14 q13 q4;q15=+- q14 0 q13;dyF2=*/ q15 1 q4;q16=+- x2O 0 dxF1;q17=+- x2O 0 dxF2;q18=+- y2O 0 dyF1;q19=+- y2O 0 dyF2;q20=mod q16 q18 0;q21=mod q17 q19 0;q22=+- q21 0 q20;dxF=?: q22 dxF1 dxF2;dyF=?: q22 dyF1 dyF2;sdxF=*/ dxF rw1 rO;sdyF=*/ dyF rh1 rO;xF=+- hc sdxF 0;yF=+- vc sdyF 0;x1I=*/ sx1 rI rw2;y1I=*/ sy1 rI rh2;x2I=*/ sx2 rI rw2;y2I=*/ sy2 rI rh2;dxI=+- x2I 0 x1I;dyI=+- y2I 0 y1I;dI=mod dxI dyI 0;v1=*/ x1I y2I 1;v2=*/ x2I y1I 1;DI=+- v1 0 v2;v3=*/ rI rI 1;v4=*/ dI dI 1;v5=*/ v3 v4 1;v6=*/ DI DI 1;v7=+- v5 0 v6;v8=max v7 0;sdelI=sqrt v8;v9=*/ sdyO dxI 1;v10=*/ v9 sdelI 1;v11=*/ DI dyI 1;dxC1=+/ v11 v10 v4;v12=+- v11 0 v10;dxC2=*/ v12 1 v4;adyI=abs dyI;v13=*/ adyI sdelI 1;v14=*/ DI dxI -1;dyC1=+/ v14 v13 v4;v15=+- v14 0 v13;dyC2=*/ v15 1 v4;v16=+- x1I 0 dxC1;v17=+- x1I 0 dxC2;v18=+- y1I 0 dyC1;v19=+- y1I 0 dyC2;v20=mod v16 v18 0;v21=mod v17 v19 0;v22=+- v21 0 v20;dxC=?: v22 dxC1 dxC2;dyC=?: v22 dyC1 dyC2;sdxC=*/ dxC rw2 rI;sdyC=*/ dyC rh2 rI;xC=+- hc sdxC 0;yC=+- vc sdyC 0;ist0=at2 sdxC sdyC;ist1=+- ist0 21600000 0;istAng=?: ist0 ist0 ist1;isw1=+- stAng 0 istAng;isw2=+- isw1 0 21600000;iswAng=?: isw1 isw2 isw1;p1=+- xF 0 xC;p2=+- yF 0 yC;p3=mod p1 p2 0;p4=*/ p3 1 2;p5=+- p4 0 thh;xGp=?: p5 xF xG;yGp=?: p5 yF yG;xBp=?: p5 xC xB;yBp=?: p5 yC yB;en0=at2 sdxF sdyF;en1=+- en0 21600000 0;en2=?: en0 en0 en1;sw0=+- en2 0 stAng;sw1=+- sw0 21600000 0;swAng=?: sw0 sw0 sw1;wtI=sin rw3 stAng;htI=cos rh3 stAng;dxI=cat2 rw3 htI wtI;dyI=sat2 rh3 htI wtI;xI=+- hc dxI 0;yI=+- vc dyI 0;aI=+- stAng 0 cd4;aA=+- ptAng cd4 0;aB=+- ptAng cd2 0;idx=cos rw1 2700000;idy=sin rh1 2700000;il=+- hc 0 idx;ir=+- hc idx 0;it=+- vc 0 idy;ib=+- vc idy 0",
+      paths: "M xE yE A rw1 rh1 stAng swAng L xGp yGp L xA yA L xBp yBp L xC yC A rw2 rh2 istAng iswAng Z",
     })
   } else if prst == "uturnArrow" {
     Some({
       avlst: "adj1=25000;adj2=25000;adj3=25000;adj4=43750;adj5=75000",
-      gdlst: "a1=pin 0 adj1 50000;a2=pin 0 adj2 50000;a5=pin 0 adj5 100000;dy=*/ h a1 200000;y1=+- hd2 0 dy;y2=+- hd2 dy 0;dx=*/ w a2 100000;x1=+- l dx 0;y3=*/ h a5 100000",
-      paths: "M l y3 L l y1 C l t x1 t x1 y1 L x1 y2 L x1 y3 L dx y3 L wd4 b L l y3 Z",
+      gdlst: "a2=pin 0 adj2 25000;maxAdj1=*/ a2 2 1;a1=pin 0 adj1 maxAdj1;q2=*/ a1 ss h;q3=+- 100000 0 q2;maxAdj3=*/ q3 h ss;a3=pin 0 adj3 maxAdj3;q1=+- a3 a1 0;minAdj5=*/ q1 ss h;a5=pin minAdj5 adj5 100000;th=*/ ss a1 100000;aw2=*/ ss a2 100000;th2=*/ th 1 2;dh2=+- aw2 0 th2;y5=*/ h a5 100000;ah=*/ ss a3 100000;y4=+- y5 0 ah;x9=+- r 0 dh2;bw=*/ x9 1 2;bs=min bw y4;maxAdj4=*/ bs 100000 ss;a4=pin 0 adj4 maxAdj4;bd=*/ ss a4 100000;bd3=+- bd 0 th;bd2=max bd3 0;x3=+- th bd2 0;x8=+- r 0 aw2;x6=+- x8 0 aw2;x7=+- x6 dh2 0;x4=+- x9 0 bd;x5=+- x7 0 bd2;cx=+/ th x7 2",
+      paths: "M l b L l bd A bd bd cd2 cd4 L x4 t A bd bd 3cd4 cd4 L x9 y4 L r y4 L x8 y5 L x6 y4 L x7 y4 L x7 x3 A bd2 bd2 0 -5400000 L x3 th A bd2 bd2 3cd4 -5400000 L th b Z",
     })
   } else if prst == "leftUpArrow" {
     Some({
@@ -1467,16 +1534,31 @@ fn get_preset_text_rect(prst : String) -> String {
   } else if prst == "star5" ||
     prst == "star6" ||
     prst == "star8" ||
-    prst == "star10" ||
-    prst == "star12" ||
-    prst == "star16" ||
-    prst == "star24" ||
-    prst == "star32" {
+    prst == "star10" {
     "x1 y1 x2 y2"
   } else if prst == "pie" || prst == "arc" {
     "wd4 hd4 3wd4 3hd4"
-  } else if prst == "donut" {
-    "wd4 hd4 3wd4 3hd4"
+  } else if prst == "donut" ||
+    prst == "cloudCallout" ||
+    prst == "circularArrow" ||
+    prst == "star16" ||
+    prst == "star24" ||
+    prst == "star32" {
+    "il it ir ib"
+  } else if prst == "star12" {
+    "sx2 sy2 sx5 sy5"
+  } else if prst == "quadArrow" {
+    "il y3 ir y4"
+  } else if prst == "lightningBolt" {
+    "x4 y4 x9 y10"
+  } else if prst == "sun" {
+    "x9 y9 x8 y8"
+  } else if prst == "moon" {
+    "g12w g15h g0w g16h"
+  } else if prst == "cube" {
+    "l y1 x4 b"
+  } else if prst == "flowChartDocument" {
+    "l t r y1"
   } else if prst == "gear6" || prst == "gear9" {
     "wd4 hd4 3wd4 3hd4"
   } else if prst == "octagon" {

@@ -223,7 +223,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_warp.mbt` | Text warp rendering (SVG `<textPath>` + transforms for prstTxWarp presets) |
 | `src/renderer/renderer_math.mbt` | OMML math rendering (fractions, radicals, integrals, matrices → SVG) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
-| `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
+| `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path). Follows ECMA-376 §20.1.9: `sin`/`cos`/`tan x ang` = x·f(ang), `arcTo` angles are visual (not parametric), sweeps > 180° are split into two SVG arcs. Preset `paths` may start a sub-path with `W pw ph` (its own `a:path w/h`) |
+| `src/renderer/renderer_geom_wbtest.mbt` | White-box tests for the guide evaluator and arc conversion |
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Preset geometries that rendered blank or distorted** (#62). `donut`, `cloudCallout`, `star12`, `circularArrow`, `uturnArrow`, `quadArrow`, `lightningBolt`, `sun`, `moon`, `cube` and `flowChartDocument` now draw the ECMA-376 outline, and `wedgeRectCallout` attaches its tail to the edge nearest the tip instead of always the bottom. The fixes are in the guide evaluator, and apply to every preset and to `a:custGeom`:
+  - a sweep over 180° (including a full 360° ellipse) is emitted as two SVG arcs — one arc whose end point equals its start point draws nothing (SVG 1.1 §F.6.2);
+  - `arcTo` angles are treated as visual angles (the ray from the ellipse centre), not parametric ones, so elliptical arcs end where the spec puts them;
+  - `sin` / `cos` / `tan` guides take `x angle` as in the spec (they were reversed), `+/` is implemented, and the `hc` / `vc` / `wd32` built-ins exist; an undefined guide name now evaluates to 0 instead of the digits in its name.
+- The definitions of those 12 presets, plus `star16` / `star24` / `star32`, `noSmoking`, `smileyFace`, `wedgeEllipseCallout`, `mathDivide` and `flowChartConnector` / `Or` / `SummingJunction` / `MagneticTape`, are now taken verbatim from `presetShapeDefinitions.xml`, replacing hand-written approximations. A path can declare its own coordinate space (`a:path w/h`). The shapes that were invisible before because of the full-circle arc bug now render correctly.
+
 ### Refactoring
 
 - **Qualified package references in black-box tests** (tests only). The current toolchain (moon 0.1.20260920) warns `test_unqualified_package` [0025] when a `*_test.mbt` file uses its own package's public API without the `@pkg.` prefix; 412 such references across `xml`, `ooxml`, `renderer`, `svg_parser` and `serializer` tests are now qualified (`render_slide_svg(...)` → `@renderer.render_slide_svg(...)`, `Color::white()` → `@ooxml.Color::white()`). `moon test` is warning-free; test count unchanged (200).

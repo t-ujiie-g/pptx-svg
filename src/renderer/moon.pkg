@@ -8,3 +8,7 @@ import {
   "pptx-svg/svg_parser",
   "moonbitlang/core/test",
 } for "test"
+
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
