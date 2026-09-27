@@ -18,7 +18,7 @@ PPTX と SVG の双方向変換ライブラリ。外部依存なし、ブラウ�
 - **PPTX → SVG**: PowerPoint スライドを高品質な SVG に変換
 - **SVG → PPTX**: SVG を編集して有効な .pptx ファイルにエクスポート（ロスレス往復）
 - **ブラウザ & Node.js**: サーバー不要でクライアント側実行、または Node.js 22+ でサーバー側実行
-- **外部依存なし**: Wasm バイナリ約 280KB、npm 依存パッケージなし
+- **外部依存なし**: Wasm バイナリ約 400KB（gzip 後 約 145KB）、npm 依存パッケージなし
 - **フレームワーク非依存**: React、Vue、Svelte、バニラ JS、Express など何でも利用可能
 
 ## インストール
@@ -362,7 +362,7 @@ python3 -m http.server 8765 --directory .
 
 ## リリース
 
-npm へのリリースは GitHub Actions でバージョンタグ push 時に自動実行されます:
+バージョンタグを push すると GitHub Actions が [trusted publishing](https://docs.npmjs.com/trusted-publishers/)（OIDC、npm トークン不要）で npm にリリースをステージングします:
 
 ```bash
 # package.json のバージョンを更新後:
@@ -370,7 +370,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-GitHub リポジトリ設定で `NPM_TOKEN` シークレットの設定が必要です。
+Trusted publisher は stage のみ許可しているため、workflow は `npm stage publish` を実行し、メンテナが 2FA で承認するまで公開されません。承認は npmjs.com（パッケージ → **Staged Packages** → Approve）または `npm stage approve <stage-id>` で行います。詳細は [staged publishing](https://docs.npmjs.com/staged-publishing/) を参照。
 
 ## コントリビュート
 

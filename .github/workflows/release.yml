@@ -25,6 +25,11 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      # npm trusted publishing (OIDC, no token) with staged publishing needs
+      # npm CLI >= 11.15.0; Node 22 bundles npm 10.
+      - name: Update npm
+        run: npm install -g npm@^11.15.0
+
       - name: Install dependencies
         run: npm ci
 
@@ -34,7 +39,16 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The trusted publisher is stage-only: this uploads to npm's staging area
+      # (provenance is attached automatically), and the release goes public only
+      # after a maintainer approves it with 2FA.
+      - name: Stage publish to npm
+        run: npm stage publish
+
+      - name: Approval reminder
+        run: |
+          {
+            echo "### ${GITHUB_REF_NAME} is staged on npm"
+            echo "Approve it with 2FA to publish: npmjs.com → pptx-svg → **Staged Packages** → Approve,"
+            echo "or \`npm stage approve <stage-id>\`."
+          } >> "$GITHUB_STEP_SUMMARY"
