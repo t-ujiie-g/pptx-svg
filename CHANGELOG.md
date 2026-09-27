@@ -10,6 +10,7 @@
 
 ### Changed
 
+- **Releases use npm trusted publishing with staged publishing.** `release.yml` authenticates via OIDC instead of an `NPM_TOKEN` secret and runs `npm stage publish` (npm CLI ≥ 11.15.0); a maintainer approves each staged release with 2FA before it goes public. Provenance is attached automatically.
 - **Preset text rectangles follow each preset's `a:rect`** instead of a hand-written subset (the rest used the whole shape), e.g. triangle text sits in the lower half and arrow text in the shaft. The Wasm grows ~59 KB (~17 KB gzipped) for the definition table.
 
 ### Fixed
