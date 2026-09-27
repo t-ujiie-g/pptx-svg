@@ -111,5 +111,82 @@ test("regressions (slides 96-98)", async () => {
     assert('slide99 SVG mirrors flipV (scale(1,-1))', svg99.includes('scale(1,-1)'));
   }
 
+  // ── Slide 100: preset geometries from the ECMA-376 definitions (issue #62) ─
+  {
+    console.log('\n── test_features.pptx — Slide 100: preset geometry (issue #62) ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const svg = r.renderSlideSvg(99);
+
+    // Shape order on the slide: 12 presets, then 4 wedgeRectCallout variants.
+    const presets = ['rect', 'donut', 'cloudCallout', 'star12', 'circularArrow',
+      'uturnArrow', 'quadArrow', 'lightningBolt', 'sun', 'moon', 'cube',
+      'flowChartDocument'];
+    const pathOf = (idx) => {
+      const start = svg.indexOf(`data-ooxml-shape-idx="${idx}"`);
+      const end = svg.indexOf(`data-ooxml-shape-idx="${idx + 1}"`);
+      const seg = svg.slice(start, end < 0 ? undefined : end);
+      const m = seg.match(/<path d="([^"]+)"/);
+      return start < 0 || !m ? '' : m[1];
+    };
+    // Parse M/L/A/C/Q/Z into commands with absolute end points.
+    const parse = (d) => {
+      const cmds = [];
+      const re = /([MLACQZ])([^MLACQZ]*)/g;
+      let m;
+      while ((m = re.exec(d))) {
+        const n = m[2].trim().split(/[\s,]+/).filter(Boolean).map(Number);
+        cmds.push({ c: m[1], x: n[n.length - 2], y: n[n.length - 1] });
+      }
+      return cmds;
+    };
+
+    presets.forEach((prst, idx) => {
+      if (prst === 'rect') return; // control shape: rendered as <rect>, not <path>
+      const d = pathOf(idx);
+      assert(`slide100 ${prst} renders a path`, d.length > 0);
+      // An SVG arc whose end point equals its start point draws nothing
+      // (the donut / cloudCallout blank-shape bug).
+      let cx = 0, cy = 0, sx = 0, sy = 0, degenerate = 0;
+      for (const k of parse(d)) {
+        if (k.c === 'Z') { cx = sx; cy = sy; continue; }
+        if (k.c === 'A' && Math.abs(k.x - cx) < 0.05 && Math.abs(k.y - cy) < 0.05) degenerate++;
+        if (k.c === 'M') { sx = k.x; sy = k.y; }
+        cx = k.x; cy = k.y;
+      }
+      assert(`slide100 ${prst} has no zero-length arcs`, degenerate === 0, `${degenerate} found`);
+    });
+
+    // star12: 24 vertices (M + 23 L).
+    const star = parse(pathOf(3));
+    assert('slide100 star12 has 24 vertices',
+      star.filter((k) => k.c === 'M' || k.c === 'L').length === 24);
+
+    // moon: every point stays inside its box, which starts at M r b.
+    const moon = parse(pathOf(9));
+    const [mr, mb] = [moon[0].x, moon[0].y];
+    assert('slide100 moon stays within its box',
+      moon.every((k) => k.c === 'Z' || (k.x <= mr + 0.5 && k.y <= mb + 0.5)));
+
+    // wedgeRectCallout: vertex 0 = (l,t), vertex 8 = (r,b); the tip is the one
+    // vertex outside the box and must sit on the edge nearest to it.
+    const tipSlot = { W_below: 10, W_above: 2, W_left: 14, W_right: 6 };
+    Object.entries(tipSlot).forEach(([name, slot], i) => {
+      const v = parse(pathOf(presets.length + i)).filter((k) => k.c !== 'Z');
+      if (v.length !== 16) {
+        assert(`slide100 ${name} has 16 vertices`, false, `got ${v.length}`);
+        return;
+      }
+      const [l, t, rr, b] = [v[0].x, v[0].y, v[8].x, v[8].y];
+      const outside = v.findIndex((p) => p.x < l - 0.5 || p.x > rr + 0.5 || p.y < t - 0.5 || p.y > b + 0.5);
+      assert(`slide100 ${name} tail leaves the matching edge`, outside === slot, `tip at vertex ${outside}`);
+    });
+  }
+
   finishAssertions();
 });

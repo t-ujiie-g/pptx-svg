@@ -88,6 +88,7 @@ The sources track current MoonBit idiom; match it in new code.
 - **A range loop evaluates its bounds once**, unlike a re-checked `while` condition. If the body pushes to / removes from the collection it is iterating, keep the `while`.
 - **`while` is still correct** for loops with a body-local step (`i = i + char_step(c)` — the step is unavailable in a `for` header), for a `continue` that must *skip* the increment, and when the index is read after the loop.
 - **`if opt is Some(x) { … }`** instead of `match opt { Some(x) => … None => () }`.
+- **Dispatch on a string with `match`, not an `if s == "a" … else if` chain**: string-literal or-patterns (`"a" | "b" => …`), and array patterns to bind operands at the same time (`match tokens { ["cos", x, ang, ..] => … }`, `match tokens[i:] { ["M", x, y, ..] => … }`). A slice pattern also replaces a manual `i + n < len` arity check.
 - **`xs.is_empty()` / `!xs.is_empty()`**, never `xs.length() == 0` / `> 0`.
 - Method-call syntax for stdlib conversions: `c.to_int()`, not `Char::to_int(c)`.
 - **Top-level declarations are separated by a `///|` block marker.** Each block is independent and order-irrelevant, so a refactor can move blocks one at a time. New top-level items get one too; `moon fmt` keeps them in place.
@@ -223,7 +224,8 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_warp.mbt` | Text warp rendering (SVG `<textPath>` + transforms for prstTxWarp presets) |
 | `src/renderer/renderer_math.mbt` | OMML math rendering (fractions, radicals, integrals, matrices → SVG) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
-| `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path) |
+| `src/renderer/renderer_geom.mbt` | Preset geometry evaluator (guide formulas → SVG path). Follows ECMA-376 §20.1.9: `sin`/`cos`/`tan x ang` = x·f(ang), `arcTo` angles are visual (not parametric), sweeps > 180° are split into two SVG arcs. Preset `paths` may start a sub-path with `W pw ph` (its own `a:path w/h`) |
+| `src/renderer/renderer_geom_wbtest.mbt` | White-box tests for the guide evaluator and arc conversion |
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |

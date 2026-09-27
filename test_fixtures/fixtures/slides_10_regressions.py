@@ -167,3 +167,49 @@ for idx, (name, flip_attr, x) in enumerate(flip_variants):
 </p:sp>
 """
     spTree99.append(etree.fromstring(sp_xml))
+
+# ── Slide 100: preset geometries from the ECMA-376 definitions (issue #62) ────
+# Regression: these presets drew blank (a full-circle arcTo was emitted as one
+# SVG arc with coincident endpoints) or distorted (hand-approximated guide
+# lists, reversed sin/cos operands, missing hc/vc and +/). The wedgeRectCallout
+# variants cover `?:` edge selection: each tip must attach to its nearest edge.
+slide100 = prs.slides.add_slide(blank)
+spTree100 = slide100.shapes._spTree
+
+issue62_presets = (
+    "rect", "donut", "cloudCallout", "star12",
+    "circularArrow", "uturnArrow", "quadArrow", "lightningBolt",
+    "sun", "moon", "cube", "flowChartDocument",
+)
+issue62_wedges = (
+    ("W_below", 30000, 80000),
+    ("W_above", 30000, -80000),
+    ("W_left", -80000, 0),
+    ("W_right", 80000, 10000),
+)
+
+
+def issue62_sp(sp_id, name, prst, x, y, cx, cy, avlst=""):
+    return f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="{sp_id}" name="{name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>
+    <a:prstGeom prst="{prst}"><a:avLst>{avlst}</a:avLst></a:prstGeom>
+    <a:solidFill><a:srgbClr val="5B9BD5"/></a:solidFill>
+  </p:spPr>
+</p:sp>
+"""
+
+
+for idx, prst in enumerate(issue62_presets):
+    x = 228600 + (idx % 6) * 1447800
+    y = 228600 + (idx // 6) * 1600200
+    spTree100.append(etree.fromstring(
+        issue62_sp(10000 + idx, f"P_{prst}", prst, x, y, 1188720, 868680)))
+for idx, (name, adj1, adj2) in enumerate(issue62_wedges):
+    av = (f'<a:gd name="adj1" fmla="val {adj1}"/>'
+          f'<a:gd name="adj2" fmla="val {adj2}"/>')
+    spTree100.append(etree.fromstring(issue62_sp(
+        10100 + idx, name, "wedgeRectCallout",
+        457200 + idx * 2133600, 4114800, 1371600, 914400, av)))
