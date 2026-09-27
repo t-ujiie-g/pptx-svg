@@ -850,80 +850,80 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
 ///|
 /// Serialize a single path segment from compact format to OOXML XML.
 fn serialize_path_segment(seg : String, path_w : Int, path_h : Int) -> String {
-  let mut out = "<a:path"
-  if path_w > 0 {
-    out = out + " w=\"" + int_to_str(path_w) + "\""
+  // Leading "W pw ph" / "F mode" / "S false" tokens are a:path attributes;
+  // the rest are drawing commands.
+  let mut w = path_w
+  let mut h = path_h
+  let mut attrs = ""
+  let mut body = ""
+  let pt = fn(x : String, y : String) {
+    "<a:pt x=\"" + x + "\" y=\"" + y + "\"/>"
   }
-  if path_h > 0 {
-    out = out + " h=\"" + int_to_str(path_h) + "\""
-  }
-  out = out + ">"
-  // Parse compact format tokens
   let tokens = @xml.split_by_space(seg)
-  let nt = tokens.length()
   let mut i = 0
-  while i < nt {
-    let cmd = tokens[i]
-    if cmd == "M" && i + 2 < nt {
-      out = out +
-        "<a:moveTo><a:pt x=\"" +
-        tokens[i + 1] +
-        "\" y=\"" +
-        tokens[i + 2] +
-        "\"/></a:moveTo>"
-      i = i + 3
-    } else if cmd == "L" && i + 2 < nt {
-      out = out +
-        "<a:lnTo><a:pt x=\"" +
-        tokens[i + 1] +
-        "\" y=\"" +
-        tokens[i + 2] +
-        "\"/></a:lnTo>"
-      i = i + 3
-    } else if cmd == "C" && i + 6 < nt {
-      out = out + "<a:cubicBezTo>"
-      for j in 0..<3 {
-        out = out +
-          "<a:pt x=\"" +
-          tokens[i + 1 + j * 2] +
-          "\" y=\"" +
-          tokens[i + 2 + j * 2] +
-          "\"/>"
+  while i < tokens.length() {
+    match tokens[i:] {
+      ["W", pw, ph, ..] => {
+        w = @xml.parse_int(pw)
+        h = @xml.parse_int(ph)
+        i = i + 3
       }
-      out = out + "</a:cubicBezTo>"
-      i = i + 7
-    } else if cmd == "Q" && i + 4 < nt {
-      out = out + "<a:quadBezTo>"
-      for j in 0..<2 {
-        out = out +
-          "<a:pt x=\"" +
-          tokens[i + 1 + j * 2] +
-          "\" y=\"" +
-          tokens[i + 2 + j * 2] +
-          "\"/>"
+      ["F", mode, ..] => {
+        attrs = attrs + " fill=\"" + mode + "\""
+        i = i + 2
       }
-      out = out + "</a:quadBezTo>"
-      i = i + 5
-    } else if cmd == "A" && i + 4 < nt {
-      out = out +
-        "<a:arcTo wR=\"" +
-        tokens[i + 1] +
-        "\" hR=\"" +
-        tokens[i + 2] +
-        "\" stAng=\"" +
-        tokens[i + 3] +
-        "\" swAng=\"" +
-        tokens[i + 4] +
-        "\"/>"
-      i = i + 5
-    } else if cmd == "Z" {
-      out = out + "<a:close/>"
-      i = i + 1
-    } else {
-      i = i + 1
+      ["S", "false", ..] => {
+        attrs = attrs + " stroke=\"0\""
+        i = i + 2
+      }
+      ["M", x, y, ..] => {
+        body = body + "<a:moveTo>" + pt(x, y) + "</a:moveTo>"
+        i = i + 3
+      }
+      ["L", x, y, ..] => {
+        body = body + "<a:lnTo>" + pt(x, y) + "</a:lnTo>"
+        i = i + 3
+      }
+      ["C", x1, y1, x2, y2, x3, y3, ..] => {
+        body = body +
+          "<a:cubicBezTo>" +
+          pt(x1, y1) +
+          pt(x2, y2) +
+          pt(x3, y3) +
+          "</a:cubicBezTo>"
+        i = i + 7
+      }
+      ["Q", x1, y1, x2, y2, ..] => {
+        body = body +
+          "<a:quadBezTo>" +
+          pt(x1, y1) +
+          pt(x2, y2) +
+          "</a:quadBezTo>"
+        i = i + 5
+      }
+      ["A", wr, hr, st, sw, ..] => {
+        body = body +
+          "<a:arcTo wR=\"" +
+          wr +
+          "\" hR=\"" +
+          hr +
+          "\" stAng=\"" +
+          st +
+          "\" swAng=\"" +
+          sw +
+          "\"/>"
+        i = i + 5
+      }
+      ["Z", ..] => {
+        body = body + "<a:close/>"
+        i = i + 1
+      }
+      _ => i = i + 1
     }
   }
-  out + "</a:path>"
+  let size = (if w > 0 { " w=\"" + int_to_str(w) + "\"" } else { "" }) +
+    (if h > 0 { " h=\"" + int_to_str(h) + "\"" } else { "" })
+  "<a:path" + size + attrs + ">" + body + "</a:path>"
 }
 
 ///|

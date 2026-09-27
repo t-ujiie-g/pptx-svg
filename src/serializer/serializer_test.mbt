@@ -584,3 +584,48 @@ test "TableCell::empty has parser defaults" {
   assert_eq(c.mar_l, -1)
   assert_eq(c.anchor, "")
 }
+
+///|
+test "custGeom per-path fill / stroke / coordinate space round-trip" {
+  let slide_xml =
+    #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+    #|  <p:cSld><p:spTree>
+    #|    <p:sp>
+    #|      <p:nvSpPr><p:cNvPr id="2" name="Icon"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+    #|      <p:spPr>
+    #|        <a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm>
+    #|        <a:custGeom><a:avLst/><a:gdLst/><a:rect l="l" t="t" r="r" b="b"/>
+    #|          <a:pathLst>
+    #|            <a:path w="100" h="100" stroke="false"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="100" y="100"/></a:lnTo><a:close/></a:path>
+    #|            <a:path w="50" h="50" fill="none"><a:moveTo><a:pt x="0" y="50"/></a:moveTo><a:lnTo><a:pt x="50" y="0"/></a:lnTo></a:path>
+    #|            <a:path w="100" h="100" fill="darken"><a:moveTo><a:pt x="10" y="10"/></a:moveTo><a:close/></a:path>
+    #|          </a:pathLst>
+    #|        </a:custGeom>
+    #|      </p:spPr>
+    #|    </p:sp>
+    #|  </p:spTree></p:cSld>
+    #|</p:sld>
+  let slide = @ooxml.parse_slide(
+    slide_xml,
+    @ooxml.SlideSize::default(),
+    @ooxml.ThemeData::default(),
+  )
+  guard slide.shapes[0].kind
+    is @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Custom(data)) else {
+    fail("expected custGeom")
+  }
+  // The first path's space is the default; the second carries its own.
+  assert_eq(data.path_w, 100)
+  assert_eq(
+    data.paths,
+    "S false M 0 0 L 100 100 Z|W 50 50 F none M 0 50 L 50 0|F darken M 10 10 Z",
+  )
+  let xml = @serializer.serialize_slide(slide)
+  assert_true(
+    xml.contains(
+      "<a:path w=\"100\" h=\"100\" stroke=\"0\"><a:moveTo><a:pt x=\"0\" y=\"0\"/></a:moveTo>",
+    ),
+  )
+  assert_true(xml.contains("<a:path w=\"50\" h=\"50\" fill=\"none\">"))
+  assert_true(xml.contains("<a:path w=\"100\" h=\"100\" fill=\"darken\">"))
+}

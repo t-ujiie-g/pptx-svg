@@ -1189,9 +1189,9 @@ pub(all) enum ShapeGeom {
 ///|
 pub(all) struct CustomGeomData {
   gdlst : String // guide formulas: "name1=fmla1;name2=fmla2"
-  paths : String // compact path: "M x y L x y Z" ("|" separates sub-paths)
-  path_w : Int // path coordinate space width (0 = use shape width)
-  path_h : Int // path coordinate space height (0 = use shape height)
+  paths : String // compact path: "M x y L x y Z" ("|" separates sub-paths; optional leading "W pw ph", "F mode", "S false")
+  path_w : Int // first path's coordinate space width (0 = use shape width)
+  path_h : Int // first path's coordinate space height (0 = use shape height)
   rect_l : String // text rect left guide name (empty = use shape bound)
   rect_t : String // text rect top guide name
   rect_r : String // text rect right guide name

@@ -85,7 +85,7 @@ test "arcTo angles are visual angles on an ellipse" {
 ///|
 test "W token scales a path from its own coordinate space" {
   let env = geom_env(200.0, 100.0)
-  let d = render_geom_paths(
+  let svg = render_styled_paths(
     env,
     parse_paths("W 21600 21600 M 0 0 L 21600 21600"),
     0,
@@ -94,8 +94,11 @@ test "W token scales a path from its own coordinate space" {
     100.0,
     0.0,
     0.0,
+    "",
+    "",
+    "",
   )
-  assert_eq(d, "M0 0L200 100")
+  assert_eq(svg, "<path d=\"M0 0L200 100\"/>")
 }
 
 ///|
@@ -240,5 +243,28 @@ test "text rectangle comes from the spec a:rect" {
   assert_eq(
     compute_preset_text_rect("noSuchPreset", [], 200, 100),
     (0, 0, 200, 100),
+  )
+}
+
+///|
+test "custGeom honours per-path fill modes and its own coordinate spaces" {
+  let data : @ooxml.CustomGeomData = {
+    gdlst: "",
+    paths: "S false M 0 0 L 100 100 Z|W 50 50 F none M 0 50 L 50 0",
+    path_w: 100,
+    path_h: 100,
+    rect_l: "",
+    rect_t: "",
+    rect_r: "",
+    rect_b: "",
+    cxn_lst: "",
+  }
+  let svg = render_custom_geom(
+    data, 200, 100, 0, 0, " fill=\"#123456\"", " stroke=\"#000000\"", "",
+  )
+  assert_eq(
+    svg,
+    "<path d=\"M0 0L200 100Z\" fill=\"#123456\" stroke=\"none\"/>" +
+    "<path d=\"M0 100L200 0\" fill=\"none\" stroke=\"#000000\"/>",
   )
 }

@@ -226,7 +226,39 @@ for idx, prst in enumerate(generated_presets):
     sp_xml = issue62_sp(10200 + idx, f"G_{prst}", prst,
                         228600 + idx * 1447800, 1371600, 1188720, 868680)
     sp = etree.fromstring(sp_xml)
-    # A visible outline so stroke-only paths render.
+    # A light outline so stroke-only paths stand out on the dark background.
     sp.find(f"{{{ns_p}}}spPr").append(etree.fromstring(
-        f'<a:ln xmlns:a="{ns_a}" w="19050"><a:solidFill><a:srgbClr val="1F3864"/></a:solidFill></a:ln>'))
+        f'<a:ln xmlns:a="{ns_a}" w="19050"><a:solidFill><a:srgbClr val="FFC000"/></a:solidFill></a:ln>'))
     spTree101.append(sp)
+
+# ── Slide 102: custGeom per-path fill / stroke / coordinate space ─────────────
+# A custom geometry with three a:path elements: a filled, unstroked square
+# (w/h 100), a stroke-only diagonal in its own 50×50 space, and a darkened
+# inner square. Each path's attributes must render and survive export.
+slide102 = prs.slides.add_slide(blank)
+cust_sp_xml = f"""
+<p:sp xmlns:p="{ns_p}" xmlns:a="{ns_a}">
+  <p:nvSpPr><p:cNvPr id="10300" name="CustStyled"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+  <p:spPr>
+    <a:xfrm><a:off x="2286000" y="1371600"/><a:ext cx="2743200" cy="2743200"/></a:xfrm>
+    <a:custGeom><a:avLst/><a:gdLst/><a:rect l="l" t="t" r="r" b="b"/>
+      <a:pathLst>
+        <a:path w="100" h="100" stroke="0">
+          <a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="100" y="0"/></a:lnTo>
+          <a:lnTo><a:pt x="100" y="100"/></a:lnTo><a:lnTo><a:pt x="0" y="100"/></a:lnTo><a:close/>
+        </a:path>
+        <a:path w="50" h="50" fill="none">
+          <a:moveTo><a:pt x="0" y="50"/></a:moveTo><a:lnTo><a:pt x="50" y="0"/></a:lnTo>
+        </a:path>
+        <a:path w="100" h="100" fill="darken" stroke="0">
+          <a:moveTo><a:pt x="25" y="25"/></a:moveTo><a:lnTo><a:pt x="50" y="25"/></a:lnTo>
+          <a:lnTo><a:pt x="50" y="50"/></a:lnTo><a:lnTo><a:pt x="25" y="50"/></a:lnTo><a:close/>
+        </a:path>
+      </a:pathLst>
+    </a:custGeom>
+    <a:solidFill><a:srgbClr val="5B9BD5"/></a:solidFill>
+    <a:ln w="28575"><a:solidFill><a:srgbClr val="FFC000"/></a:solidFill></a:ln>
+  </p:spPr>
+</p:sp>
+"""
+slide102.shapes._spTree.append(etree.fromstring(cust_sp_xml))
