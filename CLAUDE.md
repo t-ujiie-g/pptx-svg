@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Typecheck (fast — run after every meaningful edit)
 moon check --target wasm-gc --deny-warn
 
-# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~280KB)
+# Build Wasm (output: _build/wasm-gc/release/build/main/main.wasm, ~400KB)
 moon build --target wasm-gc --release
 
 # MoonBit format
@@ -224,8 +224,9 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/renderer/renderer_warp.mbt` | Text warp rendering (SVG `<textPath>` + transforms for prstTxWarp presets) |
 | `src/renderer/renderer_math.mbt` | OMML math rendering (fractions, radicals, integrals, matrices → SVG) |
 | `src/renderer/renderer_fill.mbt` | Gradient/pattern/blip fill + effect filter SVG rendering |
-| `src/renderer/renderer_geom.mbt` | Guide-formula evaluator + path rendering (ECMA-376 §20.1.9). Formula and path strings are parsed once into typed enums (`Formula`, `PathCmd`, operands `Operand::Lit`/`Var`) and evaluated by exhaustive `match`; preset definitions are parsed on first use and cached (`preset_geom`). `sin`/`cos`/`tan x ang` = x·f(ang), `arcTo` angles are visual (not parametric), sweeps > 180° are split into two SVG arcs. A compact sub-path may start with `W pw ph` (its own `a:path w/h`) |
-| `src/renderer/renderer_geom_presets.mbt` | Preset definition table (`get_preset_def`: avLst / gdLst / paths strings per `prst`) + preset text rectangles |
+| `src/renderer/renderer_geom.mbt` | Guide-formula evaluator + path rendering (ECMA-376 §20.1.9). Formula and path strings are parsed once into typed enums (`Formula`, `PathCmd`, operands `Operand::Lit`/`Var`) and evaluated by exhaustive `match`; preset definitions are parsed on first use and cached (`preset_geom`). `sin`/`cos`/`tan x ang` = x·f(ang), `arcTo` angles are visual (not parametric), sweeps > 180° are split into two SVG arcs. A compact sub-path may start with `W pw ph` (its own `a:path w/h`), `F mode` (`a:path fill`) and `S false` (not stroked); `render_styled_paths` honours them — shade modes are black/white overlays, stroke-only sub-paths are drawn after the fills |
+| `src/renderer/renderer_geom_presets.mbt` | **Generated — do not edit.** All 182 ECMA-376 presets (`get_preset_def`: avLst / gdLst / paths / text rect as compact strings), from `scripts/gen_preset_geom.py` |
+| `scripts/gen_preset_geom.py` | Regenerates `renderer_geom_presets.mbt` from `presetShapeDefinitions.xml` (ECMA-376 Part 1 attachment; path passed as the argument, the XML is not vendored), then run `moon fmt`. Documents the compact string formats |
 | `src/renderer/renderer_geom_wbtest.mbt` | White-box tests for the guide evaluator and arc conversion |
 | `src/renderer/renderer_chart.mbt` | Chart SVG rendering (bar/line/pie/donut/scatter/area/radar/bubble/stock/surface/ofPie) |
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |

@@ -19,7 +19,7 @@
 - [x] ライブラリ化: TypeScript 分割 + PptxRenderer クラス + npm + CI/CD
 
 ### シェイプ・描画
-- [x] AutoShape (~154 プリセット) + カスタムジオメトリ (`a:custGeom`) + コネクタ (直線/折れ線/曲線)
+- [x] AutoShape (ECMA-376 全 187 プリセット — 182 種は `presetShapeDefinitions.xml` から生成) + カスタムジオメトリ (`a:custGeom`) + コネクタ (直線/折れ線/曲線)
 - [x] グループシェイプ: `p:grpSp` 再帰 + 座標変換 + ネスト
 - [x] 塗りつぶし: 単色 + グラデーション (線形/放射) + パターン (48 種) + 画像フィル (stretch/tile/crop) + アルファ
 - [x] 線/ストローク: 破線 11 種 + 矢印 5 種 + 線結合/線端/複合線 + グラデーション/パターンストローク
@@ -171,8 +171,9 @@ EMF コンバータと同様の手法で WMF (16-bit GDI) をパースし SVG �
 
 ### R2: 図形・エフェクト
 
-- [ ] **プリセットジオメトリ定義を ECMA-376 `presetShapeDefinitions.xml` から一括生成**（生成先: `renderer_geom_presets.mbt`）— `get_preset_def` の多くは手書きの近似（例: `accentBorderCallout1` の引出線座標が `hd2`/`wd2` 基準で仕様と不一致、`irregularSeal1/2`・`heptagon`・`bevel` 等は簡略形）。#62 で評価器（`hc`/`vc`・`+/`・`sin`/`cos`/`tan` の引数順・arcTo の視角・360° 円弧・パス別 `w`/`h`）は仕様準拠化済みで、仕様 XML から機械変換すればそのまま描ける。テキスト矩形 (`a:rect`) も同時に生成すれば `add_text_rect_guides` の個別実装が不要になる
-- [ ] **パス別の塗り指定（`fill="none"` / `darken` / `lightenLess` 等）と `stroke="false"`** — 現状は全サブパスを 1 本の `<path>` で同一塗りにする。`cube`/`can` の面の陰影や、`cloudCallout` の線のみパスが仕様どおりに描き分けられない
+- [x] **プリセットジオメトリ定義を ECMA-376 `presetShapeDefinitions.xml` から一括生成** — `scripts/gen_preset_geom.py` → `renderer_geom_presets.mbt`（テキスト矩形 `a:rect` も生成）
+- [x] **プリセットのパス別塗り指定（`fill="none"` / `darken` / `lightenLess` 等）と `stroke="false"`** — 陰影は黒/白の半透明オーバーレイで近似
+- [ ] **カスタムジオメトリ (`a:custGeom`) のパス別塗り指定** — custGeom は全サブパスを 1 本の `<path>` で同一塗り。`CustomGeomData.paths` の文字列形式はシリアライザの round-trip に使われるため、`F`/`S` トークンを追加するならシリアライザ側も対応が必要
 - [ ] **コネクタの自動ルーティング** — `st_cxn_id`/`end_cxn_id` はパース済みだが、接続先シェイプの接続ポイントへの自動位置合わせ未実装。表示上はユーザ指定の座標で正しく描画される
 - [x] **SmartArt の cached drawing 描画** — `dsp:drawing`（`ppt/drawings/drawingN.xml`）の静的図形を描画。下記 SmartArt 仕様ギャップは残存（フル DiagramML エンジン未実装のため意図的な制限）:
   - [ ] **レイアウトエンジン未実装** — `diagramLayout`(lo) のアルゴリズムは走らせず cached drawing 依存。cached drawing が無い SmartArt（古い形式・一部コンバータ生成）は空表示

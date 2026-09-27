@@ -276,7 +276,7 @@ const scale = getSlideScale(svgElement);           // SVGピクセルあたり�
 
 ### 完全対応
 
-- **シェイプ**: AutoShape (rect/ellipse/roundRect/line/プリセット約154種), カスタムジオメトリ (`a:custGeom`), コネクタ (直線/折れ線/曲線)
+- **シェイプ**: AutoShape (rect/ellipse/roundRect/line/ECMA-376 全187種のプリセット), カスタムジオメトリ (`a:custGeom`), コネクタ (直線/折れ線/曲線)
 - **テキスト**: 段落, ラン, バレット (文字/自動/画像), フォント (Latin/EA/CS/Symbol), 太字/斜体/下線/取消線, 上付き/下付き, 文字間隔, カーニング, 大文字化, ハイパーリンク, タブ, RTL, 均等割り付け (word-spacing 分配)
 - **テキストボディ**: 縦方向整列, 余白, 自動調整, フォントスケール, 回転, 縦書き, 多段組, テキストワープ (prstTxWarp)
 - **塗りつぶし**: 単色, グラデーション (線形/放射 + ストップ), パターン (48プリセット), 画像フィル (stretch/tile/crop)

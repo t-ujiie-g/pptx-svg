@@ -357,16 +357,59 @@ priv enum PathCmd {
 }
 
 ///|
+/// How a sub-path is filled (a:path fill, ECMA-376 §20.1.10.37). The shade
+///  modes draw the shape fill darkened or lightened.
+priv enum PathFill {
+  Norm
+  NoFill
+  Darken
+  DarkenLess
+  Lighten
+  LightenLess
+} derive(Eq)
+
+///|
+fn PathFill::parse(mode : String) -> PathFill {
+  match mode {
+    "none" => NoFill
+    "darken" => Darken
+    "darkenLess" => DarkenLess
+    "lighten" => Lighten
+    "lightenLess" => LightenLess
+    _ => Norm
+  }
+}
+
+///|
+/// One a:path: its commands plus how it is filled and whether it is stroked.
+priv struct SubPath {
+  fill : PathFill
+  stroke : Bool
+  cmds : Array[PathCmd]
+}
+
+///|
 /// Parse one compact sub-path: "M x y", "L x y", "C x1 y1 x2 y2 x3 y3",
-///  "Q x1 y1 x2 y2", "A wR hR stAng swAng", "Z", and "W pw ph" for the
-///  sub-path's own coordinate space. Unrecognised tokens are skipped.
-fn parse_path(cmds : String) -> Array[PathCmd] {
+///  "Q x1 y1 x2 y2", "A wR hR stAng swAng", "Z", "W pw ph" for the sub-path's
+///  own coordinate space, "F mode" for its fill and "S false" when it is not
+///  stroked. Unrecognised tokens are skipped.
+fn parse_path(cmds : String) -> SubPath {
   let o = Operand::parse
   let tokens = @xml.split_by_space(cmds)
   let out : Array[PathCmd] = []
+  let mut fill = Norm
+  let mut stroke = true
   let mut i = 0
   while i < tokens.length() {
     let (cmd, used) : (PathCmd?, Int) = match tokens[i:] {
+      ["F", mode, ..] => {
+        fill = PathFill::parse(mode)
+        (None, 2)
+      }
+      ["S", "false", ..] => {
+        stroke = false
+        (None, 2)
+      }
       ["W", pw, ph, ..] => (Some(Space(parse_double(pw), parse_double(ph))), 3)
       ["M", x, y, ..] => (Some(MoveTo(o(x), o(y))), 3)
       ["L", x, y, ..] => (Some(LnTo(o(x), o(y))), 3)
@@ -383,12 +426,12 @@ fn parse_path(cmds : String) -> Array[PathCmd] {
     }
     i = i + used
   }
-  out
+  { fill, stroke, cmds: out, }
 }
 
 ///|
 /// Parse "|"-separated sub-paths.
-fn parse_paths(paths : String) -> Array[Array[PathCmd]] {
+fn parse_paths(paths : String) -> Array[SubPath] {
   split_on(paths, '|').map(parse_path)
 }
 
@@ -559,10 +602,11 @@ fn ellipse_point(wr : Double, hr : Double, ang : Double) -> (Double, Double) {
 // ── Multiple path support ────────────────────────────────────────────────────
 
 ///|
-/// Render multiple paths separated by "|" into a single SVG path d string.
+/// Render all sub-paths into a single SVG path d string, ignoring their
+///  per-path fill / stroke (used for a:custGeom).
 fn render_geom_paths(
   env : GuideEnv,
-  paths : Array[Array[PathCmd]],
+  paths : Array[SubPath],
   x_off : Int,
   y_off : Int,
   w : Double,
@@ -571,10 +615,104 @@ fn render_geom_paths(
   path_h : Double,
 ) -> String {
   let mut d = ""
-  for cmds in paths {
-    d = d + render_geom_path(env, cmds, x_off, y_off, path_w, path_h, w, h)
+  for sub in paths {
+    d = d + render_geom_path(env, sub.cmds, x_off, y_off, path_w, path_h, w, h)
   }
   d
+}
+
+///|
+/// Shade overlays for PathFill modes: (colour, opacity) drawn over the fill.
+fn shade_overlay(mode : PathFill) -> (String, String)? {
+  match mode {
+    Darken => Some(("#000000", "0.4"))
+    DarkenLess => Some(("#000000", "0.2"))
+    Lighten => Some(("#FFFFFF", "0.4"))
+    LightenLess => Some(("#FFFFFF", "0.2"))
+    Norm | NoFill => None
+  }
+}
+
+///|
+/// SVG elements for path data `d` drawn with one sub-path style.
+///  `fill` / `stroke` / `xform` are the shape's attribute strings.
+fn styled_path_svg(
+  d : String,
+  mode : PathFill,
+  stroked : Bool,
+  fill : String,
+  stroke : String,
+  xform : String,
+) -> String {
+  let no_fill = a("fill", "none")
+  let no_stroke = a("stroke", "none")
+  let path = fn(f : String, s : String) {
+    "<path d=\"" + d + "\"" + f + s + xform + "/>"
+  }
+  let outline = if stroked { path(no_fill, stroke) } else { "" }
+  match (mode, shade_overlay(mode)) {
+    (NoFill, _) => outline
+    (_, None) => path(fill, if stroked { stroke } else { no_stroke })
+    (_, Some((color, opacity))) => {
+      let overlay = if fill == no_fill {
+        ""
+      } else {
+        path(a("fill", color) + a("fill-opacity", opacity), no_stroke)
+      }
+      path(fill, no_stroke) + overlay + outline
+    }
+  }
+}
+
+///|
+/// Render preset sub-paths as SVG elements, honouring each a:path's fill mode
+///  and stroke flag. Adjacent sub-paths with the same style share one <path>,
+///  so a plain filled-and-stroked preset is a single element. Stroke-only
+///  (fill="none") sub-paths are drawn after the filled ones: chartPlus / chartX /
+///  chartStar list their lines before the box that would otherwise cover them.
+fn render_styled_paths(
+  env : GuideEnv,
+  paths : Array[SubPath],
+  x_off : Int,
+  y_off : Int,
+  w : Double,
+  h : Double,
+  fill : String,
+  stroke : String,
+  xform : String,
+) -> String {
+  let mut filled = ""
+  let mut lines = ""
+  let emit = fn(d : String, mode : PathFill, stroked : Bool) {
+    let svg = styled_path_svg(d, mode, stroked, fill, stroke, xform)
+    if mode == NoFill {
+      lines = lines + svg
+    } else {
+      filled = filled + svg
+    }
+  }
+  let mut group_d = ""
+  let mut group : (PathFill, Bool)? = None
+  for sub in paths {
+    let d = render_geom_path(env, sub.cmds, x_off, y_off, 0.0, 0.0, w, h)
+    if d.is_empty() {
+      continue
+    }
+    let style = (sub.fill, sub.stroke)
+    if group == Some(style) {
+      group_d = group_d + d
+    } else {
+      if group is Some((mode, stroked)) {
+        emit(group_d, mode, stroked)
+      }
+      group_d = d
+      group = Some(style)
+    }
+  }
+  if group is Some((mode, stroked)) {
+    emit(group_d, mode, stroked)
+  }
+  filled + lines
 }
 
 // ── Parsed preset cache ──────────────────────────────────────────────────────
@@ -584,7 +722,18 @@ fn render_geom_paths(
 priv struct ParsedGeom {
   adjs : Array[(String, Double)] // avLst defaults, in declaration order
   guides : Array[Guide]
-  paths : Array[Array[PathCmd]]
+  paths : Array[SubPath]
+  rect : Array[Operand] // text rectangle l t r b; empty = the whole shape
+}
+
+///|
+/// A preset definition as generated from presetShapeDefinitions.xml
+///  (formats: scripts/gen_preset_geom.py).
+priv struct PresetDef {
+  avlst : String
+  gdlst : String
+  paths : String
+  rect : String
 }
 
 ///|
@@ -604,6 +753,7 @@ fn preset_geom(prst : String) -> ParsedGeom? {
         adjs: parse_adjustments(def.avlst),
         guides: parse_guides(def.gdlst),
         paths: parse_paths(def.paths),
+        rect: @xml.split_by_space(def.rect).map(Operand::parse),
       })
   }
   preset_geom_cache[prst] = parsed
@@ -628,7 +778,7 @@ fn render_preset_geom(
   rot : String,
 ) -> String {
   // An unknown preset, or one whose path evaluates to nothing, falls back to a rectangle.
-  let d = match preset_geom(prst) {
+  let svg = match preset_geom(prst) {
     None => ""
     Some(geom) => {
       let w = cx_p.to_double()
@@ -637,10 +787,10 @@ fn render_preset_geom(
       env.init_builtins(w, h)
       apply_adjustments(env, geom.adjs, adj_values)
       eval_guides(env, geom.guides)
-      render_geom_paths(env, geom.paths, x_p, y_p, w, h, 0.0, 0.0)
+      render_styled_paths(env, geom.paths, x_p, y_p, w, h, fill, stroke, rot)
     }
   }
-  if d.is_empty() {
+  if svg.is_empty() {
     "<rect" +
     ai("x", x_p) +
     ai("y", y_p) +
@@ -651,7 +801,7 @@ fn render_preset_geom(
     rot +
     "/>"
   } else {
-    "<path d=\"" + d + "\"" + fill + stroke + rot + "/>"
+    svg
   }
 }
 
@@ -707,36 +857,19 @@ fn compute_preset_text_rect(
   cx_p : Int,
   cy_p : Int,
 ) -> (Int, Int, Int, Int) {
-  let rect_def = get_preset_text_rect(prst)
-  if rect_def.is_empty() {
+  guard preset_geom(prst) is Some({ rect: [rl, rt, rr, rb], adjs, guides, .. }) else {
     return (0, 0, cx_p, cy_p)
-  }
-  // Get the preset definition to evaluate guides
-  let geom = match preset_geom(prst) {
-    None => return (0, 0, cx_p, cy_p)
-    Some(g) => g
   }
   let w = cx_p.to_double()
   let h = cy_p.to_double()
   let env = GuideEnv::new()
   env.init_builtins(w, h)
-  // Add convenience variables for text rect formulas
-  env.set("3wd4", w * 3.0 / 4.0)
-  env.set("3hd4", h * 3.0 / 4.0)
-  env.set("5wd6", w * 5.0 / 6.0)
-  apply_adjustments(env, geom.adjs, adj_values)
-  eval_guides(env, geom.guides)
-  // Add text-rect-specific guide variables for common shapes
-  add_text_rect_guides(env, prst, w, h)
-  // Parse rect definition: "l t r b"
-  let parts = @xml.split_by_space(rect_def)
-  if parts.length() < 4 {
-    return (0, 0, cx_p, cy_p)
-  }
-  let rl = env.resolve(parts[0])
-  let rt = env.resolve(parts[1])
-  let rr = env.resolve(parts[2])
-  let rb = env.resolve(parts[3])
+  apply_adjustments(env, adjs, adj_values)
+  eval_guides(env, guides)
+  let rl = env.value(rl)
+  let rt = env.value(rt)
+  let rr = env.value(rr)
+  let rb = env.value(rb)
   // Clamp to shape bounds
   let l = if rl < 0.0 { 0 } else { rl.to_int() }
   let t = if rt < 0.0 { 0 } else { rt.to_int() }

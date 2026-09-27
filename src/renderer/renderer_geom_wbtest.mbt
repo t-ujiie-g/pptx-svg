@@ -136,7 +136,7 @@ test "formulas parse into typed operators with literal / guide operands" {
 ///|
 test "path parsing skips a command with missing operands" {
   // "L 5" lacks its y operand: both tokens are skipped.
-  let cmds = parse_path("M 0 0 L 5")
+  let cmds = parse_path("M 0 0 L 5").cmds
   assert_eq(cmds.length(), 1)
   assert_true(cmds[0] is MoveTo(Lit(_), Lit(_)))
 }
@@ -147,4 +147,98 @@ test "preset definitions are parsed once and cached" {
   guard preset_geom("donut") is Some(second) else { fail("donut missing") }
   assert_true(physical_equal(first, second))
   assert_true(preset_geom("noSuchPreset") is None)
+}
+
+///|
+fn styled_preset(prst : String) -> String {
+  render_preset_geom(
+    prst,
+    [],
+    200,
+    100,
+    0,
+    0,
+    " fill=\"#123456\"",
+    " stroke=\"#000000\"",
+    "",
+  )
+}
+
+///|
+fn count_paths(svg : String) -> Int {
+  let mut n = 0
+  let mut rest = svg
+  while rest.find("<path ") is Some(i) {
+    n = n + 1
+    rest = @xml.str_substring(rest, i + 6, rest.length())
+  }
+  n
+}
+
+///|
+test "plain preset stays a single filled-and-stroked path" {
+  let svg = styled_preset("star5")
+  assert_eq(count_paths(svg), 1)
+  assert_true(svg.contains(" fill=\"#123456\" stroke=\"#000000\""))
+}
+
+///|
+test "arc: filled wedge without stroke, then the stroked arc without fill" {
+  let svg = styled_preset("arc")
+  assert_eq(count_paths(svg), 2)
+  assert_true(svg.contains("fill=\"#123456\" stroke=\"none\""))
+  assert_true(svg.contains("fill=\"none\" stroke=\"#000000\""))
+}
+
+///|
+test "connector presets are stroke-only" {
+  let svg = styled_preset("bentConnector3")
+  assert_eq(count_paths(svg), 1)
+  assert_true(svg.contains("fill=\"none\" stroke=\"#000000\""))
+}
+
+///|
+test "cube faces are shaded with overlays" {
+  let svg = styled_preset("cube")
+  assert_true(svg.contains("fill=\"#000000\" fill-opacity=\"0.2\""))
+  assert_true(svg.contains("fill=\"#FFFFFF\" fill-opacity=\"0.2\""))
+}
+
+///|
+test "shade overlays are skipped when the shape has no fill" {
+  let svg = render_preset_geom(
+    "cube",
+    [],
+    200,
+    100,
+    0,
+    0,
+    " fill=\"none\"",
+    " stroke=\"#000000\"",
+    "",
+  )
+  assert_true(!svg.contains("fill-opacity"))
+}
+
+///|
+test "stroke-only sub-paths are drawn after the fills (chartPlus)" {
+  let svg = styled_preset("chartPlus")
+  let fill_at = svg.find("fill=\"#123456\"").unwrap()
+  let line_at = svg.find("fill=\"none\"").unwrap()
+  assert_true(line_at > fill_at)
+}
+
+///|
+test "text rectangle comes from the spec a:rect" {
+  // triangle: rect l=x1 t=vc r=x3 b=b → the lower half, inset horizontally
+  assert_eq(
+    compute_preset_text_rect("triangle", [], 200, 100),
+    (50, 50, 100, 50),
+  )
+  // plaque: inset by x1·0.70711 on every side (x1 = ss·16.667%)
+  assert_eq(compute_preset_text_rect("plaque", [], 200, 100), (11, 11, 177, 77))
+  assert_eq(
+    compute_preset_text_rect("noSuchPreset", [], 200, 100),
+    (0, 0, 200, 100),
+  )
 }
