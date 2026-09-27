@@ -170,8 +170,8 @@ When `data-ooxml-geom="custGeom"`:
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `data-ooxml-cust-gdlst` | string | Guide formulas (comma-separated) |
-| `data-ooxml-cust-paths` | string | Path definitions |
-| `data-ooxml-cust-pw/ph` | int | Path coordinate space dimensions |
+| `data-ooxml-cust-paths` | string | Path definitions: `M x y` / `L` / `C` / `Q` / `A wR hR stAng swAng` / `Z`, sub-paths separated by `\|`. A sub-path may start with `W pw ph` (its own `a:path w/h` when it differs from the first path's), `F mode` (`a:path fill`: `none`, `darken`, `darkenLess`, `lighten`, `lightenLess`) and `S false` (`a:path stroke="0"`) |
+| `data-ooxml-cust-pw/ph` | int | First path's coordinate space dimensions |
 | `data-ooxml-cust-rl/rt/rr/rb` | string | Text rectangle guide formulas |
 | `data-ooxml-cust-cxn` | string | Connection points (serialized XML) |
 

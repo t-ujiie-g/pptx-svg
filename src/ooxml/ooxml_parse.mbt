@@ -1541,20 +1541,36 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       @xml.get_children(pathlst_node),
       "a:path",
     )
-    for pi in 0..<path_nodes.length() {
-      let pn = path_nodes[pi]
-      // Get path coordinate space (first path's values used)
-      if pi == 0 {
-        path_w = match @xml.get_attr(pn, "w") {
-          Some(v) => @xml.parse_int(v)
-          None => 0
-        }
-        path_h = match @xml.get_attr(pn, "h") {
-          Some(v) => @xml.parse_int(v)
-          None => 0
-        }
+    for pi, pn in path_nodes {
+      let pw = match @xml.get_attr(pn, "w") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
       }
-      let seg = parse_custom_path_segment(pn)
+      let ph = match @xml.get_attr(pn, "h") {
+        Some(v) => @xml.parse_int(v)
+        None => 0
+      }
+      // The first path's space is the shape-wide default; a later path with a
+      // different space carries its own "W pw ph".
+      if pi == 0 {
+        path_w = pw
+        path_h = ph
+      }
+      let space = if pi > 0 && (pw != path_w || ph != path_h) {
+        "W " + @xml.int_to_str(pw) + " " + @xml.int_to_str(ph) + " "
+      } else {
+        ""
+      }
+      let fill = match @xml.get_attr(pn, "fill") {
+        Some(mode) if mode != "norm" => "F " + mode + " "
+        _ => ""
+      }
+      let stroke = match @xml.get_attr(pn, "stroke") {
+        Some("false" | "0") => "S false "
+        _ => ""
+      }
+      let cmds = parse_custom_path_segment(pn)
+      let seg = if cmds.is_empty() { "" } else { space + fill + stroke + cmds }
       if !seg.is_empty() {
         if !paths.is_empty() {
           paths = paths + "|"

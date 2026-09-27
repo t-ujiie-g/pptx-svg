@@ -221,5 +221,42 @@ test("regressions (slides 96-98)", async () => {
     assert('slide101 actionButtonHome icon is shaded', shapeSvg(4).includes('fill-opacity="0.'));
   }
 
+  // ── Slide 102: custGeom per-path fill / stroke / coordinate space ──────────
+  {
+    console.log('\n── test_features.pptx — Slide 102: custGeom per-path styles ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const svg = r.renderSlideSvg(101);
+    const paths = [...svg.matchAll(/<path d="([^"]+)"([^>]*)\/>/g)].map((m) => ({ d: m[1], attrs: m[2] }));
+    const fillOnly = paths.filter((p) => /fill="rgb\(91,155,213\)" stroke="none"/.test(p.attrs));
+    const strokeOnly = paths.filter((p) => /fill="none" stroke="rgb\(255,192,0\)"/.test(p.attrs));
+    const shade = paths.filter((p) => p.attrs.includes('fill-opacity="0.4"'));
+    // The square, and the darken path's base fill (its overlay is separate).
+    assert('slide102 fill-only paths are drawn without stroke', fillOnly.length === 2, `got ${fillOnly.length}`);
+    assert('slide102 diagonal is stroke-only', strokeOnly.length === 1);
+    assert('slide102 darken path gets a shade overlay', shade.length === 1);
+    // The diagonal lives in a 50×50 space: it must span the whole shape (as wide
+    // as the 100×100 square), not half of it as the first path's space would give.
+    if (strokeOnly.length === 1 && fillOnly.length > 0) {
+      const nums = (d) => d.match(/-?[\d.]+/g).map(Number);
+      const sq = nums(fillOnly[0].d); // M x0 y0 L x1 y0 ...
+      const dg = nums(strokeOnly[0].d);
+      assert('slide102 diagonal uses its own coordinate space',
+        Math.abs((dg[2] - dg[0]) - (sq[2] - sq[0])) < 1, `${strokeOnly[0].d} vs ${fillOnly[0].d}`);
+    }
+    // Round-trip SVG → SlideData → OOXML keeps the per-path attributes. (An
+    // untouched slide exports its original XML, so go through the SVG.)
+    r.updateSlideFromSvg(101, svg);
+    const xml = r.getSlideOoxml(101);
+    assert('slide102 export keeps fill="none"', xml.includes('<a:path w="50" h="50" fill="none">'));
+    assert('slide102 export keeps fill="darken" + stroke', xml.includes('fill="darken" stroke="0"'));
+    assert('slide102 export keeps stroke="0"', xml.includes('<a:path w="100" h="100" stroke="0">'));
+  }
+
   finishAssertions();
 });

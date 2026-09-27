@@ -602,26 +602,6 @@ fn ellipse_point(wr : Double, hr : Double, ang : Double) -> (Double, Double) {
 // ── Multiple path support ────────────────────────────────────────────────────
 
 ///|
-/// Render all sub-paths into a single SVG path d string, ignoring their
-///  per-path fill / stroke (used for a:custGeom).
-fn render_geom_paths(
-  env : GuideEnv,
-  paths : Array[SubPath],
-  x_off : Int,
-  y_off : Int,
-  w : Double,
-  h : Double,
-  path_w : Double,
-  path_h : Double,
-) -> String {
-  let mut d = ""
-  for sub in paths {
-    d = d + render_geom_path(env, sub.cmds, x_off, y_off, path_w, path_h, w, h)
-  }
-  d
-}
-
-///|
 /// Shade overlays for PathFill modes: (colour, opacity) drawn over the fill.
 fn shade_overlay(mode : PathFill) -> (String, String)? {
   match mode {
@@ -665,7 +645,7 @@ fn styled_path_svg(
 }
 
 ///|
-/// Render preset sub-paths as SVG elements, honouring each a:path's fill mode
+/// Render sub-paths as SVG elements, honouring each a:path's fill mode
 ///  and stroke flag. Adjacent sub-paths with the same style share one <path>,
 ///  so a plain filled-and-stroked preset is a single element. Stroke-only
 ///  (fill="none") sub-paths are drawn after the filled ones: chartPlus / chartX /
@@ -677,6 +657,8 @@ fn render_styled_paths(
   y_off : Int,
   w : Double,
   h : Double,
+  path_w : Double,
+  path_h : Double,
   fill : String,
   stroke : String,
   xform : String,
@@ -694,7 +676,7 @@ fn render_styled_paths(
   let mut group_d = ""
   let mut group : (PathFill, Bool)? = None
   for sub in paths {
-    let d = render_geom_path(env, sub.cmds, x_off, y_off, 0.0, 0.0, w, h)
+    let d = render_geom_path(env, sub.cmds, x_off, y_off, path_w, path_h, w, h)
     if d.is_empty() {
       continue
     }
@@ -787,7 +769,19 @@ fn render_preset_geom(
       env.init_builtins(w, h)
       apply_adjustments(env, geom.adjs, adj_values)
       eval_guides(env, geom.guides)
-      render_styled_paths(env, geom.paths, x_p, y_p, w, h, fill, stroke, rot)
+      render_styled_paths(
+        env,
+        geom.paths,
+        x_p,
+        y_p,
+        w,
+        h,
+        0.0,
+        0.0,
+        fill,
+        stroke,
+        rot,
+      )
     }
   }
   if svg.is_empty() {
@@ -826,7 +820,9 @@ fn render_custom_geom(
   // Render paths with coordinate space scaling
   let pw = data.path_w.to_double()
   let ph = data.path_h.to_double()
-  let d = render_geom_paths(
+  // An empty custGeom path draws nothing: a fallback rect would cover the
+  // slide with a coloured block where an icon should be (issue #39).
+  render_styled_paths(
     env,
     parse_paths(data.paths),
     x_p,
@@ -835,16 +831,10 @@ fn render_custom_geom(
     h,
     pw,
     ph,
+    fill,
+    stroke,
+    rot,
   )
-  if d.is_empty() {
-    // Empty custGeom path — no visible shape to render.
-    // Returning a filled rect here produces an unwanted colored block
-    // (e.g. a solid blue square where an icon should be).
-    // Better to hide the shape entirely so it doesn't obstruct the slide.
-    ""
-  } else {
-    "<path d=\"" + d + "\"" + fill + stroke + rot + "/>"
-  }
 }
 
 ///|

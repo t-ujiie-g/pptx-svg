@@ -173,7 +173,7 @@ EMF コンバータと同様の手法で WMF (16-bit GDI) をパースし SVG �
 
 - [x] **プリセットジオメトリ定義を ECMA-376 `presetShapeDefinitions.xml` から一括生成** — `scripts/gen_preset_geom.py` → `renderer_geom_presets.mbt`（テキスト矩形 `a:rect` も生成）
 - [x] **プリセットのパス別塗り指定（`fill="none"` / `darken` / `lightenLess` 等）と `stroke="false"`** — 陰影は黒/白の半透明オーバーレイで近似
-- [ ] **カスタムジオメトリ (`a:custGeom`) のパス別塗り指定** — custGeom は全サブパスを 1 本の `<path>` で同一塗り。`CustomGeomData.paths` の文字列形式はシリアライザの round-trip に使われるため、`F`/`S` トークンを追加するならシリアライザ側も対応が必要
+- [x] **カスタムジオメトリ (`a:custGeom`) のパス別塗り指定・座標系** — `F`/`S`/`W` トークンで保持し、描画・シリアライザ round-trip とも対応
 - [ ] **コネクタの自動ルーティング** — `st_cxn_id`/`end_cxn_id` はパース済みだが、接続先シェイプの接続ポイントへの自動位置合わせ未実装。表示上はユーザ指定の座標で正しく描画される
 - [x] **SmartArt の cached drawing 描画** — `dsp:drawing`（`ppt/drawings/drawingN.xml`）の静的図形を描画。下記 SmartArt 仕様ギャップは残存（フル DiagramML エンジン未実装のため意図的な制限）:
   - [ ] **レイアウトエンジン未実装** — `diagramLayout`(lo) のアルゴリズムは走らせず cached drawing 依存。cached drawing が無い SmartArt（古い形式・一部コンバータ生成）は空表示
