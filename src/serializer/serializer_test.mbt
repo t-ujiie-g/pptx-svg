@@ -16,7 +16,7 @@ test "serialize_slide empty slide" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   // Should start with XML declaration
   assert_true(@xml.str_starts_with(xml, "<?xml version"))
   // Should contain p:sld root element
@@ -44,7 +44,7 @@ test "serialize_slide hidden slide" {
     timing_xml: "",
     hidden: true,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   let nodes = @xml.parse_xml(xml)
   assert_eq(@xml.get_attr(nodes[0], "show"), Some("0"))
 }
@@ -68,7 +68,7 @@ test "serialize_slide svg-only blip background omits r:embed" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("asvg:svgBlip"))
   assert_true(xml.contains("r:embed=\"rId9\""))
   // Must NOT emit the empty r:embed attribute
@@ -89,7 +89,7 @@ test "serialize_slide raster blip background keeps r:embed" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:blip r:embed=\"rId7\""))
 }
 
@@ -106,7 +106,7 @@ test "serialize_slide with colored background" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   let nodes = @xml.parse_xml(xml)
   // p:bg is inside p:cSld
   match @xml.find_path(nodes, ["p:sld", "p:cSld", "p:bg"]) {
@@ -140,7 +140,7 @@ test "serialize_slide with single shape" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   let nodes = @xml.parse_xml(xml)
   let csld = @xml.get_children(nodes[0])
   match @xml.find_child(csld, "p:cSld") {
@@ -180,7 +180,7 @@ test "serialize_slide shape with blur effect" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   // Should contain a:effectLst with a:blur
   assert_true(xml.contains("<a:effectLst>"))
   assert_true(xml.contains("<a:blur"))
@@ -227,7 +227,7 @@ test "serialize_slide shape with outer shadow" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:outerShdw"))
   assert_true(xml.contains("blurRad=\"152400\""))
   assert_true(xml.contains("dir=\"5400000\""))
@@ -265,7 +265,7 @@ test "serialize_slide shape with glow" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:glow"))
   assert_true(xml.contains("rad=\"228600\""))
 }
@@ -306,7 +306,7 @@ test "serialize_slide shape with preset shadow" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:prstShdw"))
   assert_true(xml.contains("prst=\"shdw1\""))
   assert_true(xml.contains("dist=\"38100\""))
@@ -345,7 +345,7 @@ test "serialize_slide fill overlay" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:fillOverlay"))
   assert_true(xml.contains("blend=\"mult\""))
   // fillOverlay must wrap color in a:solidFill with RRGGBB val (not AARRGGBB)
@@ -391,7 +391,7 @@ test "serialize_slide fill overlay with alpha" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   // val must be RRGGBB (not AARRGGBB), alpha as child element
   assert_true(xml.contains("val=\"FF0000\""))
   assert_true(xml.contains("<a:alpha val="))
@@ -423,7 +423,7 @@ test "serialize_slide no effectLst when none" {
     timing_xml: "",
     hidden: false,
   }
-  let xml = serialize_slide(slide)
+  let xml = @serializer.serialize_slide(slide)
   // No effects → no a:effectLst in output
   assert_true(!xml.contains("<a:effectLst>"))
 }
@@ -479,13 +479,13 @@ test "restore round-trip: serialize is idempotent after parse_slide" {
     timing_xml: "",
     hidden: false,
   }
-  let s1 = serialize_slide(slide)
+  let s1 = @serializer.serialize_slide(slide)
   let slide2 = @ooxml.parse_slide(
     s1,
     @ooxml.SlideSize::default(),
     @ooxml.ThemeData::default(),
   )
-  let s2 = serialize_slide(slide2)
+  let s2 = @serializer.serialize_slide(slide2)
   assert_eq(s1, s2)
 }
 
@@ -500,7 +500,7 @@ test "restore round-trip: shape text survives parse_slide" {
     @ooxml.ThemeData::default(),
   )
   // Re-serialize and confirm the text is preserved.
-  let out = serialize_slide(slide)
+  let out = @serializer.serialize_slide(slide)
   assert_true(out.contains("Hello Undo"))
   // And the re-serialize is a fixed point.
   let slide2 = @ooxml.parse_slide(
@@ -508,7 +508,7 @@ test "restore round-trip: shape text survives parse_slide" {
     @ooxml.SlideSize::default(),
     @ooxml.ThemeData::default(),
   )
-  assert_eq(out, serialize_slide(slide2))
+  assert_eq(out, @serializer.serialize_slide(slide2))
 }
 
 ///|
@@ -523,7 +523,7 @@ test "serialize round-trips underline style and uFill color" {
     @ooxml.SlideSize::default(),
     @ooxml.ThemeData::default(),
   )
-  let out = serialize_slide(slide)
+  let out = @serializer.serialize_slide(slide)
   assert_true(out.contains("u=\"wavy\""))
   assert_true(out.contains("<a:uFill>"))
   assert_true(out.contains("FF0000"))
@@ -533,7 +533,7 @@ test "serialize round-trips underline style and uFill color" {
     @ooxml.SlideSize::default(),
     @ooxml.ThemeData::default(),
   )
-  assert_eq(out, serialize_slide(slide2))
+  assert_eq(out, @serializer.serialize_slide(slide2))
 }
 
 // ── parse_shapes_xml round-trip (copy/paste) ─────────────────────────────────
@@ -555,7 +555,7 @@ test "parse_shapes_xml round-trips a serialized shape" {
     ),
     fill: { r: 200, g: 100, b: 50, alpha: 255, },
   }
-  let xml = serialize_shape(shape)
+  let xml = @serializer.serialize_shape(shape)
   let shapes = @ooxml.parse_shapes_xml(xml, @ooxml.ThemeData::default())
   assert_eq(shapes.length(), 1)
   let s = shapes[0]

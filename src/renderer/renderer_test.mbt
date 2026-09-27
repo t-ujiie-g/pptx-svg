@@ -21,7 +21,7 @@ fn make_empty_slide() -> @ooxml.SlideData {
 ///|
 test "render_slide_svg empty slide" {
   let slide = make_empty_slide()
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -45,7 +45,7 @@ test "render_slide_svg empty slide" {
 ///|
 test "render_slide_svg hidden slide" {
   let slide : @ooxml.SlideData = { ..make_empty_slide(), hidden: true, }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -74,7 +74,7 @@ test "render_slide_svg with rect shape" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -115,7 +115,7 @@ test "render_slide_svg with ellipse" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -148,7 +148,7 @@ test "render_slide_svg colored background" {
     ..make_empty_slide(),
     background: @ooxml.parse_hex_color("FF0000"),
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -195,7 +195,7 @@ test "render_group with small chExt renders children" {
     flip_v: false,
   })
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [grp], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -218,7 +218,7 @@ test "render_group with small chExt renders children" {
 ///|
 test "roundtrip empty slide" {
   let slide = make_empty_slide()
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -240,7 +240,7 @@ test "roundtrip empty slide" {
 ///|
 test "roundtrip hidden slide" {
   let slide : @ooxml.SlideData = { ..make_empty_slide(), hidden: true, }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -260,7 +260,7 @@ test "roundtrip colored background" {
     ..make_empty_slide(),
     background: @ooxml.parse_hex_color("3366CC"),
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -291,7 +291,7 @@ test "roundtrip shape transform" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -327,7 +327,7 @@ test "roundtrip shape with blur effect" {
     effects: { ..@ooxml.EffectList::none(), blur: { rad: 76200, }, },
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -373,7 +373,7 @@ test "roundtrip shape with outer shadow" {
     },
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -411,7 +411,7 @@ test "roundtrip shape with glow" {
     },
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -445,7 +445,7 @@ test "roundtrip shape with soft edge" {
     effects: { ..@ooxml.EffectList::none(), soft_edge: { rad: 63500, }, },
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -477,7 +477,7 @@ test "roundtrip shape with solid fill" {
     fill: @ooxml.parse_hex_color("FF6633"),
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -513,7 +513,7 @@ test "roundtrip shape with stroke" {
     stroke_dash: "dash",
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -546,7 +546,7 @@ test "roundtrip ellipse geometry" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -590,7 +590,7 @@ test "roundtrip shape with preset shadow" {
     },
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -632,7 +632,7 @@ test "roundtrip fill overlay effect" {
     },
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -716,7 +716,7 @@ test "roundtrip justify alignment" {
     paragraphs: [para],
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -821,7 +821,7 @@ test "text run gradient and pattern fill render as defs + url refs" {
     paragraphs: [base_para],
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -932,8 +932,17 @@ test "bullet repositioning only applies to hanging indent" {
     ..make_empty_slide(),
     shapes: [make_bulleted_shape(228600)],
   }
-  let hanging_svg = render_slide_svg(hanging_slide, [], 1, theme, [], [], [], [])
-  let positive_svg = render_slide_svg(
+  let hanging_svg = @renderer.render_slide_svg(
+    hanging_slide,
+    [],
+    1,
+    theme,
+    [],
+    [],
+    [],
+    [],
+  )
+  let positive_svg = @renderer.render_slide_svg(
     positive_slide,
     [],
     1,
@@ -1040,8 +1049,26 @@ test "shape xfrm rot rotates text, not only the shape rect" {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0)],
   }
-  let rotated_svg = render_slide_svg(rotated, [], 1, theme, [], [], [], [])
-  let straight_svg = render_slide_svg(straight, [], 1, theme, [], [], [], [])
+  let rotated_svg = @renderer.render_slide_svg(
+    rotated,
+    [],
+    1,
+    theme,
+    [],
+    [],
+    [],
+    [],
+  )
+  let straight_svg = @renderer.render_slide_svg(
+    straight,
+    [],
+    1,
+    theme,
+    [],
+    [],
+    [],
+    [],
+  )
   // Rotated shape must emit a rotate(...) transform inside its <text>.
   assert_true(rotated_svg.contains("<text"))
   assert_true(rotated_svg.contains("transform=\"rotate(5.00"))
@@ -1060,7 +1087,7 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0, flip_h=true)],
   }
-  let fh_svg = render_slide_svg(fh, [], 1, theme, [], [], [], [])
+  let fh_svg = @renderer.render_slide_svg(fh, [], 1, theme, [], [], [], [])
   assert_true(fh_svg.contains("scale(-1,1)"))
   // Both the rect and the text carry the mirror.
   assert_true(fh_svg.contains("<text"))
@@ -1071,7 +1098,7 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0, flip_v=true)],
   }
-  let fv_svg = render_slide_svg(fv, [], 1, theme, [], [], [], [])
+  let fv_svg = @renderer.render_slide_svg(fv, [], 1, theme, [], [], [], [])
   assert_true(fv_svg.contains("scale(1,-1)"))
 
   // No flip → no scale() mirror.
@@ -1079,7 +1106,7 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0)],
   }
-  let none_svg = render_slide_svg(none, [], 1, theme, [], [], [], [])
+  let none_svg = @renderer.render_slide_svg(none, [], 1, theme, [], [], [], [])
   assert_false(none_svg.contains("scale(-1,1)"))
   assert_false(none_svg.contains("scale(1,-1)"))
 
@@ -1088,7 +1115,7 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(300000, flip_h=true)],
   }
-  let fhr_svg = render_slide_svg(fhr, [], 1, theme, [], [], [], [])
+  let fhr_svg = @renderer.render_slide_svg(fhr, [], 1, theme, [], [], [], [])
   assert_true(fhr_svg.contains("rotate(5.00"))
   assert_true(fhr_svg.contains("scale(-1,1)"))
 }
@@ -1144,7 +1171,7 @@ test "render waterfall chart produces rects and connectors" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1171,7 +1198,7 @@ test "render treemap chart produces labeled rects" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1196,7 +1223,7 @@ test "render sunburst chart produces arc paths" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1243,7 +1270,7 @@ test "render radar chart produces closed polygon and vertex labels" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1274,7 +1301,7 @@ test "render funnel chart produces centered rects" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1300,7 +1327,7 @@ test "render box-whisker chart produces lines and rects" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1326,7 +1353,7 @@ test "render histogram chart reuses bar renderer" {
     ..make_empty_slide(),
     shapes: [make_chart_shape(chart)],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1369,7 +1396,7 @@ test "roundtrip multiple shapes" {
     ..make_empty_slide(),
     shapes: [shape1, shape2],
   }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1389,54 +1416,63 @@ test "roundtrip multiple shapes" {
 
 ///|
 test "sanitize_url accepts safe schemes" {
-  assert_eq(sanitize_url("http://example.com/x"), "http://example.com/x")
-  assert_eq(sanitize_url("https://example.com"), "https://example.com")
-  assert_eq(sanitize_url("mailto:a@b.com"), "mailto:a@b.com")
-  assert_eq(sanitize_url("tel:+8190"), "tel:+8190")
-  assert_eq(sanitize_url("ftp://host/file"), "ftp://host/file")
+  assert_eq(
+    @renderer.sanitize_url("http://example.com/x"),
+    "http://example.com/x",
+  )
+  assert_eq(
+    @renderer.sanitize_url("https://example.com"),
+    "https://example.com",
+  )
+  assert_eq(@renderer.sanitize_url("mailto:a@b.com"), "mailto:a@b.com")
+  assert_eq(@renderer.sanitize_url("tel:+8190"), "tel:+8190")
+  assert_eq(@renderer.sanitize_url("ftp://host/file"), "ftp://host/file")
 }
 
 ///|
 test "sanitize_url accepts relative URLs and fragments" {
-  assert_eq(sanitize_url("slide2.xml"), "slide2.xml")
-  assert_eq(sanitize_url("../media/x.png"), "../media/x.png")
-  assert_eq(sanitize_url("#anchor"), "#anchor")
-  assert_eq(sanitize_url("/path/to"), "/path/to")
+  assert_eq(@renderer.sanitize_url("slide2.xml"), "slide2.xml")
+  assert_eq(@renderer.sanitize_url("../media/x.png"), "../media/x.png")
+  assert_eq(@renderer.sanitize_url("#anchor"), "#anchor")
+  assert_eq(@renderer.sanitize_url("/path/to"), "/path/to")
 }
 
 ///|
 test "sanitize_url accepts data:image/* only" {
   assert_eq(
-    sanitize_url("data:image/png;base64,AAAA"),
+    @renderer.sanitize_url("data:image/png;base64,AAAA"),
     "data:image/png;base64,AAAA",
   )
-  assert_eq(sanitize_url("data:text/html,<script>alert(1)</script>"), "")
-  assert_eq(sanitize_url("data:application/javascript,alert(1)"), "")
+  assert_eq(
+    @renderer.sanitize_url("data:text/html,<script>alert(1)</script>"),
+    "",
+  )
+  assert_eq(@renderer.sanitize_url("data:application/javascript,alert(1)"), "")
 }
 
 ///|
 test "sanitize_url rejects script-execution schemes" {
-  assert_eq(sanitize_url("javascript:alert(1)"), "")
-  assert_eq(sanitize_url("vbscript:msgbox(1)"), "")
-  assert_eq(sanitize_url("file:///etc/passwd"), "")
-  assert_eq(sanitize_url("about:blank"), "")
+  assert_eq(@renderer.sanitize_url("javascript:alert(1)"), "")
+  assert_eq(@renderer.sanitize_url("vbscript:msgbox(1)"), "")
+  assert_eq(@renderer.sanitize_url("file:///etc/passwd"), "")
+  assert_eq(@renderer.sanitize_url("about:blank"), "")
 }
 
 ///|
 test "sanitize_url is case-insensitive on scheme" {
   // Browsers parse scheme case-insensitively: JaVaScRiPt: must be rejected.
-  assert_eq(sanitize_url("JaVaScRiPt:alert(1)"), "")
-  assert_eq(sanitize_url("HTTP://example.com"), "HTTP://example.com")
+  assert_eq(@renderer.sanitize_url("JaVaScRiPt:alert(1)"), "")
+  assert_eq(@renderer.sanitize_url("HTTP://example.com"), "HTTP://example.com")
 }
 
 ///|
 test "sanitize_url strips leading whitespace and control bytes" {
   // Browsers tolerate leading whitespace/control chars in href scheme
   // parsing, so "\tjavascript:..." would still execute. We must strip them.
-  assert_eq(sanitize_url("\tjavascript:alert(1)"), "")
-  assert_eq(sanitize_url("\njavascript:alert(1)"), "")
-  assert_eq(sanitize_url(" javascript:alert(1)"), "")
-  assert_eq(sanitize_url(""), "")
+  assert_eq(@renderer.sanitize_url("\tjavascript:alert(1)"), "")
+  assert_eq(@renderer.sanitize_url("\njavascript:alert(1)"), "")
+  assert_eq(@renderer.sanitize_url(" javascript:alert(1)"), "")
+  assert_eq(@renderer.sanitize_url(""), "")
 }
 
 // ── End-to-end attribute escape (security: H2) ──────────────────────────────
@@ -1491,7 +1527,7 @@ test "rendered SVG escapes malicious ph_type in data attribute" {
     ph_type: "x\" onload=\"alert(1)",
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1586,7 +1622,7 @@ test "rendered SVG drops javascript: hyperlink target" {
       target_mode: "External",
     },
   ]
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     bad_rels,
     1,
@@ -1621,7 +1657,7 @@ test "roundRect default adj uses min(w,h) * 16667 / 100000" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1658,7 +1694,7 @@ test "roundRect custom adj round-trips" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1696,7 +1732,7 @@ test "stripedRightArrow renders as multi-segment path" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1737,7 +1773,7 @@ test "leftRightArrowCallout renders as preset path" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1838,7 +1874,7 @@ test "bullet inherits first run color when buClr is absent" {
     paragraphs: [para],
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1876,7 +1912,7 @@ test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
     },
   )
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -1949,7 +1985,7 @@ test "empty paragraph uses endParaRPr font size for autofit height" {
     body_props,
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -2036,7 +2072,7 @@ test "bullet font-size matches run when bu_size is unspecified" {
     paragraphs: [para],
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -2083,7 +2119,7 @@ test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
     fill: @ooxml.parse_hex_color("00B4D8"),
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
@@ -2191,7 +2227,7 @@ fn tl_body_props() -> @ooxml.BodyProps {
 ///|
 test "build_text_layout single run one line" {
   let para = tl_para([tl_run("Hello")])
-  let tl = build_text_layout(
+  let tl = @renderer.build_text_layout(
     [para],
     tl_transform(),
     12700,
@@ -2213,7 +2249,7 @@ test "build_text_layout single run one line" {
 ///|
 test "build_text_layout two runs offsets" {
   let para = tl_para([tl_run("Hello"), tl_run("World!")])
-  let tl = build_text_layout(
+  let tl = @renderer.build_text_layout(
     [para],
     tl_transform(),
     12700,
@@ -2235,7 +2271,7 @@ test "build_text_layout two runs offsets" {
 test "build_text_layout two paragraphs stack vertically" {
   let p0 = tl_para([tl_run("First")])
   let p1 = tl_para([tl_run("Second")])
-  let tl = build_text_layout(
+  let tl = @renderer.build_text_layout(
     [p0, p1],
     tl_transform(),
     12700,
@@ -2253,7 +2289,7 @@ test "build_text_layout two paragraphs stack vertically" {
 test "build_text_layout empty paragraph yields empty line" {
   let p0 = tl_para([tl_run("Text")])
   let p1 = tl_para([])
-  let tl = build_text_layout(
+  let tl = @renderer.build_text_layout(
     [p0, p1],
     tl_transform(),
     12700,
@@ -2267,7 +2303,7 @@ test "build_text_layout empty paragraph yields empty line" {
 
 ///|
 test "hit_test_layout selects line by vertical band" {
-  let tl = build_text_layout(
+  let tl = @renderer.build_text_layout(
     [tl_para([tl_run("First")]), tl_para([tl_run("Second")])],
     tl_transform(),
     12700,
@@ -2276,23 +2312,31 @@ test "hit_test_layout selects line by vertical band" {
   )
   // A point inside the second line's vertical band resolves to paragraph 1.
   let l1 = tl.lines[1]
-  let (p, _, _, _) = hit_test_layout(tl, l1.runs[0].x, l1.y + l1.h / 2)
+  let (p, _, _, _) = @renderer.hit_test_layout(
+    tl,
+    l1.runs[0].x,
+    l1.y + l1.h / 2,
+  )
   assert_eq(p, 1)
   // A point above the first line clamps to paragraph 0.
-  let (p0, _, _, _) = hit_test_layout(tl, tl.box_x, tl.lines[0].y - 100000)
+  let (p0, _, _, _) = @renderer.hit_test_layout(
+    tl,
+    tl.box_x,
+    tl.lines[0].y - 100000,
+  )
   assert_eq(p0, 0)
 }
 
 ///|
 test "hit_test_layout on empty layout returns origin" {
-  let tl = build_text_layout(
+  let tl = @renderer.build_text_layout(
     [],
     tl_transform(),
     12700,
     @ooxml.ThemeData::default(),
     tl_body_props(),
   )
-  let (p, r, c, po) = hit_test_layout(tl, 100000, 100000)
+  let (p, r, c, po) = @renderer.hit_test_layout(tl, 100000, 100000)
   assert_eq(p, 0)
   assert_eq(r, 0)
   assert_eq(c, 0)
@@ -2373,7 +2417,7 @@ test "underline style + color round-trip" {
     paragraphs: [para],
   }
   let slide : @ooxml.SlideData = { ..make_empty_slide(), shapes: [shape], }
-  let svg = render_slide_svg(
+  let svg = @renderer.render_slide_svg(
     slide,
     [],
     1,
