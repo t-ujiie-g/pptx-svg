@@ -1,0 +1,36 @@
+# Build the React example on changes to it (e.g. Dependabot updates). The main
+# CI does not touch examples/, so its result says nothing about them.
+name: Example
+
+on:
+  push:
+    branches: [main]
+    paths: ['examples/react/**', '.github/workflows/example.yml']
+  pull_request:
+    paths: ['examples/react/**', '.github/workflows/example.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  build-react-example:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/react
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Typecheck + bundle (same as static.yml's Pages build, plus tsc)
+      - name: Build
+        env:
+          VITE_BASE_PATH: /pptx-svg/react/
+        run: npm run build
