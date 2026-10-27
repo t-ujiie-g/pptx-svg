@@ -154,7 +154,7 @@ fn is_kinsoku_start_prohibited(c : Char) -> Bool {
 
 ///|
 /// Count space characters in a text fragment.
-fn count_spaces(text : String) -> Int {
+fn count_spaces(text : String) -> Int32 {
   let len = text.length()
   let mut count = 0
   for i in 0..<len {
@@ -170,9 +170,9 @@ fn count_spaces(text : String) -> Int {
 /// measurement, and the text-layout geometry builder).
 fn run_fs_px(
   run : @ooxml.TextRun,
-  scale : Int,
-  def_sz : Int,
-  font_scale : Int,
+  scale : Int32,
+  def_sz : Int32,
+  font_scale : Int32,
 ) -> Double {
   let fs_raw = if run.font_size > 0 {
     run.font_size
@@ -200,13 +200,13 @@ fn run_font_face(run : @ooxml.TextRun, theme : @ooxml.ThemeData) -> String {
 /// Measure total rendered width of a visual line (array of run fragments).
 /// Returns (width_px, space_count).
 fn measure_line_width(
-  vline : Array[(Int, String)],
+  vline : Array[(Int32, String)],
   para : @ooxml.TextParagraph,
-  scale : Int,
-  def_sz : Int,
-  font_scale : Int,
+  scale : Int32,
+  def_sz : Int32,
+  font_scale : Int32,
   theme : @ooxml.ThemeData,
-) -> (Double, Int) {
+) -> (Double, Int32) {
   let mut total_w : Double = 0.0
   let mut total_spaces = 0
   let mut accum = ""
@@ -244,14 +244,14 @@ fn measure_line_width(
 ///|
 fn wrap_paragraph(
   para : @ooxml.TextParagraph,
-  max_width : Int,
-  scale : Int,
-  def_sz : Int,
-  font_scale : Int,
+  max_width : Int32,
+  scale : Int32,
+  def_sz : Int32,
+  font_scale : Int32,
   theme : @ooxml.ThemeData,
-) -> Array[Array[(Int, String)]] {
-  let lines : Array[Array[(Int, String)]] = []
-  let mut cur_line : Array[(Int, String)] = []
+) -> Array[Array[(Int32, String)]] {
+  let lines : Array[Array[(Int32, String)]] = []
+  let mut cur_line : Array[(Int32, String)] = []
   let mut cur_width : Double = 0.0
   let max_w : Double = max_width.to_double()
   // Track accumulated same-font text on the current line for accurate measurement.
@@ -394,18 +394,18 @@ fn split_by_tab(s : String) -> Array[String] {
 ///  Returns (svg_output, updated_tab_idx).
 fn render_run_with_tabs(
   run : @ooxml.TextRun,
-  run_idx : Int,
+  run_idx : Int32,
   display_text : String,
   tab_stops : Array[@ooxml.TabStop],
-  tab_idx : Int,
-  text_x : Int,
-  cur_y : Int,
-  scale : Int,
-  fs : Int,
+  tab_idx : Int32,
+  text_x : Int32,
+  cur_y : Int32,
+  scale : Int32,
+  fs : Int32,
   rels : Array[@ooxml.Relationship],
   theme : @ooxml.ThemeData,
   fill_ref : String,
-) -> (String, Int) {
+) -> (String, Int32) {
   if !tab_stops.is_empty() && contains_tab(display_text) {
     let parts = split_by_tab(display_text)
     let nparts = parts.length()
@@ -435,7 +435,7 @@ fn render_run_with_tabs(
 // ── Text rendering ────────────────────────────────────────────────────────────
 
 ///|
-fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
+fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int32 {
   let mut max_fs = 0
   for run in para.runs {
     let fs = run.font_size
@@ -461,9 +461,9 @@ fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int {
 ///|
 fn para_font_size(
   para : @ooxml.TextParagraph,
-  scale : Int,
-  def_sz : Int,
-) -> Int {
+  scale : Int32,
+  def_sz : Int32,
+) -> Int32 {
   let emu = para_max_font_emu(para)
   if emu > 0 {
     px(emu, scale)
@@ -476,7 +476,7 @@ fn para_font_size(
 
 ///|
 /// font_scale: -1=inactive, 0-100000=percentage (100000=100%).
-fn apply_font_scale(val : Int, font_scale : Int) -> Int {
+fn apply_font_scale(val : Int32, font_scale : Int32) -> Int32 {
   if font_scale >= 0 && font_scale < @ooxml.pct_100 {
     val * font_scale / @ooxml.pct_100
   } else {
@@ -488,7 +488,7 @@ fn apply_font_scale(val : Int, font_scale : Int) -> Int {
 
 ///|
 /// ln_spc_reduction: -1=inactive, 0-100000=reduction percentage.
-fn apply_ln_spc_reduction(val : Int, ln_spc_reduction : Int) -> Int {
+fn apply_ln_spc_reduction(val : Int32, ln_spc_reduction : Int32) -> Int32 {
   if ln_spc_reduction > 0 {
     val * (@ooxml.pct_100 - ln_spc_reduction) / @ooxml.pct_100
   } else {
@@ -499,10 +499,10 @@ fn apply_ln_spc_reduction(val : Int, ln_spc_reduction : Int) -> Int {
 ///|
 /// Apply both normAutofit adjustments: font_scale then lnSpcReduction.
 fn apply_autofit_scale(
-  val : Int,
-  font_scale : Int,
-  ln_spc_reduction : Int,
-) -> Int {
+  val : Int32,
+  font_scale : Int32,
+  ln_spc_reduction : Int32,
+) -> Int32 {
   apply_ln_spc_reduction(apply_font_scale(val, font_scale), ln_spc_reduction)
 }
 
@@ -512,9 +512,9 @@ fn apply_autofit_scale(
 /// Returns (extra_above, extra_below) in pixels.
 fn para_baseline_shift_extra(
   para : @ooxml.TextParagraph,
-  scale : Int,
-  def_sz : Int,
-) -> (Int, Int) {
+  scale : Int32,
+  def_sz : Int32,
+) -> (Int32, Int32) {
   let mut has_super = false
   let mut has_sub = false
   for run in para.runs {
@@ -541,9 +541,9 @@ fn para_baseline_shift_extra(
 ///|
 fn para_line_height(
   para : @ooxml.TextParagraph,
-  scale : Int,
-  def_line_h : Int,
-) -> Int {
+  scale : Int32,
+  def_line_h : Int32,
+) -> Int32 {
   if para.line_spacing > 0 {
     // Positive = EMU absolute value
     px(para.line_spacing, scale)
@@ -588,11 +588,11 @@ fn css_rgba(clr : @ooxml.Color, alpha_fallback : String) -> String {
 ///|
 /// Render a CSS drop-shadow() value from shadow parameters.
 fn render_css_drop_shadow(
-  blur_rad : Int,
-  dist : Int,
-  dir : Int,
+  blur_rad : Int32,
+  dist : Int32,
+  dir : Int32,
   color : @ooxml.Color,
-  scale : Int,
+  scale : Int32,
 ) -> String {
   let blur = emu_to_filter_px(blur_rad, scale)
   let d = emu_to_filter_px(dist, scale)
@@ -614,7 +614,7 @@ fn render_css_drop_shadow(
 ///|
 /// Generate CSS style attribute with filter for text-level effects (shadow/glow).
 /// Returns empty string if no visual effects, or ` style="filter: ..."` attribute.
-fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
+fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int32) -> String {
   if eff.is_none() {
     return ""
   }
@@ -669,10 +669,10 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int) -> String {
 /// the run has neither. The matching def is emitted by render_run_fill_defs.
 fn run_text_fill_ref(
   run : @ooxml.TextRun,
-  slide_num : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
 ) -> String {
   if !run.text_grad_fill.is_none() && !run.text_grad_fill.stops.is_empty() {
     text_fill_id("tgrad-s", slide_num, shape_idx, para_idx, run_idx)
@@ -690,8 +690,8 @@ fn run_text_fill_ref(
 /// fragments of one run share a single def.
 fn render_run_fill_defs(
   paragraphs : Array[@ooxml.TextParagraph],
-  slide_num : Int,
-  shape_idx : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
 ) -> String {
   let mut defs = ""
   for pi in 0..<paragraphs.length() {
@@ -722,10 +722,10 @@ fn render_run_fill_defs(
 /// pass "" and get the solid-color fallback.
 fn render_run_tspan(
   run : @ooxml.TextRun,
-  ri : Int,
+  ri : Int32,
   display_text : String,
-  scale : Int,
-  font_scale : Int,
+  scale : Int32,
+  font_scale : Int32,
   rels : Array[@ooxml.Relationship],
   theme : @ooxml.ThemeData,
   fill_ref : String,
@@ -943,16 +943,16 @@ fn render_run_tspan(
 /// `lr` = line-spacing reduction. All heights are in px (at `scale`).
 fn solve_text_autofit(
   paragraphs : Array[@ooxml.TextParagraph],
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
-  def_sz : Int,
-  def_line_h : Int,
-  init_fs : Int,
-  init_lr : Int,
+  def_sz : Int32,
+  def_line_h : Int32,
+  init_fs : Int32,
+  init_lr : Int32,
   do_wrap : Bool,
-  col_w : Int,
-  avail_h : Int,
-) -> (Int, Int, Int, Int, Int, Int) {
+  col_w : Int32,
+  avail_h : Int32,
+) -> (Int32, Int32, Int32, Int32, Int32, Int32) {
   let np = paragraphs.length()
   let mut fs = init_fs
   let mut lr = init_lr
@@ -1056,12 +1056,12 @@ fn solve_text_autofit(
 fn render_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
   rels : Array[@ooxml.Relationship],
-  slide_num : Int,
-  shape_idx : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
 ) -> String {
   if paragraphs.is_empty() {
     return ""
@@ -1208,7 +1208,7 @@ fn render_text(
   let font_face = theme.minor_font + ", sans-serif"
   let scaled_def_sz = apply_font_scale(def_sz, fs)
 
-  fn make_text_header(tx : Int) -> String {
+  fn make_text_header(tx : Int32) -> String {
     let mut h = "<text" +
       ai("x", tx) +
       a("xml:space", "preserve") +
@@ -1239,7 +1239,7 @@ fn render_text(
   let mut cur_col = 0
 
   // Auto-number counters per level (reset when a lower level is encountered)
-  let auto_num_counters : Array[Int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  let auto_num_counters : Array[Int32] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let mut prev_para_level = -1
 
   let mut pi = 0
@@ -1671,9 +1671,9 @@ fn render_text(
 ///|
 fn estimate_text_height(
   paragraphs : Array[@ooxml.TextParagraph],
-  scale : Int,
+  scale : Int32,
   body_props : @ooxml.BodyProps,
-) -> Int {
+) -> Int32 {
   let def_sz = px(default_font_size_emu, scale)
   let def_line_h = def_sz * line_height_numer / line_height_denom
   let t_ins = if body_props.t_ins >= 0 {

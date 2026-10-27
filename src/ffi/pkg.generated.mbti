@@ -1,0 +1,41 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "pptx-svg/ffi"
+
+// Values
+pub fn ffi_atan2(Double, Double) -> Double
+
+pub fn ffi_char_code_to_str(Int32) -> String
+
+pub fn ffi_convert_emf(String) -> String
+
+pub fn ffi_cos(Double) -> Double
+
+pub fn ffi_current_date() -> String
+
+pub fn ffi_error(String) -> Unit
+
+pub fn ffi_get_entry_list() -> String
+
+pub fn ffi_get_file(String) -> String
+
+pub fn ffi_get_file_base64(String) -> String
+
+pub fn ffi_get_font_fallback(String) -> String
+
+pub fn ffi_log(String) -> Unit
+
+pub fn ffi_measure_text(String, String, Double) -> Double
+
+pub fn ffi_sin(Double) -> Double
+
+pub fn ffi_sqrt(Double) -> Double
+
+pub fn ffi_warn(String) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

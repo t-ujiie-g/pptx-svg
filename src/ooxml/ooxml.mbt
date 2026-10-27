@@ -9,40 +9,40 @@
 
 ///|
 /// 1 pt = 12700 EMU.
-pub let emu_per_pt : Int = 12700
+pub let emu_per_pt : Int32 = 12700
 
 ///|
 /// Default stroke width: 1 pt in EMU.
-pub let default_stroke_w : Int = 12700
+pub let default_stroke_w : Int32 = 12700
 
 ///|
 /// EMU per hundredth-of-a-point (12700 / 100).
-pub let emu_per_hundredth_pt : Int = 127
+pub let emu_per_hundredth_pt : Int32 = 127
 
 ///|
 /// Rotation units: 60000ths of a degree per centidegree.
-pub let rot_to_centideg : Int = 600
+pub let rot_to_centideg : Int32 = 600
 
 ///|
 /// Centidegrees per degree.
-pub let centideg_per_deg : Int = 100
+pub let centideg_per_deg : Int32 = 100
 
 ///|
 /// Hundredths-of-a-point per EMU for char spacing (100ths-pt → px at 96 DPI).
-pub let char_spc_dpi : Int = 96
+pub let char_spc_dpi : Int32 = 96
 
 ///|
 /// Hundredths-of-a-point per inch (for char spacing conversion).
-pub let hundredth_pt_per_inch : Int = 7200
+pub let hundredth_pt_per_inch : Int32 = 7200
 
 // ── Color ─────────────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct Color {
-  r : Int
-  g : Int
-  b : Int
-  alpha : Int // 0-255, 255 = fully opaque
+  r : Int32
+  g : Int32
+  b : Int32
+  alpha : Int32 // 0-255, 255 = fully opaque
 }
 
 ///|
@@ -86,25 +86,25 @@ pub fn parse_hex_color(s : String) -> Color {
 // ASCII code points for hex digit parsing
 
 ///|
-let ascii_0 : Int = 48 // '0'
+let ascii_0 : Int32 = 48 // '0'
 
 ///|
-let ascii_9 : Int = 57 // '9'
+let ascii_9 : Int32 = 57 // '9'
 
 ///|
-let ascii_A : Int = 65 // 'A'
+let ascii_A : Int32 = 65 // 'A'
 
 ///|
-let ascii_F : Int = 70 // 'F'
+let ascii_F : Int32 = 70 // 'F'
 
 ///|
-let ascii_a : Int = 97 // 'a'
+let ascii_a : Int32 = 97 // 'a'
 
 ///|
-let ascii_f : Int = 102 // 'f'
+let ascii_f : Int32 = 102 // 'f'
 
 ///|
-fn hex_digit(c : Char) -> Int {
+fn hex_digit(c : Char) -> Int32 {
   let v = c.to_int()
   if v >= ascii_0 && v <= ascii_9 {
     v - ascii_0
@@ -118,7 +118,7 @@ fn hex_digit(c : Char) -> Int {
 }
 
 ///|
-fn parse_hex2(s : String, offset : Int) -> Int {
+fn parse_hex2(s : String, offset : Int32) -> Int32 {
   hex_digit(s.get_char(offset).unwrap()) * 16 +
   hex_digit(s.get_char(offset + 1).unwrap())
 }
@@ -174,13 +174,13 @@ pub fn Color::to_hex_rgb(self : Color) -> String {
 }
 
 ///|
-fn hex_byte(v : Int) -> String {
+fn hex_byte(v : Int32) -> String {
   hex_nibble(v / 16) + hex_nibble(v % 16)
 }
 
 ///|
 /// Convert alpha (0-255) to CSS opacity string: "0", "0.XX", or "1".
-pub fn alpha_to_css_str(alpha : Int) -> String {
+pub fn alpha_to_css_str(alpha : Int32) -> String {
   let a100 = alpha * 100 / 255
   if a100 <= 0 {
     "0"
@@ -197,7 +197,7 @@ pub fn alpha_to_css_str(alpha : Int) -> String {
 }
 
 ///|
-fn hex_nibble(n : Int) -> String {
+fn hex_nibble(n : Int32) -> String {
   match n {
     0 => "0"
     1 => "1"
@@ -222,20 +222,20 @@ fn hex_nibble(n : Int) -> String {
 
 ///|
 pub(all) struct GradientStop {
-  pos : Int // 0-100000 (1/1000%)
+  pos : Int32 // 0-100000 (1/1000%)
   color : Color // resolved RGB
 }
 
 ///|
 pub(all) struct GradientFill {
   stops : Array[GradientStop] // empty = none
-  angle : Int // lin: 60000ths of degree; -1 = path gradient
+  angle : Int32 // lin: 60000ths of degree; -1 = path gradient
   path_type : String // "circle","rect","shape"; "" = linear
   rot_with_shape : Bool
-  fill_to_l : Int // path gradient fillToRect; -1 = unset
-  fill_to_t : Int
-  fill_to_r : Int
-  fill_to_b : Int
+  fill_to_l : Int32 // path gradient fillToRect; -1 = unset
+  fill_to_t : Int32
+  fill_to_r : Int32
+  fill_to_b : Int32
   tile_flip : String // "none","x","y","xy"; "" = unset
 }
 
@@ -265,20 +265,20 @@ pub fn GradientFill::is_none(self : GradientFill) -> Bool {
 pub(all) struct BlipFill {
   rid : String // r:embed relationship ID; "" = none
   stretch : Bool // true = stretch fill, false = tile
-  src_l : Int // a:srcRect crop left (0-100000 千分率); 0 = no crop
-  src_t : Int // crop top
-  src_r : Int // crop right
-  src_b : Int // crop bottom
-  tile_tx : Int // a:tile tx offset (EMU); 0 = default
-  tile_ty : Int // a:tile ty offset (EMU)
-  tile_sx : Int // a:tile sx scale (100000 = 100%); 0 = unset
-  tile_sy : Int // a:tile sy scale
+  src_l : Int32 // a:srcRect crop left (0-100000 千分率); 0 = no crop
+  src_t : Int32 // crop top
+  src_r : Int32 // crop right
+  src_b : Int32 // crop bottom
+  tile_tx : Int32 // a:tile tx offset (EMU); 0 = default
+  tile_ty : Int32 // a:tile ty offset (EMU)
+  tile_sx : Int32 // a:tile sx scale (100000 = 100%); 0 = unset
+  tile_sy : Int32 // a:tile sy scale
   tile_flip : String // "none","x","y","xy"; "" = unset
   tile_algn : String // alignment: "tl","t","tr","l","ctr","r","bl","b","br"; "" = unset
-  alpha : Int // a:alphaModFix amt (0-100000); 100000 = fully opaque; 0 = default (treat as opaque)
+  alpha : Int32 // a:alphaModFix amt (0-100000); 100000 = fully opaque; 0 = default (treat as opaque)
   svg_rid : String // asvg:svgBlip r:embed for SVG image; "" = none
-  bright : Int // a:lum bright (-100000..100000); 0 = default
-  contrast : Int // a:lum contrast (-100000..100000); 0 = default
+  bright : Int32 // a:lum bright (-100000..100000); 0 = default
+  contrast : Int32 // a:lum contrast (-100000..100000); 0 = default
   duotone_1 : Color // a:duotone first color; Color::none() = no duotone
   duotone_2 : Color // a:duotone second color
   clr_from : Color // a:clrChange from color; Color::none() = no color change
@@ -435,7 +435,7 @@ pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
 // ── RGB ↔ HSL conversion ────────────────────────────────────────────────────
 
 ///|
-fn min3(a : Int, b : Int, c : Int) -> Int {
+fn min3(a : Int32, b : Int32, c : Int32) -> Int32 {
   let m = if a < b { a } else { b }
   if m < c {
     m
@@ -445,7 +445,7 @@ fn min3(a : Int, b : Int, c : Int) -> Int {
 }
 
 ///|
-fn max3(a : Int, b : Int, c : Int) -> Int {
+fn max3(a : Int32, b : Int32, c : Int32) -> Int32 {
   let m = if a > b { a } else { b }
   if m > c {
     m
@@ -458,7 +458,7 @@ fn max3(a : Int, b : Int, c : Int) -> Int {
 
 ///|
 /// Integer square root via Newton's method.
-fn int_sqrt(n : Int) -> Int {
+fn int_sqrt(n : Int32) -> Int32 {
   if n <= 0 {
     return 0
   }
@@ -475,33 +475,33 @@ fn int_sqrt(n : Int) -> Int {
 // Hue: 0-3600 (tenths of a degree), Saturation/Lightness: 0-1000 (tenths of %)
 
 ///|
-let rgb_max : Int = 255 // max RGB component value
+let rgb_max : Int32 = 255 // max RGB component value
 
 ///|
-let hsl_scale : Int = 1000 // saturation/lightness precision (0.1% units)
+let hsl_scale : Int32 = 1000 // saturation/lightness precision (0.1% units)
 
 ///|
-let hsl_half : Int = 500 // hsl_scale / 2
+let hsl_half : Int32 = 500 // hsl_scale / 2
 
 ///|
-let hue_full : Int = 3600 // full hue circle in tenths of degree
+let hue_full : Int32 = 3600 // full hue circle in tenths of degree
 
 ///|
-let hue_sextant : Int = 600 // hue_full / 6 — one sixth of hue circle
+let hue_sextant : Int32 = 600 // hue_full / 6 — one sixth of hue circle
 
 ///|
-let hue_third : Int = 1200 // hue_full / 3
+let hue_third : Int32 = 1200 // hue_full / 3
 
 ///|
-let hue_two_thirds : Int = 2400 // hue_full * 2 / 3
+let hue_two_thirds : Int32 = 2400 // hue_full * 2 / 3
 
 ///|
-let rgb_sum_max : Int = 510 // rgb_max * 2
+let rgb_sum_max : Int32 = 510 // rgb_max * 2
 
 ///|
 /// Convert RGB (0-255) to HSL (h: 0-3600, s: 0-1000, l: 0-1000).
 ///  Uses integer arithmetic scaled by 1000 to avoid floating point.
-fn rgb_to_hsl(r : Int, g : Int, b : Int) -> (Int, Int, Int) {
+fn rgb_to_hsl(r : Int32, g : Int32, b : Int32) -> (Int32, Int32, Int32) {
   let max_c = max3(r, g, b)
   let min_c = min3(r, g, b)
   let l = (max_c + min_c) * hsl_scale / rgb_sum_max
@@ -526,7 +526,7 @@ fn rgb_to_hsl(r : Int, g : Int, b : Int) -> (Int, Int, Int) {
 }
 
 ///|
-fn hue_to_rgb(p : Int, q : Int, t_in : Int) -> Int {
+fn hue_to_rgb(p : Int32, q : Int32, t_in : Int32) -> Int32 {
   let t = if t_in < 0 {
     t_in + hue_full
   } else if t_in > hue_full {
@@ -547,7 +547,7 @@ fn hue_to_rgb(p : Int, q : Int, t_in : Int) -> Int {
 
 ///|
 /// Convert HSL (h: 0-3600, s: 0-1000, l: 0-1000) to RGB Color.
-fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
+fn hsl_to_rgb(h : Int32, s : Int32, l : Int32) -> Color {
   if s == 0 {
     let v = l * rgb_max / hsl_scale
     return { r: v, g: v, b: v, alpha: 255, }
@@ -561,7 +561,7 @@ fn hsl_to_rgb(h : Int, s : Int, l : Int) -> Color {
   let r = hue_to_rgb(p, q, h + hue_third)
   let g = hue_to_rgb(p, q, h)
   let b = hue_to_rgb(p, q, h - hue_third)
-  let clamp = fn(v : Int) -> Int {
+  let clamp = fn(v : Int32) -> Int32 {
     if v < 0 {
       0
     } else if v > rgb_max {
@@ -736,24 +736,24 @@ pub fn apply_color_modifiers(
 
 ///|
 pub(all) struct LevelTextDefaults {
-  font_size : Int // hundredths-of-pt (sz); 0 = unset
+  font_size : Int32 // hundredths-of-pt (sz); 0 = unset
   bold : Bool
   italic : Bool
   color : Color // Color::none() = unset
   font_face : String // "" = inherit
   ea_font : String // "" = inherit
   align : String // "" = inherit
-  mar_l : Int // EMU; -1 = unset
-  indent : Int // EMU; 0 = unset
+  mar_l : Int32 // EMU; -1 = unset
+  indent : Int32 // EMU; 0 = unset
   bullet : String // "" = none
   bullet_auto : String // auto-number type (a:buAutoNum); "" = none
   bullet_none : Bool
   bullet_font : String // "" = inherit
-  bullet_size : Int // 0 = inherit
+  bullet_size : Int32 // 0 = inherit
   bullet_color : Color // Color::none() = inherit
-  line_spacing : Int // 0 = unset; positive = pct (e.g. 130000 = 130%)
-  spc_before : Int // 0 = unset
-  spc_after : Int // 0 = unset
+  line_spacing : Int32 // 0 = unset; positive = pct (e.g. 130000 = 130%)
+  spc_before : Int32 // 0 = unset
+  spc_after : Int32 // 0 = unset
 }
 
 ///|
@@ -876,7 +876,7 @@ pub(all) struct TextRun {
   bold : Bool
   bold_explicit : Bool // true if b= attribute was explicitly set on a:rPr (vs inherited/default)
   italic : Bool
-  font_size : Int // in hundredths-of-a-point (sz attr); 0 = inherit
+  font_size : Int32 // in hundredths-of-a-point (sz attr); 0 = inherit
   color : Color
   font_face : String // explicit typeface from <a:latin>; "" = use theme font
   ea_font : String // East Asian typeface from <a:ea>; "" = use theme ea font
@@ -885,16 +885,16 @@ pub(all) struct TextRun {
   underline : String // "sng", "dbl", "heavy", etc.; "" = none
   underline_color : Color // a:uFill/a:uLn color; Color::none() = follow text color
   strike : String // "sngStrike", "dblStrike"; "" = none
-  baseline : Int // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
-  char_spacing : Int // character spacing in hundredths-of-a-point (spc attr); 0 = default
-  kern : Int // kerning in hundredths-of-a-point (kern attr); 0 = default
+  baseline : Int32 // superscript (+30000 = 30%) / subscript (-25000); 0 = normal
+  char_spacing : Int32 // character spacing in hundredths-of-a-point (spc attr); 0 = default
+  kern : Int32 // kerning in hundredths-of-a-point (kern attr); 0 = default
   cap : String // "all", "small"; "" = none
   hlink_rid : String // hyperlink relationship ID from <a:hlinkClick r:id="...">; "" = none
   hlink_mouse_over_rid : String // hover hyperlink from <a:hlinkHover r:id="...">; "" = none
   effects : EffectList // a:effectLst on a:rPr; text-level effects (shadow, glow, etc.)
   // Text outline: a:rPr/a:ln — stroke on text glyphs
   outline_color : Color // solid fill color; Color::none() = no outline
-  outline_w : Int // width in EMU (a:ln w="..."); 0 = default (12700)
+  outline_w : Int32 // width in EMU (a:ln w="..."); 0 = default (12700)
   // Text gradient fill: a:rPr/a:gradFill — gradient on text glyphs
   text_grad_fill : GradientFill // gradient fill; GradientFill::none() = no gradient
   // Text pattern fill: a:rPr/a:pattFill
@@ -905,7 +905,7 @@ pub(all) struct TextRun {
 
 ///|
 pub(all) struct TabStop {
-  pos : Int // position in EMU
+  pos : Int32 // position in EMU
   algn : String // "l", "ctr", "r", "dec"; "" = left (default)
 }
 
@@ -913,17 +913,17 @@ pub(all) struct TabStop {
 pub(all) struct TextParagraph {
   runs : Array[TextRun]
   align : String // "l", "c", "r", "just" or ""
-  level : Int // indent level (0 = top-level, from a:pPr lvl="N")
-  spc_before : Int // spacing before in EMU (from a:spcBef); 0 = default
-  spc_after : Int // spacing after in EMU (from a:spcAft); 0 = default
-  line_spacing : Int // line spacing: >0 = EMU, <0 = percentage (-100000=100%), 0 = default
-  mar_l : Int // left margin in EMU (from marL attr in a:pPr); -1 = unset
-  indent : Int // first-line indent in EMU (from indent attr in a:pPr); 0 = default
+  level : Int32 // indent level (0 = top-level, from a:pPr lvl="N")
+  spc_before : Int32 // spacing before in EMU (from a:spcBef); 0 = default
+  spc_after : Int32 // spacing after in EMU (from a:spcAft); 0 = default
+  line_spacing : Int32 // line spacing: >0 = EMU, <0 = percentage (-100000=100%), 0 = default
+  mar_l : Int32 // left margin in EMU (from marL attr in a:pPr); -1 = unset
+  indent : Int32 // first-line indent in EMU (from indent attr in a:pPr); 0 = default
   bullet : String // bullet char (from a:buChar); "" = none/inherit
   bullet_auto : String // auto-number type (from a:buAutoNum); "" = none
   bullet_none : Bool // explicitly no bullet (a:buNone)
   bullet_font : String // a:buFont typeface; "" = run font
-  bullet_size : Int // a:buSzPct (percentage 100000=100%) or negative for a:buSzPts; 0 = inherit
+  bullet_size : Int32 // a:buSzPct (percentage 100000=100%) or negative for a:buSzPts; 0 = inherit
   bullet_color : Color // a:buClr; Color::none() = inherit
   bullet_img_rid : String // a:buBlip r:embed; "" = none
   tab_stops : Array[TabStop] // a:tabLst/a:tab
@@ -931,7 +931,7 @@ pub(all) struct TextParagraph {
   // endParaRPr fallbacks — applied as last-resort defaults for runs missing
   // values, AFTER layout/master inheritance has had a chance to fill them.
   // A value of 0 / "" / Color::none() means "endParaRPr did not supply this".
-  epr_font_size : Int
+  epr_font_size : Int32
   epr_color : Color
   epr_font_face : String
   epr_ea_font : String
@@ -941,47 +941,47 @@ pub(all) struct TextParagraph {
 
 ///|
 /// Default text outline width: 12700 EMU = 1 pt (OOXML default for a:ln on a:rPr).
-pub let default_outline_w : Int = 12700
+pub let default_outline_w : Int32 = 12700
 
 ///|
 /// 100000 = 100% in OOXML percentage units (fontScale, lnSpcReduction, etc.)
-pub let pct_100 : Int = 100000
+pub let pct_100 : Int32 = 100000
 
 ///|
 /// Prefix for custom dash stroke_dash strings. Format: "custDash:d1,sp1;d2,sp2;..."
 pub let cust_dash_prefix : String = "custDash:"
 
 ///|
-pub let cust_dash_prefix_len : Int = 9
+pub let cust_dash_prefix_len : Int32 = 9
 
 ///|
 /// Maximum outline levels in OOXML (lvl1pPr through lvl9pPr).
-pub let max_outline_levels : Int = 9
+pub let max_outline_levels : Int32 = 9
 
 ///|
 /// OOXML default `adj` for `prstGeom prst="roundRect"` (16.667% of the short side).
 /// Per ECMA-376 presetShapeDefinitions/roundRect: `<a:gd name="adj" fmla="val 16667"/>`.
-pub let round_rect_default_adj : Int = 16667
+pub let round_rect_default_adj : Int32 = 16667
 
 ///|
 pub(all) struct BodyProps {
   anchor : String // vertical alignment: "t", "ctr", "b", "" = default (top)
-  l_ins : Int // left inset in EMU (-1 = default 91440 ≈ 0.1in)
-  t_ins : Int // top inset in EMU (-1 = default 45720 ≈ 0.05in)
-  r_ins : Int // right inset in EMU (-1 = default 91440)
-  b_ins : Int // bottom inset in EMU (-1 = default 45720)
+  l_ins : Int32 // left inset in EMU (-1 = default 91440 ≈ 0.1in)
+  t_ins : Int32 // top inset in EMU (-1 = default 45720 ≈ 0.05in)
+  r_ins : Int32 // right inset in EMU (-1 = default 91440)
+  b_ins : Int32 // bottom inset in EMU (-1 = default 45720)
   auto_fit : Bool // <a:spAutoFit/> — expand shape to fit text
-  font_scale : Int // <a:normAutofit fontScale="..."/> -1=unset, 0-100000=percent
-  ln_spc_reduction : Int // <a:normAutofit lnSpcReduction="..."/> -1=unset, 0-100000=percent
+  font_scale : Int32 // <a:normAutofit fontScale="..."/> -1=unset, 0-100000=percent
+  ln_spc_reduction : Int32 // <a:normAutofit lnSpcReduction="..."/> -1=unset, 0-100000=percent
   wrap : String // "square" (default=wrap) or "none"; "" = default (square)
-  rot : Int // text rotation in 60000ths of a degree; 0 = default
+  rot : Int32 // text rotation in 60000ths of a degree; 0 = default
   vert : String // vertical text: "vert"/"eaVert"/"vert270"/"wordArtVert"; "" = horizontal
-  num_cols : Int // number of text columns; 0 = default (1)
-  col_spacing : Int // spacing between columns in EMU; 0 = default
+  num_cols : Int32 // number of text columns; 0 = default (1)
+  col_spacing : Int32 // spacing between columns in EMU; 0 = default
   // Text warp: a:prstTxWarp prst="..." — preset text warp effect
   warp_prst : String // preset name e.g. "textWave1"; "" = none
-  warp_av1 : Int // adjust value 1 (from a:avLst a:gd fmla="val N"); -1 = default
-  warp_av2 : Int // adjust value 2; -1 = default
+  warp_av1 : Int32 // adjust value 1 (from a:avLst a:gd fmla="val N"); -1 = default
+  warp_av2 : Int32 // adjust value 2; -1 = default
 }
 
 ///|
@@ -1014,29 +1014,29 @@ pub(all) struct TableCell {
   fill : Color
   grad_fill : GradientFill
   // Cell merge
-  grid_span : Int // horizontal merge span (1 = no merge)
-  row_span : Int // vertical merge span (1 = no merge)
+  grid_span : Int32 // horizontal merge span (1 = no merge)
+  row_span : Int32 // vertical merge span (1 = no merge)
   v_merge : Bool // true = this cell is merged into the cell above
   h_merge : Bool // true = this cell is merged into the cell to the left
   // Cell borders (line width in EMU, 0 = default, -1 = none)
-  bdr_l_w : Int
-  bdr_r_w : Int
-  bdr_t_w : Int
-  bdr_b_w : Int
+  bdr_l_w : Int32
+  bdr_r_w : Int32
+  bdr_t_w : Int32
+  bdr_b_w : Int32
   bdr_l_color : Color
   bdr_r_color : Color
   bdr_t_color : Color
   bdr_b_color : Color
   // Diagonal borders
-  bdr_tl_br_w : Int // top-left to bottom-right
+  bdr_tl_br_w : Int32 // top-left to bottom-right
   bdr_tl_br_color : Color
-  bdr_bl_tr_w : Int // bottom-left to top-right
+  bdr_bl_tr_w : Int32 // bottom-left to top-right
   bdr_bl_tr_color : Color
   // Cell margins in EMU (-1 = use default)
-  mar_l : Int
-  mar_r : Int
-  mar_t : Int
-  mar_b : Int
+  mar_l : Int32
+  mar_r : Int32
+  mar_t : Int32
+  mar_b : Int32
   // Cell anchor: "t" (top, default), "ctr" (center), "b" (bottom)
   anchor : String
 }
@@ -1075,13 +1075,13 @@ pub fn TableCell::empty() -> TableCell {
 
 ///|
 pub(all) struct TableRow {
-  height : Int // EMU
+  height : Int32 // EMU
   cells : Array[TableCell]
 }
 
 ///|
 pub(all) struct TableData {
-  col_widths : Array[Int] // EMU per column
+  col_widths : Array[Int32] // EMU per column
   rows : Array[TableRow]
   // Table properties from a:tblPr
   style_id : String // tblStyleId UUID (empty = none)
@@ -1099,10 +1099,10 @@ pub(all) struct TableData {
 pub(all) struct TableStyleCell {
   fill : Color
   grad_fill : GradientFill
-  bdr_l_w : Int
-  bdr_r_w : Int
-  bdr_t_w : Int
-  bdr_b_w : Int
+  bdr_l_w : Int32
+  bdr_r_w : Int32
+  bdr_t_w : Int32
+  bdr_b_w : Int32
   bdr_l_color : Color
   bdr_r_color : Color
   bdr_t_color : Color
@@ -1179,10 +1179,10 @@ pub fn TableStyleDef::none() -> TableStyleDef {
 pub(all) enum ShapeGeom {
   Rect
   Ellipse
-  RoundRect(Int) // adj (0-100000); default 16667 (= 16.667%)
+  RoundRect(Int32) // adj (0-100000); default 16667 (= 16.667%)
   Line
-  Connector(String, Array[Int]) // preset name, adjustment values (0-100000)
-  Other(String, Array[Int]) // preset name, adjustment values
+  Connector(String, Array[Int32]) // preset name, adjustment values (0-100000)
+  Other(String, Array[Int32]) // preset name, adjustment values
   Custom(CustomGeomData) // a:custGeom freeform/custom geometry
 }
 
@@ -1190,8 +1190,8 @@ pub(all) enum ShapeGeom {
 pub(all) struct CustomGeomData {
   gdlst : String // guide formulas: "name1=fmla1;name2=fmla2"
   paths : String // compact path: "M x y L x y Z" ("|" separates sub-paths; optional leading "W pw ph", "F mode", "S false")
-  path_w : Int // first path's coordinate space width (0 = use shape width)
-  path_h : Int // first path's coordinate space height (0 = use shape height)
+  path_w : Int32 // first path's coordinate space width (0 = use shape width)
+  path_h : Int32 // first path's coordinate space height (0 = use shape height)
   rect_l : String // text rect left guide name (empty = use shape bound)
   rect_t : String // text rect top guide name
   rect_r : String // text rect right guide name
@@ -1200,7 +1200,7 @@ pub(all) struct CustomGeomData {
 }
 
 ///|
-pub fn parse_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
+pub fn parse_geom(prst : String, avlst : Array[Int32]) -> ShapeGeom {
   if prst == "rect" {
     ShapeGeom::Rect
   } else if prst == "ellipse" || prst == "oval" {
@@ -1217,7 +1217,7 @@ pub fn parse_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
 
 ///|
 /// Parse connector geometry with adjustment values.
-pub fn parse_connector_geom(prst : String, avlst : Array[Int]) -> ShapeGeom {
+pub fn parse_connector_geom(prst : String, avlst : Array[Int32]) -> ShapeGeom {
   if prst == "straightConnector1" || prst == "line" {
     ShapeGeom::Line
   } else {
@@ -1245,12 +1245,12 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
 /// Outer shadow (a:outerShdw).
 /// blurRad/dist in EMU, dir in 60000ths of a degree (0=right, 5400000=bottom).
 pub(all) struct OuterShadow {
-  blur_rad : Int // blurRad in EMU; 0 = no blur
-  dist : Int // dist in EMU; 0 = no offset
-  dir : Int // dir in 60000ths of degree; 0 = right
+  blur_rad : Int32 // blurRad in EMU; 0 = no blur
+  dist : Int32 // dist in EMU; 0 = no offset
+  dir : Int32 // dir in 60000ths of degree; 0 = right
   color : Color // shadow color with alpha
-  sx : Int // sx scale %; 0 = default (100000)
-  sy : Int // sy scale %; 0 = default (100000)
+  sx : Int32 // sx scale %; 0 = default (100000)
+  sy : Int32 // sy scale %; 0 = default (100000)
   algn : String // alignment: "tl","t","tr","l","ctr","r","bl","b","br"; "" = default ("b")
   rot_with_shape : Bool // rotWithShape
 }
@@ -1277,9 +1277,9 @@ pub fn OuterShadow::is_none(self : OuterShadow) -> Bool {
 ///|
 /// Inner shadow (a:innerShdw).
 pub(all) struct InnerShadow {
-  blur_rad : Int // blurRad in EMU
-  dist : Int // dist in EMU
-  dir : Int // dir in 60000ths of degree
+  blur_rad : Int32 // blurRad in EMU
+  dist : Int32 // dist in EMU
+  dir : Int32 // dir in 60000ths of degree
   color : Color // shadow color with alpha
 }
 
@@ -1296,7 +1296,7 @@ pub fn InnerShadow::is_none(self : InnerShadow) -> Bool {
 ///|
 /// Glow effect (a:glow).
 pub(all) struct Glow {
-  rad : Int // rad in EMU; 0 = no glow
+  rad : Int32 // rad in EMU; 0 = no glow
   color : Color // glow color with alpha
 }
 
@@ -1313,7 +1313,7 @@ pub fn Glow::is_none(self : Glow) -> Bool {
 ///|
 /// Soft edge effect (a:softEdge).
 pub(all) struct SoftEdge {
-  rad : Int // rad in EMU; 0 = no soft edge
+  rad : Int32 // rad in EMU; 0 = no soft edge
 }
 
 ///|
@@ -1329,7 +1329,7 @@ pub fn SoftEdge::is_none(self : SoftEdge) -> Bool {
 ///|
 /// Blur effect (a:blur).
 pub(all) struct Blur {
-  rad : Int // rad in EMU; 0 = no blur
+  rad : Int32 // rad in EMU; 0 = no blur
 }
 
 ///|
@@ -1347,8 +1347,8 @@ pub fn Blur::is_none(self : Blur) -> Bool {
 /// Maps to predefined outer shadow parameters based on preset name.
 pub(all) struct PresetShadow {
   prst : String // preset name: "shdw1".."shdw20"; "" = none
-  dist : Int // dist in EMU
-  dir : Int // dir in 60000ths of degree
+  dist : Int32 // dist in EMU
+  dir : Int32 // dir in 60000ths of degree
   color : Color // shadow color with alpha
 }
 
@@ -1365,7 +1365,7 @@ pub fn PresetShadow::is_none(self : PresetShadow) -> Bool {
 ///|
 /// Get blur radius for a preset shadow (shdw1-shdw20).
 /// Values based on ECMA-376 §20.1.10.52 preset shadow definitions.
-pub fn PresetShadow::blur_rad(self : PresetShadow) -> Int {
+pub fn PresetShadow::blur_rad(self : PresetShadow) -> Int32 {
   // shdw1-shdw8: offset shadows — moderate blur
   // shdw9: center shadow — large blur
   // shdw10-shdw12: perspective shadows — moderate blur
@@ -1386,14 +1386,14 @@ pub fn PresetShadow::blur_rad(self : PresetShadow) -> Int {
 ///|
 /// Reflection effect (a:reflection).
 pub(all) struct Reflection {
-  blur_rad : Int // blurRad in EMU
-  dist : Int // dist in EMU (gap between shape and reflection)
-  dir : Int // dir in 60000ths of degree
-  st_alpha : Int // stA start alpha (0-100000); 100000 = opaque
-  end_alpha : Int // endA end alpha (0-100000); 0 = transparent
-  fade_dir : Int // fadeDir direction for alpha gradient (60000ths of degree)
-  sx : Int // sx scale %
-  sy : Int // sy scale %
+  blur_rad : Int32 // blurRad in EMU
+  dist : Int32 // dist in EMU (gap between shape and reflection)
+  dir : Int32 // dir in 60000ths of degree
+  st_alpha : Int32 // stA start alpha (0-100000); 100000 = opaque
+  end_alpha : Int32 // endA end alpha (0-100000); 0 = transparent
+  fade_dir : Int32 // fadeDir direction for alpha gradient (60000ths of degree)
+  sx : Int32 // sx scale %
+  sy : Int32 // sy scale %
   algn : String // alignment
   rot_with_shape : Bool
 }
@@ -1481,8 +1481,8 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
 ///|
 /// Bevel definition (a:bevelT / a:bevelB).
 pub(all) struct Bevel {
-  w : Int // width in EMU
-  h : Int // height in EMU
+  w : Int32 // width in EMU
+  h : Int32 // height in EMU
   prst : String // preset type (e.g. "relaxedInset", "circle", "slope")
 }
 
@@ -1501,12 +1501,12 @@ pub fn Bevel::is_none(self : Bevel) -> Bool {
 pub(all) struct Shape3d {
   bevel_t : Bevel
   bevel_b : Bevel
-  extrusion_h : Int // extrusionH in EMU
-  contour_w : Int // contourW in EMU
+  extrusion_h : Int32 // extrusionH in EMU
+  contour_w : Int32 // contourW in EMU
   extrusion_clr : Color
   contour_clr : Color
   prst_material : String // e.g. "matte", "warmMatte", "plastic"
-  z : Int // z coordinate in EMU
+  z : Int32 // z coordinate in EMU
 }
 
 ///|
@@ -1553,11 +1553,11 @@ pub fn Scene3d::is_none(self : Scene3d) -> Bool {
 
 ///|
 pub(all) struct ShapeTransform {
-  x : Int
-  y : Int
-  cx : Int
-  cy : Int
-  rot : Int // rotation in 1/60000 degree units
+  x : Int32
+  y : Int32
+  cx : Int32
+  cy : Int32
+  rot : Int32 // rotation in 1/60000 degree units
   flip_h : Bool
   flip_v : Bool
 }
@@ -1569,10 +1569,10 @@ pub fn ShapeTransform::default() -> ShapeTransform {
 
 ///|
 pub(all) struct GroupShapeData {
-  ch_off_x : Int // child offset x (EMU)
-  ch_off_y : Int // child offset y (EMU)
-  ch_ext_cx : Int // child extent cx (EMU)
-  ch_ext_cy : Int // child extent cy (EMU)
+  ch_off_x : Int32 // child offset x (EMU)
+  ch_off_y : Int32 // child offset y (EMU)
+  ch_ext_cx : Int32 // child extent cx (EMU)
+  ch_ext_cy : Int32 // child extent cy (EMU)
   children : Array[Shape]
 }
 
@@ -1590,11 +1590,11 @@ pub(all) enum ShapeKind {
 /// Parsed stroke properties from a:ln.
 pub(all) struct StrokeProps {
   color : Color
-  width : Int
+  width : Int32
   dash : String
   cap : String
   join : String
-  miter_limit : Int
+  miter_limit : Int32
   head_type : String
   head_w : String
   head_len : String
@@ -1638,11 +1638,11 @@ pub(all) struct Shape {
   blip_fill : BlipFill // BlipFill::none() = no image fill
   patt_fill : PatternFill // PatternFill::none() = no pattern fill
   stroke : Color // Color::none() = no stroke
-  stroke_w : Int // stroke width in EMU (0 = default ~12700)
+  stroke_w : Int32 // stroke width in EMU (0 = default ~12700)
   stroke_dash : String // preset dash: dash/dot/dashDot/lgDash/sysDot/sysDash/etc. "" = solid
   stroke_cap : String // line cap: flat/rnd/sq. "" = default (flat)
   stroke_join : String // line join: round/bevel/miter. "" = default
-  stroke_miter_limit : Int // miter limit (EMU percentage, e.g. 800000). 0 = default
+  stroke_miter_limit : Int32 // miter limit (EMU percentage, e.g. 800000). 0 = default
   stroke_head_type : String // arrow head type: triangle/stealth/diamond/oval/arrow. "" = none
   stroke_head_w : String // arrow head width: sm/med/lg. "" = default (med)
   stroke_head_len : String // arrow head length: sm/med/lg. "" = default (med)
@@ -1656,11 +1656,11 @@ pub(all) struct Shape {
   paragraphs : Array[TextParagraph]
   body_props : BodyProps // text body properties (anchor, insets)
   ph_type : String // "title","body","ctrTitle","subTitle","dt","ftr","sldNum","" (non-PH)
-  ph_idx : Int // -1 = none
-  st_cxn_id : Int // start connection shape id (-1 = none)
-  st_cxn_idx : Int // start connection point index (-1 = none)
-  end_cxn_id : Int // end connection shape id (-1 = none)
-  end_cxn_idx : Int // end connection point index (-1 = none)
+  ph_idx : Int32 // -1 = none
+  st_cxn_id : Int32 // start connection shape id (-1 = none)
+  st_cxn_idx : Int32 // start connection point index (-1 = none)
+  end_cxn_id : Int32 // end connection shape id (-1 = none)
+  end_cxn_idx : Int32 // end connection point index (-1 = none)
   sh_link_rid : String // shape hyperlink r:id (a:hlinkClick on p:cNvPr)
   sh_link_hover_rid : String // shape hover link r:id (a:hlinkHover on p:cNvPr)
   mc_choice_xml : String // raw mc:Choice XML for SmartArt round-trip; "" = normal shape
@@ -1735,8 +1735,8 @@ pub fn Shape::default_with_blip(
 
 ///|
 pub(all) struct SlideSize {
-  cx : Int
-  cy : Int
+  cx : Int32
+  cy : Int32
 }
 
 ///|

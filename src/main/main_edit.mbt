@@ -13,7 +13,7 @@
 /// Composite shape-index radix: a group child is addressed as
 /// `parent_composite * group_index_base + child_local` (so up to 999 children per
 /// level). Top-level shapes use indices `0..group_index_base-1`.
-let group_index_base : Int = 1000
+let group_index_base : Int32 = 1000
 
 ///|
 /// Resolve a composite shape index (used by group children) to the containing
@@ -21,8 +21,8 @@ let group_index_base : Int = 1000
 /// Returns (shapes_array, local_index) or None if out of range.
 fn resolve_shape_location(
   slide : @ooxml.SlideData,
-  composite_idx : Int,
-) -> (Array[@ooxml.Shape], Int)? {
+  composite_idx : Int32,
+) -> (Array[@ooxml.Shape], Int32)? {
   if composite_idx < group_index_base {
     if composite_idx >= 0 && composite_idx < slide.shapes.length() {
       Some((slide.shapes, composite_idx))
@@ -57,7 +57,7 @@ fn resolve_shape_location(
 /// one before the slide was ever rendered would silently no-op ("shape index out of
 /// range") and the edit would never reach the export. This guard parses the slide on
 /// demand so editing works regardless of call order.
-fn ensure_slide_parsed(slide_idx : Int) -> Unit {
+fn ensure_slide_parsed(slide_idx : Int32) -> Unit {
   let n = g_slide_count.val
   if n == 0 || slide_idx < 0 || slide_idx >= n {
     return
@@ -74,9 +74,9 @@ fn ensure_slide_parsed(slide_idx : Int) -> Unit {
 ///|
 /// Validate slide index and resolve shape. Returns error string or calls `f` with (arr, local_idx).
 fn with_shape(
-  slide_idx : Int,
-  shape_idx : Int,
-  f : (Array[@ooxml.Shape], Int) -> String,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  f : (Array[@ooxml.Shape], Int32) -> String,
 ) -> String {
   let n = g_slide_count.val
   if n == 0 {
@@ -97,10 +97,10 @@ fn with_shape(
 /// Validate slide/shape/paragraph and resolve the text run.
 /// Returns error string or calls `f` with (shape, paragraph, run).
 fn with_run(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
   f : (@ooxml.Shape, @ooxml.TextParagraph, @ooxml.TextRun) -> String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -120,8 +120,8 @@ fn with_run(
 /// Create a default TextRun with the given text and optional settings.
 fn make_default_run(
   text : String,
-  font_size? : Int = 0,
-  color? : @ooxml.Color = @ooxml.Color::none(),
+  font_size~ : Int32 = 0,
+  color~ : @ooxml.Color = @ooxml.Color::none(),
 ) -> @ooxml.TextRun {
   {
     text,
@@ -156,7 +156,7 @@ fn make_default_run(
 /// Create a default TextParagraph with a single run.
 fn make_default_paragraph(
   run : @ooxml.TextRun,
-  align? : String = "",
+  align~ : String = "",
 ) -> @ooxml.TextParagraph {
   {
     runs: [run],
@@ -185,7 +185,7 @@ fn make_default_paragraph(
 
 ///|
 /// Remove an element at `idx` from an array in-place.
-fn[T] array_remove_at(arr : Array[T], idx : Int) -> Unit {
+fn[T] array_remove_at(arr : Array[T], idx : Int32) -> Unit {
   let new_arr : Array[T] = []
   let len = arr.length()
   for i in 0..<len {
@@ -245,7 +245,7 @@ fn split_string(s : String, sep : Char) -> Array[String] {
 ///|
 /// Render a single shape as SVG (0-indexed slide and shape).
 /// Returns the shape SVG with `<defs>` prepended, or "ERROR:<message>".
-pub fn render_shape_svg(slide_idx : Int, shape_idx : Int) -> String {
+pub fn render_shape_svg(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
     let scale = get_scale()
@@ -282,13 +282,13 @@ pub fn render_shape_svg(slide_idx : Int, shape_idx : Int) -> String {
 /// Update a shape's transform (position, size, rotation) and return re-rendered SVG.
 /// All values are in EMU.
 pub fn update_shape_transform(
-  slide_idx : Int,
-  shape_idx : Int,
-  x : Int,
-  y : Int,
-  cx : Int,
-  cy : Int,
-  rot : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  x : Int32,
+  y : Int32,
+  cx : Int32,
+  cy : Int32,
+  rot : Int32,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
@@ -316,7 +316,10 @@ pub fn update_shape_transform(
 /// Every shape index is resolved and validated *before* any change is applied, so
 /// a bad index leaves the slide untouched (no partial application). Intended for
 /// multi-select move/align as one undo step. Returns "OK:<count>" or "ERROR:...".
-pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
+pub fn update_shapes_transform(
+  slide_idx : Int32,
+  items_data : String,
+) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -327,7 +330,7 @@ pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
   ensure_slide_parsed(slide_idx)
   let slide = g_slides.val[slide_idx]
   // Pass 1: parse + validate every item, collecting (array, local_idx, transform).
-  let targets : Array[(Array[@ooxml.Shape], Int, @ooxml.ShapeTransform)] = []
+  let targets : Array[(Array[@ooxml.Shape], Int32, @ooxml.ShapeTransform)] = []
   let parts = split_string(items_data, ';')
   let np = parts.length()
   let mut i = 0
@@ -375,10 +378,10 @@ pub fn update_shapes_transform(slide_idx : Int, items_data : String) -> String {
 ///|
 /// Update a text run's content and return the shape's re-rendered SVG.
 pub fn update_shape_text(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
   text : String,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
@@ -391,11 +394,11 @@ pub fn update_shape_text(
 ///|
 /// Update a shape's solid fill color (RGB 0-255) and return re-rendered SVG.
 pub fn update_shape_fill(
-  slide_idx : Int,
-  shape_idx : Int,
-  r : Int,
-  g : Int,
-  b : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  r : Int32,
+  g : Int32,
+  b : Int32,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     arr[local_idx] = {
@@ -411,7 +414,7 @@ pub fn update_shape_fill(
 
 ///|
 /// Delete a shape from a slide. Returns "OK" or "ERROR:<message>".
-pub fn delete_shape(slide_idx : Int, shape_idx : Int) -> String {
+pub fn delete_shape(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     array_remove_at(arr, local_idx)
     g_modified.val[slide_idx] = true
@@ -424,15 +427,15 @@ pub fn delete_shape(slide_idx : Int, shape_idx : Int) -> String {
 /// `geom_type`: "rect", "ellipse", "roundRect", "line", etc.
 /// Position/size in EMU. fill_r/g/b: -1 = no fill.
 pub fn add_shape(
-  slide_idx : Int,
+  slide_idx : Int32,
   geom_type : String,
-  x : Int,
-  y : Int,
-  cx : Int,
-  cy : Int,
-  fill_r : Int,
-  fill_g : Int,
-  fill_b : Int,
+  x : Int32,
+  y : Int32,
+  cx : Int32,
+  cy : Int32,
+  fill_r : Int32,
+  fill_g : Int32,
+  fill_b : Int32,
 ) -> String {
   let n = g_slide_count.val
   if n == 0 {
@@ -490,12 +493,12 @@ pub fn add_shape(
 /// and referenced via the given relationship ID in the slide's .rels file.
 /// Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn add_picture_shape(
-  slide_idx : Int,
+  slide_idx : Int32,
   rid : String,
-  x : Int,
-  y : Int,
-  cx : Int,
-  cy : Int,
+  x : Int32,
+  y : Int32,
+  cx : Int32,
+  cy : Int32,
 ) -> String {
   let n = g_slide_count.val
   if n == 0 {
@@ -550,8 +553,8 @@ pub fn add_picture_shape(
 /// Updates the blip_fill rid and ShapeKind::Picture(rid).
 /// Returns "OK" or "ERROR:<message>".
 pub fn replace_picture_rid(
-  slide_idx : Int,
-  shape_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
   new_rid : String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -575,13 +578,13 @@ pub fn replace_picture_rid(
 /// Add a text paragraph with a single run to a shape.
 /// Returns "OK:<paraIndex>" or "ERROR:<message>".
 pub fn add_shape_text(
-  slide_idx : Int,
-  shape_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
   text : String,
-  font_size : Int,
-  color_r : Int,
-  color_g : Int,
-  color_b : Int,
+  font_size : Int32,
+  color_r : Int32,
+  color_g : Int32,
+  color_b : Int32,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
@@ -603,10 +606,10 @@ pub fn add_shape_text(
 /// Duplicate a shape on a slide, offset by (dx_emu, dy_emu).
 /// Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn duplicate_shape(
-  slide_idx : Int,
-  shape_idx : Int,
-  dx_emu : Int,
-  dy_emu : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  dx_emu : Int32,
+  dy_emu : Int32,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let src = arr[local_idx]
@@ -641,9 +644,9 @@ pub fn duplicate_shape(
 /// `angle`: gradient angle in 60000ths of a degree (e.g. 5400000 = 90deg)
 /// `stops_data`: "pos,r,g,b;pos,r,g,b;..." where pos is 0-100000
 pub fn update_shape_gradient_fill(
-  slide_idx : Int,
-  shape_idx : Int,
-  angle : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  angle : Int32,
   stops_data : String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -678,12 +681,12 @@ pub fn update_shape_gradient_fill(
 /// Update a shape's stroke color, width, and dash. Returns re-rendered SVG.
 /// r/g/b: -1 = remove stroke. width_emu: 0 = default. dash: "" = solid.
 pub fn update_shape_stroke(
-  slide_idx : Int,
-  shape_idx : Int,
-  r : Int,
-  g : Int,
-  b : Int,
-  width_emu : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  r : Int32,
+  g : Int32,
+  b : Int32,
+  width_emu : Int32,
   dash : String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -710,8 +713,8 @@ pub fn update_shape_stroke(
 /// Add a new paragraph to a shape. Creates a paragraph with a single run.
 /// Returns "OK:<paraIndex>" or "ERROR:<message>".
 pub fn add_paragraph(
-  slide_idx : Int,
-  shape_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
   text : String,
   align : String,
 ) -> String {
@@ -729,9 +732,9 @@ pub fn add_paragraph(
 ///|
 /// Delete a paragraph from a shape. Returns "OK" or "ERROR:<message>".
 pub fn delete_paragraph(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
@@ -747,9 +750,9 @@ pub fn delete_paragraph(
 ///|
 /// Add a new text run to a paragraph. Returns "OK:<runIndex>" or "ERROR:<message>".
 pub fn add_run(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
   text : String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -769,10 +772,10 @@ pub fn add_run(
 ///|
 /// Delete a text run from a paragraph. Returns "OK" or "ERROR:<message>".
 pub fn delete_run(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, _run) {
     array_remove_at(para.runs, run_idx)
@@ -786,12 +789,12 @@ pub fn delete_run(
 /// bold/italic: 1 = set true, 0 = set false, -1 = no change.
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_text_run_style(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
-  bold : Int,
-  italic : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
+  bold : Int32,
+  italic : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     para.runs[run_idx] = {
@@ -821,11 +824,11 @@ pub fn update_text_run_style(
 /// Update a text run's font size (hundredths of a point, e.g. 1800 = 18pt). 0 = inherit.
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_text_run_font_size(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
-  font_size : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
+  font_size : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     para.runs[run_idx] = { ..run, font_size, }
@@ -838,13 +841,13 @@ pub fn update_text_run_font_size(
 /// Update a text run's color (RGB 0-255). Pass r = -1 to clear (inherit).
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_text_run_color(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
-  r : Int,
-  g_ : Int,
-  b : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
+  r : Int32,
+  g_ : Int32,
+  b : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     let color : @ooxml.Color = if r >= 0 && g_ >= 0 && b >= 0 {
@@ -862,10 +865,10 @@ pub fn update_text_run_color(
 /// Update a text run's font family. Empty string = no change.
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_text_run_font(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
   font_face : String,
   ea_font : String,
   cs_font : String,
@@ -899,9 +902,9 @@ pub fn update_text_run_font(
 /// align: "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_paragraph_align(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
   align : String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -922,13 +925,13 @@ pub fn update_paragraph_align(
 /// baseline: 30000 = superscript, -25000 = subscript, 0 = normal, -1 = no change.
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_text_run_decoration(
-  slide_idx : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
   underline : String,
   strike : String,
-  baseline : Int,
+  baseline : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
     let new_underline = if underline == "" {
@@ -980,7 +983,7 @@ pub fn update_text_run_decoration(
 /// full fidelity.
 ///
 /// Returns "OK" or "ERROR:<message>".
-pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
+pub fn restore_slide_ooxml(slide_idx : Int32, xml : String) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -992,41 +995,21 @@ pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
     return "ERROR:empty xml"
   }
   let slide_num = slide_idx + 1
-  // Resolve the slide's .rels + layout/master/theme (mirror render_slide_svg).
-  let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
-  let rels_xml = @ffi.ffi_get_file(rels_path)
-  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
-  let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
-    g_slide_layout_paths.val[slide_idx]
-  } else {
-    ""
-  }
-  let layout_opt = if !layout_path.is_empty() {
-    get_layout(layout_path)
-  } else {
-    None
-  }
-  let master_path = if !layout_path.is_empty() {
-    find_master_for_layout(layout_path)
-  } else {
-    ""
-  }
-  let master_opt = if !master_path.is_empty() {
-    get_master(master_path)
-  } else {
-    None
-  }
-  let base_theme = if !master_path.is_empty() {
-    get_master_theme(master_path)
-  } else {
-    g_theme.val
-  }
-  let slide_data = resolve_slide_data(
-    slide_num, xml, rels, layout_opt, master_opt, layout_path, master_path, base_theme,
+  let ctx = slide_context(slide_idx)
+  let (slide_data, bg_rels) = resolve_slide_data(
+    slide_num,
+    xml,
+    ctx.rels,
+    ctx.layout_opt,
+    ctx.master_opt,
+    ctx.layout_path,
+    ctx.master_path,
+    ctx.base_theme,
   )
   g_slides.val[slide_idx] = slide_data
   g_modified.val[slide_idx] = true
   g_parsed.val[slide_idx] = true
+  g_bg_rels.val[slide_idx] = bg_rels
   "OK"
 }
 
@@ -1039,7 +1022,7 @@ pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
 
 ///|
 /// Insert `item` at `idx`, shifting later elements right (in-place).
-fn[T] array_insert_at(arr : Array[T], idx : Int, item : T) -> Unit {
+fn[T] array_insert_at(arr : Array[T], idx : Int32, item : T) -> Unit {
   arr.push(item)
   let mut i = arr.length() - 1
   while i > idx {
@@ -1051,7 +1034,7 @@ fn[T] array_insert_at(arr : Array[T], idx : Int, item : T) -> Unit {
 
 ///|
 /// Composite index for a sibling at `local_idx` within the same container as `shape_idx`.
-fn sibling_composite_idx(shape_idx : Int, local_idx : Int) -> Int {
+fn sibling_composite_idx(shape_idx : Int32, local_idx : Int32) -> Int32 {
   let base = if shape_idx < group_index_base {
     0
   } else {
@@ -1063,7 +1046,7 @@ fn sibling_composite_idx(shape_idx : Int, local_idx : Int) -> Int {
 ///|
 /// Move a shape to the front (top of the z-order = end of the array).
 /// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
-pub fn bring_to_front(slide_idx : Int, shape_idx : Int) -> String {
+pub fn bring_to_front(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let sh = arr[local_idx]
     array_remove_at(arr, local_idx)
@@ -1076,7 +1059,7 @@ pub fn bring_to_front(slide_idx : Int, shape_idx : Int) -> String {
 ///|
 /// Move a shape to the back (bottom of the z-order = start of the array).
 /// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
-pub fn send_to_back(slide_idx : Int, shape_idx : Int) -> String {
+pub fn send_to_back(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let sh = arr[local_idx]
     array_remove_at(arr, local_idx)
@@ -1089,7 +1072,7 @@ pub fn send_to_back(slide_idx : Int, shape_idx : Int) -> String {
 ///|
 /// Move a shape one step toward the front (swap with the next sibling).
 /// No-op if already front-most. Returns "OK:<new_composite_idx>".
-pub fn bring_forward(slide_idx : Int, shape_idx : Int) -> String {
+pub fn bring_forward(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let new_local = if local_idx < arr.length() - 1 {
       let sh = arr[local_idx]
@@ -1107,7 +1090,7 @@ pub fn bring_forward(slide_idx : Int, shape_idx : Int) -> String {
 ///|
 /// Move a shape one step toward the back (swap with the previous sibling).
 /// No-op if already back-most. Returns "OK:<new_composite_idx>".
-pub fn send_backward(slide_idx : Int, shape_idx : Int) -> String {
+pub fn send_backward(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let new_local = if local_idx > 0 {
       let sh = arr[local_idx]
@@ -1130,7 +1113,7 @@ pub fn send_backward(slide_idx : Int, shape_idx : Int) -> String {
 ///|
 /// Serialize a single shape to its OOXML fragment (for copy). Returns the XML, or
 /// "ERROR:<message>" (e.g. charts, which are preserved out-of-band, serialize to "").
-pub fn get_shape_ooxml(slide_idx : Int, shape_idx : Int) -> String {
+pub fn get_shape_ooxml(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let xml = @serializer.serialize_shape(arr[local_idx])
     if xml.is_empty() {
@@ -1146,10 +1129,10 @@ pub fn get_shape_ooxml(slide_idx : Int, shape_idx : Int) -> String {
 /// (for paste). rIds in `shape_xml` must already point at the target slide's rels.
 /// Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn add_shape_from_ooxml(
-  slide_idx : Int,
+  slide_idx : Int32,
   shape_xml : String,
-  dx_emu : Int,
-  dy_emu : Int,
+  dx_emu : Int32,
+  dy_emu : Int32,
 ) -> String {
   let n = g_slide_count.val
   if n == 0 {

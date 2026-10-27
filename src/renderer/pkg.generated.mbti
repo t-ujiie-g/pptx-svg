@@ -1,0 +1,58 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "pptx-svg/renderer"
+
+import {
+  "pptx-svg/ooxml",
+}
+
+// Values
+pub fn build_text_layout(Array[@ooxml.TextParagraph], @ooxml.ShapeTransform, Int32, @ooxml.ThemeData, @ooxml.BodyProps) -> TextLayout
+
+pub fn hit_test_layout(TextLayout, Int32, Int32) -> (Int32, Int32, Int32, Int32)
+
+pub fn render_shape(@ooxml.Shape, Array[@ooxml.Relationship], Int32, Int32, Int32, @ooxml.ThemeData, Array[@ooxml.TableStyleDef]) -> String
+
+pub fn render_shape_defs(@ooxml.Shape, Int32, Int32, Int32) -> String
+
+pub fn render_slide_svg(@ooxml.SlideData, Array[@ooxml.Relationship], Int32, @ooxml.ThemeData, Array[@ooxml.Shape], Array[@ooxml.TableStyleDef], Array[Array[@ooxml.Relationship]], Array[@ooxml.Relationship]) -> String
+
+pub fn sanitize_url(String) -> String
+
+pub fn text_layout_to_json(TextLayout) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct GlyphBox {
+  x : Int32
+  w : Int32
+}
+
+pub(all) struct LineBox {
+  para_idx : Int32
+  y : Int32
+  h : Int32
+  runs : Array[RunBox]
+}
+
+pub(all) struct RunBox {
+  para_idx : Int32
+  run_idx : Int32
+  x : Int32
+  w : Int32
+  run_char_start : Int32
+  para_char_start : Int32
+  chars : Array[GlyphBox]
+}
+
+pub(all) struct TextLayout {
+  box_x : Int32
+  box_y : Int32
+  box_cx : Int32
+  box_cy : Int32
+  lines : Array[LineBox]
+}
+
+// Type aliases
+
+// Traits

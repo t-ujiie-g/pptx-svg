@@ -25,7 +25,7 @@ pub fn ffi_get_file_base64(path : String) -> String = "pptx_ffi" "get_file_base6
 /// Convert a Unicode code point (int) to a single-character string.
 /// Implemented via String.fromCharCode in the JavaScript host.
 /// Used to build strings without StringBuilder (avoids fromCharCodeArray).
-pub fn ffi_char_code_to_str(code : Int) -> String = "pptx_ffi" "char_code_to_str"
+pub fn ffi_char_code_to_str(code : Int32) -> String = "pptx_ffi" "char_code_to_str"
 
 ///|
 /// Log an informational message to the browser console.

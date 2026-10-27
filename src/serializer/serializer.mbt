@@ -37,7 +37,7 @@ fn serialize_cnvpr(
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 ///|
-fn int_to_str(n : Int) -> String {
+fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
 }
 
@@ -364,7 +364,7 @@ fn serialize_body_pr(bp : @ooxml.BodyProps) -> String {
 
 ///|
 /// Serialize spacing as a:spcBef or a:spcAft child element.
-fn serialize_spacing(tag : String, val : Int) -> String {
+fn serialize_spacing(tag : String, val : Int32) -> String {
   if val == 0 {
     return ""
   }
@@ -849,7 +849,11 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
 
 ///|
 /// Serialize a single path segment from compact format to OOXML XML.
-fn serialize_path_segment(seg : String, path_w : Int, path_h : Int) -> String {
+fn serialize_path_segment(
+  seg : String,
+  path_w : Int32,
+  path_h : Int32,
+) -> String {
   // Leading "W pw ph" / "F mode" / "S false" tokens are a:path attributes;
   // the rest are drawing commands.
   let mut w = path_w
@@ -979,7 +983,7 @@ fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
 
 ///|
 /// Conditionally emit an XML integer attribute (non-zero only).
-fn xml_int_attr(name : String, val : Int) -> String {
+fn xml_int_attr(name : String, val : Int32) -> String {
   if val > 0 {
     " " + name + "=\"" + int_to_str(val) + "\""
   } else {
@@ -989,7 +993,7 @@ fn xml_int_attr(name : String, val : Int) -> String {
 
 ///|
 /// Conditionally emit an XML integer attribute when it differs from a default.
-fn xml_int_attr_ne(name : String, val : Int, default : Int) -> String {
+fn xml_int_attr_ne(name : String, val : Int32, default : Int32) -> String {
   if val != default {
     " " + name + "=\"" + int_to_str(val) + "\""
   } else {
@@ -1293,7 +1297,7 @@ fn serialize_picture(shape : @ooxml.Shape, rid : String) -> String {
 }
 
 ///|
-fn serialize_tc_border(tag : String, w : Int, color : @ooxml.Color) -> String {
+fn serialize_tc_border(tag : String, w : Int32, color : @ooxml.Color) -> String {
   if w == 0 && color.is_none() {
     return ""
   }

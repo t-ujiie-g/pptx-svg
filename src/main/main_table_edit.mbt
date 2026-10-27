@@ -8,14 +8,14 @@
 ///|
 /// Default width (EMU) for a new column when no width is given and there is no
 /// neighbour to copy from. 914400 EMU = 1 inch.
-let default_table_col_width_emu : Int = 914400
+let default_table_col_width_emu : Int32 = 914400
 
 ///|
 /// Resolve a shape and require it to be a table. Calls `f` with its TableData,
 /// or returns "ERROR:shape is not a table".
 fn with_table(
-  slide_idx : Int,
-  shape_idx : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
   f : (@ooxml.TableData) -> String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
@@ -29,7 +29,7 @@ fn with_table(
 ///|
 /// Insertion index for an "insert after `after`" operation into an array of
 /// length `len`: `after = -1` → front (0); otherwise `after + 1`, clamped to `len`.
-fn clamp_insert_index(after : Int, len : Int) -> Int {
+fn clamp_insert_index(after : Int32, len : Int32) -> Int32 {
   if after < 0 {
     0
   } else if after + 1 > len {
@@ -44,10 +44,10 @@ fn clamp_insert_index(after : Int, len : Int) -> Int {
 /// inherits the cell's existing first-run formatting when present.
 /// Returns re-rendered shape SVG or "ERROR:<message>".
 pub fn update_table_cell_text(
-  slide_idx : Int,
-  shape_idx : Int,
-  row : Int,
-  col : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  row : Int32,
+  col : Int32,
   text : String,
 ) -> String {
   with_table(slide_idx, shape_idx, fn(t) {
@@ -75,9 +75,9 @@ pub fn update_table_cell_text(
 /// Insert a new (empty) row. `after_row = -1` inserts at the top; otherwise after
 /// the given row (clamped). Returns "OK:<new_row_idx>" or "ERROR:<message>".
 pub fn add_table_row(
-  slide_idx : Int,
-  shape_idx : Int,
-  after_row : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  after_row : Int32,
 ) -> String {
   with_table(slide_idx, shape_idx, fn(t) {
     let ncols = t.col_widths.length()
@@ -105,7 +105,11 @@ pub fn add_table_row(
 
 ///|
 /// Delete a row. At least one row must remain. Returns "OK" or "ERROR:<message>".
-pub fn delete_table_row(slide_idx : Int, shape_idx : Int, row : Int) -> String {
+pub fn delete_table_row(
+  slide_idx : Int32,
+  shape_idx : Int32,
+  row : Int32,
+) -> String {
   with_table(slide_idx, shape_idx, fn(t) {
     if t.rows.length() <= 1 {
       return "ERROR:cannot delete the last row"
@@ -124,10 +128,10 @@ pub fn delete_table_row(slide_idx : Int, shape_idx : Int, row : Int) -> String {
 /// after the given column (clamped). `width_emu <= 0` copies a neighbour's width
 /// (or 1 inch). Returns "OK:<new_col_idx>" or "ERROR:<message>".
 pub fn add_table_column(
-  slide_idx : Int,
-  shape_idx : Int,
-  after_col : Int,
-  width_emu : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  after_col : Int32,
+  width_emu : Int32,
 ) -> String {
   with_table(slide_idx, shape_idx, fn(t) {
     let ncols = t.col_widths.length()
@@ -163,9 +167,9 @@ pub fn add_table_column(
 ///|
 /// Delete a column. At least one column must remain. Returns "OK" or "ERROR:...".
 pub fn delete_table_column(
-  slide_idx : Int,
-  shape_idx : Int,
-  col : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  col : Int32,
 ) -> String {
   with_table(slide_idx, shape_idx, fn(t) {
     if t.col_widths.length() <= 1 {

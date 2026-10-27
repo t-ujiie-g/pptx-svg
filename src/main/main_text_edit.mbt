@@ -11,7 +11,7 @@
 
 ///|
 /// Total character length of a paragraph's concatenated run text.
-fn para_text_len(para : @ooxml.TextParagraph) -> Int {
+fn para_text_len(para : @ooxml.TextParagraph) -> Int32 {
   let mut total = 0
   for run in para.runs {
     total = total + run.text.length()
@@ -25,7 +25,7 @@ fn para_text_len(para : @ooxml.TextParagraph) -> Int {
 /// Returns (left_runs, right_runs).
 fn split_para_runs(
   para : @ooxml.TextParagraph,
-  char_off : Int,
+  char_off : Int32,
 ) -> (Array[@ooxml.TextRun], Array[@ooxml.TextRun]) {
   let left : Array[@ooxml.TextRun] = []
   let right : Array[@ooxml.TextRun] = []
@@ -62,8 +62,8 @@ fn split_para_runs(
 /// Replace paragraphs `[start..end]` (inclusive) of an array in-place with `items`.
 fn[T] array_splice(
   arr : Array[T],
-  start : Int,
-  end_inclusive : Int,
+  start : Int32,
+  end_inclusive : Int32,
   items : Array[T],
 ) -> Unit {
   let new_arr : Array[T] = []
@@ -97,7 +97,7 @@ fn[T] array_splice(
 /// Get the text geometry of a shape's text body as JSON. Coordinates in EMU.
 /// See `@renderer.build_text_layout` for the schema and scope.
 /// Returns JSON or "ERROR:<message>".
-pub fn get_text_layout(slide_idx : Int, shape_idx : Int) -> String {
+pub fn get_text_layout(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
     let scale = get_scale()
@@ -118,10 +118,10 @@ pub fn get_text_layout(slide_idx : Int, shape_idx : Int) -> String {
 /// `charOffset` is the offset within the run; `paraOffset` is within the paragraph
 /// (use the latter with `replace_text_range`).
 pub fn hit_test_text(
-  slide_idx : Int,
-  shape_idx : Int,
-  x_emu : Int,
-  y_emu : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  x_emu : Int32,
+  y_emu : Int32,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
@@ -153,12 +153,12 @@ pub fn hit_test_text(
 /// range (start == end) inserts; an empty `new_text` deletes. Returns re-rendered
 /// shape SVG or "ERROR:<message>".
 pub fn replace_text_range(
-  slide_idx : Int,
-  shape_idx : Int,
-  start_para : Int,
-  start_char : Int,
-  end_para : Int,
-  end_char : Int,
+  slide_idx : Int32,
+  shape_idx : Int32,
+  start_para : Int32,
+  start_char : Int32,
+  end_para : Int32,
+  end_char : Int32,
   new_text : String,
 ) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {

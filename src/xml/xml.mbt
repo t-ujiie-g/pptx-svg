@@ -38,7 +38,7 @@ pub fn is_astral(c : Char) -> Bool {
 ///|
 /// Return the number of UTF-16 code units for a character.
 /// Astral-plane characters occupy 2 code units (surrogate pair).
-pub fn char_step(c : Char) -> Int {
+pub fn char_step(c : Char) -> Int32 {
   if is_astral(c) {
     2
   } else {
@@ -51,7 +51,7 @@ pub fn char_step(c : Char) -> Int {
 ///|
 priv struct Parser {
   src : String
-  mut pos : Int
+  mut pos : Int32
 }
 
 ///|
@@ -145,7 +145,7 @@ pub fn concat_balanced(parts : Array[String]) -> String {
 }
 
 ///|
-fn collect_chars(s : String, start : Int, end_exclusive : Int) -> String {
+fn collect_chars(s : String, start : Int32, end_exclusive : Int32) -> String {
   let lim = if end_exclusive < s.length() { end_exclusive } else { s.length() }
   let parts : Array[String] = []
   let mut i = start
@@ -331,10 +331,10 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
 ///|
 /// Maximum element nesting depth. Guards against malicious OOXML with
 /// extreme nesting that would overflow the Wasm call stack.
-let max_xml_depth : Int = 1024
+let max_xml_depth : Int32 = 1024
 
 ///|
-fn Parser::parse_children(self : Parser, depth : Int) -> Array[XmlNode] {
+fn Parser::parse_children(self : Parser, depth : Int32) -> Array[XmlNode] {
   let children : Array[XmlNode] = []
   // If we've hit the depth cap, skip the entire content of this element
   // (including any nested children) until the matching closing tag.
@@ -636,7 +636,7 @@ pub fn find_path(nodes : Array[XmlNode], path : Array[String]) -> XmlNode? {
 
 ///|
 /// Parse an integer from a string, returning 0 on failure.
-pub fn parse_int(s : String) -> Int {
+pub fn parse_int(s : String) -> Int32 {
   let len = s.length()
   if len == 0 {
     return 0
@@ -665,7 +665,7 @@ pub fn parse_int(s : String) -> Int {
 
 ///|
 /// Parse a hexadecimal string to an integer.
-pub fn parse_hex_int(s : String) -> Int {
+pub fn parse_hex_int(s : String) -> Int32 {
   let len = s.length()
   if len == 0 {
     return 0
@@ -692,7 +692,7 @@ pub fn parse_hex_int(s : String) -> Int {
 
 ///|
 /// Convert a single digit (0-9) to its string representation.
-fn digit_str(d : Int) -> String {
+fn digit_str(d : Int32) -> String {
   match d {
     0 => "0"
     1 => "1"
@@ -709,7 +709,7 @@ fn digit_str(d : Int) -> String {
 
 ///|
 /// Convert an integer to its decimal string representation.
-pub fn int_to_str(n : Int) -> String {
+pub fn int_to_str(n : Int32) -> String {
   if n < 0 {
     "-" + int_to_str(-n)
   } else if n < 10 {
@@ -723,7 +723,7 @@ pub fn int_to_str(n : Int) -> String {
 
 ///|
 /// Extract a substring from index `from` to the end.
-pub fn str_suffix(s : String, from : Int) -> String {
+pub fn str_suffix(s : String, from : Int32) -> String {
   let len = s.length()
   let parts : Array[String] = []
   let mut i = from
@@ -807,7 +807,7 @@ pub fn str_ends_with(s : String, pat : String) -> Bool {
 
 ///|
 /// Extract substring from `from` (inclusive) to `to` (exclusive).
-pub fn str_substring(s : String, from : Int, to : Int) -> String {
+pub fn str_substring(s : String, from : Int32, to : Int32) -> String {
   let parts : Array[String] = []
   let mut i = from
   while i < to {

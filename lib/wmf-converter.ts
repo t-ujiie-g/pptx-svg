@@ -169,8 +169,7 @@ function parseWmf(data: Uint8Array): string {
   if (offset + 18 > data.length) return '';
   const mtType = dv.getUint16(offset, true);          // 1=memory, 2=disk
   const mtHeaderSize = dv.getUint16(offset + 2, true); // Size in words (should be 9)
-  // const mtVersion = dv.getUint16(offset + 4, true);
-  // const mtSize = dv.getUint32(offset + 6, true);       // Total size in words
+  // +4 mtVersion, +6 mtSize (total size in words) are not needed.
   const mtNoObjects = dv.getUint16(offset + 10, true);
 
   if ((mtType !== 1 && mtType !== 2) || mtHeaderSize < 9) return '';

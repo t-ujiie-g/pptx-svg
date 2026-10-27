@@ -25,6 +25,9 @@
 //   g_parsed         — per-slide flag: has the slide XML been parsed into g_slides?
 //                      (g_slides starts as empty placeholders; editing APIs need a
 //                       real parse first — see ensure_slide_parsed)
+//   g_bg_rels        — per-slide rels of the part the background was inherited
+//                      from (slide / layout / master), so a blipFill rId resolves
+//                      against the right .rels; empty = use the slide's own rels
 //   g_theme          — parsed theme1.xml color/font scheme
 //
 // Inheritance chain (slide → layout → master → theme):
@@ -36,7 +39,7 @@
 //   g_layout_to_master   — (layout_path, master_path) mapping
 
 ///|
-let g_slide_count : Ref[Int] = { val: 0, }
+let g_slide_count : Ref[Int32] = { val: 0, }
 
 ///|
 let g_slide_size : Ref[@ooxml.SlideSize] = { val: @ooxml.SlideSize::default(), }
@@ -49,6 +52,9 @@ let g_modified : Ref[Array[Bool]] = { val: [], }
 
 ///|
 let g_parsed : Ref[Array[Bool]] = { val: [], }
+
+///|
+let g_bg_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [], }
 
 ///|
 let g_theme : Ref[@ooxml.ThemeData] = { val: @ooxml.ThemeData::default(), }
@@ -86,14 +92,14 @@ let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [], }
 // ── Package-local string/int helpers ─────────────────────────────────────────
 
 ///|
-fn int_to_str(n : Int) -> String {
+fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
 }
 
 // ── Slide counting ──────────────────────────────────────────────────────────
 
 ///|
-fn count_slide_ids(xml : String) -> Int {
+fn count_slide_ids(xml : String) -> Int32 {
   count_occurrences(xml, "<p:sldId ") +
   count_occurrences(xml, "<p:sldId\t") +
   count_occurrences(xml, "<p:sldId\n") +
@@ -101,7 +107,7 @@ fn count_slide_ids(xml : String) -> Int {
 }
 
 ///|
-fn count_occurrences(text : String, pattern : String) -> Int {
+fn count_occurrences(text : String, pattern : String) -> Int32 {
   let plen = pattern.length()
   let tlen = text.length()
   if plen == 0 || tlen < plen {
@@ -121,7 +127,7 @@ fn count_occurrences(text : String, pattern : String) -> Int {
 }
 
 ///|
-fn match_at(text : String, pattern : String, pos : Int) -> Bool {
+fn match_at(text : String, pattern : String, pos : Int32) -> Bool {
   let plen = pattern.length()
   for j in 0..<plen {
     if text.get_char(pos + j).unwrap() != pattern.get_char(j).unwrap() {
@@ -392,7 +398,7 @@ fn resolve_diagram_shapes(
 }
 
 ///|
-fn last_index_of(s : String, c : Char) -> Int {
+fn last_index_of(s : String, c : Char) -> Int32 {
   let len = s.length()
   let mut i = len - 1
   while i >= 0 {
@@ -405,7 +411,7 @@ fn last_index_of(s : String, c : Char) -> Int {
 }
 
 ///|
-fn substring(s : String, from : Int, to : Int) -> String {
+fn substring(s : String, from : Int32, to : Int32) -> String {
   @xml.str_substring(s, from, to)
 }
 
@@ -447,7 +453,7 @@ fn array_contains(arr : Array[String], val : String) -> Bool {
 
 ///|
 /// Find index of a string in an array, or -1.
-fn array_index_of(arr : Array[String], val : String) -> Int {
+fn array_index_of(arr : Array[String], val : String) -> Int32 {
   let n = arr.length()
   for i in 0..<n {
     if arr[i] == val {
@@ -765,6 +771,7 @@ pub fn initialize_pptx() -> String {
   let slides : Array[@ooxml.SlideData] = []
   let modified : Array[Bool] = []
   let parsed : Array[Bool] = []
+  let bg_rels : Array[Array[@ooxml.Relationship]] = []
   for i = 0; i < count; i = i + 1 {
     slides.push({
       slide_size: g_slide_size.val,
@@ -779,10 +786,12 @@ pub fn initialize_pptx() -> String {
     })
     modified.push(false)
     parsed.push(false)
+    bg_rels.push([])
   }
   g_slides.val = slides
   g_modified.val = modified
   g_parsed.val = parsed
+  g_bg_rels.val = bg_rels
   @ffi.ffi_log(
     "Slide count: " +
     int_to_str(count) +
@@ -796,13 +805,13 @@ pub fn initialize_pptx() -> String {
 
 ///|
 /// Get the number of slides in the loaded presentation.
-pub fn get_slide_count() -> Int {
+pub fn get_slide_count() -> Int32 {
   g_slide_count.val
 }
 
 ///|
 /// Check if a slide is hidden (0-indexed). Returns 1 if hidden, 0 otherwise.
-pub fn is_slide_hidden(slide_idx : Int) -> Int {
+pub fn is_slide_hidden(slide_idx : Int32) -> Int32 {
   if slide_idx < 0 || slide_idx >= g_slide_count.val {
     return 0
   }
@@ -830,7 +839,7 @@ pub fn is_slide_hidden(slide_idx : Int) -> Int {
 
 ///|
 /// Get the raw XML of a slide (0-indexed).
-pub fn get_slide_xml_raw(slide_idx : Int) -> String {
+pub fn get_slide_xml_raw(slide_idx : Int32) -> String {
   let path = "ppt/slides/slide" + int_to_str(slide_idx + 1) + ".xml"
   @ffi.ffi_log("get_slide_xml_raw: " + path)
   let xml = @ffi.ffi_get_file(path)
@@ -848,6 +857,82 @@ pub fn get_entry_list() -> String {
 }
 
 ///|
+/// A slide's own .rels plus the layout / master / theme it inherits from.
+priv struct SlideContext {
+  rels : Array[@ooxml.Relationship]
+  layout_path : String
+  layout_opt : @ooxml.SlideLayoutData?
+  master_path : String
+  master_opt : @ooxml.SlideMasterData?
+  base_theme : @ooxml.ThemeData // the master's own theme (g_theme without one)
+}
+
+///|
+/// Resolve the inheritance context of slide `slide_idx` (0-indexed, in range).
+fn slide_context(slide_idx : Int32) -> SlideContext {
+  let rels_path = "ppt/slides/_rels/slide" +
+    int_to_str(slide_idx + 1) +
+    ".xml.rels"
+  let rels_xml = @ffi.ffi_get_file(rels_path)
+  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
+  let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
+    g_slide_layout_paths.val[slide_idx]
+  } else {
+    ""
+  }
+  let layout_opt = if !layout_path.is_empty() {
+    get_layout(layout_path)
+  } else {
+    None
+  }
+  let master_path = if !layout_path.is_empty() {
+    find_master_for_layout(layout_path)
+  } else {
+    ""
+  }
+  let master_opt = if !master_path.is_empty() {
+    get_master(master_path)
+  } else {
+    None
+  }
+  let base_theme = if !master_path.is_empty() {
+    get_master_theme(master_path)
+  } else {
+    g_theme.val
+  }
+  { rels, layout_path, layout_opt, master_path, master_opt, base_theme, }
+}
+
+///|
+/// `base_theme` with the master's clrMap applied, replaced by the layout's
+/// clrMapOvr when it has one. (A slide's own clrMapOvr is applied on top by
+/// `resolve_slide_data`.)
+fn layout_effective_theme(
+  base_theme : @ooxml.ThemeData,
+  master_opt : @ooxml.SlideMasterData?,
+  layout_opt : @ooxml.SlideLayoutData?,
+) -> @ooxml.ThemeData {
+  if layout_opt is Some(layout) && layout.clr_map_ovr is Some(ovr) {
+    return @ooxml.apply_color_map(base_theme, ovr)
+  }
+  match master_opt {
+    Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
+    None => base_theme
+  }
+}
+
+///|
+/// True when any of the four background fill kinds is set.
+fn has_background(
+  color : @ooxml.Color,
+  grad : @ooxml.GradientFill,
+  blip : @ooxml.BlipFill,
+  patt : @ooxml.PatternFill,
+) -> Bool {
+  !color.is_none() || !grad.is_none() || !blip.is_none() || !patt.is_none()
+}
+
+///|
 /// Parse slide XML into a fully-resolved `SlideData`: effective theme + color
 /// map overrides, chart shapes, placeholder inheritance, auto-content injection,
 /// background inheritance, and text-style defaults.
@@ -858,7 +943,7 @@ pub fn get_entry_list() -> String {
 /// placeholders with no text, so re-running this on already-serialized slide XML
 /// is idempotent — Undo/Redo restores keep full visual fidelity.
 fn resolve_slide_data(
-  slide_num : Int,
+  slide_num : Int32,
   slide_xml : String,
   rels : Array[@ooxml.Relationship],
   layout_opt : @ooxml.SlideLayoutData?,
@@ -866,19 +951,9 @@ fn resolve_slide_data(
   layout_path : String,
   master_path : String,
   base_theme : @ooxml.ThemeData,
-) -> @ooxml.SlideData {
+) -> (@ooxml.SlideData, Array[@ooxml.Relationship]) {
   let effective_theme = {
-    // Start with master's clr_map applied to master's theme
-    let mut eff = match master_opt {
-      Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
-      None => base_theme
-    }
-    // Apply layout clrMapOvr if present
-    if layout_opt is Some(layout) {
-      if layout.clr_map_ovr is Some(ovr) {
-        eff = @ooxml.apply_color_map(base_theme, ovr)
-      }
-    }
+    let mut eff = layout_effective_theme(base_theme, master_opt, layout_opt)
     // Apply slide's own clrMapOvr if present
     let slide_nodes = @xml.parse_xml(slide_xml)
     let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
@@ -910,59 +985,39 @@ fn resolve_slide_data(
     master_opt,
   )
   // ── Background inheritance: slide → layout → master → white ──
+  // `bg_rels` follows the part the background came from: an inherited
+  // blipFill rId belongs to the layout's / master's .rels, not the slide's.
   let mut bg = slide_data.background
   let mut bg_grad = slide_data.bg_grad
   let mut bg_blip_fill = slide_data.bg_blip_fill
   let mut bg_patt_fill = slide_data.bg_patt_fill
-  let mut bg_fill_rels : Array[@ooxml.Relationship] = rels
-  // Check if slide has any explicit background
-  let slide_has_bg = !bg.is_none() ||
-    !bg_grad.is_none() ||
-    !bg_blip_fill.is_none() ||
-    !bg_patt_fill.is_none()
-  if !slide_has_bg {
-    // Try layout
-    let mut inherited = false
-    if layout_opt is Some(layout) {
-      let layout_has_bg = !layout.background.is_none() ||
-        !layout.bg_grad.is_none() ||
-        !layout.bg_blip_fill.is_none() ||
-        !layout.bg_patt_fill.is_none()
-      if layout_has_bg {
-        bg = layout.background
-        bg_grad = layout.bg_grad
-        bg_blip_fill = layout.bg_blip_fill
-        bg_patt_fill = layout.bg_patt_fill
-        bg_fill_rels = if !layout_path.is_empty() {
-          get_layout_rels(layout_path)
-        } else {
-          rels
-        }
-        inherited = true
-      }
-    }
-    // Try master
-    if !inherited {
-      if master_opt is Some(master) {
-        let master_has_bg = !master.background.is_none() ||
-          !master.bg_grad.is_none() ||
-          !master.bg_blip_fill.is_none() ||
-          !master.bg_patt_fill.is_none()
-        if master_has_bg {
-          bg = master.background
-          bg_grad = master.bg_grad
-          bg_blip_fill = master.bg_blip_fill
-          bg_patt_fill = master.bg_patt_fill
-          bg_fill_rels = if !master_path.is_empty() {
-            get_master_rels(master_path)
-          } else {
-            rels
-          }
-          inherited = true
-        }
-      }
-    }
-    if !inherited && bg.is_none() {
+  let mut bg_rels = rels
+  if !has_background(bg, bg_grad, bg_blip_fill, bg_patt_fill) {
+    if layout_opt is Some(layout) &&
+      has_background(
+        layout.background,
+        layout.bg_grad,
+        layout.bg_blip_fill,
+        layout.bg_patt_fill,
+      ) {
+      bg = layout.background
+      bg_grad = layout.bg_grad
+      bg_blip_fill = layout.bg_blip_fill
+      bg_patt_fill = layout.bg_patt_fill
+      bg_rels = get_layout_rels(layout_path)
+    } else if master_opt is Some(master) &&
+      has_background(
+        master.background,
+        master.bg_grad,
+        master.bg_blip_fill,
+        master.bg_patt_fill,
+      ) {
+      bg = master.background
+      bg_grad = master.bg_grad
+      bg_blip_fill = master.bg_blip_fill
+      bg_patt_fill = master.bg_patt_fill
+      bg_rels = get_master_rels(master_path)
+    } else {
       bg = @ooxml.Color::white()
     }
   }
@@ -986,8 +1041,7 @@ fn resolve_slide_data(
     // has no color (matches PowerPoint behavior for accent-styled shapes).
     apply_font_ref_fallback(shape)
   }
-  ignore(bg_fill_rels)
-  {
+  let resolved : @ooxml.SlideData = {
     slide_size: slide_data.slide_size,
     background: bg,
     bg_grad,
@@ -998,13 +1052,14 @@ fn resolve_slide_data(
     timing_xml: slide_data.timing_xml,
     hidden: slide_data.hidden,
   }
+  (resolved, bg_rels)
 }
 
 ///|
 /// Render slide `slide_idx` (0-indexed) as an SVG string.
 ///
 /// Returns the SVG markup on success, or "ERROR:<message>" on failure.
-pub fn render_slide_svg(slide_idx : Int) -> String {
+pub fn render_slide_svg(slide_idx : Int32) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -1013,38 +1068,12 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     return "ERROR:slide index out of range"
   }
   let slide_num = slide_idx + 1
-  // Load slide relationships (.rels) — needed for both fresh and cached paths
-  let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
-  let rels_xml = @ffi.ffi_get_file(rels_path)
-  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
-  // ── Resolve layout/master for this slide ──
-  let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
-    g_slide_layout_paths.val[slide_idx]
-  } else {
-    ""
-  }
-  let layout_opt = if !layout_path.is_empty() {
-    get_layout(layout_path)
-  } else {
-    None
-  }
-  let master_path = if !layout_path.is_empty() {
-    find_master_for_layout(layout_path)
-  } else {
-    ""
-  }
-  let master_opt = if !master_path.is_empty() {
-    get_master(master_path)
-  } else {
-    None
-  }
-  // ── Compute effective theme with color map overrides ──
-  // Use the master's own theme (not g_theme) for correct per-master colors
-  let base_theme = if !master_path.is_empty() {
-    get_master_theme(master_path)
-  } else {
-    g_theme.val
-  }
+  let ctx = slide_context(slide_idx)
+  let rels = ctx.rels
+  let layout_path = ctx.layout_path
+  let layout_opt = ctx.layout_opt
+  let master_path = ctx.master_path
+  let master_opt = ctx.master_opt
   // ── If slide is modified, skip XML re-parse and use cached SlideData ──
   let resolved_slide = if g_modified.val[slide_idx] {
     g_slides.val[slide_idx]
@@ -1055,69 +1084,26 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     if slide_xml.is_empty() {
       return "ERROR:slide XML not found: " + slide_path
     }
-    let s = resolve_slide_data(
-      slide_num, slide_xml, rels, layout_opt, master_opt, layout_path, master_path,
-      base_theme,
+    let (s, bg_rels) = resolve_slide_data(
+      slide_num,
+      slide_xml,
+      rels,
+      layout_opt,
+      master_opt,
+      layout_path,
+      master_path,
+      ctx.base_theme,
     )
     g_slides.val[slide_idx] = s
     g_parsed.val[slide_idx] = true
+    g_bg_rels.val[slide_idx] = bg_rels
     s
   }
-  // ── Resolve effective theme for rendering (needed for both paths) ──
-  let effective_theme = {
-    let mut eff = match master_opt {
-      Some(master) => @ooxml.apply_color_map(base_theme, master.clr_map)
-      None => base_theme
-    }
-    if layout_opt is Some(layout) {
-      if layout.clr_map_ovr is Some(ovr) {
-        eff = @ooxml.apply_color_map(base_theme, ovr)
-      }
-    }
-    eff
-  }
-  // ── Resolve background fill rels for rendering ──
-  let bg_fill_rels : Array[@ooxml.Relationship] = {
-    let slide_has_bg = !resolved_slide.background.is_none() ||
-      !resolved_slide.bg_grad.is_none() ||
-      !resolved_slide.bg_blip_fill.is_none() ||
-      !resolved_slide.bg_patt_fill.is_none()
-    if slide_has_bg {
-      rels
-    } else {
-      // Check layout then master for bg fill rels
-      let mut r = rels
-      let mut found = false
-      if layout_opt is Some(layout) {
-        if !layout.background.is_none() ||
-          !layout.bg_grad.is_none() ||
-          !layout.bg_blip_fill.is_none() ||
-          !layout.bg_patt_fill.is_none() {
-          r = if !layout_path.is_empty() {
-            get_layout_rels(layout_path)
-          } else {
-            rels
-          }
-          found = true
-        }
-      }
-      if !found {
-        if master_opt is Some(master) {
-          if !master.background.is_none() ||
-            !master.bg_grad.is_none() ||
-            !master.bg_blip_fill.is_none() ||
-            !master.bg_patt_fill.is_none() {
-            r = if !master_path.is_empty() {
-              get_master_rels(master_path)
-            } else {
-              rels
-            }
-          }
-        }
-      }
-      r
-    }
-  }
+  let effective_theme = layout_effective_theme(
+    ctx.base_theme,
+    master_opt,
+    layout_opt,
+  )
   // ── Collect master/layout background shapes (non-placeholder) ──
   let bg_shapes : Array[@ooxml.Shape] = []
   let bg_shapes_rels : Array[Array[@ooxml.Relationship]] = []
@@ -1156,7 +1142,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
     bg_shapes,
     g_table_styles.val,
     bg_shapes_rels,
-    bg_fill_rels,
+    g_bg_rels.val[slide_idx],
   )
 }
 
@@ -1165,7 +1151,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
 ///
 /// Parses the SVG's data-ooxml-* attributes back into SlideData.
 /// Returns "OK" on success, "ERROR:<message>" on failure.
-pub fn update_slide_from_svg(slide_idx : Int, svg_string : String) -> String {
+pub fn update_slide_from_svg(slide_idx : Int32, svg_string : String) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -1185,7 +1171,7 @@ pub fn update_slide_from_svg(slide_idx : Int, svg_string : String) -> String {
 /// If the slide has been modified via update_slide_from_svg(),
 /// returns the serialized modified data. Otherwise returns the
 /// original slide XML from the PPTX.
-pub fn get_slide_ooxml(slide_idx : Int) -> String {
+pub fn get_slide_ooxml(slide_idx : Int32) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -1230,7 +1216,7 @@ pub fn get_modified_entries() -> String {
 
 ///|
 /// Compute the EMU-to-pixel scale factor for the current presentation.
-fn get_scale() -> Int {
+fn get_scale() -> Int32 {
   let sw = g_slide_size.val.cx
   let w = 960 // svg_target_width
   if sw > 0 {

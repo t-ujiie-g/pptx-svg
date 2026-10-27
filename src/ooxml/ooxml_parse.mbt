@@ -9,7 +9,7 @@ let diagram_graphic_uri : String = "http://schemas.openxmlformats.org/drawingml/
 // ── Attribute helpers ─────────────────────────────────────────────────────────
 
 ///|
-fn attr_int(node : @xml.XmlNode, name : String) -> Int {
+fn attr_int(node : @xml.XmlNode, name : String) -> Int32 {
   match @xml.get_attr(node, name) {
     Some(v) => @xml.parse_int(v)
     None => 0
@@ -823,7 +823,7 @@ fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
 fn parse_style_ref(
   style_ch : Array[@xml.XmlNode],
   tag : String,
-) -> (Int, String) {
+) -> (Int32, String) {
   match @xml.find_child(style_ch, tag) {
     None => (0, "")
     Some(ref_node) => {
@@ -848,7 +848,7 @@ fn parse_style_ref(
 /// (solid, gradient, blip, pattern) fill — exactly one will be non-none (or
 /// all none if `idx` is out of range or the style list is empty).
 fn resolve_fill_ref(
-  idx : Int,
+  idx : Int32,
   scheme_color_name : String,
   theme : ThemeData,
 ) -> (Color, GradientFill, BlipFill, PatternFill) {
@@ -890,7 +890,7 @@ fn parse_font_ref_color(
 /// theme's `a:fmtScheme/a:lnStyleLst`.  Returns StrokeProps::default() if not
 /// applicable.
 fn resolve_ln_ref(
-  idx : Int,
+  idx : Int32,
   scheme_color_name : String,
   theme : ThemeData,
 ) -> StrokeProps {
@@ -1117,7 +1117,7 @@ fn parse_tc_border(
   tcpr_ch : Array[@xml.XmlNode],
   tag : String,
   theme : ThemeData,
-) -> (Int, Color) {
+) -> (Int32, Color) {
   match @xml.find_child(tcpr_ch, tag) {
     None => (0, Color::none())
     Some(ln_node) => {
@@ -1406,7 +1406,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         band_col = attr_int(tbl_pr, "bandCol") == 1
       }
       // Parse column widths from <a:tblGrid>/<a:gridCol w="...">
-      let col_widths : Array[Int] = []
+      let col_widths : Array[Int32] = []
       if @xml.find_child(tbl_ch, "a:tblGrid") is Some(grid) {
         let gcols = @xml.find_children(@xml.get_children(grid), "a:gridCol")
         for gcol in gcols {
@@ -1471,8 +1471,8 @@ fn shape_with_stroke(
 
 ///|
 /// Parse adjustment values from a:avLst inside a:prstGeom.
-fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int] {
-  let avs : Array[Int] = []
+fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int32] {
+  let avs : Array[Int32] = []
   if @xml.find_child(@xml.get_children(geom_node), "a:avLst") is Some(avlst) {
     let gds = @xml.find_children(@xml.get_children(avlst), "a:gd")
     for gd in gds {

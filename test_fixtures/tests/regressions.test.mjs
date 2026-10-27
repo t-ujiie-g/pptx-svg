@@ -258,5 +258,35 @@ test("regressions (slides 96-98)", async () => {
     assert('slide102 export keeps stroke="0"', xml.includes('<a:path w="100" h="100" stroke="0">'));
   }
 
+  // ── Inherited layout image background: rId resolves against the layout's .rels ─
+  {
+    console.log('\n── test_features.pptx — layout blipFill background inheritance ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const { buildZip } = await import(join(DIST_DIR, 'zip.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    // Slide 1 has no <p:bg> and uses slideLayout7; give that layout an image
+    // background whose rId exists only in the layout's .rels.
+    const layoutPath = 'ppt/slideLayouts/slideLayout7.xml';
+    const layoutRelsPath = 'ppt/slideLayouts/_rels/slideLayout7.xml.rels';
+    const layoutXml = textFiles.get(layoutPath).replace(/<p:cSld([^>]*)>/,
+      '<p:cSld$1><p:bg><p:bgPr><a:blipFill><a:blip r:embed="rIdLayoutBg"/>' +
+      '<a:stretch><a:fillRect/></a:stretch></a:blipFill><a:effectLst/></p:bgPr></p:bg>');
+    const layoutRels = textFiles.get(layoutRelsPath).replace('</Relationships>',
+      '<Relationship Id="rIdLayoutBg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ' +
+      'Target="../media/image1.png"/></Relationships>');
+    assert('slide1 has no own background', !textFiles.get('ppt/slides/slide1.xml').includes('<p:bg>'));
+    const patched = await buildZip(pptxAb, new Map([[layoutPath, layoutXml], [layoutRelsPath, layoutRels]]));
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(patched);
+    const hasBgImage = (svg) => /<image x="0" y="0"[^>]*href="data:image\/png;base64,/.test(svg);
+    assert('inherited layout image background is rendered', hasBgImage(r.renderSlideSvg(0)));
+    // An edited slide renders from the SlideData cache; the background rels must survive.
+    r.updateShapeFill(0, 0, 255, 0, 0);
+    assert('inherited layout image background survives an edit', hasBgImage(r.renderSlideSvg(0)));
+  }
+
   finishAssertions();
 });
