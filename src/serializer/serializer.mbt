@@ -1583,8 +1583,11 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   }
   out = out + ">"
   out = out + "<p:cSld>"
-  // Background
-  if !slide.bg_blip_fill.is_none() {
+  // Background (an inherited one stays with the layout/master: its blipFill
+  // rId belongs to their .rels, and baking it in would detach the slide)
+  if slide.bg_inherited {
+    ()
+  } else if !slide.bg_blip_fill.is_none() {
     out = out + "<p:bg><p:bgPr>"
     out = out + serialize_blip_fill(slide.bg_blip_fill)
     out = out + "<a:effectLst/></p:bgPr></p:bg>"

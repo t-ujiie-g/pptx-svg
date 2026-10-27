@@ -608,6 +608,7 @@ pub(all) struct SlideData {
   transition_xml : String
   timing_xml : String
   hidden : Bool
+  bg_inherited : Bool
 }
 
 pub(all) struct SlideLayoutData {

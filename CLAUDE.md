@@ -128,7 +128,7 @@ Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with
 ## Data model (ooxml.mbt)
 
 ```
-SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, bg_blip_fill: BlipFill, bg_patt_fill: PatternFill, shapes: Array[Shape], transition_xml: String, timing_xml: String, hidden: Bool }
+SlideData { slide_size: SlideSize, background: Color, bg_grad: GradientFill, bg_blip_fill: BlipFill, bg_patt_fill: PatternFill, shapes: Array[Shape], transition_xml: String, timing_xml: String, hidden: Bool, bg_inherited: Bool }  // bg_inherited: background came from layout/master/default white → serializer writes no <p:bg>
 Shape { kind: ShapeKind, transform: ShapeTransform,
   fill: Color, grad_fill: GradientFill, blip_fill: BlipFill, patt_fill: PatternFill,
   stroke: Color, stroke_w: Int,

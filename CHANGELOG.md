@@ -5,6 +5,7 @@
 ### Fixed
 
 - **Image backgrounds inherited from a layout or master rendered blank.** When a slide had no `<p:bg>` of its own, an inherited `a:blipFill` background's `r:embed` was looked up in the slide's `.rels` instead of the layout's / master's, so the image was missing (or the wrong one). The source part's relationships are now kept per slide, including for edited slides and Undo/Redo restores.
+- **Exporting an edited slide baked an inherited background into the slide.** The layout's / master's background was written as the slide's own `<p:bg>` — for an image background with an `rId` from the layout's `.rels`, which does not exist in the slide's, and in every case detaching the slide from later layout/master background changes. `SlideData.bg_inherited` now marks such backgrounds; the serializer skips them, and the SVG round-trip carries the flag as `data-ooxml-bg-inherited="1"` (`docs/svg-specification.md`).
 
 ### Changed
 

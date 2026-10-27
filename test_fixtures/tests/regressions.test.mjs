@@ -286,6 +286,17 @@ test("regressions (slides 96-98)", async () => {
     // An edited slide renders from the SlideData cache; the background rels must survive.
     r.updateShapeFill(0, 0, 255, 0, 0);
     assert('inherited layout image background survives an edit', hasBgImage(r.renderSlideSvg(0)));
+    // Export must not bake the inherited background (and the layout's rId) into the slide.
+    assert('edited slide export has no <p:bg>', !r.getSlideOoxml(0).includes('<p:bg>'));
+    // Undo/Redo re-parses the serialized slide XML, which re-inherits the background.
+    r.undo();
+    r.redo();
+    assert('inherited layout image background survives undo/redo', hasBgImage(r.renderSlideSvg(0)));
+    // SVG round-trip carries the inherited flag (data-ooxml-bg-inherited).
+    const svg = r.renderSlideSvg(0);
+    assert('SVG marks the background as inherited', svg.includes('data-ooxml-bg-inherited="1"'));
+    r.updateSlideFromSvg(0, svg);
+    assert('SVG round-trip export has no <p:bg>', !r.getSlideOoxml(0).includes('<p:bg>'));
   }
 
   finishAssertions();

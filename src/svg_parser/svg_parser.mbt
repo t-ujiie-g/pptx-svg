@@ -961,6 +961,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
         transition_xml: "",
         timing_xml: "",
         hidden: false,
+        bg_inherited: false,
       }
   }
   // Read slide metadata from SVG root
@@ -968,6 +969,7 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
   let slide_cy = get_dai(svg_node, "slide-cy")
   let bg_hex = get_da(svg_node, "bg")
   let hidden = get_da(svg_node, "hidden") == "1"
+  let bg_inherited = get_da(svg_node, "bg-inherited") == "1"
   let transition_xml = get_da(svg_node, "transition-xml")
   let timing_xml = get_da(svg_node, "timing-xml")
 
@@ -1009,5 +1011,6 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     transition_xml,
     timing_xml,
     hidden,
+    bg_inherited,
   }
 }

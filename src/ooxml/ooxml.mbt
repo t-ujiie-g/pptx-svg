@@ -1756,6 +1756,7 @@ pub(all) struct SlideData {
   transition_xml : String // raw <p:transition> XML for round-trip (empty = none)
   timing_xml : String // raw <p:timing> XML for round-trip (empty = none)
   hidden : Bool // <p:sld show="0"> — hidden slide
+  bg_inherited : Bool // background came from the layout/master (or default white); not written as <p:bg>
 }
 
 // ── Relationship type ─────────────────────────────────────────────────────────

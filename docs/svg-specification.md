@@ -35,6 +35,7 @@ Set on the root `<svg>` element.
 | `data-ooxml-slide-cy` | int | Slide height in EMU |
 | `data-ooxml-bg` | string | Background color (`RRGGBB` hex or `"none"`) |
 | `data-ooxml-scale` | int | EMU-to-pixel conversion factor |
+| `data-ooxml-bg-inherited` | string | `"1"` if the background is inherited from the layout/master (not written as `<p:bg>` on export); absent otherwise |
 | `data-ooxml-hidden` | string | `"1"` if slide is hidden (`<p:sld show="0">`); absent otherwise |
 | `data-ooxml-transition-xml` | string | Raw `<p:transition>` XML (XML-escaped); absent if no transition |
 | `data-ooxml-timing-xml` | string | Raw `<p:timing>` XML (XML-escaped); absent if no timing |

@@ -783,6 +783,7 @@ pub fn initialize_pptx() -> String {
       transition_xml: "",
       timing_xml: "",
       hidden: false,
+      bg_inherited: false,
     })
     modified.push(false)
     parsed.push(false)
@@ -992,7 +993,8 @@ fn resolve_slide_data(
   let mut bg_blip_fill = slide_data.bg_blip_fill
   let mut bg_patt_fill = slide_data.bg_patt_fill
   let mut bg_rels = rels
-  if !has_background(bg, bg_grad, bg_blip_fill, bg_patt_fill) {
+  let own_bg = has_background(bg, bg_grad, bg_blip_fill, bg_patt_fill)
+  if !own_bg {
     if layout_opt is Some(layout) &&
       has_background(
         layout.background,
@@ -1051,6 +1053,7 @@ fn resolve_slide_data(
     transition_xml: slide_data.transition_xml,
     timing_xml: slide_data.timing_xml,
     hidden: slide_data.hidden,
+    bg_inherited: !own_bg,
   }
   (resolved, bg_rels)
 }
