@@ -1,0 +1,41 @@
+# Dependabot version updates. Security updates for known advisories are
+# enabled separately in the repository settings and are not limited by the
+# schedule below.
+version: 2
+updates:
+  # Workflow actions (.github/workflows/*.yml)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore(ci)
+
+  # Library devDependencies (the published package has no runtime deps)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    # Wait a week after a release before proposing it, so a compromised or
+    # yanked version is usually caught upstream first.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore(deps)
+
+  # React example (built and deployed to GitHub Pages by static.yml)
+  - package-ecosystem: npm
+    directory: /examples/react
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      example-react:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore(example)
