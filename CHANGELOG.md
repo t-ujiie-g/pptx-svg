@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Image backgrounds inherited from a layout or master rendered blank.** When a slide had no `<p:bg>` of its own, an inherited `a:blipFill` background's `r:embed` was looked up in the slide's `.rels` instead of the layout's / master's, so the image was missing (or the wrong one). The source part's relationships are now kept per slide, including for edited slides and Undo/Redo restores.
+
+### Changed
+
+- Internal cleanup: slide context resolution (`.rels` → layout → master → theme) is shared by `render_slide_svg` and `restore_slide_ooxml`, and the background-presence and layout/master color-map checks are single helpers. No output changes.
+
 ## 0.6.6
 
 Preset geometry release: every ECMA-376 preset shape is now drawn from its

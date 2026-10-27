@@ -915,12 +915,9 @@ fn render_blip_filter(
       b1 +
       "\"/>" +
       "</feComponentTransfer>"
-    result_name = "duotone"
   }
-  // Color change (a:clrChange) — not renderable via SVG filters
-  // (requires exact pixel color matching which SVG filters can't do)
-  // Data is preserved in round-trip via data-ooxml-* attributes
-  ignore(result_name)
+  // Color change (a:clrChange) is not rendered: it needs exact per-pixel color
+  // matching, which SVG filters can't do. It still round-trips via data-ooxml-*.
   let defs = "<defs><filter id=\"" +
     filter_id +
     "\">" +

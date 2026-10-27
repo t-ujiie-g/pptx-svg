@@ -54,7 +54,7 @@
       width: 1px; height: 24px; background: #3a3a7a; margin: 0 4px;
     }
 
-    /* ── History + clipboard toolbar (E6.1 / E6.5) ── */
+    /* ── History + clipboard toolbar ── */
     #history-toolbar {
       display: none; gap: 8px; align-items: center; flex-wrap: wrap;
       padding: 8px 12px; background: #0f1a33; border: 1px solid #3a3a7a;
@@ -64,7 +64,7 @@
     #history-toolbar .sep { width: 1px; height: 20px; background: #3a3a7a; margin: 0 4px; }
     #history-toolbar button:disabled { opacity: 0.4; cursor: default; }
 
-    /* ── Table editing panel (E6.6) ── */
+    /* ── Table editing panel ── */
     #table-panel {
       display: none; gap: 8px; align-items: center; flex-wrap: wrap;
       padding: 12px; background: #0a1628; border: 1px solid #b07a30;
@@ -78,7 +78,7 @@
       background: #16213e; color: #e0e0e0; font-size: 13px;
     }
 
-    /* ── Inline text editing overlays (E6.2) ── */
+    /* ── Inline text editing overlays ── */
     #edit-toolbar.inline-active #inline-edit-btn { background: #4a90d9; color: #fff; }
     .text-caret {
       position: absolute; width: 2px; background: #4a90d9;
@@ -89,7 +89,7 @@
       position: absolute; pointer-events: none; z-index: 102;
       border: 1px solid rgba(74,144,217,0.35); background: rgba(74,144,217,0.06);
     }
-    /* ── Multi-select overlay (E6.4) ── */
+    /* ── Multi-select overlay ── */
     .multi-overlay {
       position: absolute; pointer-events: none; z-index: 99;
       border: 2px dashed #d98a4a; background: rgba(217,138,74,0.08);
@@ -288,12 +288,12 @@
     <details style="margin-bottom:12px;background:#0a1628;border:1px solid #2a3a6a;border-radius:6px;padding:8px 12px">
       <summary style="cursor:pointer;color:#9ab;font-size:0.85em">E6 editing features — how to test</summary>
       <ul style="margin:8px 0 0 18px;color:#9ab;font-size:0.82em;line-height:1.6">
-        <li><b>Undo/Redo (E6.1)</b>: any edit, then the Undo/Redo buttons or <code>Ctrl+Z</code> / <code>Ctrl+Y</code>.</li>
-        <li><b>Inline text (E6.2)</b>: select a text shape → <b>✎ Inline Text</b> → click in the text (boxes show per-char geometry), type, Backspace, Enter; <code>Esc</code> exits.</li>
-        <li><b>Z-order (E6.3)</b>: select a shape (overlapping ones help) → Front / ▲ / ▼ / Back.</li>
-        <li><b>Group move (E6.4)</b>: <code>Shift+click</code> several shapes → arrow keys move them together as <b>one</b> undo step.</li>
-        <li><b>Copy/Paste (E6.5)</b>: select a shape → Copy (<code>Ctrl+C</code>), change slide, Paste (<code>Ctrl+V</code>). Works with images.</li>
-        <li><b>Table (E6.6)</b>: select a table → set R/C + text and Set Cell, or +Row/−Row/+Col/−Col.</li>
+        <li><b>Undo/Redo</b>: any edit, then the Undo/Redo buttons or <code>Ctrl+Z</code> / <code>Ctrl+Y</code>.</li>
+        <li><b>Inline text</b>: select a text shape → <b>✎ Inline Text</b> → click in the text (boxes show per-char geometry), type, Backspace, Enter; <code>Esc</code> exits.</li>
+        <li><b>Z-order</b>: select a shape (overlapping ones help) → Front / ▲ / ▼ / Back.</li>
+        <li><b>Group move</b>: <code>Shift+click</code> several shapes → arrow keys move them together as <b>one</b> undo step.</li>
+        <li><b>Copy/Paste</b>: select a shape → Copy (<code>Ctrl+C</code>), change slide, Paste (<code>Ctrl+V</code>). Works with images.</li>
+        <li><b>Table</b>: select a table → set R/C + text and Set Cell, or +Row/−Row/+Col/−Col.</li>
       </ul>
     </details>
     <div class="slide-nav">
@@ -315,7 +315,7 @@
       <button id="del-slide-btn" class="danger" title="Delete current slide">Delete Slide</button>
     </div>
 
-    <!-- History + clipboard toolbar (E6.1 / E6.5) -->
+    <!-- History + clipboard toolbar -->
     <div id="history-toolbar">
       <button id="undo-btn" disabled title="Undo (Ctrl+Z)">&#x21A9; Undo</button>
       <button id="redo-btn" disabled title="Redo (Ctrl+Y / Ctrl+Shift+Z)">Redo &#x21AA;</button>
@@ -390,7 +390,7 @@
       <label id="shape-label">No shape selected</label>
     </div>
 
-    <!-- Table editing panel (visible when a table shape is selected — E6.6) -->
+    <!-- Table editing panel (visible when a table shape is selected) -->
     <div id="table-panel">
       <label>Table cell:</label>
       <span>R</span><input type="number" id="tbl-row" value="0" min="0" style="width:48px">
@@ -440,9 +440,9 @@
     let selectedShapeIdx = -1;
     let dragState = null;
     // E6 demo state
-    let clipboardSpec = null;        // copied ShapeSpec JSON (E6.5)
-    const multiSel = new Set();      // multi-selected shape indices (E6.4)
-    let inlineMode = false;          // inline text editing active (E6.2)
+    let clipboardSpec = null;        // copied ShapeSpec JSON
+    const multiSel = new Set();      // multi-selected shape indices
+    let inlineMode = false;          // inline text editing active
     let caret = null;                // { paraIdx, paraOffset } in inline mode
 
     function getSvgEl() { return $('svg-container').querySelector('svg'); }
@@ -1386,7 +1386,7 @@
     //  E6 feature demos
     // ══════════════════════════════════════════════════════════════════════
 
-    // ── History (E6.1): Undo / Redo ──
+    // ── History: Undo / Redo ──
     function updateHistoryButtons() {
       const ub = $('undo-btn'), rb = $('redo-btn'), pb = $('paste-btn');
       if (ub) ub.disabled = !(renderer.canUndo && renderer.canUndo());
@@ -1426,7 +1426,7 @@
     $('undo-btn').addEventListener('click', doUndo);
     $('redo-btn').addEventListener('click', doRedo);
 
-    // ── Z-order (E6.3) ──
+    // ── Z-order ──
     function zorder(opFn, label) {
       if (selectedShapeIdx < 0) return;
       const res = opFn(currentSlide, selectedShapeIdx);
@@ -1441,7 +1441,7 @@
     $('z-forward-btn').addEventListener('click', () => zorder((s, i) => renderer.bringForward(s, i), 'Bring forward'));
     $('z-backward-btn').addEventListener('click', () => zorder((s, i) => renderer.sendBackward(s, i), 'Send backward'));
 
-    // ── Copy / paste (E6.5) ──
+    // ── Copy / paste ──
     function doCopy() {
       if (selectedShapeIdx < 0) return;
       const spec = renderer.getShapeSpec(currentSlide, selectedShapeIdx);
@@ -1466,7 +1466,7 @@
     $('copy-shape-btn').addEventListener('click', doCopy);
     $('paste-btn').addEventListener('click', doPaste);
 
-    // ── Multi-select + group transform (E6.4) ──
+    // ── Multi-select + group transform ──
     function removeMultiOverlays() {
       $('svg-container').querySelectorAll('.multi-overlay').forEach(el => el.remove());
     }
@@ -1522,7 +1522,7 @@
       renderAndRefresh();
     }
 
-    // ── Inline text editing (E6.2): getTextLayout / hitTestText / replaceTextRange ──
+    // ── Inline text editing: getTextLayout / hitTestText / replaceTextRange ──
     const NUDGE_EMU = 91440; // 0.1 inch per arrow-key step
 
     function removeInlineOverlays() {
@@ -1659,7 +1659,7 @@
       renderAndRefresh();
     }
 
-    // ── Table editing (E6.6) ──
+    // ── Table editing ──
     function tableOp(opFn, label) {
       if (selectedShapeIdx < 0) return;
       const res = opFn();
@@ -1708,7 +1708,7 @@
         if (clipboardSpec) { e.preventDefault(); doPaste(); }
         return;
       }
-      // Arrow keys move a multi-selection together (E6.4).
+      // Arrow keys move a multi-selection together.
       if (!inField && multiSel.size > 0 && e.key.startsWith('Arrow')) {
         e.preventDefault();
         const d = NUDGE_EMU;
