@@ -1994,6 +1994,7 @@ pub fn parse_slide(
         transition_xml,
         timing_xml,
         hidden,
+        bg_inherited: false,
       }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
@@ -2041,6 +2042,7 @@ pub fn parse_slide(
             transition_xml,
             timing_xml,
             hidden,
+            bg_inherited: false,
           }
         Some(tree) => {
           let parsed = parse_shapes_from_children(
@@ -2057,6 +2059,7 @@ pub fn parse_slide(
             transition_xml,
             timing_xml,
             hidden,
+            bg_inherited: false,
           }
         }
       }

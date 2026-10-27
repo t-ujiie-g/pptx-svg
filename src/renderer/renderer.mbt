@@ -2446,6 +2446,7 @@ pub fn render_slide_svg(
     da("bg", slide.background.to_hex()) +
     dai("scale", scale) +
     (if slide.hidden { da("hidden", "1") } else { "" }) +
+    (if slide.bg_inherited { da("bg-inherited", "1") } else { "" }) +
     (if !slide.transition_xml.is_empty() {
       " data-ooxml-transition-xml=\"" +
       @xml.xml_escape(slide.transition_xml) +

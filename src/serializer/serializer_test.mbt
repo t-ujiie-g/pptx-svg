@@ -15,6 +15,7 @@ test "serialize_slide empty slide" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   // Should start with XML declaration
@@ -43,10 +44,32 @@ test "serialize_slide hidden slide" {
     transition_xml: "",
     timing_xml: "",
     hidden: true,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   let nodes = @xml.parse_xml(xml)
   assert_eq(@xml.get_attr(nodes[0], "show"), Some("0"))
+}
+
+///|
+test "serialize_slide inherited background writes no p:bg" {
+  // The background came from the layout/master: its blipFill rId belongs to
+  // their .rels, so writing it into the slide would break the image.
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::none(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: { ..@ooxml.BlipFill::none(), rid: "rId7", },
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+    bg_inherited: true,
+  }
+  assert_false(@serializer.serialize_slide(slide).contains("<p:bg>"))
+  let own = @serializer.serialize_slide({ ..slide, bg_inherited: false, })
+  assert_true(own.contains("<p:bg>"))
 }
 
 ///|
@@ -67,6 +90,7 @@ test "serialize_slide svg-only blip background omits r:embed" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("asvg:svgBlip"))
@@ -88,6 +112,7 @@ test "serialize_slide raster blip background keeps r:embed" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:blip r:embed=\"rId7\""))
@@ -105,6 +130,7 @@ test "serialize_slide with colored background" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   let nodes = @xml.parse_xml(xml)
@@ -139,6 +165,7 @@ test "serialize_slide with single shape" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   let nodes = @xml.parse_xml(xml)
@@ -179,6 +206,7 @@ test "serialize_slide shape with blur effect" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   // Should contain a:effectLst with a:blur
@@ -226,6 +254,7 @@ test "serialize_slide shape with outer shadow" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:outerShdw"))
@@ -264,6 +293,7 @@ test "serialize_slide shape with glow" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:glow"))
@@ -305,6 +335,7 @@ test "serialize_slide shape with preset shadow" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:prstShdw"))
@@ -344,6 +375,7 @@ test "serialize_slide fill overlay" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   assert_true(xml.contains("<a:fillOverlay"))
@@ -390,6 +422,7 @@ test "serialize_slide fill overlay with alpha" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   // val must be RRGGBB (not AARRGGBB), alpha as child element
@@ -422,6 +455,7 @@ test "serialize_slide no effectLst when none" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
   // No effects → no a:effectLst in output
@@ -478,6 +512,7 @@ test "restore round-trip: serialize is idempotent after parse_slide" {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
   let s1 = @serializer.serialize_slide(slide)
   let slide2 = @ooxml.parse_slide(

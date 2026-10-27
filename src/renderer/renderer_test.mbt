@@ -15,6 +15,7 @@ fn make_empty_slide() -> @ooxml.SlideData {
     transition_xml: "",
     timing_xml: "",
     hidden: false,
+    bg_inherited: false,
   }
 }
 
@@ -40,6 +41,35 @@ test "render_slide_svg empty slide" {
   assert_eq(@xml.get_tag(nodes[0]), "svg")
   assert_eq(@xml.get_attr(nodes[0], "data-ooxml-slide-cx"), Some("9144000"))
   assert_eq(@xml.get_attr(nodes[0], "data-ooxml-slide-cy"), Some("6858000"))
+}
+
+///|
+test "render_slide_svg inherited background round-trips" {
+  let slide : @ooxml.SlideData = { ..make_empty_slide(), bg_inherited: true, }
+  let svg = @renderer.render_slide_svg(
+    slide,
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  let nodes = @xml.parse_xml(svg)
+  assert_eq(@xml.get_attr(nodes[0], "data-ooxml-bg-inherited"), Some("1"))
+  assert_true(@svg_parser.parse_svg_to_slide(svg).bg_inherited)
+  let own = @renderer.render_slide_svg(
+    make_empty_slide(),
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  assert_false(@svg_parser.parse_svg_to_slide(own).bg_inherited)
 }
 
 ///|
