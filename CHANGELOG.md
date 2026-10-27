@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.6.7
+
+Slide background fix release. Image backgrounds inherited from a layout or
+master now render, editing such a slide no longer writes the inherited
+background into the exported slide, and the SVG round-trip keeps a slide's own
+gradient, image and pattern backgrounds. The `<svg>` root gains
+`data-ooxml-bg-inherited` and `data-ooxml-bg-grad-*` / `-blip-*` / `-patt-*`
+attributes (`docs/svg-specification.md`). The public TypeScript API is
+unchanged; the Wasm stays ~400 KB (~145 KB gzipped).
 
 ### Fixed
 
@@ -12,6 +20,7 @@
 ### Changed
 
 - Internal cleanup: slide context resolution (`.rels` → layout → master → theme) is shared by `render_slide_svg` and `restore_slide_ooxml`, and the background-presence and layout/master color-map checks are single helpers. The `data-ooxml-*` fill attributes for shapes, the slide background and text runs are emitted / parsed by shared prefix-aware helpers. No output changes beyond the fixes above.
+- The MoonBit sources follow the `moon fmt` style of moon 0.1.20261023+ (`Int32`, `x~ : T = d`), and each package's `pkg.generated.mbti` is committed.
 
 ## 0.6.6
 
