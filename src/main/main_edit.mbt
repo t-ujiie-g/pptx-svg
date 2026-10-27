@@ -992,41 +992,21 @@ pub fn restore_slide_ooxml(slide_idx : Int, xml : String) -> String {
     return "ERROR:empty xml"
   }
   let slide_num = slide_idx + 1
-  // Resolve the slide's .rels + layout/master/theme (mirror render_slide_svg).
-  let rels_path = "ppt/slides/_rels/slide" + int_to_str(slide_num) + ".xml.rels"
-  let rels_xml = @ffi.ffi_get_file(rels_path)
-  let rels = if rels_xml.is_empty() { [] } else { @ooxml.parse_rels(rels_xml) }
-  let layout_path = if slide_idx < g_slide_layout_paths.val.length() {
-    g_slide_layout_paths.val[slide_idx]
-  } else {
-    ""
-  }
-  let layout_opt = if !layout_path.is_empty() {
-    get_layout(layout_path)
-  } else {
-    None
-  }
-  let master_path = if !layout_path.is_empty() {
-    find_master_for_layout(layout_path)
-  } else {
-    ""
-  }
-  let master_opt = if !master_path.is_empty() {
-    get_master(master_path)
-  } else {
-    None
-  }
-  let base_theme = if !master_path.is_empty() {
-    get_master_theme(master_path)
-  } else {
-    g_theme.val
-  }
-  let slide_data = resolve_slide_data(
-    slide_num, xml, rels, layout_opt, master_opt, layout_path, master_path, base_theme,
+  let ctx = slide_context(slide_idx)
+  let (slide_data, bg_rels) = resolve_slide_data(
+    slide_num,
+    xml,
+    ctx.rels,
+    ctx.layout_opt,
+    ctx.master_opt,
+    ctx.layout_path,
+    ctx.master_path,
+    ctx.base_theme,
   )
   g_slides.val[slide_idx] = slide_data
   g_modified.val[slide_idx] = true
   g_parsed.val[slide_idx] = true
+  g_bg_rels.val[slide_idx] = bg_rels
   "OK"
 }
 
