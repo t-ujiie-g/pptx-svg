@@ -1709,6 +1709,85 @@ test "roundRect default adj uses min(w,h) * 16667 / 100000" {
 }
 
 ///|
+fn render_and_parse(slide : @ooxml.SlideData) -> @ooxml.SlideData {
+  @svg_parser.parse_svg_to_slide(
+    @renderer.render_slide_svg(
+      slide,
+      [],
+      1,
+      @ooxml.ThemeData::default(),
+      [],
+      [],
+      [],
+      [],
+    ),
+  )
+}
+
+///|
+/// A slide's own gradient / pattern / image background survives SVG → SlideData.
+test "slide background fills round-trip" {
+  let grad : @ooxml.GradientFill = {
+    ..@ooxml.GradientFill::none(),
+    stops: [
+      { pos: 0, color: @ooxml.parse_hex_color("1F4E79"), },
+      { pos: 100000, color: @ooxml.parse_hex_color("9DC3E6"), },
+    ],
+    angle: 5400000,
+  }
+  let g = render_and_parse({ ..make_empty_slide(), bg_grad: grad, }).bg_grad
+  assert_eq(g.stops.length(), 2)
+  assert_eq(g.stops[1].pos, 100000)
+  assert_eq(g.stops[1].color.to_hex(), "9DC3E6")
+  assert_eq(g.angle, 5400000)
+  let patt : @ooxml.PatternFill = {
+    prst: "dkDnDiag",
+    fg_color: @ooxml.parse_hex_color("C00000"),
+    bg_color: @ooxml.parse_hex_color("FFF2CC"),
+  }
+  let p = render_and_parse({ ..make_empty_slide(), bg_patt_fill: patt, }).bg_patt_fill
+  assert_eq(p.prst, "dkDnDiag")
+  assert_eq(p.fg_color.to_hex(), "C00000")
+  assert_eq(p.bg_color.to_hex(), "FFF2CC")
+  let blip : @ooxml.BlipFill = {
+    ..@ooxml.BlipFill::none(),
+    rid: "rId5",
+    bright: 20000,
+  }
+  let b = render_and_parse({ ..make_empty_slide(), bg_blip_fill: blip, }).bg_blip_fill
+  assert_eq(b.rid, "rId5")
+  assert_eq(b.bright, 20000)
+  // No background fills → none after the round-trip.
+  let none = render_and_parse(make_empty_slide())
+  assert_true(none.bg_grad.is_none())
+  assert_true(none.bg_patt_fill.is_none())
+  assert_true(none.bg_blip_fill.is_none())
+}
+
+///|
+/// An SVG-only image fill (asvg:svgBlip, no raster r:embed) keeps its
+/// reference through SVG → SlideData.
+test "svg-only blip fill round-trips on a shape" {
+  let shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 1000000,
+        cy: 1000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    blip_fill: { ..@ooxml.BlipFill::none(), svg_rid: "rId9", },
+  }
+  let parsed = render_and_parse({ ..make_empty_slide(), shapes: [shape], })
+  assert_eq(parsed.shapes[0].blip_fill.svg_rid, "rId9")
+}
+
+///|
 /// Author-specified roundRect adj must round-trip through SVG → SlideData.
 test "roundRect custom adj round-trips" {
   let shape = @ooxml.Shape::default_with(

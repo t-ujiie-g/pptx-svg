@@ -39,6 +39,9 @@ Set on the root `<svg>` element.
 | `data-ooxml-hidden` | string | `"1"` if slide is hidden (`<p:sld show="0">`); absent otherwise |
 | `data-ooxml-transition-xml` | string | Raw `<p:transition>` XML (XML-escaped); absent if no transition |
 | `data-ooxml-timing-xml` | string | Raw `<p:timing>` XML (XML-escaped); absent if no timing |
+| `data-ooxml-bg-grad-*` | — | Background gradient: the [Gradient Fill](#gradient-fill) attributes with a `bg-` prefix (e.g. `data-ooxml-bg-grad-stops`); absent if none |
+| `data-ooxml-bg-blip-*` | — | Background image: the [Blip Fill](#blip-fill-image) attributes with a `bg-` prefix (e.g. `data-ooxml-bg-blip-rid`); absent if none |
+| `data-ooxml-bg-patt-*` | — | Background pattern: the [Pattern Fill](#pattern-fill) attributes with a `bg-` prefix (e.g. `data-ooxml-bg-patt-prst`); absent if none |
 
 ## Shape Wrapper Attributes
 

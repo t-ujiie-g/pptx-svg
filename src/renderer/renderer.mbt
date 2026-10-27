@@ -213,6 +213,77 @@ fn dai(name : String, value : Int32) -> String {
   " data-ooxml-" + name + "=\"" + int_to_str(value) + "\""
 }
 
+// ── Fill round-trip attributes ───────────────────────────────────────────────
+// Shared by shapes (`prefix` "") and the slide background on the <svg> root
+// (`prefix` "bg-"); `svg_parser` reads them back with the same prefix.
+
+///|
+/// `data-ooxml-<prefix>grad-*` attributes for a gradient fill ("" if none).
+fn grad_fill_attrs(prefix : String, gf : @ooxml.GradientFill) -> String {
+  if gf.is_none() {
+    return ""
+  }
+  let p = prefix + "grad-"
+  da(p + "stops", grad_stops_attr(gf)) +
+  dai(p + "angle", gf.angle) +
+  da(p + "path", gf.path_type) +
+  da(p + "rot", if gf.rot_with_shape { "1" } else { "0" }) +
+  dai(p + "ftl", gf.fill_to_l) +
+  dai(p + "ftt", gf.fill_to_t) +
+  dai(p + "ftr", gf.fill_to_r) +
+  dai(p + "ftb", gf.fill_to_b) +
+  da(p + "tile-flip", gf.tile_flip)
+}
+
+///|
+/// `data-ooxml-<prefix>blip-*` attributes for an image fill ("" if none).
+fn blip_fill_attrs(prefix : String, bf : @ooxml.BlipFill) -> String {
+  if bf.is_none() {
+    return ""
+  }
+  let p = prefix + "blip-"
+  da(p + "rid", bf.rid) +
+  da(p + "stretch", if bf.stretch { "1" } else { "0" }) +
+  dai(p + "src-l", bf.src_l) +
+  dai(p + "src-t", bf.src_t) +
+  dai(p + "src-r", bf.src_r) +
+  dai(p + "src-b", bf.src_b) +
+  dai(p + "tile-tx", bf.tile_tx) +
+  dai(p + "tile-ty", bf.tile_ty) +
+  dai(p + "tile-sx", bf.tile_sx) +
+  dai(p + "tile-sy", bf.tile_sy) +
+  da(p + "tile-flip", bf.tile_flip) +
+  da(p + "tile-algn", bf.tile_algn) +
+  dai(p + "alpha", bf.alpha) +
+  da(p + "svg-rid", bf.svg_rid) +
+  dai(p + "bright", bf.bright) +
+  dai(p + "contrast", bf.contrast) +
+  (if !bf.duotone_1.is_none() {
+    da(p + "duotone1", bf.duotone_1.to_hex()) +
+    da(p + "duotone2", bf.duotone_2.to_hex())
+  } else {
+    ""
+  }) +
+  (if !bf.clr_from.is_none() {
+    da(p + "clr-from", bf.clr_from.to_hex()) +
+    da(p + "clr-to", bf.clr_to.to_hex())
+  } else {
+    ""
+  })
+}
+
+///|
+/// `data-ooxml-<prefix>patt-*` attributes for a pattern fill ("" if none).
+fn patt_fill_attrs(prefix : String, pf : @ooxml.PatternFill) -> String {
+  if pf.is_none() {
+    return ""
+  }
+  let p = prefix + "patt-"
+  da(p + "prst", pf.prst) +
+  da(p + "fg", pf.fg_color.to_hex()) +
+  da(p + "bg", pf.bg_color.to_hex())
+}
+
 ///|
 fn bool_str(b : Bool) -> String {
   if b {
@@ -1729,61 +1800,9 @@ pub fn render_shape(
         0
       },
     ) +
-    // Gradient fill attributes
-    (if !shape.grad_fill.is_none() {
-      da("grad-stops", grad_stops_attr(shape.grad_fill)) +
-      dai("grad-angle", shape.grad_fill.angle) +
-      da("grad-path", shape.grad_fill.path_type) +
-      da("grad-rot", if shape.grad_fill.rot_with_shape { "1" } else { "0" }) +
-      dai("grad-ftl", shape.grad_fill.fill_to_l) +
-      dai("grad-ftt", shape.grad_fill.fill_to_t) +
-      dai("grad-ftr", shape.grad_fill.fill_to_r) +
-      dai("grad-ftb", shape.grad_fill.fill_to_b) +
-      da("grad-tile-flip", shape.grad_fill.tile_flip)
-    } else {
-      ""
-    }) +
-    // Blip fill attributes
-    (if !shape.blip_fill.is_none() {
-      da("blip-rid", shape.blip_fill.rid) +
-      da("blip-stretch", if shape.blip_fill.stretch { "1" } else { "0" }) +
-      dai("blip-src-l", shape.blip_fill.src_l) +
-      dai("blip-src-t", shape.blip_fill.src_t) +
-      dai("blip-src-r", shape.blip_fill.src_r) +
-      dai("blip-src-b", shape.blip_fill.src_b) +
-      dai("blip-tile-tx", shape.blip_fill.tile_tx) +
-      dai("blip-tile-ty", shape.blip_fill.tile_ty) +
-      dai("blip-tile-sx", shape.blip_fill.tile_sx) +
-      dai("blip-tile-sy", shape.blip_fill.tile_sy) +
-      da("blip-tile-flip", shape.blip_fill.tile_flip) +
-      da("blip-tile-algn", shape.blip_fill.tile_algn) +
-      dai("blip-alpha", shape.blip_fill.alpha) +
-      da("blip-svg-rid", shape.blip_fill.svg_rid) +
-      dai("blip-bright", shape.blip_fill.bright) +
-      dai("blip-contrast", shape.blip_fill.contrast) +
-      (if !shape.blip_fill.duotone_1.is_none() {
-        da("blip-duotone1", shape.blip_fill.duotone_1.to_hex()) +
-        da("blip-duotone2", shape.blip_fill.duotone_2.to_hex())
-      } else {
-        ""
-      }) +
-      (if !shape.blip_fill.clr_from.is_none() {
-        da("blip-clr-from", shape.blip_fill.clr_from.to_hex()) +
-        da("blip-clr-to", shape.blip_fill.clr_to.to_hex())
-      } else {
-        ""
-      })
-    } else {
-      ""
-    }) +
-    // Pattern fill attributes
-    (if !shape.patt_fill.is_none() {
-      da("patt-prst", shape.patt_fill.prst) +
-      da("patt-fg", shape.patt_fill.fg_color.to_hex()) +
-      da("patt-bg", shape.patt_fill.bg_color.to_hex())
-    } else {
-      ""
-    }) +
+    grad_fill_attrs("", shape.grad_fill) +
+    blip_fill_attrs("", shape.blip_fill) +
+    patt_fill_attrs("", shape.patt_fill) +
     // Group shape / connector-specific attributes
     (match shape.kind {
       @ooxml.ShapeKind::GroupShape(grp) =>
@@ -2447,6 +2466,9 @@ pub fn render_slide_svg(
     dai("scale", scale) +
     (if slide.hidden { da("hidden", "1") } else { "" }) +
     (if slide.bg_inherited { da("bg-inherited", "1") } else { "" }) +
+    grad_fill_attrs("bg-", slide.bg_grad) +
+    blip_fill_attrs("bg-", slide.bg_blip_fill) +
+    patt_fill_attrs("bg-", slide.bg_patt_fill) +
     (if !slide.transition_xml.is_empty() {
       " data-ooxml-transition-xml=\"" +
       @xml.xml_escape(slide.transition_xml) +
