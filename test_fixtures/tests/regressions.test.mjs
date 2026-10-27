@@ -299,5 +299,38 @@ test("regressions (slides 96-98)", async () => {
     assert('SVG round-trip export has no <p:bg>', !r.getSlideOoxml(0).includes('<p:bg>'));
   }
 
+  // ── Slides 103-105: slide-own gradient / pattern / image backgrounds ─────
+  {
+    console.log('\n── test_features.pptx — Slides 103-105: background SVG round-trip ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const bgOf = (xml) => (xml.match(/<p:bg>.*?<\/p:bg>/s) || [''])[0];
+    const cases = [
+      { idx: 102, name: 'gradient', attr: 'data-ooxml-bg-grad-stops="0,1F4E79;100000,9DC3E6"',
+        svgMark: 'url(#grad-bg-s103)', xml: ['<a:gradFill', '1F4E79', '9DC3E6'] },
+      { idx: 103, name: 'pattern', attr: 'data-ooxml-bg-patt-prst="dkDnDiag"',
+        svgMark: 'patt-bg-s104', xml: ['<a:pattFill prst="dkDnDiag"', 'C00000', 'FFF2CC'] },
+      { idx: 104, name: 'image', attr: 'data-ooxml-bg-blip-rid="rId',
+        svgMark: 'href="data:image/png;base64,', xml: ['<a:blipFill', 'r:embed="rId'] },
+    ];
+    for (const c of cases) {
+      const svg = r.renderSlideSvg(c.idx);
+      assert(`slide${c.idx + 1} SVG carries the ${c.name} background attrs`, svg.includes(c.attr));
+      assert(`slide${c.idx + 1} renders the ${c.name} background`, svg.includes(c.svgMark));
+      r.updateSlideFromSvg(c.idx, svg);
+      const bg = bgOf(r.getSlideOoxml(c.idx));
+      for (const frag of c.xml) {
+        assert(`slide${c.idx + 1} round-trip export keeps ${c.name} <p:bg> (${frag})`, bg.includes(frag), bg);
+      }
+      assert(`slide${c.idx + 1} re-renders the ${c.name} background after round-trip`,
+        r.renderSlideSvg(c.idx).includes(c.svgMark));
+    }
+  }
+
   finishAssertions();
 });

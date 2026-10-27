@@ -262,3 +262,41 @@ cust_sp_xml = f"""
 </p:sp>
 """
 slide102.shapes._spTree.append(etree.fromstring(cust_sp_xml))
+
+# ── Slides 103-105: slide-own gradient / pattern / image backgrounds ──────────
+# Each slide carries its own non-solid <p:bg>; it must render and survive the
+# SVG round-trip (data-ooxml-bg-grad-* / -bg-patt-* / -bg-blip-*) on export.
+import base64
+import io
+
+ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+def set_slide_bg(slide, fill_xml):
+    """Insert <p:bg><p:bgPr>fill<a:effectLst/></p:bgPr></p:bg> into p:cSld."""
+    cSld = slide._element.find(f"{{{ns_p}}}cSld")
+    bg = etree.fromstring(
+        f'<p:bg xmlns:p="{ns_p}" xmlns:a="{ns_a}" xmlns:r="{ns_r}"><p:bgPr>'
+        f'{fill_xml}<a:effectLst/></p:bgPr></p:bg>')
+    cSld.insert(0, bg)
+
+
+slide103 = prs.slides.add_slide(blank)
+set_slide_bg(slide103,
+             '<a:gradFill rotWithShape="1"><a:gsLst>'
+             '<a:gs pos="0"><a:srgbClr val="1F4E79"/></a:gs>'
+             '<a:gs pos="100000"><a:srgbClr val="9DC3E6"/></a:gs>'
+             '</a:gsLst><a:lin ang="5400000" scaled="0"/></a:gradFill>')
+
+slide104 = prs.slides.add_slide(blank)
+set_slide_bg(slide104,
+             '<a:pattFill prst="dkDnDiag"><a:fgClr><a:srgbClr val="C00000"/></a:fgClr>'
+             '<a:bgClr><a:srgbClr val="FFF2CC"/></a:bgClr></a:pattFill>')
+
+slide105 = prs.slides.add_slide(blank)
+_bg_png = base64.b64decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==')
+_, bg_rid = slide105.part.get_or_add_image_part(io.BytesIO(_bg_png))
+set_slide_bg(slide105,
+             f'<a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="{bg_rid}"/>'
+             '<a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill>')

@@ -6,10 +6,12 @@
 
 - **Image backgrounds inherited from a layout or master rendered blank.** When a slide had no `<p:bg>` of its own, an inherited `a:blipFill` background's `r:embed` was looked up in the slide's `.rels` instead of the layout's / master's, so the image was missing (or the wrong one). The source part's relationships are now kept per slide, including for edited slides and Undo/Redo restores.
 - **Exporting an edited slide baked an inherited background into the slide.** The layout's / master's background was written as the slide's own `<p:bg>` — for an image background with an `rId` from the layout's `.rels`, which does not exist in the slide's, and in every case detaching the slide from later layout/master background changes. `SlideData.bg_inherited` now marks such backgrounds; the serializer skips them, and the SVG round-trip carries the flag as `data-ooxml-bg-inherited="1"` (`docs/svg-specification.md`).
+- **The SVG round-trip dropped a slide's own gradient, image and pattern backgrounds.** Only the solid color (`data-ooxml-bg`) was written to and read from the `<svg>` root, so `updateSlideFromSvg` lost any other background and the exported slide had none. The root now carries `data-ooxml-bg-grad-*` / `data-ooxml-bg-blip-*` / `data-ooxml-bg-patt-*` — the shape fill attributes with a `bg-` prefix (`docs/svg-specification.md`).
+- **The SVG round-trip dropped SVG-only image fills on shapes** (`asvg:svgBlip` with no raster `r:embed`): the parser required `data-ooxml-blip-rid`. It now also accepts `data-ooxml-blip-svg-rid`.
 
 ### Changed
 
-- Internal cleanup: slide context resolution (`.rels` → layout → master → theme) is shared by `render_slide_svg` and `restore_slide_ooxml`, and the background-presence and layout/master color-map checks are single helpers. No output changes.
+- Internal cleanup: slide context resolution (`.rels` → layout → master → theme) is shared by `render_slide_svg` and `restore_slide_ooxml`, and the background-presence and layout/master color-map checks are single helpers. The `data-ooxml-*` fill attributes for shapes, the slide background and text runs are emitted / parsed by shared prefix-aware helpers. No output changes beyond the fixes above.
 
 ## 0.6.6
 

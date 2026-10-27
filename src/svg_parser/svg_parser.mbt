@@ -330,104 +330,103 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
 }
 
 ///|
-/// Parse GradientFill from data-ooxml-grad-* attributes on a <g> node.
-fn parse_grad_fill_from_g(g_node : @xml.XmlNode) -> @ooxml.GradientFill {
-  let stops_str = get_da(g_node, "grad-stops")
-  if stops_str.is_empty() {
-    return @ooxml.GradientFill::none()
-  }
-  let stops = parse_grad_stops(stops_str)
+/// Parse a GradientFill from `data-ooxml-<prefix>grad-*` attributes (`prefix`
+/// "" on a shape's <g>, "bg-" on the <svg> root for the slide background, "t"
+/// on a text run's <tspan>).
+fn parse_grad_fill_attrs(
+  node : @xml.XmlNode,
+  prefix : String,
+) -> @ooxml.GradientFill {
+  let p = prefix + "grad-"
+  let stops = parse_grad_stops(get_da(node, p + "stops"))
   if stops.is_empty() {
     return @ooxml.GradientFill::none()
   }
-  let angle = get_dai(g_node, "grad-angle")
-  let path_type = get_da(g_node, "grad-path")
-  let rot_s = get_da(g_node, "grad-rot")
-  let rot_with_shape = rot_s != "0"
-  let fill_to_l = get_dai(g_node, "grad-ftl")
-  let fill_to_t = get_dai(g_node, "grad-ftt")
-  let fill_to_r = get_dai(g_node, "grad-ftr")
-  let fill_to_b = get_dai(g_node, "grad-ftb")
-  let tile_flip = get_da(g_node, "grad-tile-flip")
+  // fillToRect edges: 0 is written for "unset" (-1)
+  fn edge(v : Int32) -> Int32 {
+    if v == 0 {
+      -1
+    } else {
+      v
+    }
+  }
+
   {
     stops,
-    angle,
-    path_type,
-    rot_with_shape,
-    fill_to_l: if fill_to_l == 0 {
-      -1
-    } else {
-      fill_to_l
-    },
-    fill_to_t: if fill_to_t == 0 {
-      -1
-    } else {
-      fill_to_t
-    },
-    fill_to_r: if fill_to_r == 0 {
-      -1
-    } else {
-      fill_to_r
-    },
-    fill_to_b: if fill_to_b == 0 {
-      -1
-    } else {
-      fill_to_b
-    },
-    tile_flip,
-  }
-}
-
-// ── Text run fill helpers ────────────────────────────────────────────────────
-
-///|
-/// Parse text gradient fill from tgrad-* data attributes on a run tspan.
-fn parse_text_grad_fill(node : @xml.XmlNode) -> @ooxml.GradientFill {
-  let stops_str = get_da(node, "tgrad-stops")
-  if stops_str.is_empty() {
-    return @ooxml.GradientFill::none()
-  }
-  let stops = parse_grad_stops(stops_str)
-  if stops.is_empty() {
-    return @ooxml.GradientFill::none()
-  }
-  let angle = get_dai(node, "tgrad-angle")
-  let path_type = get_da(node, "tgrad-path")
-  let rot_s = get_da(node, "tgrad-rot")
-  let rot_with_shape = rot_s != "0"
-  {
-    stops,
-    angle,
-    path_type,
-    rot_with_shape,
-    fill_to_l: -1,
-    fill_to_t: -1,
-    fill_to_r: -1,
-    fill_to_b: -1,
-    tile_flip: "",
+    angle: get_dai(node, p + "angle"),
+    path_type: get_da(node, p + "path"),
+    rot_with_shape: get_da(node, p + "rot") != "0",
+    fill_to_l: edge(get_dai(node, p + "ftl")),
+    fill_to_t: edge(get_dai(node, p + "ftt")),
+    fill_to_r: edge(get_dai(node, p + "ftr")),
+    fill_to_b: edge(get_dai(node, p + "ftb")),
+    tile_flip: get_da(node, p + "tile-flip"),
   }
 }
 
 ///|
-/// Parse text pattern fill from tpatt-* data attributes on a run tspan.
-fn parse_text_patt_fill(node : @xml.XmlNode) -> @ooxml.PatternFill {
-  let prst = get_da(node, "tpatt-prst")
+/// Parse a BlipFill from `data-ooxml-<prefix>blip-*` attributes. An image is
+/// present when it has a raster (`rid`) or an SVG-only (`svg-rid`) reference.
+fn parse_blip_fill_attrs(
+  node : @xml.XmlNode,
+  prefix : String,
+) -> @ooxml.BlipFill {
+  let p = prefix + "blip-"
+  let rid = get_da(node, p + "rid")
+  let svg_rid = get_da(node, p + "svg-rid")
+  if rid.is_empty() && svg_rid.is_empty() {
+    return @ooxml.BlipFill::none()
+  }
+  {
+    rid,
+    stretch: get_da(node, p + "stretch") != "0",
+    src_l: get_dai(node, p + "src-l"),
+    src_t: get_dai(node, p + "src-t"),
+    src_r: get_dai(node, p + "src-r"),
+    src_b: get_dai(node, p + "src-b"),
+    tile_tx: get_dai(node, p + "tile-tx"),
+    tile_ty: get_dai(node, p + "tile-ty"),
+    tile_sx: get_dai(node, p + "tile-sx"),
+    tile_sy: get_dai(node, p + "tile-sy"),
+    tile_flip: get_da(node, p + "tile-flip"),
+    tile_algn: get_da(node, p + "tile-algn"),
+    alpha: get_dai(node, p + "alpha"),
+    svg_rid,
+    bright: get_dai(node, p + "bright"),
+    contrast: get_dai(node, p + "contrast"),
+    duotone_1: color_or_none(node, p + "duotone1"),
+    duotone_2: color_or_none(node, p + "duotone2"),
+    clr_from: color_or_none(node, p + "clr-from"),
+    clr_to: color_or_none(node, p + "clr-to"),
+  }
+}
+
+///|
+/// Parse a PatternFill from `data-ooxml-<prefix>patt-*` attributes.
+fn parse_patt_fill_attrs(
+  node : @xml.XmlNode,
+  prefix : String,
+) -> @ooxml.PatternFill {
+  let p = prefix + "patt-"
+  let prst = get_da(node, p + "prst")
   if prst.is_empty() {
     return @ooxml.PatternFill::none()
   }
-  let fg_hex = get_da(node, "tpatt-fg")
-  let bg_hex = get_da(node, "tpatt-bg")
-  let fg = if fg_hex.is_empty() {
-    @ooxml.Color::black()
-  } else {
-    parse_hex_color(fg_hex)
+  let fg_hex = get_da(node, p + "fg")
+  let bg_hex = get_da(node, p + "bg")
+  {
+    prst,
+    fg_color: if fg_hex.is_empty() {
+      @ooxml.Color::black()
+    } else {
+      parse_hex_color(fg_hex)
+    },
+    bg_color: if bg_hex.is_empty() {
+      @ooxml.Color::white()
+    } else {
+      parse_hex_color(bg_hex)
+    },
   }
-  let bg = if bg_hex.is_empty() {
-    @ooxml.Color::white()
-  } else {
-    parse_hex_color(bg_hex)
-  }
-  { prst, fg_color: fg, bg_color: bg, }
 }
 
 // ── Text parsing from SVG ────────────────────────────────────────────────────
@@ -498,8 +497,8 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                     effects: parse_run_effects_from_da(run_node),
                     outline_color: color_or_none(run_node, "outline-color"),
                     outline_w: get_dai(run_node, "outline-w"),
-                    text_grad_fill: parse_text_grad_fill(run_node),
-                    text_patt_fill: parse_text_patt_fill(run_node),
+                    text_grad_fill: parse_grad_fill_attrs(run_node, "t"),
+                    text_patt_fill: parse_patt_fill_attrs(run_node, "t"),
                     bold_explicit: bold,
                     math_xml: @xml.xml_unescape(get_da(run_node, "math-xml")),
                   })
@@ -762,65 +761,9 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   }
   let ph_type = get_da(g_node, "ph-type")
   let ph_idx = get_dai(g_node, "ph-idx")
-  let grad_fill = parse_grad_fill_from_g(g_node)
-  // BlipFill from data attributes
-  let blip_rid = get_da(g_node, "blip-rid")
-  let blip_fill : @ooxml.BlipFill = if blip_rid.is_empty() {
-    @ooxml.BlipFill::none()
-  } else {
-    let blip_stretch = get_da(g_node, "blip-stretch") != "0"
-    let blip_tile_tx = get_dai(g_node, "blip-tile-tx")
-    let blip_tile_ty = get_dai(g_node, "blip-tile-ty")
-    let blip_tile_sx = get_dai(g_node, "blip-tile-sx")
-    let blip_tile_sy = get_dai(g_node, "blip-tile-sy")
-    let blip_tile_flip = get_da(g_node, "blip-tile-flip")
-    let blip_tile_algn = get_da(g_node, "blip-tile-algn")
-    let blip_src_l = get_dai(g_node, "blip-src-l")
-    let blip_src_t = get_dai(g_node, "blip-src-t")
-    let blip_src_r = get_dai(g_node, "blip-src-r")
-    let blip_src_b = get_dai(g_node, "blip-src-b")
-    {
-      rid: blip_rid,
-      stretch: blip_stretch,
-      src_l: blip_src_l,
-      src_t: blip_src_t,
-      src_r: blip_src_r,
-      src_b: blip_src_b,
-      tile_tx: blip_tile_tx,
-      tile_ty: blip_tile_ty,
-      tile_sx: blip_tile_sx,
-      tile_sy: blip_tile_sy,
-      tile_flip: blip_tile_flip,
-      tile_algn: blip_tile_algn,
-      alpha: get_dai(g_node, "blip-alpha"),
-      svg_rid: get_da(g_node, "blip-svg-rid"),
-      bright: get_dai(g_node, "blip-bright"),
-      contrast: get_dai(g_node, "blip-contrast"),
-      duotone_1: color_or_none(g_node, "blip-duotone1"),
-      duotone_2: color_or_none(g_node, "blip-duotone2"),
-      clr_from: color_or_none(g_node, "blip-clr-from"),
-      clr_to: color_or_none(g_node, "blip-clr-to"),
-    }
-  }
-  // PatternFill from data attributes
-  let patt_prst = get_da(g_node, "patt-prst")
-  let patt_fill : @ooxml.PatternFill = if patt_prst.is_empty() {
-    @ooxml.PatternFill::none()
-  } else {
-    let patt_fg_hex = get_da(g_node, "patt-fg")
-    let patt_bg_hex = get_da(g_node, "patt-bg")
-    let fg = if patt_fg_hex.is_empty() {
-      @ooxml.Color::black()
-    } else {
-      parse_hex_color(patt_fg_hex)
-    }
-    let bg = if patt_bg_hex.is_empty() {
-      @ooxml.Color::white()
-    } else {
-      parse_hex_color(patt_bg_hex)
-    }
-    { prst: patt_prst, fg_color: fg, bg_color: bg, }
-  }
+  let grad_fill = parse_grad_fill_attrs(g_node, "")
+  let blip_fill = parse_blip_fill_attrs(g_node, "")
+  let patt_fill = parse_patt_fill_attrs(g_node, "")
   {
     kind,
     transform,
@@ -1004,9 +947,9 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
   {
     slide_size,
     background,
-    bg_grad: @ooxml.GradientFill::none(),
-    bg_blip_fill: @ooxml.BlipFill::none(),
-    bg_patt_fill: @ooxml.PatternFill::none(),
+    bg_grad: parse_grad_fill_attrs(svg_node, "bg-"),
+    bg_blip_fill: parse_blip_fill_attrs(svg_node, "bg-"),
+    bg_patt_fill: parse_patt_fill_attrs(svg_node, "bg-"),
     shapes,
     transition_xml,
     timing_xml,
