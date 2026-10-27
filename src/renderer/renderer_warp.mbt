@@ -10,7 +10,7 @@
 ///|
 /// Return default adjustment value for a warp preset (OOXML 60000th-degree for
 /// angles, 0-100000 for percentages).  idx=1 for av1, idx=2 for av2.
-fn warp_default_av(prst : String, idx : Int) -> Int {
+fn warp_default_av(prst : String, idx : Int32) -> Int32 {
   if idx == 1 {
     // av1 defaults
     if prst == "textArchUp" || prst == "textArchUpPour" {
@@ -103,10 +103,10 @@ fn warp_default_av(prst : String, idx : Int) -> Int {
 /// Returns (text, font_size_px, font_family, fill_color, bold, italic).
 fn flatten_warp_text(
   paragraphs : Array[@ooxml.TextParagraph],
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
-) -> (String, Int, String, @ooxml.Color, Bool, Bool) {
+) -> (String, Int32, String, @ooxml.Color, Bool, Bool) {
   let mut text = ""
   let mut first_font_size = -1
   let mut first_ff = ""
@@ -832,12 +832,12 @@ fn generate_warp_transform(
 fn render_warp_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
   rels : Array[@ooxml.Relationship],
-  slide_num : Int,
-  shape_idx : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
 ) -> String {
   let (text, font_sz, ff, color, bold, italic) = flatten_warp_text(
     paragraphs, scale, theme, body_props,

@@ -15,43 +15,43 @@
 // 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
 ///|
-let default_font_size_emu : Int = 228600 // 18 pt
+let default_font_size_emu : Int32 = 228600 // 18 pt
 
 ///|
-let default_table_font_size_emu : Int = 127000 // 10 pt — built-in table styles typically default to 10pt
+let default_table_font_size_emu : Int32 = 127000 // 10 pt — built-in table styles typically default to 10pt
 
 ///|
-let default_l_inset : Int = 91440 // 0.1 in (left / right)
+let default_l_inset : Int32 = 91440 // 0.1 in (left / right)
 
 ///|
-let default_t_inset : Int = 45720 // 0.05 in (top / bottom)
+let default_t_inset : Int32 = 45720 // 0.05 in (top / bottom)
 
 ///|
-let level_indent_emu : Int = 342900 // indent per bullet level
+let level_indent_emu : Int32 = 342900 // indent per bullet level
 
 ///|
-let svg_target_width : Int = 960 // output SVG width in px
+let svg_target_width : Int32 = 960 // output SVG width in px
 
 ///|
-let default_emu_per_px : Int = 9525 // EMU per pixel at 96 DPI
+let default_emu_per_px : Int32 = 9525 // EMU per pixel at 96 DPI
 
 ///|
-let line_height_numer : Int = 12 // default line-height = font-size * 12/10
+let line_height_numer : Int32 = 12 // default line-height = font-size * 12/10
 
 ///|
-let line_height_denom : Int = 10
+let line_height_denom : Int32 = 10
 
 ///|
-let pct_line_height_numer : Int = 12 // for %-based spacing: font-size * 12/10 ≈ 1.2 (OOXML single spacing base)
+let pct_line_height_numer : Int32 = 12 // for %-based spacing: font-size * 12/10 ≈ 1.2 (OOXML single spacing base)
 
 ///|
-let pct_line_height_denom : Int = 10
+let pct_line_height_denom : Int32 = 10
 
 ///|
-let default_run_fs_hundredths : Int = 1800 // 18 pt — fallback run size when none resolves
+let default_run_fs_hundredths : Int32 = 1800 // 18 pt — fallback run size when none resolves
 
 ///|
-let no_wrap_width_px : Int = 1_000_000_000 // sentinel "infinite" width for non-wrapping layout
+let no_wrap_width_px : Int32 = 1_000_000_000 // sentinel "infinite" width for non-wrapping layout
 
 ///|
 let default_text_fill : String = "black"
@@ -63,24 +63,24 @@ let image_placeholder_fill : String = "#dddddd"
 let table_border_color : String = "#999999" // fallback when no border color specified
 
 ///|
-let group_child_idx_multiplier : Int = 1000 // child_idx = shape_idx * 1000 + ci
+let group_child_idx_multiplier : Int32 = 1000 // child_idx = shape_idx * 1000 + ci
 
 ///|
-let baseline_shift_extra_numer : Int = 2 // extra spacing for super/subscript = font_px * numer / denom
+let baseline_shift_extra_numer : Int32 = 2 // extra spacing for super/subscript = font_px * numer / denom
 
 ///|
-let baseline_shift_extra_denom : Int = 5
+let baseline_shift_extra_denom : Int32 = 5
 
 // ── OOXML unit constants ─────────────────────────────────────────────────────
 
 ///|
-let ooxml_pct_denom : Int = @ooxml.pct_100 // OOXML percentage denominator (100000 = 100%)
+let ooxml_pct_denom : Int32 = @ooxml.pct_100 // OOXML percentage denominator (100000 = 100%)
 
 ///|
-let ooxml_angle_unit : Int = 60000 // 1 degree = 60000 units in OOXML
+let ooxml_angle_unit : Int32 = 60000 // 1 degree = 60000 units in OOXML
 
 ///|
-let ooxml_fill_to_pct : Int = 2000 // fillToRect midpoint num/2000 → center % (decimal)
+let ooxml_fill_to_pct : Int32 = 2000 // fillToRect midpoint num/2000 → center % (decimal)
 
 // ── SVG element ID builders ─────────────────────────────────────────────────
 // Each SVG <defs> element (gradient, pattern, filter, mask) needs a unique ID.
@@ -91,8 +91,8 @@ let ooxml_fill_to_pct : Int = 2000 // fillToRect midpoint num/2000 → center % 
 fn svg_id(
   prefix : String,
   sep : String,
-  slide_num : Int,
-  shape_idx : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
 ) -> String {
   prefix + sep + int_to_str(slide_num) + sep + int_to_str(shape_idx)
 }
@@ -100,7 +100,7 @@ fn svg_id(
 ///|
 /// Shape index component for def IDs. Negative shape_idx (background shapes)
 /// uses "n" prefix to keep the ID free of double dashes.
-fn signed_idx_part(shape_idx : Int) -> String {
+fn signed_idx_part(shape_idx : Int32) -> String {
   if shape_idx >= 0 {
     int_to_str(shape_idx)
   } else {
@@ -110,22 +110,22 @@ fn signed_idx_part(shape_idx : Int) -> String {
 
 ///|
 /// Build a gradient definition ID. Negative shape_idx uses "n" prefix.
-fn grad_id(slide_num : Int, shape_idx : Int) -> String {
+fn grad_id(slide_num : Int32, shape_idx : Int32) -> String {
   "grad-s" + int_to_str(slide_num) + "-" + signed_idx_part(shape_idx)
 }
 
 ///|
-fn patt_id(slide_num : Int, shape_idx : Int) -> String {
+fn patt_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("patt-s", "-", slide_num, shape_idx)
 }
 
 ///|
-fn stroke_grad_id(slide_num : Int, shape_idx : Int) -> String {
+fn stroke_grad_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("sgrad-s", "-", slide_num, shape_idx)
 }
 
 ///|
-fn stroke_patt_id(slide_num : Int, shape_idx : Int) -> String {
+fn stroke_patt_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("spatt-s", "-", slide_num, shape_idx)
 }
 
@@ -134,10 +134,10 @@ fn stroke_patt_id(slide_num : Int, shape_idx : Int) -> String {
 /// prefix: "tgrad-s" (gradient) or "tpatt-s" (pattern).
 fn text_fill_id(
   prefix : String,
-  slide_num : Int,
-  shape_idx : Int,
-  para_idx : Int,
-  run_idx : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
+  para_idx : Int32,
+  run_idx : Int32,
 ) -> String {
   prefix +
   int_to_str(slide_num) +
@@ -150,34 +150,38 @@ fn text_fill_id(
 }
 
 ///|
-fn effect_filter_id(slide_num : Int, shape_idx : Int) -> String {
+fn effect_filter_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("eff_s", "_", slide_num, shape_idx)
 }
 
 ///|
-fn refl_shape_id(slide_num : Int, shape_idx : Int) -> String {
+fn refl_shape_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("rshp_s", "_", slide_num, shape_idx)
 }
 
 ///|
-fn refl_mask_id(slide_num : Int, shape_idx : Int) -> String {
+fn refl_mask_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("rmsk_s", "_", slide_num, shape_idx)
 }
 
 ///|
-fn blip_filter_id(slide_num : Int, shape_idx : Int) -> String {
+fn blip_filter_id(slide_num : Int32, shape_idx : Int32) -> String {
   svg_id("blipfx_s", "_", slide_num, shape_idx)
 }
 
 ///|
-fn blip_clip_id(prefix : String, slide_num : Int, shape_idx : Int) -> String {
+fn blip_clip_id(
+  prefix : String,
+  slide_num : Int32,
+  shape_idx : Int32,
+) -> String {
   prefix + "_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
 }
 
 // ── Shared helpers (from @xml) ───────────────────────────────────────────────
 
 ///|
-fn int_to_str(n : Int) -> String {
+fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
 }
 
@@ -193,7 +197,7 @@ fn a(name : String, value : String) -> String {
 ///|
 /// Build a single SVG attribute with an integer value. Skips escaping
 /// since `int_to_str` cannot produce XML metacharacters.
-fn ai(name : String, value : Int) -> String {
+fn ai(name : String, value : Int32) -> String {
   " " + name + "=\"" + int_to_str(value) + "\""
 }
 
@@ -205,7 +209,7 @@ fn da(name : String, value : String) -> String {
 
 ///|
 /// Shorthand for data-ooxml-* attributes with an integer value.
-fn dai(name : String, value : Int) -> String {
+fn dai(name : String, value : Int32) -> String {
   " data-ooxml-" + name + "=\"" + int_to_str(value) + "\""
 }
 
@@ -222,7 +226,7 @@ fn bool_str(b : Bool) -> String {
 
 ///|
 /// Convert OOXML preset dash name to SVG stroke-dasharray attribute.
-fn stroke_dasharray(dash : String, sw : Int) -> String {
+fn stroke_dasharray(dash : String, sw : Int32) -> String {
   if dash.is_empty() {
     return ""
   }
@@ -305,7 +309,7 @@ fn stroke_linecap(cap : String) -> String {
 
 ///|
 /// Convert OOXML line join to SVG stroke-linejoin + miterlimit attributes.
-fn stroke_linejoin(join : String, miter_limit : Int) -> String {
+fn stroke_linejoin(join : String, miter_limit : Int32) -> String {
   if join == "round" {
     a("stroke-linejoin", "round")
   } else if join == "bevel" {
@@ -337,7 +341,11 @@ fn has_arrow(arrow_type : String) -> Bool {
 
 ///|
 /// Generate arrow marker ID: "ah-s{slide}-{shape}-h" or "ah-s{slide}-{shape}-t".
-fn arrow_marker_id(slide_num : Int, shape_idx : Int, is_head : Bool) -> String {
+fn arrow_marker_id(
+  slide_num : Int32,
+  shape_idx : Int32,
+  is_head : Bool,
+) -> String {
   "ah-s" +
   int_to_str(slide_num) +
   "-" +
@@ -347,7 +355,7 @@ fn arrow_marker_id(slide_num : Int, shape_idx : Int, is_head : Bool) -> String {
 
 ///|
 /// Arrow marker size from sm/med/lg.
-fn arrow_size(sz : String) -> Int {
+fn arrow_size(sz : String) -> Int32 {
   if sz == "sm" {
     3
   } else if sz == "lg" {
@@ -402,8 +410,8 @@ fn render_arrow_marker(
 /// Generate marker-start/marker-end attributes for arrows.
 fn stroke_markers(
   shape : @ooxml.Shape,
-  shape_idx : Int,
-  slide_num : Int,
+  shape_idx : Int32,
+  slide_num : Int32,
 ) -> String {
   let mut result = ""
   if has_arrow(shape.stroke_head_type) {
@@ -516,7 +524,7 @@ pub fn sanitize_url(url : String) -> String {
 // ── EMU → pixel conversion ────────────────────────────────────────────────────
 
 ///|
-fn px(emu : Int, scale : Int) -> Int {
+fn px(emu : Int32, scale : Int32) -> Int32 {
   if scale <= 0 {
     0
   } else {
@@ -530,7 +538,7 @@ let min_stroke_width_str : String = "0.3" // minimum visible stroke (sub-pixel)
 ///|
 /// Convert EMU to fractional pixel string (e.g. "0.3", "1.5", "2").
 /// Used for stroke-width where sub-pixel precision matters.
-fn px_frac(emu : Int, scale : Int) -> String {
+fn px_frac(emu : Int32, scale : Int32) -> String {
   if scale <= 0 || emu <= 0 {
     return min_stroke_width_str
   }
@@ -549,7 +557,7 @@ fn px_frac(emu : Int, scale : Int) -> String {
 // ── Font size ─────────────────────────────────────────────────────────────────
 
 ///|
-fn hundredth_pt_to_emu(sz : Int) -> Int {
+fn hundredth_pt_to_emu(sz : Int32) -> Int32 {
   sz * @ooxml.emu_per_hundredth_pt
 }
 
@@ -558,7 +566,7 @@ fn hundredth_pt_to_emu(sz : Int) -> Int {
 ///|
 /// Format rotation in 60000ths of a degree as "D.DD" string (e.g. "45.00").
 /// Handles negative rotations correctly.
-fn format_rotation_deg(rot_60k : Int) -> String {
+fn format_rotation_deg(rot_60k : Int32) -> String {
   let deg_x100 = rot_60k / @ooxml.rot_to_centideg
   let deg_int = deg_x100 / @ooxml.centideg_per_deg
   let deg_frac_raw = deg_x100 % @ooxml.centideg_per_deg
@@ -573,7 +581,7 @@ fn format_rotation_deg(rot_60k : Int) -> String {
 
 ///|
 /// Build SVG rotate() transform attribute string centered on (cx, cy).
-fn rotation_transform(rot_60k : Int, cx : Int, cy : Int) -> String {
+fn rotation_transform(rot_60k : Int32, cx : Int32, cy : Int32) -> String {
   if rot_60k == 0 {
     return ""
   }
@@ -593,11 +601,11 @@ fn rotation_transform(rot_60k : Int, cx : Int, cy : Int) -> String {
 /// the shape center, so the SVG transform list is `rotate(...) <mirror>` (SVG
 /// applies the rightmost operation to coordinates first).
 fn transform_ops(
-  rot_60k : Int,
+  rot_60k : Int32,
   flip_h : Bool,
   flip_v : Bool,
-  cx : Int,
-  cy : Int,
+  cx : Int32,
+  cy : Int32,
 ) -> String {
   let mut ops = ""
   if rot_60k != 0 {
@@ -634,11 +642,11 @@ fn transform_ops(
 /// Build SVG transform attribute combining rotation and flipH/flipV mirror,
 /// centered on (cx, cy). Returns "" when neither applies.
 fn transform_with_flip(
-  rot_60k : Int,
+  rot_60k : Int32,
   flip_h : Bool,
   flip_v : Bool,
-  cx : Int,
-  cy : Int,
+  cx : Int32,
+  cy : Int32,
 ) -> String {
   let ops = transform_ops(rot_60k, flip_h, flip_v, cx, cy)
   if ops.is_empty() {
@@ -649,7 +657,7 @@ fn transform_with_flip(
 }
 
 ///|
-fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
+fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
   let cx_p = px(t.x + t.cx / 2, scale)
   let cy_p = px(t.y + t.cy / 2, scale)
   rotation_transform(t.rot, cx_p, cy_p)
@@ -659,7 +667,7 @@ fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
 /// Like `rotation_attr` but also applies flipH/flipV mirroring. Used for shape
 /// geometry, images and text — anything that does not already account for flip
 /// by other means (lines/connectors swap their endpoints instead).
-fn transform_attr(t : @ooxml.ShapeTransform, scale : Int) -> String {
+fn transform_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
   let cx_p = px(t.x + t.cx / 2, scale)
   let cy_p = px(t.y + t.cy / 2, scale)
   transform_with_flip(t.rot, t.flip_h, t.flip_v, cx_p, cy_p)
@@ -766,10 +774,10 @@ fn blip_opacity_attr(bf : @ooxml.BlipFill) -> String {
 fn render_cropped_image_with_filter(
   bf : @ooxml.BlipFill,
   href : String,
-  x_p : Int,
-  y_p : Int,
-  cx_p : Int,
-  cy_p : Int,
+  x_p : Int32,
+  y_p : Int32,
+  cx_p : Int32,
+  cy_p : Int32,
   clip_id : String,
   opacity : String,
   rot : String,
@@ -931,7 +939,7 @@ fn render_blip_filter(
 
 ///|
 /// Used for SVG scale() transform values.
-fn format_ratio(num : Int, den : Int) -> String {
+fn format_ratio(num : Int32, den : Int32) -> String {
   if den == 0 || num == den {
     return "1"
   }
@@ -968,7 +976,7 @@ fn format_ratio(num : Int, den : Int) -> String {
 
 ///|
 /// Format OOXML percentage (0-100000) as decimal string (e.g. 50000 → "0.5").
-fn format_pct_decimal(val : Int) -> String {
+fn format_pct_decimal(val : Int32) -> String {
   format_ratio(val, ooxml_pct_denom)
 }
 
@@ -1010,7 +1018,7 @@ fn format_ratio_64(num : Int64, den : Int64) -> String {
 
 ///|
 /// Encode adjustment values as comma-separated string for data attribute.
-fn encode_adj_values(avs : Array[Int]) -> String {
+fn encode_adj_values(avs : Array[Int32]) -> String {
   let n = avs.length()
   let mut out = ""
   for i in 0..<n {
@@ -1027,13 +1035,13 @@ fn encode_adj_values(avs : Array[Int]) -> String {
 ///|
 /// Compute line endpoints considering flipH/flipV.
 fn line_endpoints(
-  x : Int,
-  y : Int,
-  w : Int,
-  h : Int,
+  x : Int32,
+  y : Int32,
+  w : Int32,
+  h : Int32,
   flip_h : Bool,
   flip_v : Bool,
-) -> (Int, Int, Int, Int) {
+) -> (Int32, Int32, Int32, Int32) {
   if flip_h && flip_v {
     (x + w, y + h, x, y)
   } else if flip_h {
@@ -1047,10 +1055,10 @@ fn line_endpoints(
 
 ///|
 fn render_line_geom(
-  x : Int,
-  y : Int,
-  w : Int,
-  h : Int,
+  x : Int32,
+  y : Int32,
+  w : Int32,
+  h : Int32,
   flip_h : Bool,
   flip_v : Bool,
   stroke : String,
@@ -1069,7 +1077,7 @@ fn render_line_geom(
 
 ///|
 /// Get adjustment value with default fallback (50000 = 50%).
-fn adj_val(avs : Array[Int], idx : Int) -> Int {
+fn adj_val(avs : Array[Int32], idx : Int32) -> Int32 {
   if idx < avs.length() {
     avs[idx]
   } else {
@@ -1081,7 +1089,7 @@ fn adj_val(avs : Array[Int], idx : Int) -> Int {
 /// Compute `start + span * adj / 100000` without 32-bit overflow.
 /// Connectors written by Google Slides occasionally use very large adj values
 /// (e.g. -39687500); the intermediate `span * adj` can exceed Int32 range.
-fn bend_offset(start : Int, span : Int, adj : Int) -> Int {
+fn bend_offset(start : Int32, span : Int32, adj : Int32) -> Int32 {
   let prod = span.to_int64() * adj.to_int64()
   start + (prod / 100000L).to_int()
 }
@@ -1094,12 +1102,12 @@ fn bend_offset(start : Int, span : Int, adj : Int) -> Int {
 /// when a non-zero adj value is supplied.
 fn render_connector_path(
   prst : String,
-  avs : Array[Int],
-  x_emu : Int,
-  y_emu : Int,
-  w_emu : Int,
-  h_emu : Int,
-  scale : Int,
+  avs : Array[Int32],
+  x_emu : Int32,
+  y_emu : Int32,
+  w_emu : Int32,
+  h_emu : Int32,
+  scale : Int32,
   flip_h : Bool,
   flip_v : Bool,
   stroke : String,
@@ -1150,15 +1158,15 @@ fn is_curved_connector(prst : String) -> Bool {
 /// 900 EMU with a non-zero adj1).
 fn render_bent_path(
   prst : String,
-  avs : Array[Int],
-  x1 : Int,
-  y1 : Int,
-  x2 : Int,
-  y2 : Int,
-  scale : Int,
+  avs : Array[Int32],
+  x1 : Int32,
+  y1 : Int32,
+  x2 : Int32,
+  y2 : Int32,
+  scale : Int32,
 ) -> String {
   let s = " "
-  let p = fn(emu : Int) -> String { int_to_str(px(emu, scale)) }
+  let p = fn(emu : Int32) -> String { int_to_str(px(emu, scale)) }
   if prst == "bentConnector2" {
     // L-shape: horizontal then vertical
     "M" + p(x1) + s + p(y1) + "L" + p(x2) + s + p(y1) + "L" + p(x2) + s + p(y2)
@@ -1249,15 +1257,15 @@ fn render_bent_path(
 /// Coordinates and bend math run in EMU; scaled to pixels at output.
 fn render_curved_path(
   prst : String,
-  avs : Array[Int],
-  x1 : Int,
-  y1 : Int,
-  x2 : Int,
-  y2 : Int,
-  scale : Int,
+  avs : Array[Int32],
+  x1 : Int32,
+  y1 : Int32,
+  x2 : Int32,
+  y2 : Int32,
+  scale : Int32,
 ) -> String {
   let s = " "
-  let p = fn(emu : Int) -> String { int_to_str(px(emu, scale)) }
+  let p = fn(emu : Int32) -> String { int_to_str(px(emu, scale)) }
   if prst == "curvedConnector2" {
     // Simple S-curve
     let mx = (x1 + x2) / 2
@@ -1408,7 +1416,7 @@ fn geom_str(kind : @ooxml.ShapeKind) -> String {
 // ── Bullet auto-numbering ─────────────────────────────────────────────────────
 
 ///|
-fn auto_number_text(type_ : String, idx : Int) -> String {
+fn auto_number_text(type_ : String, idx : Int32) -> String {
   let n = idx + 1
   if type_ == "arabicPeriod" {
     int_to_str(n) + "."
@@ -1432,25 +1440,25 @@ fn auto_number_text(type_ : String, idx : Int) -> String {
 }
 
 ///|
-let alpha_count : Int = 26 // number of letters in alphabet
+let alpha_count : Int32 = 26 // number of letters in alphabet
 
 ///|
-let ascii_lower_a_minus1 : Int = 96 // 'a' - 1
+let ascii_lower_a_minus1 : Int32 = 96 // 'a' - 1
 
 ///|
-let ascii_upper_a_minus1 : Int = 64 // 'A' - 1
+let ascii_upper_a_minus1 : Int32 = 64 // 'A' - 1
 
 ///|
-let ascii_lower_a : Int = 97
+let ascii_lower_a : Int32 = 97
 
 ///|
-let ascii_lower_z : Int = 122
+let ascii_lower_z : Int32 = 122
 
 ///|
-let ascii_case_shift : Int = 32 // 'a' - 'A'
+let ascii_case_shift : Int32 = 32 // 'a' - 'A'
 
 ///|
-fn alpha_lower(n : Int) -> String {
+fn alpha_lower(n : Int32) -> String {
   if n >= 1 && n <= alpha_count {
     @ffi.ffi_char_code_to_str(ascii_lower_a_minus1 + n)
   } else {
@@ -1459,7 +1467,7 @@ fn alpha_lower(n : Int) -> String {
 }
 
 ///|
-fn alpha_upper(n : Int) -> String {
+fn alpha_upper(n : Int32) -> String {
   if n >= 1 && n <= alpha_count {
     @ffi.ffi_char_code_to_str(ascii_upper_a_minus1 + n)
   } else {
@@ -1468,17 +1476,17 @@ fn alpha_upper(n : Int) -> String {
 }
 
 ///|
-fn roman_lower(n : Int) -> String {
+fn roman_lower(n : Int32) -> String {
   roman_convert(n, true)
 }
 
 ///|
-fn roman_upper(n : Int) -> String {
+fn roman_upper(n : Int32) -> String {
   roman_convert(n, false)
 }
 
 ///|
-fn roman_convert(n : Int, lower : Bool) -> String {
+fn roman_convert(n : Int32, lower : Bool) -> String {
   if n <= 0 || n > 3999 {
     return int_to_str(n)
   }
@@ -1507,9 +1515,9 @@ fn roman_convert(n : Int, lower : Bool) -> String {
 pub fn render_shape(
   shape : @ooxml.Shape,
   rels : Array[@ooxml.Relationship],
-  slide_num : Int,
-  scale : Int,
-  shape_idx : Int,
+  slide_num : Int32,
+  scale : Int32,
+  shape_idx : Int32,
   theme : @ooxml.ThemeData,
   table_styles : Array[@ooxml.TableStyleDef],
 ) -> String {
@@ -2169,9 +2177,9 @@ fn render_group(
   grp : @ooxml.GroupShapeData,
   t : @ooxml.ShapeTransform,
   rels : Array[@ooxml.Relationship],
-  slide_num : Int,
-  scale : Int,
-  shape_idx : Int,
+  slide_num : Int32,
+  scale : Int32,
+  shape_idx : Int32,
   theme : @ooxml.ThemeData,
   table_styles : Array[@ooxml.TableStyleDef],
 ) -> String {
@@ -2340,9 +2348,9 @@ fn render_group(
 /// Returns the raw defs content (without wrapping `<defs>` tags).
 pub fn render_shape_defs(
   shape : @ooxml.Shape,
-  slide_num : Int,
-  shape_idx : Int,
-  scale : Int,
+  slide_num : Int32,
+  shape_idx : Int32,
+  scale : Int32,
 ) -> String {
   let mut defs = ""
   if !shape.grad_fill.is_none() {
@@ -2412,7 +2420,7 @@ pub fn render_shape_defs(
 pub fn render_slide_svg(
   slide : @ooxml.SlideData,
   rels : Array[@ooxml.Relationship],
-  slide_num : Int,
+  slide_num : Int32,
   theme : @ooxml.ThemeData,
   bg_shapes : Array[@ooxml.Shape],
   table_styles : Array[@ooxml.TableStyleDef],

@@ -1,0 +1,105 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "pptx-svg/main"
+
+// Values
+pub fn add_paragraph(Int32, Int32, String, String) -> String
+
+pub fn add_picture_shape(Int32, String, Int32, Int32, Int32, Int32) -> String
+
+pub fn add_run(Int32, Int32, Int32, String) -> String
+
+pub fn add_shape(Int32, String, Int32, Int32, Int32, Int32, Int32, Int32, Int32) -> String
+
+pub fn add_shape_from_ooxml(Int32, String, Int32, Int32) -> String
+
+pub fn add_shape_text(Int32, Int32, String, Int32, Int32, Int32, Int32) -> String
+
+pub fn add_table_column(Int32, Int32, Int32, Int32) -> String
+
+pub fn add_table_row(Int32, Int32, Int32) -> String
+
+pub fn bring_forward(Int32, Int32) -> String
+
+pub fn bring_to_front(Int32, Int32) -> String
+
+pub fn delete_paragraph(Int32, Int32, Int32) -> String
+
+pub fn delete_run(Int32, Int32, Int32, Int32) -> String
+
+pub fn delete_shape(Int32, Int32) -> String
+
+pub fn delete_table_column(Int32, Int32, Int32) -> String
+
+pub fn delete_table_row(Int32, Int32, Int32) -> String
+
+pub fn duplicate_shape(Int32, Int32, Int32, Int32) -> String
+
+pub fn get_entry_list() -> String
+
+pub fn get_modified_entries() -> String
+
+pub fn get_shape_ooxml(Int32, Int32) -> String
+
+pub fn get_slide_count() -> Int32
+
+pub fn get_slide_ooxml(Int32) -> String
+
+pub fn get_slide_xml_raw(Int32) -> String
+
+pub fn get_text_layout(Int32, Int32) -> String
+
+pub fn hit_test_text(Int32, Int32, Int32, Int32) -> String
+
+pub fn initialize_pptx() -> String
+
+pub fn is_slide_hidden(Int32) -> Int32
+
+pub fn render_shape_svg(Int32, Int32) -> String
+
+pub fn render_slide_svg(Int32) -> String
+
+pub fn replace_picture_rid(Int32, Int32, String) -> String
+
+pub fn replace_text_range(Int32, Int32, Int32, Int32, Int32, Int32, String) -> String
+
+pub fn restore_slide_ooxml(Int32, String) -> String
+
+pub fn send_backward(Int32, Int32) -> String
+
+pub fn send_to_back(Int32, Int32) -> String
+
+pub fn update_paragraph_align(Int32, Int32, Int32, String) -> String
+
+pub fn update_shape_fill(Int32, Int32, Int32, Int32, Int32) -> String
+
+pub fn update_shape_gradient_fill(Int32, Int32, Int32, String) -> String
+
+pub fn update_shape_stroke(Int32, Int32, Int32, Int32, Int32, Int32, String) -> String
+
+pub fn update_shape_text(Int32, Int32, Int32, Int32, String) -> String
+
+pub fn update_shape_transform(Int32, Int32, Int32, Int32, Int32, Int32, Int32) -> String
+
+pub fn update_shapes_transform(Int32, String) -> String
+
+pub fn update_slide_from_svg(Int32, String) -> String
+
+pub fn update_table_cell_text(Int32, Int32, Int32, Int32, String) -> String
+
+pub fn update_text_run_color(Int32, Int32, Int32, Int32, Int32, Int32, Int32) -> String
+
+pub fn update_text_run_decoration(Int32, Int32, Int32, Int32, String, String, Int32) -> String
+
+pub fn update_text_run_font(Int32, Int32, Int32, Int32, String, String, String) -> String
+
+pub fn update_text_run_font_size(Int32, Int32, Int32, Int32, Int32) -> String
+
+pub fn update_text_run_style(Int32, Int32, Int32, Int32, Int32, Int32) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits

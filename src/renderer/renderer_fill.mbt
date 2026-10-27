@@ -3,7 +3,7 @@
 // Same package as renderer.mbt — all constants and helpers are shared.
 
 ///|
-let pattern_tile_sz : Int = 8 // default SVG <pattern> tile size in px
+let pattern_tile_sz : Int32 = 8 // default SVG <pattern> tile size in px
 
 // ── Gradient helpers ─────────────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ fn patt_svg_content(
   prst : String,
   fg : String,
   bg : String,
-  sz : Int,
+  sz : Int32,
 ) -> String {
   let s = int_to_str(sz)
   let h = int_to_str(sz / 2)
@@ -507,7 +507,7 @@ fn eff_alpha_str(clr : @ooxml.Color, fallback : String) -> String {
 
 ///|
 /// Convert OOXML EMU to SVG pixel value for filter attributes.
-fn emu_to_filter_px(emu : Int, scale : Int) -> Int {
+fn emu_to_filter_px(emu : Int32, scale : Int32) -> Int32 {
   if scale > 0 {
     emu / scale
   } else {
@@ -518,11 +518,11 @@ fn emu_to_filter_px(emu : Int, scale : Int) -> Int {
 ///|
 /// Render an SVG feDropShadow element from shadow parameters.
 fn render_drop_shadow_filter(
-  blur_rad : Int,
-  dist : Int,
-  dir : Int,
+  blur_rad : Int32,
+  dist : Int32,
+  dir : Int32,
   color : @ooxml.Color,
-  scale : Int,
+  scale : Int32,
 ) -> String {
   let blur = emu_to_filter_px(blur_rad, scale)
   let d = emu_to_filter_px(dist, scale)
@@ -550,7 +550,7 @@ fn render_drop_shadow_filter(
 fn render_effect_filter(
   eff : @ooxml.EffectList,
   filter_id : String,
-  scale : Int,
+  scale : Int32,
 ) -> (String, String) {
   if eff.is_none() {
     return ("", "")
@@ -716,11 +716,11 @@ fn render_reflection_element(
   r : @ooxml.Reflection,
   shape_id : String,
   mask_id : String,
-  _x_p : Int,
-  y_p : Int,
-  cx_p : Int,
-  cy_p : Int,
-  scale : Int,
+  _x_p : Int32,
+  y_p : Int32,
+  cx_p : Int32,
+  cy_p : Int32,
+  scale : Int32,
 ) -> String {
   // sy is scale % (typically -100000 for full vertical flip, but OOXML default is 100000)
   // For reflection, we flip vertically: scaleY(-1) relative to the bottom of the shape
@@ -757,7 +757,7 @@ fn render_reflection_element(
 
 ///|
 /// Simple cos approximation for shadow direction (degrees → *100 result for int math).
-fn cos_deg(deg : Int) -> Int {
+fn cos_deg(deg : Int32) -> Int32 {
   // cos for 0,45,90,135,180,225,270,315 quadrants
   let d = (deg % 360 + 360) % 360
   if d == 0 {
@@ -782,6 +782,6 @@ fn cos_deg(deg : Int) -> Int {
 
 ///|
 /// Simple sin approximation for shadow direction (degrees → *100 result for int math).
-fn sin_deg(deg : Int) -> Int {
+fn sin_deg(deg : Int32) -> Int32 {
   cos_deg(deg - 90)
 }

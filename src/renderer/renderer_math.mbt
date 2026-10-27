@@ -1141,12 +1141,12 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
 fn render_math_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
-  scale : Int,
+  scale : Int32,
   _theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
   _rels : Array[@ooxml.Relationship],
-  _slide_num : Int,
-  _shape_idx : Int,
+  _slide_num : Int32,
+  _shape_idx : Int32,
 ) -> String {
   // Collect all math XML from runs
   let np = paragraphs.length()

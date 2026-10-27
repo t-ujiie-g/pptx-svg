@@ -41,7 +41,7 @@ fn get_data_attr(node : @xml.XmlNode, name : String) -> String {
 }
 
 ///|
-fn get_data_int(node : @xml.XmlNode, name : String) -> Int {
+fn get_data_int(node : @xml.XmlNode, name : String) -> Int32 {
   @xml.parse_int(get_data_attr(node, name))
 }
 
@@ -52,7 +52,7 @@ fn get_da(node : @xml.XmlNode, name : String) -> String {
 }
 
 ///|
-fn get_dai(node : @xml.XmlNode, name : String) -> Int {
+fn get_dai(node : @xml.XmlNode, name : String) -> Int32 {
   get_data_int(node, "data-ooxml-" + name)
 }
 
@@ -923,8 +923,8 @@ fn parse_connector_geom_from_svg(
 
 ///|
 /// Parse comma-separated adjustment values.
-fn parse_adj_string(s : String) -> Array[Int] {
-  let result : Array[Int] = []
+fn parse_adj_string(s : String) -> Array[Int32] {
+  let result : Array[Int32] = []
   let mut start = 0
   let len = s.length()
   for i in 0..<len {

@@ -849,7 +849,7 @@ test "text run gradient and pattern fill render as defs + url refs" {
 ///|
 /// Construct a text shape with a single bulleted paragraph for indent tests.
 /// marL = 457200 EMU (0.5"), bullet = "•", font_size = 1800 (18pt).
-fn make_bulleted_shape(indent : Int) -> @ooxml.Shape {
+fn make_bulleted_shape(indent : Int32) -> @ooxml.Shape {
   let run : @ooxml.TextRun = {
     text: "Hello",
     bold: false,
@@ -971,9 +971,9 @@ test "bullet repositioning only applies to hanging indent" {
 /// Uses noFill/noStroke so only the text itself is visible — matches the
 /// slide 6 regression where rotation wasn't applied to the text.
 fn make_rotated_text_shape(
-  rot : Int,
-  flip_h? : Bool = false,
-  flip_v? : Bool = false,
+  rot : Int32,
+  flip_h~ : Bool = false,
+  flip_v~ : Bool = false,
 ) -> @ooxml.Shape {
   let run : @ooxml.TextRun = {
     text: "Tilted",
@@ -1140,7 +1140,7 @@ fn make_cx_chart_xml(
   layout_id : String,
   cats : String,
   vals : String,
-  extra? : String = "",
+  extra~ : String = "",
 ) -> String {
   let cat_dim = if cats.is_empty() {
     ""
@@ -1479,7 +1479,7 @@ test "sanitize_url strips leading whitespace and control bytes" {
 
 ///|
 /// Helper: find first occurrence of `pat` in `s`, or -1 if not found.
-fn find_substring(s : String, pat : String) -> Int {
+fn find_substring(s : String, pat : String) -> Int32 {
   let slen = s.length()
   let plen = pat.length()
   if plen == 0 {

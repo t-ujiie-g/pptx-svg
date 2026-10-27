@@ -1,0 +1,68 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "pptx-svg/xml"
+
+// Values
+pub fn char_step(Char) -> Int32
+
+pub fn concat_balanced(Array[String]) -> String
+
+pub fn find_child(Array[XmlNode], String) -> XmlNode?
+
+pub fn find_children(Array[XmlNode], String) -> Array[XmlNode]
+
+pub fn find_descendant(Array[XmlNode], String) -> XmlNode?
+
+pub fn find_path(Array[XmlNode], Array[String]) -> XmlNode?
+
+pub fn get_attr(XmlNode, String) -> String?
+
+pub fn get_children(XmlNode) -> Array[XmlNode]
+
+pub fn get_tag(XmlNode) -> String
+
+pub fn get_text_content(XmlNode) -> String
+
+pub fn int_to_str(Int32) -> String
+
+pub fn is_astral(Char) -> Bool
+
+pub fn parse_hex_int(String) -> Int32
+
+pub fn parse_int(String) -> Int32
+
+pub fn parse_xml(String) -> Array[XmlNode]
+
+pub fn serialize_node(XmlNode) -> String
+
+pub fn split_by_space(String) -> Array[String]
+
+pub fn str_ends_with(String, String) -> Bool
+
+pub fn str_replace_all(String, String, String) -> String
+
+pub fn str_starts_with(String, String) -> Bool
+
+pub fn str_substring(String, Int32, Int32) -> String
+
+pub fn str_suffix(String, Int32) -> String
+
+pub fn xml_escape(String) -> String
+
+pub fn xml_unescape(String) -> String
+
+// Errors
+
+// Types and methods
+pub struct XmlAttr {
+  name : String
+  value : String
+}
+
+pub enum XmlNode {
+  Element(String, Array[XmlAttr], Array[XmlNode])
+  Text(String)
+}
+
+// Type aliases
+
+// Traits

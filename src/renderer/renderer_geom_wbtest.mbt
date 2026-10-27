@@ -102,7 +102,12 @@ test "W token scales a path from its own coordinate space" {
 }
 
 ///|
-fn preset_path(prst : String, adj : Array[Int], w : Int, h : Int) -> String {
+fn preset_path(
+  prst : String,
+  adj : Array[Int32],
+  w : Int32,
+  h : Int32,
+) -> String {
   render_preset_geom(prst, adj, w, h, 0, 0, "", "", "")
 }
 
@@ -168,7 +173,7 @@ fn styled_preset(prst : String) -> String {
 }
 
 ///|
-fn count_paths(svg : String) -> Int {
+fn count_paths(svg : String) -> Int32 {
   let mut n = 0
   let mut rest = svg
   while rest.find("<path ") is Some(i) {

@@ -5,29 +5,29 @@
 // ── Table constants ─────────────────────────────────────────────────────────
 
 ///|
-let default_cell_mar_lr : Int = 91440 // OOXML default L/R margin: 0.1 inch
+let default_cell_mar_lr : Int32 = 91440 // OOXML default L/R margin: 0.1 inch
 
 ///|
-let default_cell_mar_tb : Int = 45720 // OOXML default T/B margin: 0.05 inch
+let default_cell_mar_tb : Int32 = 45720 // OOXML default T/B margin: 0.05 inch
 
 ///|
-let auto_contrast_lum_threshold : Int = 128000 // luminance threshold (×1000) for auto-contrast text color
+let auto_contrast_lum_threshold : Int32 = 128000 // luminance threshold (×1000) for auto-contrast text color
 
 // ── Table cell text rendering ───────────────────────────────────────────────
 
 ///|
 fn render_table_cell_text(
   paragraphs : Array[@ooxml.TextParagraph],
-  cell_x : Int,
-  cell_y : Int,
-  cell_w : Int,
-  cell_h : Int,
-  pad_l : Int,
-  pad_r : Int,
-  pad_t : Int,
-  pad_b : Int,
+  cell_x : Int32,
+  cell_y : Int32,
+  cell_w : Int32,
+  cell_h : Int32,
+  pad_l : Int32,
+  pad_r : Int32,
+  pad_t : Int32,
+  pad_b : Int32,
   anchor : String,
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
   rels : Array[@ooxml.Relationship],
   style_cell : @ooxml.TableStyleCell,
@@ -45,9 +45,9 @@ fn render_table_cell_text(
   let content_w = cell_w - pad_l - pad_r
   let np = paragraphs.length()
   // Pre-compute per-paragraph: line height, wrapped lines count, bullet indent
-  let para_line_hs : Array[Int] = []
-  let para_wrap_counts : Array[Int] = []
-  let para_bul_mars : Array[Int] = []
+  let para_line_hs : Array[Int32] = []
+  let para_wrap_counts : Array[Int32] = []
+  let para_bul_mars : Array[Int32] = []
   for pi in 0..<np {
     let para = paragraphs[pi]
     // Line height from max run font size
@@ -157,7 +157,7 @@ fn render_table_cell_text(
       wrap_paragraph(para, wrap_w, scale, def_sz, -1, theme)
     } else {
       // Fallback: all segments on one line
-      let segs : Array[(Int, String)] = []
+      let segs : Array[(Int32, String)] = []
       for ri in 0..<nr {
         segs.push((ri, para.runs[ri].text))
       }
@@ -222,13 +222,13 @@ fn render_table_cell_text(
 
 ///|
 fn render_table_border_line(
-  x1 : Int,
-  y1 : Int,
-  x2 : Int,
-  y2 : Int,
-  w : Int,
+  x1 : Int32,
+  y1 : Int32,
+  x2 : Int32,
+  y2 : Int32,
+  w : Int32,
   color : @ooxml.Color,
-  scale : Int,
+  scale : Int32,
 ) -> String {
   // w == 0 → default 1px border, w == -1 → no border
   if w == -1 {
@@ -256,7 +256,7 @@ fn render_table_border_line(
 }
 
 ///|
-fn eff_bdr_w(cell_w : Int, style_w : Int) -> Int {
+fn eff_bdr_w(cell_w : Int32, style_w : Int32) -> Int32 {
   if cell_w != 0 {
     cell_w
   } else {
@@ -295,10 +295,10 @@ fn find_table_style(
 fn resolve_table_style_cell(
   style : @ooxml.TableStyleDef,
   table : @ooxml.TableData,
-  row_idx : Int,
-  col_idx : Int,
-  nrows : Int,
-  ncols : Int,
+  row_idx : Int32,
+  col_idx : Int32,
+  nrows : Int32,
+  ncols : Int32,
 ) -> @ooxml.TableStyleCell {
   // Priority: firstRow/lastRow/firstCol/lastCol > band > wholeTbl
   // Check special row/column positions first
@@ -358,7 +358,7 @@ fn resolve_table_style_cell(
 fn render_table(
   table : @ooxml.TableData,
   t : @ooxml.ShapeTransform,
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
   rels : Array[@ooxml.Relationship],
   table_styles : Array[@ooxml.TableStyleDef],
@@ -368,7 +368,7 @@ fn render_table(
   let mut out = ""
   // Precompute column x-offsets in EMU
   let ncols = table.col_widths.length()
-  let col_x_emu : Array[Int] = []
+  let col_x_emu : Array[Int32] = []
   let mut cx_accum = 0
   for ci in 0..<ncols {
     col_x_emu.push(cx_accum)
@@ -376,7 +376,7 @@ fn render_table(
   }
   // Precompute row heights in EMU (auto-size rows with h=0)
   let nrows = table.rows.length()
-  let row_heights_emu : Array[Int] = []
+  let row_heights_emu : Array[Int32] = []
   // Minimum row height: default font size + top/bottom margins
   let min_row_h_emu = default_table_font_size_emu *
     line_height_numer /
@@ -491,7 +491,7 @@ fn render_table(
     row_heights_emu.push(max_cell_h_emu)
   }
   // Precompute row y-offsets in EMU
-  let row_y_emu : Array[Int] = []
+  let row_y_emu : Array[Int32] = []
   let mut ry_accum = 0
   for ri2 in 0..<nrows {
     row_y_emu.push(ry_accum)

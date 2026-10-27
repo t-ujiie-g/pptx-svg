@@ -13,35 +13,35 @@
 
 ///|
 pub(all) struct GlyphBox {
-  x : Int // EMU, absolute
-  w : Int // EMU
+  x : Int32 // EMU, absolute
+  w : Int32 // EMU
 }
 
 ///|
 pub(all) struct RunBox {
-  para_idx : Int
-  run_idx : Int
-  x : Int // EMU, absolute left edge
-  w : Int // EMU
-  run_char_start : Int // char offset within the run where this box begins
-  para_char_start : Int // char offset within the paragraph where this box begins
+  para_idx : Int32
+  run_idx : Int32
+  x : Int32 // EMU, absolute left edge
+  w : Int32 // EMU
+  run_char_start : Int32 // char offset within the run where this box begins
+  para_char_start : Int32 // char offset within the paragraph where this box begins
   chars : Array[GlyphBox]
 }
 
 ///|
 pub(all) struct LineBox {
-  para_idx : Int
-  y : Int // EMU, top edge
-  h : Int // EMU, line height
+  para_idx : Int32
+  y : Int32 // EMU, top edge
+  h : Int32 // EMU, line height
   runs : Array[RunBox]
 }
 
 ///|
 pub(all) struct TextLayout {
-  box_x : Int
-  box_y : Int
-  box_cx : Int
-  box_cy : Int
+  box_x : Int32
+  box_y : Int32
+  box_cx : Int32
+  box_cy : Int32
   lines : Array[LineBox]
 }
 
@@ -49,7 +49,7 @@ pub(all) struct TextLayout {
 /// Approximate bullet glyph width (px) for a paragraph's first line.
 fn layout_bullet_width_px(
   para : @ooxml.TextParagraph,
-  p_font_sz : Int,
+  p_font_sz : Int32,
   theme : @ooxml.ThemeData,
 ) -> Double {
   if para.bullet_none || para.bullet.is_empty() {
@@ -69,7 +69,7 @@ fn layout_bullet_width_px(
 pub fn build_text_layout(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
-  scale : Int,
+  scale : Int32,
   theme : @ooxml.ThemeData,
   body_props : @ooxml.BodyProps,
 ) -> TextLayout {
@@ -228,13 +228,13 @@ pub fn build_text_layout(
     let bullet_w = layout_bullet_width_px(para, p_font_sz, theme)
 
     // Per-run paragraph offset prefix + consumed tracker
-    let run_para_off : Array[Int] = []
+    let run_para_off : Array[Int32] = []
     let mut acc_off = 0
     for ro in 0..<nr {
       run_para_off.push(acc_off)
       acc_off = acc_off + para.runs[ro].text.length()
     }
-    let consumed : Array[Int] = Array::make(nr, 0)
+    let consumed : Array[Int32] = Array::make(nr, 0)
 
     let wrap_w = if do_wrap { text_w - indent } else { no_wrap_width_px }
     let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
@@ -417,9 +417,9 @@ pub fn text_layout_to_json(tl : TextLayout) -> String {
 /// Falls back to the nearest line / line end when the point is outside content.
 pub fn hit_test_layout(
   tl : TextLayout,
-  x_emu : Int,
-  y_emu : Int,
-) -> (Int, Int, Int, Int) {
+  x_emu : Int32,
+  y_emu : Int32,
+) -> (Int32, Int32, Int32, Int32) {
   let nl = tl.lines.length()
   if nl == 0 {
     return (0, 0, 0, 0)

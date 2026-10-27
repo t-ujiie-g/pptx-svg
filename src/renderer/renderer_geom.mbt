@@ -401,7 +401,7 @@ fn parse_path(cmds : String) -> SubPath {
   let mut stroke = true
   let mut i = 0
   while i < tokens.length() {
-    let (cmd, used) : (PathCmd?, Int) = match tokens[i:] {
+    let (cmd, used) : (PathCmd?, Int32) = match tokens[i:] {
       ["F", mode, ..] => {
         fill = PathFill::parse(mode)
         (None, 2)
@@ -440,8 +440,8 @@ fn parse_paths(paths : String) -> Array[SubPath] {
 fn render_geom_path(
   env : GuideEnv,
   cmds : Array[PathCmd],
-  x_off : Int,
-  y_off : Int,
+  x_off : Int32,
+  y_off : Int32,
   path_w : Double,
   path_h : Double,
   shape_w : Double,
@@ -532,8 +532,8 @@ fn arcto_svg(
   hr : Double,
   st_ang : Double,
   sw_ang : Double,
-  x_off : Int,
-  y_off : Int,
+  x_off : Int32,
+  y_off : Int32,
 ) -> (String, Double, Double) {
   if wr <= 0.0 || hr <= 0.0 {
     return ("", cur_x, cur_y)
@@ -653,8 +653,8 @@ fn styled_path_svg(
 fn render_styled_paths(
   env : GuideEnv,
   paths : Array[SubPath],
-  x_off : Int,
-  y_off : Int,
+  x_off : Int32,
+  y_off : Int32,
   w : Double,
   h : Double,
   path_w : Double,
@@ -750,11 +750,11 @@ fn preset_geom(prst : String) -> ParsedGeom? {
 ///  If the preset is not implemented, returns a fallback rectangle.
 fn render_preset_geom(
   prst : String,
-  adj_values : Array[Int],
-  cx_p : Int,
-  cy_p : Int,
-  x_p : Int,
-  y_p : Int,
+  adj_values : Array[Int32],
+  cx_p : Int32,
+  cy_p : Int32,
+  x_p : Int32,
+  y_p : Int32,
   fill : String,
   stroke : String,
   rot : String,
@@ -803,10 +803,10 @@ fn render_preset_geom(
 /// Render custom geometry (a:custGeom) using the guide formula engine.
 fn render_custom_geom(
   data : @ooxml.CustomGeomData,
-  cx_p : Int,
-  cy_p : Int,
-  x_p : Int,
-  y_p : Int,
+  cx_p : Int32,
+  cy_p : Int32,
+  x_p : Int32,
+  y_p : Int32,
   fill : String,
   stroke : String,
   rot : String,
@@ -843,10 +843,10 @@ fn render_custom_geom(
 /// If the shape has no custom text rect, returns (0, 0, cx_p, cy_p).
 fn compute_preset_text_rect(
   prst : String,
-  adj_values : Array[Int],
-  cx_p : Int,
-  cy_p : Int,
-) -> (Int, Int, Int, Int) {
+  adj_values : Array[Int32],
+  cx_p : Int32,
+  cy_p : Int32,
+) -> (Int32, Int32, Int32, Int32) {
   guard preset_geom(prst) is Some({ rect: [rl, rt, rr, rb], adjs, guides, .. }) else {
     return (0, 0, cx_p, cy_p)
   }
@@ -873,9 +873,9 @@ fn compute_preset_text_rect(
 /// Uses guide formulas and the a:rect definition from the custom geom data.
 fn compute_custom_text_rect(
   data : @ooxml.CustomGeomData,
-  cx_p : Int,
-  cy_p : Int,
-) -> (Int, Int, Int, Int) {
+  cx_p : Int32,
+  cy_p : Int32,
+) -> (Int32, Int32, Int32, Int32) {
   if data.rect_l.is_empty() &&
     data.rect_t.is_empty() &&
     data.rect_r.is_empty() &&
@@ -918,7 +918,7 @@ fn parse_adjustments(avlst : String) -> Array[(String, Double)] {
 fn apply_adjustments(
   env : GuideEnv,
   adjs : Array[(String, Double)],
-  adj_values : Array[Int],
+  adj_values : Array[Int32],
 ) -> Unit {
   for adj in adjs {
     env.set(adj.0, adj.1)

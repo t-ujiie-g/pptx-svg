@@ -37,7 +37,7 @@ fn extract_math_text(node : @xml.XmlNode) -> String {
 ///|
 /// Parse spacing value from <a:spcBef>/<a:spcAft>/<a:lnSpc> children.
 ///  Returns EMU. Supports <a:spcPts val="N"> (N in hundredths of a point).
-fn parse_spacing(parent : @xml.XmlNode) -> Int {
+fn parse_spacing(parent : @xml.XmlNode) -> Int32 {
   let ch = @xml.get_children(parent)
   match @xml.find_child(ch, "a:spcPts") {
     Some(pts) => {
@@ -231,17 +231,17 @@ fn parse_para_props(
   theme : ThemeData,
 ) -> (
   String,
-  Int,
-  Int,
-  Int,
-  Int,
-  Int,
-  Int,
+  Int32,
+  Int32,
+  Int32,
+  Int32,
+  Int32,
+  Int32,
   String,
   String,
   Bool,
   String,
-  Int,
+  Int32,
   Color,
   String,
   Array[TabStop],
@@ -370,7 +370,7 @@ fn parse_para_props(
 fn parse_def_rpr(
   ppr : @xml.XmlNode,
   theme : ThemeData,
-) -> (Bool, Bool, Bool, Int, Color, String, String) {
+) -> (Bool, Bool, Bool, Int32, Color, String, String) {
   let ppr_ch = @xml.get_children(ppr)
   match @xml.find_child(ppr_ch, "a:defRPr") {
     None => (false, false, false, 0, Color::none(), "", "")
@@ -409,7 +409,7 @@ fn default_text_run(
   def_bold : Bool,
   def_bold_explicit : Bool,
   def_italic : Bool,
-  def_font_size : Int,
+  def_font_size : Int32,
   def_color : Color,
   def_font_face : String,
   def_ea_font : String,
@@ -469,7 +469,7 @@ fn parse_run_props(
   def_bold : Bool,
   def_bold_explicit : Bool,
   def_italic : Bool,
-  def_font_size : Int,
+  def_font_size : Int32,
   def_color : Color,
   def_font_face : String,
   def_ea_font : String,

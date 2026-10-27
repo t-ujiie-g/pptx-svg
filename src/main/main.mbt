@@ -39,7 +39,7 @@
 //   g_layout_to_master   — (layout_path, master_path) mapping
 
 ///|
-let g_slide_count : Ref[Int] = { val: 0, }
+let g_slide_count : Ref[Int32] = { val: 0, }
 
 ///|
 let g_slide_size : Ref[@ooxml.SlideSize] = { val: @ooxml.SlideSize::default(), }
@@ -92,14 +92,14 @@ let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [], }
 // ── Package-local string/int helpers ─────────────────────────────────────────
 
 ///|
-fn int_to_str(n : Int) -> String {
+fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
 }
 
 // ── Slide counting ──────────────────────────────────────────────────────────
 
 ///|
-fn count_slide_ids(xml : String) -> Int {
+fn count_slide_ids(xml : String) -> Int32 {
   count_occurrences(xml, "<p:sldId ") +
   count_occurrences(xml, "<p:sldId\t") +
   count_occurrences(xml, "<p:sldId\n") +
@@ -107,7 +107,7 @@ fn count_slide_ids(xml : String) -> Int {
 }
 
 ///|
-fn count_occurrences(text : String, pattern : String) -> Int {
+fn count_occurrences(text : String, pattern : String) -> Int32 {
   let plen = pattern.length()
   let tlen = text.length()
   if plen == 0 || tlen < plen {
@@ -127,7 +127,7 @@ fn count_occurrences(text : String, pattern : String) -> Int {
 }
 
 ///|
-fn match_at(text : String, pattern : String, pos : Int) -> Bool {
+fn match_at(text : String, pattern : String, pos : Int32) -> Bool {
   let plen = pattern.length()
   for j in 0..<plen {
     if text.get_char(pos + j).unwrap() != pattern.get_char(j).unwrap() {
@@ -398,7 +398,7 @@ fn resolve_diagram_shapes(
 }
 
 ///|
-fn last_index_of(s : String, c : Char) -> Int {
+fn last_index_of(s : String, c : Char) -> Int32 {
   let len = s.length()
   let mut i = len - 1
   while i >= 0 {
@@ -411,7 +411,7 @@ fn last_index_of(s : String, c : Char) -> Int {
 }
 
 ///|
-fn substring(s : String, from : Int, to : Int) -> String {
+fn substring(s : String, from : Int32, to : Int32) -> String {
   @xml.str_substring(s, from, to)
 }
 
@@ -453,7 +453,7 @@ fn array_contains(arr : Array[String], val : String) -> Bool {
 
 ///|
 /// Find index of a string in an array, or -1.
-fn array_index_of(arr : Array[String], val : String) -> Int {
+fn array_index_of(arr : Array[String], val : String) -> Int32 {
   let n = arr.length()
   for i in 0..<n {
     if arr[i] == val {
@@ -805,13 +805,13 @@ pub fn initialize_pptx() -> String {
 
 ///|
 /// Get the number of slides in the loaded presentation.
-pub fn get_slide_count() -> Int {
+pub fn get_slide_count() -> Int32 {
   g_slide_count.val
 }
 
 ///|
 /// Check if a slide is hidden (0-indexed). Returns 1 if hidden, 0 otherwise.
-pub fn is_slide_hidden(slide_idx : Int) -> Int {
+pub fn is_slide_hidden(slide_idx : Int32) -> Int32 {
   if slide_idx < 0 || slide_idx >= g_slide_count.val {
     return 0
   }
@@ -839,7 +839,7 @@ pub fn is_slide_hidden(slide_idx : Int) -> Int {
 
 ///|
 /// Get the raw XML of a slide (0-indexed).
-pub fn get_slide_xml_raw(slide_idx : Int) -> String {
+pub fn get_slide_xml_raw(slide_idx : Int32) -> String {
   let path = "ppt/slides/slide" + int_to_str(slide_idx + 1) + ".xml"
   @ffi.ffi_log("get_slide_xml_raw: " + path)
   let xml = @ffi.ffi_get_file(path)
@@ -869,7 +869,7 @@ priv struct SlideContext {
 
 ///|
 /// Resolve the inheritance context of slide `slide_idx` (0-indexed, in range).
-fn slide_context(slide_idx : Int) -> SlideContext {
+fn slide_context(slide_idx : Int32) -> SlideContext {
   let rels_path = "ppt/slides/_rels/slide" +
     int_to_str(slide_idx + 1) +
     ".xml.rels"
@@ -943,7 +943,7 @@ fn has_background(
 /// placeholders with no text, so re-running this on already-serialized slide XML
 /// is idempotent — Undo/Redo restores keep full visual fidelity.
 fn resolve_slide_data(
-  slide_num : Int,
+  slide_num : Int32,
   slide_xml : String,
   rels : Array[@ooxml.Relationship],
   layout_opt : @ooxml.SlideLayoutData?,
@@ -1059,7 +1059,7 @@ fn resolve_slide_data(
 /// Render slide `slide_idx` (0-indexed) as an SVG string.
 ///
 /// Returns the SVG markup on success, or "ERROR:<message>" on failure.
-pub fn render_slide_svg(slide_idx : Int) -> String {
+pub fn render_slide_svg(slide_idx : Int32) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -1151,7 +1151,7 @@ pub fn render_slide_svg(slide_idx : Int) -> String {
 ///
 /// Parses the SVG's data-ooxml-* attributes back into SlideData.
 /// Returns "OK" on success, "ERROR:<message>" on failure.
-pub fn update_slide_from_svg(slide_idx : Int, svg_string : String) -> String {
+pub fn update_slide_from_svg(slide_idx : Int32, svg_string : String) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -1171,7 +1171,7 @@ pub fn update_slide_from_svg(slide_idx : Int, svg_string : String) -> String {
 /// If the slide has been modified via update_slide_from_svg(),
 /// returns the serialized modified data. Otherwise returns the
 /// original slide XML from the PPTX.
-pub fn get_slide_ooxml(slide_idx : Int) -> String {
+pub fn get_slide_ooxml(slide_idx : Int32) -> String {
   let n = g_slide_count.val
   if n == 0 {
     return "ERROR:not initialized"
@@ -1216,7 +1216,7 @@ pub fn get_modified_entries() -> String {
 
 ///|
 /// Compute the EMU-to-pixel scale factor for the current presentation.
-fn get_scale() -> Int {
+fn get_scale() -> Int32 {
   let sw = g_slide_size.val.cx
   let w = 960 // svg_target_width
   if sw > 0 {

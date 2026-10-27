@@ -1,0 +1,833 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "pptx-svg/ooxml"
+
+import {
+  "pptx-svg/xml",
+}
+
+// Values
+pub fn alpha_to_css_str(Int32) -> String
+
+pub fn apply_color_map(ThemeData, ColorMap) -> ThemeData
+
+pub fn apply_color_modifiers(Color, Array[@xml.XmlNode]) -> Color
+
+pub fn apply_diagram_text_color(Array[Shape], Color) -> Unit
+
+pub let centideg_per_deg : Int32
+
+pub let char_spc_dpi : Int32
+
+pub let cust_dash_prefix : String
+
+pub let cust_dash_prefix_len : Int32
+
+pub let default_outline_w : Int32
+
+pub let default_stroke_w : Int32
+
+pub let emu_per_hundredth_pt : Int32
+
+pub let emu_per_pt : Int32
+
+pub fn extract_clr_map_ovr_from_nodes(Array[@xml.XmlNode]) -> ColorMap?
+
+pub fn find_rel(Array[Relationship], String) -> Relationship?
+
+pub fn find_rel_target(Array[Relationship], String) -> String
+
+pub let hundredth_pt_per_inch : Int32
+
+pub let max_outline_levels : Int32
+
+pub fn parse_bg_fills_from_csld(Array[@xml.XmlNode], ThemeData) -> (Color, GradientFill, BlipFill, PatternFill)
+
+pub fn parse_chart_xml(String, ThemeData) -> ChartData
+
+pub fn parse_chartex_xml(String, ThemeData) -> ChartData
+
+pub fn parse_clr_map_from_node(@xml.XmlNode) -> ColorMap
+
+pub fn parse_connector_geom(String, Array[Int32]) -> ShapeGeom
+
+pub fn parse_diagram_drawing(String, ThemeData) -> Array[Shape]
+
+pub fn parse_diagram_text_color(String, ThemeData) -> Color
+
+pub fn parse_geom(String, Array[Int32]) -> ShapeGeom
+
+pub fn parse_hex_color(String) -> Color
+
+pub fn parse_rels(String) -> Array[Relationship]
+
+pub fn parse_shapes_xml(String, ThemeData) -> Array[Shape]
+
+pub fn parse_slide(String, SlideSize, ThemeData) -> SlideData
+
+pub fn parse_slide_layout(String, ThemeData) -> SlideLayoutData
+
+pub fn parse_slide_master(String, ThemeData) -> SlideMasterData
+
+pub fn parse_slide_size(String) -> SlideSize
+
+pub fn parse_table_styles(String, ThemeData) -> Array[TableStyleDef]
+
+pub fn parse_text_style_group(@xml.XmlNode, ThemeData) -> TextStyleGroup
+
+pub fn parse_theme(String) -> ThemeData
+
+pub let pct_100 : Int32
+
+pub fn resolve_scheme_color(String, ThemeData) -> Color
+
+pub let rot_to_centideg : Int32
+
+pub let round_rect_default_adj : Int32
+
+// Errors
+
+// Types and methods
+pub(all) enum AxisDataSource {
+  NumSource(String, NumData)
+  StrSource(String, StrData)
+  NoData
+}
+
+pub(all) struct Bevel {
+  w : Int32
+  h : Int32
+  prst : String
+}
+pub fn Bevel::is_none(Self) -> Bool
+pub fn Bevel::none() -> Self
+
+pub(all) struct BlipFill {
+  rid : String
+  stretch : Bool
+  src_l : Int32
+  src_t : Int32
+  src_r : Int32
+  src_b : Int32
+  tile_tx : Int32
+  tile_ty : Int32
+  tile_sx : Int32
+  tile_sy : Int32
+  tile_flip : String
+  tile_algn : String
+  alpha : Int32
+  svg_rid : String
+  bright : Int32
+  contrast : Int32
+  duotone_1 : Color
+  duotone_2 : Color
+  clr_from : Color
+  clr_to : Color
+}
+pub fn BlipFill::has_crop(Self) -> Bool
+pub fn BlipFill::is_none(Self) -> Bool
+pub fn BlipFill::none() -> Self
+
+pub(all) struct Blur {
+  rad : Int32
+}
+pub fn Blur::is_none(Self) -> Bool
+pub fn Blur::none() -> Self
+
+pub(all) struct BodyProps {
+  anchor : String
+  l_ins : Int32
+  t_ins : Int32
+  r_ins : Int32
+  b_ins : Int32
+  auto_fit : Bool
+  font_scale : Int32
+  ln_spc_reduction : Int32
+  wrap : String
+  rot : Int32
+  vert : String
+  num_cols : Int32
+  col_spacing : Int32
+  warp_prst : String
+  warp_av1 : Int32
+  warp_av2 : Int32
+}
+pub fn BodyProps::default() -> Self
+
+pub(all) struct ChartAxis {
+  ax_id : Int32
+  cross_ax : Int32
+  ax_pos : String
+  delete : Bool
+  is_val : Bool
+  major_gridlines : Bool
+  minor_gridlines : Bool
+  title : String
+  orientation : String
+  min_val : String
+  max_val : String
+  major_unit : String
+  num_fmt : String
+  tick_lbl_pos : String
+  cross_between : String
+  sp_pr : ChartSpPr
+}
+pub fn ChartAxis::default() -> Self
+
+pub(all) struct ChartData {
+  groups : Array[ChartGroup]
+  axes : Array[ChartAxis]
+  title : String
+  legend : ChartLegend
+  style : Int32
+  chart_xml : String
+  view_3d : ChartView3D
+}
+pub fn ChartData::empty() -> Self
+
+pub(all) struct ChartDataLabels {
+  show_val : Bool
+  show_cat_name : Bool
+  show_ser_name : Bool
+  show_percent : Bool
+  show_leader_lines : Bool
+  separator : String
+}
+pub fn ChartDataLabels::is_visible(Self) -> Bool
+pub fn ChartDataLabels::none() -> Self
+
+pub(all) struct ChartDataPoint {
+  idx : Int32
+  sp_pr : ChartSpPr
+}
+
+pub(all) struct ChartErrBars {
+  err_dir : String
+  err_bar_type : String
+  err_val_type : String
+  val : Int32
+  sp_pr : ChartSpPr
+}
+pub fn ChartErrBars::is_none(Self) -> Bool
+pub fn ChartErrBars::none() -> Self
+
+pub(all) struct ChartGroup {
+  chart_type : ChartKind
+  series : Array[ChartSeries]
+  bar_dir : String
+  grouping : String
+  gap_width : Int32
+  overlap : Int32
+  vary_colors : Bool
+  hole_size : Int32
+  scatter_style : String
+  ax_ids : Array[Int32]
+  data_labels : ChartDataLabels
+  of_pie_type : String
+  split_pos : Int32
+  wireframe : Bool
+  subtotals : Array[Int32]
+}
+pub fn ChartGroup::default(ChartKind) -> Self
+
+pub(all) enum ChartKind {
+  BarChart
+  LineChart
+  PieChart
+  DoughnutChart
+  ScatterChart
+  AreaChart
+  RadarChart
+  BubbleChart
+  StockChart
+  SurfaceChart
+  OfPieChart
+  WaterfallChart
+  TreemapChart
+  SunburstChart
+  HistogramChart
+  BoxWhiskerChart
+  FunnelChart
+}
+
+pub(all) struct ChartLegend {
+  position : String
+  overlay : Bool
+  show : Bool
+}
+pub fn ChartLegend::none() -> Self
+
+pub(all) struct ChartPoint {
+  idx : Int32
+  value : String
+}
+
+pub(all) struct ChartSeries {
+  idx : Int32
+  order : Int32
+  title : String
+  sp_pr : ChartSpPr
+  cat : AxisDataSource
+  val : AxisDataSource
+  x_val : AxisDataSource
+  y_val : AxisDataSource
+  bubble_size : AxisDataSource
+  smooth : Bool
+  explosion : Int32
+  data_points : Array[ChartDataPoint]
+  trendlines : Array[ChartTrendline]
+  err_bars : ChartErrBars
+  data_labels : ChartDataLabels
+}
+
+pub(all) struct ChartSpPr {
+  fill : Color
+  grad_fill : GradientFill
+  patt_fill : PatternFill
+  stroke : Color
+  stroke_w : Int32
+  no_fill : Bool
+}
+pub fn ChartSpPr::none() -> Self
+
+pub(all) struct ChartTrendline {
+  trendline_type : String
+  order : Int32
+  period : Int32
+  forward : Int32
+  backward : Int32
+  sp_pr : ChartSpPr
+  name : String
+}
+pub fn ChartTrendline::none() -> Self
+
+pub(all) struct ChartView3D {
+  rot_x : Int32
+  rot_y : Int32
+  depth_percent : Int32
+  r_ang_ax : Bool
+  perspective : Int32
+}
+pub fn ChartView3D::none() -> Self
+
+pub(all) struct Color {
+  r : Int32
+  g : Int32
+  b : Int32
+  alpha : Int32
+}
+pub fn Color::black() -> Self
+pub fn Color::is_none(Self) -> Bool
+pub fn Color::none() -> Self
+pub fn Color::to_css(Self) -> String
+pub fn Color::to_hex(Self) -> String
+pub fn Color::to_hex_rgb(Self) -> String
+pub fn Color::white() -> Self
+
+pub(all) struct ColorMap {
+  bg1 : String
+  tx1 : String
+  bg2 : String
+  tx2 : String
+  accent1 : String
+  accent2 : String
+  accent3 : String
+  accent4 : String
+  accent5 : String
+  accent6 : String
+  hlink : String
+  fol_hlink : String
+}
+pub fn ColorMap::default() -> Self
+
+pub(all) struct CustomGeomData {
+  gdlst : String
+  paths : String
+  path_w : Int32
+  path_h : Int32
+  rect_l : String
+  rect_t : String
+  rect_r : String
+  rect_b : String
+  cxn_lst : String
+}
+
+pub(all) struct EffectList {
+  outer_shadow : OuterShadow
+  inner_shadow : InnerShadow
+  glow : Glow
+  soft_edge : SoftEdge
+  reflection : Reflection
+  blur : Blur
+  prst_shadow : PresetShadow
+  fill_overlay : FillOverlay
+}
+pub fn EffectList::is_none(Self) -> Bool
+pub fn EffectList::none() -> Self
+
+pub(all) struct FillOverlay {
+  blend : String
+  color : Color
+}
+pub fn FillOverlay::is_none(Self) -> Bool
+pub fn FillOverlay::none() -> Self
+
+pub(all) struct Glow {
+  rad : Int32
+  color : Color
+}
+pub fn Glow::is_none(Self) -> Bool
+pub fn Glow::none() -> Self
+
+pub(all) struct GradientFill {
+  stops : Array[GradientStop]
+  angle : Int32
+  path_type : String
+  rot_with_shape : Bool
+  fill_to_l : Int32
+  fill_to_t : Int32
+  fill_to_r : Int32
+  fill_to_b : Int32
+  tile_flip : String
+}
+pub fn GradientFill::is_none(Self) -> Bool
+pub fn GradientFill::none() -> Self
+
+pub(all) struct GradientStop {
+  pos : Int32
+  color : Color
+}
+
+pub(all) struct GroupShapeData {
+  ch_off_x : Int32
+  ch_off_y : Int32
+  ch_ext_cx : Int32
+  ch_ext_cy : Int32
+  children : Array[Shape]
+}
+
+pub(all) struct InnerShadow {
+  blur_rad : Int32
+  dist : Int32
+  dir : Int32
+  color : Color
+}
+pub fn InnerShadow::is_none(Self) -> Bool
+pub fn InnerShadow::none() -> Self
+
+pub(all) struct LevelTextDefaults {
+  font_size : Int32
+  bold : Bool
+  italic : Bool
+  color : Color
+  font_face : String
+  ea_font : String
+  align : String
+  mar_l : Int32
+  indent : Int32
+  bullet : String
+  bullet_auto : String
+  bullet_none : Bool
+  bullet_font : String
+  bullet_size : Int32
+  bullet_color : Color
+  line_spacing : Int32
+  spc_before : Int32
+  spc_after : Int32
+}
+pub fn LevelTextDefaults::empty() -> Self
+
+pub(all) struct MasterTextStyles {
+  title_style : TextStyleGroup
+  body_style : TextStyleGroup
+  other_style : TextStyleGroup
+}
+pub fn MasterTextStyles::empty() -> Self
+
+pub(all) struct NumData {
+  format_code : String
+  points : Array[ChartPoint]
+}
+pub fn NumData::empty() -> Self
+
+pub(all) struct OuterShadow {
+  blur_rad : Int32
+  dist : Int32
+  dir : Int32
+  color : Color
+  sx : Int32
+  sy : Int32
+  algn : String
+  rot_with_shape : Bool
+}
+pub fn OuterShadow::is_none(Self) -> Bool
+pub fn OuterShadow::none() -> Self
+
+pub(all) struct PatternFill {
+  prst : String
+  fg_color : Color
+  bg_color : Color
+}
+pub fn PatternFill::is_none(Self) -> Bool
+pub fn PatternFill::none() -> Self
+
+pub(all) struct PresetShadow {
+  prst : String
+  dist : Int32
+  dir : Int32
+  color : Color
+}
+pub fn PresetShadow::blur_rad(Self) -> Int32
+pub fn PresetShadow::is_none(Self) -> Bool
+pub fn PresetShadow::none() -> Self
+
+pub(all) struct Reflection {
+  blur_rad : Int32
+  dist : Int32
+  dir : Int32
+  st_alpha : Int32
+  end_alpha : Int32
+  fade_dir : Int32
+  sx : Int32
+  sy : Int32
+  algn : String
+  rot_with_shape : Bool
+}
+pub fn Reflection::is_none(Self) -> Bool
+pub fn Reflection::none() -> Self
+
+pub(all) struct Relationship {
+  id : String
+  target : String
+  type_ : String
+  target_mode : String
+}
+
+pub(all) struct Scene3d {
+  camera_prst : String
+  light_rig : String
+  light_dir : String
+}
+pub fn Scene3d::is_none(Self) -> Bool
+pub fn Scene3d::none() -> Self
+
+pub(all) struct Shape {
+  kind : ShapeKind
+  transform : ShapeTransform
+  fill : Color
+  grad_fill : GradientFill
+  blip_fill : BlipFill
+  patt_fill : PatternFill
+  stroke : Color
+  stroke_w : Int32
+  stroke_dash : String
+  stroke_cap : String
+  stroke_join : String
+  stroke_miter_limit : Int32
+  stroke_head_type : String
+  stroke_head_w : String
+  stroke_head_len : String
+  stroke_tail_type : String
+  stroke_tail_w : String
+  stroke_tail_len : String
+  stroke_cmpd : String
+  stroke_no_fill : Bool
+  stroke_grad_fill : GradientFill
+  stroke_patt_fill : PatternFill
+  paragraphs : Array[TextParagraph]
+  body_props : BodyProps
+  ph_type : String
+  ph_idx : Int32
+  st_cxn_id : Int32
+  st_cxn_idx : Int32
+  end_cxn_id : Int32
+  end_cxn_idx : Int32
+  sh_link_rid : String
+  sh_link_hover_rid : String
+  mc_choice_xml : String
+  ole_xml : String
+  effects : EffectList
+  scene_3d : Scene3d
+  sp_3d : Shape3d
+  lst_style : TextStyleGroup
+  font_ref_color : Color
+}
+pub fn Shape::default_with(ShapeKind, ShapeTransform) -> Self
+pub fn Shape::default_with_blip(ShapeKind, ShapeTransform, BlipFill) -> Self
+
+pub(all) struct Shape3d {
+  bevel_t : Bevel
+  bevel_b : Bevel
+  extrusion_h : Int32
+  contour_w : Int32
+  extrusion_clr : Color
+  contour_clr : Color
+  prst_material : String
+  z : Int32
+}
+pub fn Shape3d::is_none(Self) -> Bool
+pub fn Shape3d::none() -> Self
+
+pub(all) enum ShapeGeom {
+  Rect
+  Ellipse
+  RoundRect(Int32)
+  Line
+  Connector(String, Array[Int32])
+  Other(String, Array[Int32])
+  Custom(CustomGeomData)
+}
+pub fn ShapeGeom::to_prst(Self) -> String
+
+pub(all) enum ShapeKind {
+  AutoShape(ShapeGeom)
+  Picture(String)
+  TableShape(TableData)
+  GroupShape(GroupShapeData)
+  ChartShape(ChartData)
+  Other
+}
+
+pub(all) struct ShapeTransform {
+  x : Int32
+  y : Int32
+  cx : Int32
+  cy : Int32
+  rot : Int32
+  flip_h : Bool
+  flip_v : Bool
+}
+pub fn ShapeTransform::default() -> Self
+
+pub(all) struct SlideData {
+  slide_size : SlideSize
+  background : Color
+  bg_grad : GradientFill
+  bg_blip_fill : BlipFill
+  bg_patt_fill : PatternFill
+  shapes : Array[Shape]
+  transition_xml : String
+  timing_xml : String
+  hidden : Bool
+}
+
+pub(all) struct SlideLayoutData {
+  background : Color
+  bg_grad : GradientFill
+  bg_blip_fill : BlipFill
+  bg_patt_fill : PatternFill
+  shapes : Array[Shape]
+  clr_map_ovr : ColorMap?
+}
+
+pub(all) struct SlideMasterData {
+  background : Color
+  bg_grad : GradientFill
+  bg_blip_fill : BlipFill
+  bg_patt_fill : PatternFill
+  shapes : Array[Shape]
+  text_styles : MasterTextStyles
+  clr_map : ColorMap
+}
+
+pub(all) struct SlideSize {
+  cx : Int32
+  cy : Int32
+}
+pub fn SlideSize::default() -> Self
+
+pub(all) struct SoftEdge {
+  rad : Int32
+}
+pub fn SoftEdge::is_none(Self) -> Bool
+pub fn SoftEdge::none() -> Self
+
+pub(all) struct StrData {
+  points : Array[ChartPoint]
+}
+pub fn StrData::empty() -> Self
+
+pub(all) struct StrokeProps {
+  color : Color
+  width : Int32
+  dash : String
+  cap : String
+  join : String
+  miter_limit : Int32
+  head_type : String
+  head_w : String
+  head_len : String
+  tail_type : String
+  tail_w : String
+  tail_len : String
+  cmpd : String
+  no_fill : Bool
+  grad_fill : GradientFill
+  patt_fill : PatternFill
+}
+pub fn StrokeProps::default() -> Self
+
+pub(all) struct TabStop {
+  pos : Int32
+  algn : String
+}
+
+pub(all) struct TableCell {
+  paragraphs : Array[TextParagraph]
+  fill : Color
+  grad_fill : GradientFill
+  grid_span : Int32
+  row_span : Int32
+  v_merge : Bool
+  h_merge : Bool
+  bdr_l_w : Int32
+  bdr_r_w : Int32
+  bdr_t_w : Int32
+  bdr_b_w : Int32
+  bdr_l_color : Color
+  bdr_r_color : Color
+  bdr_t_color : Color
+  bdr_b_color : Color
+  bdr_tl_br_w : Int32
+  bdr_tl_br_color : Color
+  bdr_bl_tr_w : Int32
+  bdr_bl_tr_color : Color
+  mar_l : Int32
+  mar_r : Int32
+  mar_t : Int32
+  mar_b : Int32
+  anchor : String
+}
+pub fn TableCell::empty() -> Self
+
+pub(all) struct TableData {
+  col_widths : Array[Int32]
+  rows : Array[TableRow]
+  style_id : String
+  first_row : Bool
+  last_row : Bool
+  first_col : Bool
+  last_col : Bool
+  band_row : Bool
+  band_col : Bool
+}
+
+pub(all) struct TableRow {
+  height : Int32
+  cells : Array[TableCell]
+}
+
+pub(all) struct TableStyleCell {
+  fill : Color
+  grad_fill : GradientFill
+  bdr_l_w : Int32
+  bdr_r_w : Int32
+  bdr_t_w : Int32
+  bdr_b_w : Int32
+  bdr_l_color : Color
+  bdr_r_color : Color
+  bdr_t_color : Color
+  bdr_b_color : Color
+  bold : Bool
+  italic : Bool
+  font_color : Color
+}
+pub fn TableStyleCell::is_none(Self) -> Bool
+pub fn TableStyleCell::none() -> Self
+
+pub(all) struct TableStyleDef {
+  id : String
+  whole_tbl : TableStyleCell
+  band1_h : TableStyleCell
+  band2_h : TableStyleCell
+  band1_v : TableStyleCell
+  band2_v : TableStyleCell
+  first_row : TableStyleCell
+  last_row : TableStyleCell
+  first_col : TableStyleCell
+  last_col : TableStyleCell
+}
+pub fn TableStyleDef::none() -> Self
+
+pub(all) struct TextParagraph {
+  runs : Array[TextRun]
+  align : String
+  level : Int32
+  spc_before : Int32
+  spc_after : Int32
+  line_spacing : Int32
+  mar_l : Int32
+  indent : Int32
+  bullet : String
+  bullet_auto : String
+  bullet_none : Bool
+  bullet_font : String
+  bullet_size : Int32
+  bullet_color : Color
+  bullet_img_rid : String
+  tab_stops : Array[TabStop]
+  rtl : Bool
+  epr_font_size : Int32
+  epr_color : Color
+  epr_font_face : String
+  epr_ea_font : String
+}
+
+pub(all) struct TextRun {
+  text : String
+  bold : Bool
+  bold_explicit : Bool
+  italic : Bool
+  font_size : Int32
+  color : Color
+  font_face : String
+  ea_font : String
+  cs_font : String
+  sym_font : String
+  underline : String
+  underline_color : Color
+  strike : String
+  baseline : Int32
+  char_spacing : Int32
+  kern : Int32
+  cap : String
+  hlink_rid : String
+  hlink_mouse_over_rid : String
+  effects : EffectList
+  outline_color : Color
+  outline_w : Int32
+  text_grad_fill : GradientFill
+  text_patt_fill : PatternFill
+  math_xml : String
+}
+
+pub(all) struct TextStyleGroup {
+  levels : Array[LevelTextDefaults]
+}
+pub fn TextStyleGroup::empty() -> Self
+
+pub(all) struct ThemeData {
+  dk1 : Color
+  lt1 : Color
+  dk2 : Color
+  lt2 : Color
+  accent1 : Color
+  accent2 : Color
+  accent3 : Color
+  accent4 : Color
+  accent5 : Color
+  accent6 : Color
+  hlink : Color
+  fol_hlink : Color
+  major_font : String
+  minor_font : String
+  major_ea_font : String
+  minor_ea_font : String
+  fill_style_xmls : Array[String]
+  ln_style_xmls : Array[String]
+  clr_map : ColorMap
+}
+pub fn ThemeData::default() -> Self
+
+// Type aliases
+
+// Traits

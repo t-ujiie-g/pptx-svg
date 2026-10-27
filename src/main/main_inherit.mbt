@@ -9,7 +9,7 @@
 fn find_placeholder(
   shapes : Array[@ooxml.Shape],
   ph_type : String,
-  ph_idx : Int,
+  ph_idx : Int32,
 ) -> @ooxml.Shape? {
   let n = shapes.length()
   let mut i = 0
@@ -42,7 +42,7 @@ fn find_placeholder(
 /// Applies what it can and returns (got_transform, got_body_props).
 fn try_inherit_from_source(
   shapes : Array[@ooxml.Shape],
-  idx : Int,
+  idx : Int32,
   shape : @ooxml.Shape,
   source_shapes : Array[@ooxml.Shape],
   needs_transform : Bool,
@@ -550,7 +550,7 @@ fn has_no_text(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
 /// from the master's otherStyle); runs with no size render at the generic default.
 fn inject_placeholder_auto_content(
   shapes : Array[@ooxml.Shape],
-  slide_num : Int,
+  slide_num : Int32,
   layout_opt : @ooxml.SlideLayoutData?,
   master_opt : @ooxml.SlideMasterData?,
 ) -> Unit {
@@ -609,7 +609,7 @@ fn replace_auto_content_text(
 /// Find text content from a placeholder in layout or master.
 fn find_ph_text(
   ph_type : String,
-  ph_idx : Int,
+  ph_idx : Int32,
   layout_opt : @ooxml.SlideLayoutData?,
   master_opt : @ooxml.SlideMasterData?,
 ) -> String {

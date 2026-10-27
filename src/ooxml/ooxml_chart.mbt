@@ -12,10 +12,10 @@
 // ── Chart defaults (ECMA-376) ───────────────────────────────────────────────
 
 ///|
-let default_bar_gap_width : Int = 150 // ECMA-376 default gap width percentage
+let default_bar_gap_width : Int32 = 150 // ECMA-376 default gap width percentage
 
 ///|
-let default_donut_hole_size : Int = 50 // ECMA-376 default donut hole size percentage
+let default_donut_hole_size : Int32 = 50 // ECMA-376 default donut hole size percentage
 
 // ── Chart data labels ─────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ pub fn ChartDataLabels::is_visible(self : ChartDataLabels) -> Bool {
 ///|
 /// Per-data-point formatting override (c:dPt).
 pub(all) struct ChartDataPoint {
-  idx : Int // c:idx/@val
+  idx : Int32 // c:idx/@val
   sp_pr : ChartSpPr // point-level formatting
 }
 
@@ -60,10 +60,10 @@ pub(all) struct ChartDataPoint {
 /// Trendline type (c:trendlineType).
 pub(all) struct ChartTrendline {
   trendline_type : String // "linear"|"exp"|"log"|"poly"|"power"|"movingAvg"
-  order : Int // polynomial order (c:order, default 2)
-  period : Int // moving average period (c:period, default 2)
-  forward : Int // forward extrapolation (c:forward, in category units × 100)
-  backward : Int // backward extrapolation (c:backward, in category units × 100)
+  order : Int32 // polynomial order (c:order, default 2)
+  period : Int32 // moving average period (c:period, default 2)
+  forward : Int32 // forward extrapolation (c:forward, in category units × 100)
+  backward : Int32 // backward extrapolation (c:backward, in category units × 100)
   sp_pr : ChartSpPr // line formatting
   name : String // custom name (c:name)
 }
@@ -89,7 +89,7 @@ pub(all) struct ChartErrBars {
   err_dir : String // "x"|"y" (c:errDir)
   err_bar_type : String // "both"|"plus"|"minus" (c:errBarType)
   err_val_type : String // "fixedVal"|"percentage"|"stdDev"|"stdErr"|"cust" (c:errValType)
-  val : Int // fixed value or percentage (c:val × 1, scaled)
+  val : Int32 // fixed value or percentage (c:val × 1, scaled)
   sp_pr : ChartSpPr // bar line formatting
 }
 
@@ -114,11 +114,11 @@ pub fn ChartErrBars::is_none(self : ChartErrBars) -> Bool {
 ///|
 /// 3D view settings (c:view3D) — preserved for round-trip, not rendered.
 pub(all) struct ChartView3D {
-  rot_x : Int // c:rotX (degrees × 1)
-  rot_y : Int // c:rotY (degrees × 1)
-  depth_percent : Int // c:depthPercent (default 100)
+  rot_x : Int32 // c:rotX (degrees × 1)
+  rot_y : Int32 // c:rotY (degrees × 1)
+  depth_percent : Int32 // c:depthPercent (default 100)
   r_ang_ax : Bool // c:rAngAx (right-angle axes)
-  perspective : Int // c:perspective (0-240, default 30)
+  perspective : Int32 // c:perspective (0-240, default 30)
 }
 
 ///|
@@ -154,7 +154,7 @@ pub(all) enum ChartKind {
 ///|
 /// A single data point (from c:pt).
 pub(all) struct ChartPoint {
-  idx : Int // c:pt/@idx
+  idx : Int32 // c:pt/@idx
   value : String // c:v text
 }
 
@@ -196,7 +196,7 @@ pub(all) struct ChartSpPr {
   grad_fill : GradientFill
   patt_fill : PatternFill
   stroke : Color
-  stroke_w : Int
+  stroke_w : Int32
   no_fill : Bool
 }
 
@@ -215,8 +215,8 @@ pub fn ChartSpPr::none() -> ChartSpPr {
 ///|
 /// A single chart series (c:ser).
 pub(all) struct ChartSeries {
-  idx : Int // c:idx/@val
-  order : Int // c:order/@val
+  idx : Int32 // c:idx/@val
+  order : Int32 // c:order/@val
   title : String // series name (from c:tx strCache)
   sp_pr : ChartSpPr // series formatting
   // Category-based (bar/line/area/pie)
@@ -229,7 +229,7 @@ pub(all) struct ChartSeries {
   // Line/scatter
   smooth : Bool // c:smooth
   // Pie
-  explosion : Int // c:explosion (0 = none)
+  explosion : Int32 // c:explosion (0 = none)
   // Per-point formatting
   data_points : Array[ChartDataPoint] // c:dPt list
   // Trendlines + error bars
@@ -246,17 +246,17 @@ pub(all) struct ChartGroup {
   series : Array[ChartSeries]
   bar_dir : String // "bar"|"col" (bar chart only)
   grouping : String // "clustered"|"stacked"|"percentStacked"|"standard"
-  gap_width : Int // percentage (default 150)
-  overlap : Int // -100 to 100 (default 0)
+  gap_width : Int32 // percentage (default 150)
+  overlap : Int32 // -100 to 100 (default 0)
   vary_colors : Bool
-  hole_size : Int // donut: 1-90 percentage
+  hole_size : Int32 // donut: 1-90 percentage
   scatter_style : String // scatter: "lineMarker" etc.
-  ax_ids : Array[Int] // axis ID references
+  ax_ids : Array[Int32] // axis ID references
   data_labels : ChartDataLabels // c:dLbls
   of_pie_type : String // ofPieChart: "pie"|"bar" (c:ofPieType)
-  split_pos : Int // ofPieChart: split position (c:splitPos)
+  split_pos : Int32 // ofPieChart: split position (c:splitPos)
   wireframe : Bool // surface chart: wireframe mode
-  subtotals : Array[Int] // waterfall: indices of subtotal/total points
+  subtotals : Array[Int32] // waterfall: indices of subtotal/total points
 }
 
 ///|
@@ -283,8 +283,8 @@ pub fn ChartGroup::default(ct : ChartKind) -> ChartGroup {
 ///|
 /// Chart axis.
 pub(all) struct ChartAxis {
-  ax_id : Int
-  cross_ax : Int
+  ax_id : Int32
+  cross_ax : Int32
   ax_pos : String // "b"|"l"|"r"|"t"
   delete : Bool // hidden axis
   is_val : Bool // true=valAx, false=catAx/dateAx
@@ -343,7 +343,7 @@ pub(all) struct ChartData {
   axes : Array[ChartAxis] // all axes
   title : String // chart title text (simplified)
   legend : ChartLegend
-  style : Int // c:style (0 = none)
+  style : Int32 // c:style (0 = none)
   chart_xml : String // raw chart XML for round-trip preservation
   view_3d : ChartView3D // c:view3D — preserved for round-trip
 }
@@ -695,7 +695,7 @@ fn child_attr_val(ch : Array[@xml.XmlNode], tag : String) -> String {
 
 ///|
 /// Get val attribute as int.
-fn child_attr_int(ch : Array[@xml.XmlNode], tag : String) -> Int {
+fn child_attr_int(ch : Array[@xml.XmlNode], tag : String) -> Int32 {
   match @xml.find_child(ch, tag) {
     None => 0
     Some(n) => attr_int(n, "val")
@@ -704,8 +704,8 @@ fn child_attr_int(ch : Array[@xml.XmlNode], tag : String) -> Int {
 
 ///|
 /// Parse axId references.
-fn parse_ax_ids(ch : Array[@xml.XmlNode]) -> Array[Int] {
-  let ids : Array[Int] = []
+fn parse_ax_ids(ch : Array[@xml.XmlNode]) -> Array[Int32] {
+  let ids : Array[Int32] = []
   let nodes = @xml.find_children(ch, "c:axId")
   for i in 0..<nodes.length() {
     ids.push(attr_int(nodes[i], "val"))
@@ -1258,7 +1258,7 @@ pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
 ///|
 /// Parsed cx:data block — holds category and value data.
 priv struct CxDataBlock {
-  id : Int
+  id : Int32
   cats : AxisDataSource // cx:strDim type="cat"
   vals : AxisDataSource // cx:numDim type="val"
 }
@@ -1434,7 +1434,7 @@ fn cx_layout_to_kind(layout_id : String) -> ChartKind {
 
 ///|
 /// Find CxDataBlock by id.
-fn find_cx_data(data_map : Array[CxDataBlock], id : Int) -> CxDataBlock {
+fn find_cx_data(data_map : Array[CxDataBlock], id : Int32) -> CxDataBlock {
   for i in 0..<data_map.length() {
     if data_map[i].id == id {
       return data_map[i]
@@ -1448,7 +1448,7 @@ fn find_cx_data(data_map : Array[CxDataBlock], id : Int) -> CxDataBlock {
 fn parse_cx_series(
   node : @xml.XmlNode,
   data_map : Array[CxDataBlock],
-  idx : Int,
+  idx : Int32,
   theme : ThemeData,
 ) -> ChartGroup {
   let layout_id = match @xml.get_attr(node, "layoutId") {
@@ -1533,8 +1533,8 @@ fn parse_cx_data_points(
 
 ///|
 /// Parse cx:layoutPr/cx:subtotals for waterfall charts.
-fn parse_cx_subtotals(ch : Array[@xml.XmlNode]) -> Array[Int] {
-  let result : Array[Int] = []
+fn parse_cx_subtotals(ch : Array[@xml.XmlNode]) -> Array[Int32] {
+  let result : Array[Int32] = []
   let lp = match @xml.find_child(ch, "cx:layoutPr") {
     None => return result
     Some(n) => n
