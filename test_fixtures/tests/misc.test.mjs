@@ -12,7 +12,6 @@ test("misc features (slides 74-87)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 74: Speaker notes + comments ──────────────────────────────────────
   {
     section('test_features.pptx — Slide 74: Speaker notes + comments');
     const slide74 = textFiles.get('ppt/slides/slide75.xml') || '';
@@ -62,7 +61,6 @@ test("misc features (slides 74-87)", async () => {
     }
   }
 
-  // ── Slide 75: SmartArt fallback (mc:AlternateContent) ─────────────────────
   {
     section('test_features.pptx — Slide 75: SmartArt fallback');
     const slide75 = textFiles.get('ppt/slides/slide76.xml') || '';
@@ -85,7 +83,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide75 has green fill (70AD47)', slide75.includes('70AD47'));
   }
 
-  // ── Slide 76: OLE embedded object ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 76: OLE embedded object');
     const slide76 = textFiles.get('ppt/slides/slide77.xml') || '';
@@ -104,7 +101,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide76 has oleObject relationship', rels76.includes('oleObject'));
   }
 
-  // ── Slide 77: Media (video with poster frame) ─────────────────────────────
   {
     section('test_features.pptx — Slide 77: Media (video with poster frame)');
     const slide77 = textFiles.get('ppt/slides/slide78.xml') || '';
@@ -120,7 +116,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide77 has video relationship', rels77.includes('video'));
   }
 
-  // ── Slide 78: Math equation (OMML) ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 78: Math equation (OMML)');
     const slide78 = textFiles.get('ppt/slides/slide79.xml') || '';
@@ -135,7 +130,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide78 has xmlns:m namespace', slide78.includes('xmlns:m='));
   }
 
-  // ── Slide 79: Transition + Timing (round-trip) ──────────────────────────────
   {
     section('test_features.pptx — Slide 79: Transition + Timing');
     const slide79 = textFiles.get('ppt/slides/slide80.xml') || '';
@@ -146,7 +140,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide79 has p:tnLst', slide79.includes('<p:tnLst>'));
   }
 
-  // ── Slide 80: Hidden slide ──────────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 80: Hidden slide');
     const slide80 = textFiles.get('ppt/slides/slide81.xml') || '';
@@ -154,7 +147,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide80 has show="0"', slide80.includes('show="0"'));
   }
 
-  // ── Slide 82: OMML — Large operators + delimiters ───────────────────────────
   {
     section('test_features.pptx — Slide 82: OMML nary');
     const slide82 = textFiles.get('ppt/slides/slide83.xml') || '';
@@ -165,7 +157,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide82 has m:sSup', slide82.includes('m:sSup'));
   }
 
-  // ── Slide 83: OMML — Matrix + delimiters ──────────────────────────────────
   {
     section('test_features.pptx — Slide 83: OMML matrix');
     const slide83 = textFiles.get('ppt/slides/slide84.xml') || '';
@@ -176,7 +167,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide83 has m:begChr', slide83.includes('m:begChr'));
   }
 
-  // ── Slide 84: OMML — Accent + bar + subsup ───────────────────────────────
   {
     section('test_features.pptx — Slide 84: OMML accent/bar/subsup');
     const slide84 = textFiles.get('ppt/slides/slide85.xml') || '';
@@ -186,7 +176,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide84 has m:sSubSup', slide84.includes('m:sSubSup'));
   }
 
-  // ── Slide 85: Blur effect ─────────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 85: blur effect');
     const slide85 = textFiles.get('ppt/slides/slide86.xml') || '';
@@ -196,7 +185,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide85 blur rad=76200', slide85.includes('rad="76200"'));
   }
 
-  // ── Slide 86: Preset shadow ─────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 86: preset shadow');
     const slide86 = textFiles.get('ppt/slides/slide87.xml') || '';
@@ -208,7 +196,6 @@ test("misc features (slides 74-87)", async () => {
     assert('slide86 has dist=76200', slide86.includes('dist="76200"'));
   }
 
-  // ── Slide 87: Fill overlay ─────────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 87: fill overlay');
     const slide87 = textFiles.get('ppt/slides/slide88.xml') || '';

@@ -1,13 +1,3 @@
-// SVG renderer — Text rendering
-//
-// Handles paragraph layout, bullet rendering, text wrapping (Latin word-break
-// and CJK character-break), line spacing, tab stops, super/subscript,
-// capitalization, hyperlinks, and text-level effects (shadow/glow via CSS filter).
-//
-// Same package as renderer.mbt — all constants and helpers are shared.
-
-// ── Text helpers ─────────────────────────────────────────────────────────────
-
 ///|
 /// Build a comma-separated font-family string from sym/cs/ea/latin fonts.
 /// Returns empty string if no fonts are specified.
@@ -26,7 +16,6 @@ fn build_font_family(
   }
   if !ea.is_empty() {
     ff = if ff.is_empty() { ea } else { ff + ", " + ea }
-    // Append platform fallbacks for EA font
     let fb = @ffi.ffi_get_font_fallback(ea)
     if !fb.is_empty() {
       ff = ff + ", " + fb
@@ -34,7 +23,6 @@ fn build_font_family(
   }
   if !latin.is_empty() {
     ff = if ff.is_empty() { latin } else { ff + ", " + latin }
-    // Append platform fallbacks for Latin font (if different from EA)
     if latin != ea {
       let fb = @ffi.ffi_get_font_fallback(latin)
       if !fb.is_empty() {
@@ -55,7 +43,6 @@ fn to_upper_ascii(s : String) -> String {
     let c = s.get_char(i).unwrap()
     let code = c.to_int()
     if code >= ascii_lower_a && code <= ascii_lower_z {
-      // a-z → A-Z
       result = result + @ffi.ffi_char_code_to_str(code - ascii_case_shift)
     } else {
       result = result + @ffi.ffi_char_code_to_str(code)
@@ -142,8 +129,6 @@ fn is_kinsoku_start_prohibited(c : Char) -> Bool {
   c == 'ヮ'
 }
 
-// ── Text wrapping ────────────────────────────────────────────────────────────
-
 ///| A visual line fragment: (run_index, text_fragment)
 ///  Used to split paragraph runs into wrapped lines.
 
@@ -223,7 +208,6 @@ fn measure_line_width(
       frag_text
     }
     total_spaces = total_spaces + count_spaces(text)
-    // Accumulate same-font text for accurate measurement
     if ff == accum_ff && fs_px == accum_fs {
       accum = accum + text
     } else {
@@ -254,9 +238,8 @@ fn wrap_paragraph(
   let mut cur_line : Array[(Int32, String)] = []
   let mut cur_width : Double = 0.0
   let max_w : Double = max_width.to_double()
-  // Track accumulated same-font text on the current line for accurate measurement.
-  // Measuring CJK characters individually over-counts width due to per-glyph
-  // side-bearings; measuring the concatenated string gives the true rendered width.
+  // Measure same-font text as one string: per-glyph side bearings make CJK measured
+  // char by char come out too wide.
   let mut run_accum : String = "" // accumulated text for current font
   let mut run_ff : String = "" // font face for accumulated text
   let mut run_fs : Double = 0.0 // font size for accumulated text
@@ -271,7 +254,6 @@ fn wrap_paragraph(
     } else {
       run.text
     }
-    // Handle explicit line break runs (from <a:br>)
     if text == "\n" {
       if !cur_line.is_empty() {
         lines.push(cur_line)
@@ -284,7 +266,6 @@ fn wrap_paragraph(
       ri = ri + 1
       continue
     }
-    // When font changes, lock in the accumulated width and reset
     if ff != run_ff || fs_px != run_fs {
       if !run_accum.is_empty() {
         cur_width = cur_width + @ffi.ffi_measure_text(run_accum, run_ff, run_fs)
@@ -315,7 +296,6 @@ fn wrap_paragraph(
         }
       }
       let seg_text = @xml.str_substring(text, seg_start, seg_end)
-      // Measure candidate: accumulated same-font text + new segment
       let candidate = run_accum + seg_text
       let candidate_w = @ffi.ffi_measure_text(candidate, ff, fs_px)
       let total_w = cur_width + candidate_w
@@ -328,7 +308,6 @@ fn wrap_paragraph(
           seg_start = seg_end
           continue
         }
-        // Start new line — lock in accumulated width first
         if !cur_line.is_empty() {
           lines.push(cur_line)
         }
@@ -342,7 +321,6 @@ fn wrap_paragraph(
     }
     ri = ri + 1
   }
-  // Lock in any remaining accumulated text
   if !cur_line.is_empty() {
     lines.push(cur_line)
   }
@@ -351,8 +329,6 @@ fn wrap_paragraph(
   }
   lines
 }
-
-// ── Tab helpers ──────────────────────────────────────────────────────────
 
 ///|
 /// Check if a string contains a tab character.
@@ -432,8 +408,6 @@ fn render_run_with_tabs(
   }
 }
 
-// ── Text rendering ────────────────────────────────────────────────────────────
-
 ///|
 fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int32 {
   let mut max_fs = 0
@@ -443,11 +417,8 @@ fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int32 {
       max_fs = fs
     }
   }
-  // Empty paragraphs (no runs) carry their font size on endParaRPr so they
-  // contribute the correct line height. Without this, an empty paragraph in a
-  // text box auto-sized via <a:spAutoFit/> reserves the full default 24pt
-  // line height (~28 px) instead of the actual 8pt (~10 px), inflating the
-  // shape and making content overflow into adjacent shapes.
+  // An empty paragraph takes its line height from endParaRPr, not the 24 pt default
+  // (which inflates spAutoFit boxes).
   if max_fs == 0 && para.epr_font_size > 0 {
     max_fs = para.epr_font_size
   }
@@ -545,13 +516,9 @@ fn para_line_height(
   def_line_h : Int32,
 ) -> Int32 {
   if para.line_spacing > 0 {
-    // Positive = EMU absolute value
     px(para.line_spacing, scale)
   } else if para.line_spacing < 0 {
-    // Negative = percentage (-100000 = 100% = single spacing)
-    // In OOXML, percentage is relative to "normal" line spacing (ascent + descent + gap).
-    // Use pct_line_height_numer/denom (1.2) as the base "single spacing" factor.
-    // OOXML single spacing ≈ font (ascent+descent)/em ≈ 1.2× for common CJK fonts.
+    // Negative = percentage of single spacing, taken as 1.2 × font size (≈ ascent + descent).
     let pct = -para.line_spacing // e.g. 130000 for 130%
     let emu = para_max_font_emu(para)
     let base_line_h = if emu > 0 {
@@ -561,7 +528,6 @@ fn para_line_height(
     }
     base_line_h * pct / @ooxml.pct_100
   } else {
-    // Default: use font size * line_height ratio
     let emu = para_max_font_emu(para)
     if emu > 0 {
       px(emu, scale) * line_height_numer / line_height_denom
@@ -648,7 +614,6 @@ fn render_text_effect_style(eff : @ooxml.EffectList, scale : Int32) -> String {
       css_rgba(eff.glow.color, "0.7") +
       ")"
   }
-  // Blur
   if !eff.blur.is_none() {
     let rad = emu_to_filter_px(eff.blur.rad, scale)
     let std_dev = if rad / 2 > 0 { rad / 2 } else { 1 }
@@ -684,10 +649,8 @@ fn run_text_fill_ref(
 }
 
 ///|
-/// Gradient/pattern defs for text-run fills (a:rPr/a:gradFill, a:pattFill),
-/// wrapped in <defs> ("" when no run has one). Def IDs come from
-/// run_text_fill_ref, so tspans reference them by construction; wrapped
-/// fragments of one run share a single def.
+/// `<defs>` for run gradient/pattern fills ("" if none), with IDs from run_text_fill_ref;
+/// fragments of one run share a def.
 fn render_run_fill_defs(
   paragraphs : Array[@ooxml.TextParagraph],
   slide_num : Int32,
@@ -716,10 +679,8 @@ fn render_run_fill_defs(
 }
 
 ///|
-/// Render a single text run as a <tspan> element.
-/// fill_ref: def ID of the run's gradient/pattern fill ("" = none); the def
-/// itself is emitted by render_text. Callers without a defs context (tables)
-/// pass "" and get the solid-color fallback.
+/// Render a run as a `<tspan>`. `fill_ref` is its fill def ID ("" = none: gradient falls
+/// back to the first stop and pattern to fgClr, e.g. in tables).
 fn render_run_tspan(
   run : @ooxml.TextRun,
   ri : Int32,
@@ -731,7 +692,6 @@ fn render_run_tspan(
   fill_ref : String,
 ) -> String {
   let mut span = "<tspan"
-  // Visual attributes
   if run.bold {
     span = span + " font-weight=\"bold\""
   }
@@ -748,7 +708,6 @@ fn render_run_tspan(
         ),
       )
   }
-  // font-family: sym_font, cs_font, ea_font, latin_font, sans-serif
   let ff = build_font_family(
     run.sym_font,
     run.cs_font,
@@ -758,9 +717,6 @@ fn render_run_tspan(
   if !ff.is_empty() {
     span = span + a("font-family", ff + ", sans-serif")
   }
-  // Color: gradient/pattern fill def reference, explicit color, or theme
-  // hlink/folHlink color for hyperlinks. Without a def (fill_ref empty),
-  // gradient falls back to the first stop color and pattern to fgClr.
   if !fill_ref.is_empty() {
     span = span + a("fill", "url(#" + fill_ref + ")")
   } else if !run.text_grad_fill.is_none() &&
@@ -774,7 +730,6 @@ fn render_run_tspan(
   } else if !run.hlink_rid.is_empty() && !theme.hlink.is_none() {
     span = span + a("fill", theme.hlink.to_css())
   }
-  // Text outline: render as SVG stroke on text
   if !run.outline_color.is_none() && run.outline_w > 0 {
     span = span + a("stroke", run.outline_color.to_css())
     let ow_px = px(run.outline_w, scale)
@@ -785,7 +740,6 @@ fn render_run_tspan(
     }
     span = span + a("paint-order", "stroke")
   }
-  // Character spacing
   if run.char_spacing != 0 {
     let ls_px = run.char_spacing *
       @ooxml.char_spc_dpi /
@@ -794,14 +748,8 @@ fn render_run_tspan(
       span = span + ai("letter-spacing", ls_px)
     }
   }
-  // Text decorations (underline / strikethrough).
-  // NOTE: only the decoration LINE renders here. Browsers ignore
-  // text-decoration-style / text-decoration-color on SVG <text> (verified), so
-  // underline variants (dbl/dotted/wavy) and underline color (a:uFill) cannot be
-  // shown via CSS — they would require drawing the decoration as explicit
-  // <line>/<path> geometry from the run-box layout. The style/color are
-  // still parsed and round-tripped (data-ooxml-underline-color) so they survive
-  // export.
+  // Only the decoration line renders: browsers ignore text-decoration-style/-color on SVG
+  // <text>, so underline variants and color need drawn geometry (they still round-trip).
   let mut deco = ""
   if !run.underline.is_empty() && run.underline != "none" {
     deco = "underline"
@@ -812,7 +760,6 @@ fn render_run_tspan(
   if !deco.is_empty() {
     span = span + a("text-decoration", deco)
   }
-  // Superscript / subscript via baseline-shift
   if run.baseline > 0 {
     span = span + a("baseline-shift", "super")
     span = span + a("font-size", "70%")
@@ -820,11 +767,9 @@ fn render_run_tspan(
     span = span + a("baseline-shift", "sub")
     span = span + a("font-size", "70%")
   }
-  // Capitalization
   if run.cap == "small" {
     span = span + a("font-variant", "small-caps")
   }
-  // data-ooxml-* attributes for round-trip
   span = span +
     da("run-idx", int_to_str(ri)) +
     da("bold", bool_str(run.bold)) +
@@ -850,7 +795,6 @@ fn render_run_tspan(
     da("cap", run.cap) +
     da("hlink-rid", run.hlink_rid) +
     da("hlink-hover-rid", run.hlink_mouse_over_rid) +
-    // Text outline round-trip
     da(
       "outline-color",
       if run.outline_color.is_none() {
@@ -860,7 +804,6 @@ fn render_run_tspan(
       },
     ) +
     dai("outline-w", run.outline_w) +
-    // Text gradient fill round-trip
     (if !run.text_grad_fill.is_none() {
       da("tgrad-stops", grad_stops_attr(run.text_grad_fill)) +
       dai("tgrad-angle", run.text_grad_fill.angle) +
@@ -869,7 +812,6 @@ fn render_run_tspan(
     } else {
       ""
     }) +
-    // Text pattern fill round-trip
     (if !run.text_patt_fill.is_none() {
       da("tpatt-prst", run.text_patt_fill.prst) +
       da("tpatt-fg", run.text_patt_fill.fg_color.to_hex()) +
@@ -909,11 +851,9 @@ fn render_run_tspan(
     } else {
       ""
     }) +
-    // OMML math equation raw XML for round-trip
     (if !run.math_xml.is_empty() { da("math-xml", run.math_xml) } else { "" }) +
     // CSS filter for text-level effects (shadow/glow visual rendering)
     render_text_effect_style(run.effects, scale)
-  // Wrap in hyperlink if present
   let inner = svg_escape(display_text)
   if !run.hlink_rid.is_empty() {
     let url = @ooxml.find_rel_target(rels, run.hlink_rid)
@@ -934,13 +874,9 @@ fn render_run_tspan(
 }
 
 ///|
-/// Solve the normAutofit-style font/line shrink for a text body and compute its
-/// total laid-out height. Shared by `render_text` and `build_text_layout` so the
-/// geometry API uses identical font scaling (→ identical line/run counts).
-///
-/// Returns `(fs, lr, total_text_h, last_para_line_h, last_para_font_sz,
-/// last_para_spc_after)` where `fs` = resolved font scale (1000ths of %),
-/// `lr` = line-spacing reduction. All heights are in px (at `scale`).
+/// Solve the normAutofit shrink and total text height, shared with `build_text_layout` so
+/// both lay out identically. Returns (font scale ‰, line reduction, total height, and the
+/// last paragraph's line height, font size and spc_after), heights in px.
 fn solve_text_autofit(
   paragraphs : Array[@ooxml.TextParagraph],
   scale : Int32,
@@ -981,7 +917,6 @@ fn solve_text_autofit(
         last_para_font_sz = p_fsz
         last_para_spc_after = 0
       } else {
-        // Add spacing before
         if para.spc_before > 0 && ti > 0 {
           total_text_h = total_text_h + px(para.spc_before, scale)
         }
@@ -1002,7 +937,6 @@ fn solve_text_autofit(
           let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
           vlines.length()
         } else {
-          // Count explicit line breaks (from <a:br>) to get visual line count
           let mut br_count = 0
           for bri in 0..<nr {
             if para.runs[bri].text == "\n" {
@@ -1015,7 +949,6 @@ fn solve_text_autofit(
         total_text_h = total_text_h + bl_extra_below
         last_para_line_h = para_line_h
         last_para_font_sz = p_fsz
-        // Add spacing after
         last_para_spc_after = if para.spc_after > 0 {
           let sa = px(para.spc_after, scale)
           total_text_h = total_text_h + sa
@@ -1025,10 +958,9 @@ fn solve_text_autofit(
         }
       }
     }
-    // Auto-shrink text to fit: apply normAutofit-like scaling when text overflows.
-    // This handles both explicit normAutofit and implicit overflow in fixed-size text boxes.
+    // Shrink overflowing text (normAutofit, or implicit in fixed boxes): line spacing
+    // first, up to 20%, then font scale.
     if total_text_h > avail_h && avail_h > 0 {
-      // First try increasing line spacing reduction (up to 20%)
       if lr < 20000 {
         lr = lr + 5000
         if lr > 20000 {
@@ -1037,7 +969,6 @@ fn solve_text_autofit(
         autofit_pass = autofit_pass + 1
         continue
       }
-      // Then reduce font scale proportionally
       let needed_fs = fs * avail_h / total_text_h
       if needed_fs < fs && needed_fs > 25000 {
         fs = needed_fs
@@ -1066,14 +997,12 @@ fn render_text(
   if paragraphs.is_empty() {
     return ""
   }
-  // Warp text: delegate to warp renderer for non-trivial presets
   let wp = body_props.warp_prst
   if !wp.is_empty() && wp != "textNoShape" && wp != "textPlain" {
     return render_warp_text(
       paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
     )
   }
-  // Math text: delegate to math renderer for OMML-only text boxes
   if is_all_math(paragraphs) {
     return render_math_text(
       paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
@@ -1082,7 +1011,7 @@ fn render_text(
   let run_fill_defs_section = render_run_fill_defs(
     paragraphs, slide_num, shape_idx,
   )
-  // Insets: use body_props if specified, otherwise default (91440 / 45720 EMU)
+  // Default insets: 91440 EMU left/right, 45720 EMU top/bottom.
   let l_ins = if body_props.l_ins >= 0 {
     body_props.l_ins
   } else {
@@ -1113,7 +1042,6 @@ fn render_text(
 
   let do_wrap = body_props.wrap != "none"
 
-  // Multi-column support
   let num_cols = if body_props.num_cols > 1 { body_props.num_cols } else { 1 }
   let col_spacing_px = if num_cols > 1 {
     px(body_props.col_spacing, scale)
@@ -1129,7 +1057,6 @@ fn render_text(
     text_w = col_w
   }
 
-  // Compute available height (needed for normAutofit and anchor offset)
   let shape_h = px(t.cy, scale)
   let b_ins = if body_props.b_ins >= 0 {
     body_props.b_ins
@@ -1139,7 +1066,6 @@ fn render_text(
   let pad_b = px(b_ins, scale)
   let avail_h = shape_h - pad_t - pad_b
 
-  // Calculate total text height for vertical alignment + solve normAutofit shrink.
   let np = paragraphs.length()
   let (
     fs,
@@ -1152,10 +1078,8 @@ fn render_text(
     paragraphs, scale, theme, def_sz, def_line_h, init_fs, init_lr, do_wrap, col_w,
     avail_h,
   )
-  // For vertical centering/bottom alignment, the trailing space of the last line
-  // (line_height - font_size) and spc_after should not count toward the text extent.
-  // The rendering places text at the baseline (font_size from line top), so the visual
-  // bottom of text is at the last baseline, not at the last baseline + trailing space.
+  // Text ends at the last baseline: the last line's trailing gap and spc_after don't
+  // count toward the extent used for anchoring.
   let trailing_space = if last_para_line_h > last_para_font_sz {
     last_para_line_h - last_para_font_sz + last_para_spc_after
   } else {
@@ -1163,7 +1087,6 @@ fn render_text(
   }
   let text_h_for_anchor = total_text_h - trailing_space
 
-  // Vertical anchor offset
   let anchor_offset = if body_props.anchor == "ctr" {
     (avail_h - text_h_for_anchor) / 2
   } else if body_props.anchor == "b" {
@@ -1171,10 +1094,8 @@ fn render_text(
   } else {
     0
   }
-  // For anchor="ctr", allow negative offset so text centers even when it
-  // overflows the padding area (PowerPoint behavior: center in full shape).
-  // But clamp to -pad_t so text never starts above the shape's top edge.
-  // For "t"/"b", clamp to 0 so text stays within the padding boundary.
+  // "ctr" may go negative so overflowing text stays centered (as PowerPoint does), but
+  // never above the top edge; "t"/"b" stay inside the padding.
   let anchor_offset_clamped = if body_props.anchor == "ctr" {
     if anchor_offset >= 0 - pad_t {
       anchor_offset
@@ -1187,20 +1108,15 @@ fn render_text(
     0
   }
 
-  // Vertical text mode
   let is_vert = body_props.vert == "vert" ||
     body_props.vert == "eaVert" ||
     body_props.vert == "vert270" ||
     body_props.vert == "wordArtVert"
 
-  // Text rotation. Shape transform rot (t.rot) rotates the whole shape
-  // including its text; bodyPr rot rotates only the text within the shape.
-  // Both pivot on the shape center, so we can sum them into a single
-  // rotate() transform on the <text> element. Without t.rot, text inside
-  // a rotated shape with no visible fill/stroke would render straight.
+  // Shape rot and bodyPr rot both pivot on the shape center, so they sum into one rotate().
   let bp_rot = t.rot + body_props.rot
 
-  // Image bullets — render before <text> as separate <image> elements, collect them
+  // Image bullets are separate <image> elements, emitted before the <text>.
   let mut img_bullets_svg = ""
 
   let max_col_h = if num_cols > 1 { total_text_h / num_cols + 1 } else { 0 }
@@ -1238,7 +1154,7 @@ fn render_text(
   let mut cur_y = base_y
   let mut cur_col = 0
 
-  // Auto-number counters per level (reset when a lower level is encountered)
+  // Auto-number counters per level; deeper levels reset when a shallower one appears.
   let auto_num_counters : Array[Int32] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
   let mut prev_para_level = -1
 
@@ -1252,11 +1168,9 @@ fn render_text(
       lr,
     )
     let p_font_sz = apply_font_scale(para_font_size(para, scale, def_sz), fs)
-    // Apply spacing before paragraph
     if para.spc_before > 0 && pi > 0 {
       cur_y = cur_y + px(para.spc_before, scale)
     }
-    // Multi-column: check if we need to move to the next column (paragraph boundary)
     if num_cols > 1 && cur_col < num_cols - 1 && cur_y - base_y >= max_col_h {
       out = out + "</text>"
       cur_col = cur_col + 1
@@ -1265,44 +1179,37 @@ fn render_text(
 
       out = out + make_text_header(text_x)
     }
-    // Extra space for super/subscript to avoid overlap with adjacent lines
+    // Super/subscript need extra line space (must match solve_text_autofit).
     let (bl_extra_above, bl_extra_below) = para_baseline_shift_extra(
       para, scale, def_sz,
     )
     cur_y = cur_y + bl_extra_above
-    // Advance to baseline (ascent ≈ font_size)
     cur_y = cur_y + p_font_sz
     if nr == 0 {
       cur_y = cur_y + (p_line_h - p_font_sz)
       pi = pi + 1
     } else {
-      // Indent: marL = left margin for continuation lines
-      //         para.indent = first-line offset from marL (negative = hanging indent)
+      // marL is the continuation-line margin; indent offsets the first line (negative = hanging).
       let mar_l_emu = if para.mar_l >= 0 {
         para.mar_l
       } else {
         para.level * level_indent_emu
       }
       let indent = px(mar_l_emu, scale)
-      // First-line indent: marL + indent (e.g., marL=171450, indent=-171450 → 0)
       let first_line_indent_emu = mar_l_emu + para.indent
       let first_line_indent = if first_line_indent_emu > 0 {
         px(first_line_indent_emu, scale)
       } else {
         0
       }
-      // RTL: default alignment is right
-      // In SVG with direction="rtl", text-anchor semantics are swapped:
-      //   "start" = right edge (text flows leftward from x)
-      //   "end"   = left edge (text flows rightward from x)
+      // RTL defaults to right alignment; with direction="rtl" SVG swaps start/end.
       let effective_align = if para.rtl && para.align.is_empty() {
         "r"
       } else {
         para.align
       }
       let is_justify = effective_align == "just"
-      // anchor_x: first line uses first_line_indent, continuation uses indent (marL)
-      // Justify uses left-align positioning as base
+      // Justify is positioned like left alignment.
       let (anchor_x, cont_anchor_x_init, anchor_attr) = if effective_align ==
         "ctr" ||
         effective_align == "c" {
@@ -1324,9 +1231,7 @@ fn render_text(
         (text_x + first_line_indent, text_x + indent, " text-anchor=\"start\"")
       }
       let mut cont_anchor_x = cont_anchor_x_init
-      // RTL direction attribute
       let rtl_attr = if para.rtl { " direction=\"rtl\"" } else { "" }
-      // Reset auto-number counters for levels deeper than current
       let cur_level = para.level
       if cur_level < prev_para_level {
         let mut rl = cur_level + 1
@@ -1336,7 +1241,6 @@ fn render_text(
         }
       }
       prev_para_level = cur_level
-      // Determine bullet text
       let bullet_text = if para.bullet_none {
         ""
       } else if !para.bullet.is_empty() {
@@ -1348,7 +1252,6 @@ fn render_text(
       } else {
         ""
       }
-      // Image bullet: render <image> element before text
       if !para.bullet_img_rid.is_empty() {
         let bu_target = @ooxml.find_rel_target(rels, para.bullet_img_rid)
         if !bu_target.is_empty() {
@@ -1374,7 +1277,6 @@ fn render_text(
           }
         }
       }
-      // Paragraph-level tspan with data-ooxml-* attributes
       let para_align = if para.align.is_empty() { "l" } else { para.align }
       out = out +
         "<tspan" +
@@ -1390,20 +1292,15 @@ fn render_text(
         da("bu-color", para.bullet_color.to_hex()) +
         da("rtl", bool_str(para.rtl)) +
         ">"
-      // Render bullet if present
       if !bullet_text.is_empty() {
         let mut bu_span = "<tspan"
         if !para.bullet_font.is_empty() {
           bu_span = bu_span +
             a("font-family", para.bullet_font + ", sans-serif")
         }
-        // Per ECMA-376 §21.1.2.4.5: when no <a:buSzPct> or <a:buSzPts> is set,
-        // the bullet uses the same size as the paragraph's text. Without an
-        // explicit font-size the bullet would inherit the parent <text>
-        // element's default 18 pt, making bullets visibly larger than the
-        // run text whenever the run is smaller (very common — e.g. 12 pt body).
+        // Without buSzPct/buSzPts the bullet matches the text size (ECMA-376 §21.1.2.4.5), not
+        // the <text> default.
         if para.bullet_size > 0 {
-          // Percentage of run font size
           let run_fs = if p_font_sz > 0 { p_font_sz } else { scaled_def_sz }
           let bu_fs = run_fs * para.bullet_size / @ooxml.pct_100
           bu_span = bu_span + ai("font-size", bu_fs)
@@ -1413,7 +1310,6 @@ fn render_text(
           bu_span = bu_span +
             ai("font-size", apply_font_scale(px(bu_fs_emu, scale), fs))
         } else {
-          // Unspecified → match the run's font size.
           let run_fs = if p_font_sz > 0 { p_font_sz } else { scaled_def_sz }
           bu_span = bu_span + ai("font-size", run_fs)
         }
@@ -1430,30 +1326,24 @@ fn render_text(
         }
         out = out + bu_span + ">" + svg_escape(bullet_text) + " </tspan>"
       }
-      // Text wrapping: split runs into visual lines
       if do_wrap {
         let wrap_w = text_w - indent
         let vlines = wrap_paragraph(para, wrap_w, scale, def_sz, fs, theme)
         let nvl = vlines.length()
         let mut vli = 0
         let mut tab_idx = 0
-        // Use first-line anchor for first line, continuation anchor for rest
         let mut cur_anchor_x = anchor_x
         while vli < nvl {
           let vline = vlines[vli]
-          // For wrapped lines after the first, emit a new positioning tspan
           if vli > 0 {
             cur_y = cur_y + p_line_h
-            // Multi-column: check if this line overflows to next column
             if num_cols > 1 &&
               cur_col < num_cols - 1 &&
               cur_y - base_y >= max_col_h {
-              // Close current paragraph tspan and <text>
               out = out + "</tspan></text>"
               cur_col = cur_col + 1
               text_x = base_text_x + (col_w + col_spacing_px) * cur_col
               cur_y = base_y + p_font_sz
-              // Recompute anchor for new column (use continuation indent)
               cur_anchor_x = if effective_align == "ctr" ||
                 effective_align == "c" {
                 text_x + indent + (text_w - indent) / 2
@@ -1462,9 +1352,7 @@ fn render_text(
               } else {
                 text_x + indent
               }
-              // Update cont_anchor_x for subsequent lines in new column
               cont_anchor_x = cur_anchor_x
-              // Open new <text> and paragraph tspan
               out = out + make_text_header(text_x)
               out = out +
                 "<tspan" +
@@ -1476,7 +1364,6 @@ fn render_text(
                 da("para-align", para_align) +
                 ">"
             } else {
-              // Switch to continuation indent (marL) for wrapped lines
               cur_anchor_x = cont_anchor_x
               out = out +
                 "</tspan><tspan" +
@@ -1489,10 +1376,7 @@ fn render_text(
                 ">"
             }
           }
-          // On first line with bullet, reposition to cont_anchor_x (= marL)
-          // so text aligns with continuation lines (OOXML text starts at marL).
-          // Only applies to hanging indent (para.indent < 0); for positive
-          // first-line indent, text flows naturally after the bullet.
+          // With a hanging indent, text after the bullet starts at marL like continuation lines.
           if vli == 0 && !bullet_text.is_empty() && para.indent < 0 {
             out = out +
               "</tspan><tspan" +
@@ -1504,7 +1388,6 @@ fn render_text(
               da("para-align", para_align) +
               ">"
           }
-          // Justify: calculate word-spacing for non-last lines
           let justify_ws_attr = if is_justify &&
             vli < nvl - 1 &&
             !vline.is_empty() {
@@ -1520,7 +1403,6 @@ fn render_text(
               let extra_px = avail_w.to_double() - line_w
               if extra_px > 0.0 {
                 let ws = extra_px / space_count.to_double()
-                // Round to 1 decimal
                 let ws_10 = (ws * 10.0).to_int()
                 " word-spacing=\"" +
                 int_to_str(ws_10 / 10) +
@@ -1537,7 +1419,7 @@ fn render_text(
                 ""
               }
             } else {
-              // No spaces: use letter-spacing as fallback
+              // No spaces to stretch: justify with letter-spacing.
               let total_chars = {
                 let mut n = 0
                 for frag in vline {
@@ -1571,10 +1453,7 @@ fn render_text(
           } else {
             ""
           }
-          // Apply justify spacing to current line's tspan if needed
           if !justify_ws_attr.is_empty() {
-            // Re-emit the current tspan with word-spacing
-            // Close and reopen with the spacing attribute
             out = out +
               "</tspan><tspan" +
               ai("x", cur_anchor_x) +
@@ -1586,7 +1465,6 @@ fn render_text(
               da("para-align", para_align) +
               ">"
           }
-          // Render fragments in this visual line
           for frag in vline {
             let (run_idx, frag_text) = frag
             let run = para.runs[run_idx]
@@ -1610,7 +1488,7 @@ fn render_text(
           vli = vli + 1
         }
       } else {
-        // No wrapping: render runs directly, handling tab stops and line breaks
+        // No wrapping: emit runs directly, honoring tabs and line breaks.
         let mut tab_idx = 0
         let mut ri = 0
         while ri < nr {
@@ -1620,7 +1498,6 @@ fn render_text(
           } else {
             run.text
           }
-          // Handle line break runs (from <a:br>)
           if display_text == "\n" {
             cur_y = cur_y + p_line_h
             out = out +
@@ -1656,7 +1533,6 @@ fn render_text(
       }
       out = out + "</tspan>"
       cur_y = cur_y + (p_line_h - p_font_sz) + bl_extra_below
-      // Apply spacing after paragraph
       if para.spc_after > 0 {
         cur_y = cur_y + px(para.spc_after, scale)
       }
@@ -1665,8 +1541,6 @@ fn render_text(
   }
   run_fill_defs_section + img_bullets_svg + out + "</text>"
 }
-
-// ── Text height estimation ──────────────────────────────────────────────────
 
 ///|
 fn estimate_text_height(

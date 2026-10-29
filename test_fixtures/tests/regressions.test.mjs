@@ -15,7 +15,6 @@ test("regressions (slides 96-98)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 96: empty custGeom + fontRef text color ──────────────────────
   {
     console.log('\n── test_features.pptx — Slide 96: regressions ──');
     const slide96 = textFiles.get('ppt/slides/slide96.xml');
@@ -38,9 +37,7 @@ test("regressions (slides 96-98)", async () => {
       slide96.includes('<a:r><a:t>Reference rect (prstGeom)</a:t></a:r>'),
     );
 
-    // Empty custGeom: the issue #39 reproduction. The shape must be present
-    // in OOXML (so the renderer exercises the suppression path) but have an
-    // empty path with no draw commands.
+    // Empty custGeom (#39): present in the OOXML, with a path that has no commands.
     assert('slide96 has EmptyCustGeom shape', slide96.includes('EmptyCustGeom'));
     assert('slide96 EmptyCustGeom has solidFill 00B4D8', slide96.includes('00B4D8'));
     assert(
@@ -56,7 +53,6 @@ test("regressions (slides 96-98)", async () => {
     assert('slide96 ValidCustGeom has a:lnTo', hasTag(slide96, 'a:lnTo'));
   }
 
-  // ── Slide 97: header/footer field placeholders (date / footer / slide num) ──
   {
     console.log('\n── test_features.pptx — Slide 97: header/footer fields ──');
     const slide97 = textFiles.get('ppt/slides/slide97.xml');
@@ -73,7 +69,6 @@ test("regressions (slides 96-98)", async () => {
     }
   }
 
-  // ── Slide 98: underline styles + underline color (a:uFill) + double strike ──
   {
     console.log('\n── test_features.pptx — Slide 98: text decoration fidelity ──');
     const slide98 = textFiles.get('ppt/slides/slide98.xml');
@@ -87,7 +82,6 @@ test("regressions (slides 96-98)", async () => {
     }
   }
 
-  // ── Slide 99: flipH/flipV mirroring (issue #55) ─────────────────────────────
   {
     console.log('\n── test_features.pptx — Slide 99: flipH/flipV mirroring ──');
     const slide99 = textFiles.get('ppt/slides/slide99.xml');
@@ -111,7 +105,6 @@ test("regressions (slides 96-98)", async () => {
     assert('slide99 SVG mirrors flipV (scale(1,-1))', svg99.includes('scale(1,-1)'));
   }
 
-  // ── Slide 100: preset geometries from the ECMA-376 definitions (issue #62) ─
   {
     console.log('\n── test_features.pptx — Slide 100: preset geometry (issue #62) ──');
     const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
@@ -188,7 +181,6 @@ test("regressions (slides 96-98)", async () => {
     });
   }
 
-  // ── Slide 101: presets generated from presetShapeDefinitions.xml ──────────
   {
     console.log('\n── test_features.pptx — Slide 101: generated preset geometry ──');
     const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
@@ -221,7 +213,6 @@ test("regressions (slides 96-98)", async () => {
     assert('slide101 actionButtonHome icon is shaded', shapeSvg(4).includes('fill-opacity="0.'));
   }
 
-  // ── Slide 102: custGeom per-path fill / stroke / coordinate space ──────────
   {
     console.log('\n── test_features.pptx — Slide 102: custGeom per-path styles ──');
     const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
@@ -258,7 +249,6 @@ test("regressions (slides 96-98)", async () => {
     assert('slide102 export keeps stroke="0"', xml.includes('<a:path w="100" h="100" stroke="0">'));
   }
 
-  // ── Inherited layout image background: rId resolves against the layout's .rels ─
   {
     console.log('\n── test_features.pptx — layout blipFill background inheritance ──');
     const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
@@ -299,7 +289,6 @@ test("regressions (slides 96-98)", async () => {
     assert('SVG round-trip export has no <p:bg>', !r.getSlideOoxml(0).includes('<p:bg>'));
   }
 
-  // ── Slides 103-105: slide-own gradient / pattern / image backgrounds ─────
   {
     console.log('\n── test_features.pptx — Slides 103-105: background SVG round-trip ──');
     const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
@@ -332,7 +321,6 @@ test("regressions (slides 96-98)", async () => {
     }
   }
 
-  // ── Editing a slide with a chart / ChartEx / OLE frame keeps the frame ───
   {
     console.log('\n── test_features.pptx — chart / OLE graphicFrame survives editing ──');
     const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));

@@ -1,18 +1,12 @@
-// pptx-svg: Table editing API
-//
-// Cell text + row/column add/delete. Cells/rows/col_widths are mutable arrays in
-// the cached TableData, so edits happen in place. NOTE: merged cells
-// (gridSpan/rowSpan/hMerge/vMerge) are not span-adjusted on row/column changes —
-// editing the structure of a table with merged cells may corrupt it (v1 limit).
+// Merged cells (gridSpan/rowSpan/hMerge/vMerge) are not span-adjusted by row/column
+// edits, so changing the structure of a table with merged cells can corrupt it.
 
 ///|
-/// Default width (EMU) for a new column when no width is given and there is no
-/// neighbour to copy from. 914400 EMU = 1 inch.
+/// Width of a new column with no neighbour to copy (1 inch, EMU).
 let default_table_col_width_emu : Int32 = 914400
 
 ///|
-/// Resolve a shape and require it to be a table. Calls `f` with its TableData,
-/// or returns "ERROR:shape is not a table".
+/// Call `f` with the shape's TableData, or return "ERROR:shape is not a table".
 fn with_table(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -27,8 +21,7 @@ fn with_table(
 }
 
 ///|
-/// Insertion index for an "insert after `after`" operation into an array of
-/// length `len`: `after = -1` → front (0); otherwise `after + 1`, clamped to `len`.
+/// Index for inserting after `after` (-1 = front), clamped to `len`.
 fn clamp_insert_index(after : Int32, len : Int32) -> Int32 {
   if after < 0 {
     0
@@ -40,9 +33,7 @@ fn clamp_insert_index(after : Int32, len : Int32) -> Int32 {
 }
 
 ///|
-/// Set a table cell's text (plain text, replacing its contents). The new run
-/// inherits the cell's existing first-run formatting when present.
-/// Returns re-rendered shape SVG or "ERROR:<message>".
+/// Set a cell's text, keeping its first run's formatting. Returns the shape SVG or "ERROR:...".
 pub fn update_table_cell_text(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -72,8 +63,7 @@ pub fn update_table_cell_text(
 }
 
 ///|
-/// Insert a new (empty) row. `after_row = -1` inserts at the top; otherwise after
-/// the given row (clamped). Returns "OK:<new_row_idx>" or "ERROR:<message>".
+/// Insert an empty row after `after_row` (-1 = top). Returns "OK:<new_row_idx>" or "ERROR:...".
 pub fn add_table_row(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -124,9 +114,8 @@ pub fn delete_table_row(
 }
 
 ///|
-/// Insert a new (empty) column. `after_col = -1` inserts at the left; otherwise
-/// after the given column (clamped). `width_emu <= 0` copies a neighbour's width
-/// (or 1 inch). Returns "OK:<new_col_idx>" or "ERROR:<message>".
+/// Insert an empty column after `after_col` (-1 = left); `width_emu <= 0` copies a
+/// neighbour's width. Returns "OK:<new_col_idx>" or "ERROR:<message>".
 pub fn add_table_column(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -151,7 +140,7 @@ pub fn add_table_column(
     array_insert_at(t.col_widths, insert_at, width)
     for row in t.rows {
       let cells = row.cells
-      // Clamp per row (defensive: rows should have one cell per grid column).
+      // Clamp per row: malformed tables can have short rows.
       let at = if insert_at > cells.length() {
         cells.length()
       } else {

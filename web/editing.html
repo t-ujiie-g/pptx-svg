@@ -286,7 +286,7 @@
   <div class="card" id="slide-viewer-card">
     <h2>Interactive Editor</h2>
     <details style="margin-bottom:12px;background:#0a1628;border:1px solid #2a3a6a;border-radius:6px;padding:8px 12px">
-      <summary style="cursor:pointer;color:#9ab;font-size:0.85em">E6 editing features — how to test</summary>
+      <summary style="cursor:pointer;color:#9ab;font-size:0.85em">Editing features — how to test</summary>
       <ul style="margin:8px 0 0 18px;color:#9ab;font-size:0.82em;line-height:1.6">
         <li><b>Undo/Redo</b>: any edit, then the Undo/Redo buttons or <code>Ctrl+Z</code> / <code>Ctrl+Y</code>.</li>
         <li><b>Inline text</b>: select a text shape → <b>✎ Inline Text</b> → click in the text (boxes show per-char geometry), type, Backspace, Enter; <code>Esc</code> exits.</li>
@@ -439,7 +439,7 @@
     let totalSlides = 0;
     let selectedShapeIdx = -1;
     let dragState = null;
-    // E6 demo state
+    // Editing demo state
     let clipboardSpec = null;        // copied ShapeSpec JSON
     const multiSel = new Set();      // multi-selected shape indices
     let inlineMode = false;          // inline text editing active
@@ -1383,7 +1383,7 @@
     });
 
     // ══════════════════════════════════════════════════════════════════════
-    //  E6 feature demos
+    //  Editing feature demos
     // ══════════════════════════════════════════════════════════════════════
 
     // ── History: Undo / Redo ──

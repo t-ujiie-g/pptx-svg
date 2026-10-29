@@ -1,14 +1,3 @@
-// pptx-svg: Inline text editing API
-//
-// Wasm exports backing a PowerPoint/Google-Slides–style direct-typing experience
-// (double-click to edit, IME input) via a contentEditable overlay:
-//   - get_text_layout   — text geometry (EMU) for caret / selection rendering
-//   - hit_test_text     — click point (EMU) → caret insertion position
-//   - replace_text_range — range replacement with boundary-run format preservation
-//
-// These read/mutate the `g_slides` cache through `with_shape` (which calls
-// `ensure_slide_parsed`), so they work regardless of render order.
-
 ///|
 /// Total character length of a paragraph's concatenated run text.
 fn para_text_len(para : @ooxml.TextParagraph) -> Int32 {
@@ -20,9 +9,8 @@ fn para_text_len(para : @ooxml.TextParagraph) -> Int32 {
 }
 
 ///|
-/// Split a paragraph's runs at a paragraph-level char offset, preserving each
-/// run's formatting and splitting the boundary run. Empty pieces are skipped.
-/// Returns (left_runs, right_runs).
+/// Split a paragraph's runs at a paragraph-level offset, keeping each run's formatting.
+/// Returns (left_runs, right_runs); empty pieces are dropped.
 fn split_para_runs(
   para : @ooxml.TextParagraph,
   char_off : Int32,
@@ -78,8 +66,7 @@ fn[T] array_splice(
       new_arr.push(arr[i])
     }
   }
-  // start may equal len (append case): handled by the i == start check only when
-  // start < len; for start == len, append items at the end.
+  // start == len appends.
   if start >= len {
     for item in items {
       new_arr.push(item)
@@ -94,9 +81,8 @@ fn[T] array_splice(
 }
 
 ///|
-/// Get the text geometry of a shape's text body as JSON. Coordinates in EMU.
-/// See `@renderer.build_text_layout` for the schema and scope.
-/// Returns JSON or "ERROR:<message>".
+/// A shape's text geometry as JSON (EMU; schema in `@renderer.build_text_layout`),
+/// or "ERROR:<message>".
 pub fn get_text_layout(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
@@ -113,10 +99,8 @@ pub fn get_text_layout(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Hit-test a point (EMU) against a shape's text → caret insertion position.
-/// Returns JSON `{paraIdx, runIdx, charOffset, paraOffset}` or "ERROR:<message>".
-/// `charOffset` is the offset within the run; `paraOffset` is within the paragraph
-/// (use the latter with `replace_text_range`).
+/// The caret position at an EMU point: `{paraIdx, runIdx, charOffset, paraOffset}`
+/// (offsets within the run / paragraph), or "ERROR:<message>".
 pub fn hit_test_text(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -147,11 +131,8 @@ pub fn hit_test_text(
 }
 
 ///|
-/// Replace a text range with `new_text`, preserving boundary run formatting.
-/// `start_char`/`end_char` are paragraph-level char offsets (see `hit_test_text`
-/// `paraOffset`). `\n` in `new_text` splits into multiple paragraphs. A collapsed
-/// range (start == end) inserts; an empty `new_text` deletes. Returns re-rendered
-/// shape SVG or "ERROR:<message>".
+/// Replace a paragraph-offset range with `new_text`, keeping the boundary runs' formatting:
+/// start == end inserts, "" deletes, `\n` splits paragraphs. Returns the shape SVG.
 pub fn replace_text_range(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -164,7 +145,6 @@ pub fn replace_text_range(
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let shape = arr[local_idx]
     let nparas = shape.paragraphs.length()
-    // Normalize so (sp, sc) precedes (ep, ec).
     let swap = start_para > end_para ||
       (start_para == end_para && start_char > end_char)
     let sp = if swap { end_para } else { start_para }
@@ -174,7 +154,6 @@ pub fn replace_text_range(
     if sp < 0 || sp >= nparas || ep < 0 || ep >= nparas {
       return "ERROR:paragraph index out of range"
     }
-    // Clamp char offsets to paragraph text lengths.
     let sp_len = para_text_len(shape.paragraphs[sp])
     let ep_len = para_text_len(shape.paragraphs[ep])
     let sc = if sc_in < 0 { 0 } else if sc_in > sp_len { sp_len } else { sc_in }
@@ -219,14 +198,12 @@ pub fn replace_text_range(
       new_paras.push({ ..base_para, runs, })
     } else {
       let last = segs.length() - 1
-      // First paragraph: prefix + seg0
       let first_runs : Array[@ooxml.TextRun] = []
       append_all(first_runs, prefix)
       if !segs[0].is_empty() {
         first_runs.push(mk_run(segs[0]))
       }
       new_paras.push({ ..base_para, runs: first_runs, })
-      // Middle paragraphs
       for k in 1..<last {
         let mid_runs : Array[@ooxml.TextRun] = []
         if !segs[k].is_empty() {
@@ -234,7 +211,6 @@ pub fn replace_text_range(
         }
         new_paras.push({ ..base_para, runs: mid_runs, })
       }
-      // Last paragraph: segLast + suffix
       let last_runs : Array[@ooxml.TextRun] = []
       if !segs[last].is_empty() {
         last_runs.push(mk_run(segs[last]))

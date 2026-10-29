@@ -1,13 +1,6 @@
 /**
- * Security regression tests.
- *
- * Covers fixes from PR #30 and PR #31:
- *   - L1: getSlideNotes / getSlideComments decode XML entities so consumers
- *     get plain text (not raw `&lt;`), making the API safe for `.textContent`.
- *   - L2: dynamic `new RegExp(...)` paths must escape PPTX-derived rIds /
- *     targets so regex metachars don't throw `SyntaxError`.
- *   - M1: ZIP extraction caps decompression at 256 MiB per entry / 1 GiB per
- *     archive, defending against decompression bombs.
+ * Security regressions (#30, #31): notes/comments decode XML entities, PPTX-derived
+ * rIds are regex-escaped, and ZIP inflation is capped (256 MiB/entry, 1 GiB/archive).
  */
 
 import { test } from 'node:test';
@@ -32,8 +25,6 @@ function readFixtureAb(name) {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-// ── ZIP construction helpers (for M1 bomb test) ─────────────────────────────
-
 /** CRC-32 over a Uint8Array (matches lib/utils.ts crc32). */
 function crc32(data) {
   let crc = 0xFFFFFFFF;
@@ -44,11 +35,7 @@ function crc32(data) {
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
-/**
- * Build a minimal single-entry ZIP. `declaredUncompressedSize` lets the
- * caller fake the central-directory size field (used to test the pre-check
- * cap without actually allocating gigabytes).
- */
+/** A one-entry ZIP; `declaredUncompressedSize` fakes the central-directory size. */
 function buildSingleEntryZip({ name, content, declaredUncompressedSize }) {
   const enc = new TextEncoder();
   const nameBytes = enc.encode(name);
@@ -108,8 +95,6 @@ function buildSingleEntryZip({ name, content, declaredUncompressedSize }) {
   return out.buffer;
 }
 
-// ── Tests ───────────────────────────────────────────────────────────────────
-
 test('M1: extractZip rejects entries with declared size over the cap', async () => {
   resetAssertions();
   const { extractZip } = await import(join(DIST_DIR, 'zip.js'));
@@ -137,9 +122,8 @@ test('M1: extractZip aborts streaming inflate past the cap', async () => {
   resetAssertions();
   const { extractZip } = await import(join(DIST_DIR, 'zip.js'));
 
-  // Compressed payload that actually inflates to ~260 MiB of zeros. The
-  // streaming check inside inflate() must reject this regardless of what
-  // the central directory claims.
+  // Really inflates to ~260 MiB: the streaming check must reject it whatever the
+  // central directory claims.
   const oversize = 260 * 1024 * 1024;
   const zeros = new Uint8Array(oversize); // 260 MiB of zeros
   const ab = buildSingleEntryZip({
@@ -169,17 +153,11 @@ test('L1 + L2: PPTX with metachar rIds and entity-encoded notes works end-to-end
   const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
   const { extractZip, buildZip } = await import(join(DIST_DIR, 'zip.js'));
 
-  // Start from the regular fixture, then inject:
-  //   1. A notesSlide containing `&amp;` and `&lt;script&gt;` entities — L1
-  //      (getSlideNotes must return decoded text).
-  //   2. A relationship whose rId contains regex metachars — L2
-  //      (no RegExp SyntaxError; renderSlide / save must not throw).
+  // Inject an entity-encoded notes slide and a relationship whose rId has regex metachars.
   const ab = readFixtureAb('test_features.pptx');
   const { textFiles, binaryFiles } = await extractZip(ab);
 
-  // Locate notesSlide1.xml and replace its body text with entity-encoded chars.
-  // In test_features.pptx, notesSlide1.xml is referenced from slide75.xml
-  // (slide index 74).
+  // notesSlide1.xml belongs to slide 75 (index 74).
   const notesPath = 'ppt/notesSlides/notesSlide1.xml';
   const origNotes = textFiles.get(notesPath);
   expect('notesSlide1.xml present in fixture', !!origNotes);
@@ -192,9 +170,7 @@ test('L1 + L2: PPTX with metachar rIds and entity-encoded notes works end-to-end
   );
   expect('notes were patched', patchedNotes !== origNotes);
 
-  // Add a relationship whose rId contains regex metachars: `rId$(.*)+`.
-  // Append to slide1's rels — rendering shouldn't try to use it,
-  // but resolveRidTarget / extractRelTarget must not throw.
+  // Unused by rendering, but resolveRidTarget / extractRelTarget must not throw on it.
   const slide1RelsPath = 'ppt/slides/_rels/slide1.xml.rels';
   const origRels = textFiles.get(slide1RelsPath) ?? '';
   const evilRid = 'rId$(.*)+';

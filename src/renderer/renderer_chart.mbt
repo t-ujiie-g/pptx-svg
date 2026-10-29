@@ -1,24 +1,3 @@
-// SVG renderer — Chart rendering
-//
-// Renders ChartData (parsed from ChartML / ECMA-376 Part 1 Chapter 21) as SVG.
-// Supports: bar/column, line, pie, donut, scatter, area, radar, bubble, stock,
-// surface, ofPie charts (c:chart), and waterfall, treemap, sunburst, histogram,
-// box & whisker, funnel charts (cx:chart / Office 2016+).
-//
-// Layout strategy:
-//   - Title at top (if present)
-//   - Legend at right (if enabled)
-//   - Plot area fills remaining space, with axis label margins
-//   - Pie/donut: no axis margins (centered in available space)
-//   - Horizontal bar: category labels on left, value labels at bottom
-//
-// Trigonometry for pie/donut uses integer lookup table (cos_table)
-// with 1° granularity × 1000 scale — sufficient for SVG path rendering.
-//
-// Same package as renderer.mbt — all constants and helpers are shared.
-
-// ── Chart layout constants ──────────────────────────────────────────────────
-
 ///|
 let chart_title_h : Int32 = 24 // title area height in px
 
@@ -85,8 +64,6 @@ let chart_pie_start_angle : Int32 = -9000 // -90° in hundredths (start from top
 ///|
 let chart_label_offset_y : Int32 = 12 // vertical offset for bottom axis labels
 
-// ── Chart style constants ─────────────────────────────────────────────────
-
 ///|
 let chart_bg_color : String = "white"
 
@@ -116,8 +93,6 @@ let chart_colors_fallback : Array[String] = [
 ///|
 let chart_data_label_font_size : Int32 = 9
 
-// ── Theme color palette ──────────────────────────────────────────────────────
-
 ///|
 /// Build chart color palette from theme accent colors (accent1..accent6 + darker variants).
 fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
@@ -127,12 +102,10 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   let accent4 = theme.accent4
   let accent5 = theme.accent5
   let accent6 = theme.accent6
-  // Check if theme has real accent colors (not all none)
   if accent1.is_none() && accent2.is_none() {
     return chart_colors_fallback
   }
   let colors : Array[String] = []
-  // Primary 6 accent colors
   let accents = [accent1, accent2, accent3, accent4, accent5, accent6]
   for i in 0..<6 {
     if !accents[i].is_none() {
@@ -157,8 +130,6 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   }
   colors
 }
-
-// ── Main chart renderer ─────────────────────────────────────────────────────
 
 ///|
 /// Detect if a chart needs no axes (pie, donut, treemap, sunburst, funnel).
@@ -216,13 +187,11 @@ fn render_chart(
   if w <= 0 || h <= 0 {
     return ""
   }
-  // Wrap in translate group for positioning
   let mut svg = "<g transform=\"translate(" +
     int_to_str(ox) +
     "," +
     int_to_str(oy) +
     ")\">"
-  // Background rect
   svg = svg +
     "<rect width=\"" +
     int_to_str(w) +
@@ -233,7 +202,6 @@ fn render_chart(
     "\" stroke=\"" +
     chart_border_color +
     "\" stroke-width=\"1\"/>"
-  // Title
   let title_h = if chart.title.is_empty() { 0 } else { chart_title_h }
   if !chart.title.is_empty() {
     svg = svg +
@@ -249,16 +217,12 @@ fn render_chart(
       svg_escape(chart.title) +
       "</text>"
   }
-  // Legend
   let legend_w = if chart.legend.show { chart_legend_w } else { 0 }
-  // Plot area bounds — adapt based on chart type
-  // Radar charts use a polar plot area, so they need no Cartesian axis padding
-  // and the standard render_axes pass is suppressed below.
+  // Radar charts are polar: no Cartesian axis padding, and render_axes is skipped.
   let is_radar = is_radar_chart(chart.groups)
   let no_axes = is_pie_or_donut_chart(chart.groups) || is_radar
   let h_bar = is_horizontal_bar(chart.groups)
-  // For horizontal bar: category labels on left (wider), value labels at bottom
-  // For pie/donut: no axis labels at all
+  // Horizontal bar: category labels on the left; pie/donut: no axis labels.
   let left_pad = if no_axes {
     chart_pad
   } else if h_bar {
@@ -266,7 +230,6 @@ fn render_chart(
   } else {
     chart_pad + chart_axis_label_w
   }
-  // Detect if X-axis labels need rotation (many categories)
   let has_many_cats = if !no_axes &&
     !h_bar &&
     !chart.groups.is_empty() &&
@@ -290,9 +253,7 @@ fn render_chart(
   if plot_w <= 0 || plot_h <= 0 {
     return svg
   }
-  // Build color palette from theme
   let colors = build_chart_colors(theme)
-  // Render chart groups
   for gi in 0..<chart.groups.length() {
     svg = svg +
       render_chart_group(
@@ -305,20 +266,16 @@ fn render_chart(
         chart.axes,
       )
   }
-  // Render axes (radar charts draw their own polar gridlines inside
-  // render_radar_chart, so suppress the Cartesian axis pass here).
+
   if !is_radar {
     svg = svg +
       render_axes(chart.axes, plot_x, plot_y, plot_w, plot_h, chart.groups)
   }
-  // Render legend
   if chart.legend.show {
     svg = svg + render_legend(chart.groups, w - legend_w + 4, plot_y, colors)
   }
   svg + "</g>"
 }
-
-// ── Chart group rendering ───────────────────────────────────────────────────
 
 ///|
 fn render_chart_group(
@@ -368,8 +325,6 @@ fn render_chart_group(
   }
 }
 
-// ── Bar / Column chart ──────────────────────────────────────────────────────
-
 ///|
 fn render_bar_chart(
   group : @ooxml.ChartGroup,
@@ -388,7 +343,6 @@ fn render_bar_chart(
   let is_stacked = group.grouping == "stacked" ||
     group.grouping == "percentStacked"
   let is_pct_stacked = group.grouping == "percentStacked"
-  // Get data range
   let (cats, raw_max) = if is_stacked {
     get_stacked_series_range(group.series)
   } else {
@@ -409,10 +363,8 @@ fn render_bar_chart(
   let cat_size = if is_horizontal { ph } else { pw }
   let val_size = if is_horizontal { pw } else { ph }
   if is_stacked {
-    // Stacked / percentStacked: one bar per category, series stacked
     let units_per_cat = 100 + gap_pct
     let cat_totals = compute_cat_totals(group, nc)
-    // Accumulate stacked offsets per category
     let stack_offset : Array[Int32] = Array::make(nc, 0)
     for si in 0..<ns {
       let ser = group.series[si]
@@ -465,7 +417,6 @@ fn render_bar_chart(
       }
     }
   } else {
-    // Clustered: each category has ns bars side by side + gap
     let units_per_cat = ns * 100 + gap_pct
     for si in 0..<ns {
       let ser = group.series[si]
@@ -513,7 +464,6 @@ fn render_bar_chart(
       }
     }
   }
-  // Data labels (check group-level and series-level)
   let has_data_labels = group.data_labels.is_visible() ||
     ({
       let mut found = false
@@ -528,15 +478,12 @@ fn render_bar_chart(
     svg = svg +
       render_bar_data_labels(group, px_, py, pw, ph, max_val, is_horizontal)
   }
-  // Trendlines + error bars (vertical column charts only)
   if !is_horizontal {
     svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
     svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   }
   svg
 }
-
-// ── Line chart ──────────────────────────────────────────────────────────────
 
 ///|
 fn render_line_chart(
@@ -564,7 +511,6 @@ fn render_line_chart(
     let color = series_color(ser, si, colors)
     let values = get_num_values(ser.val)
     let nv = values.length()
-    // Build polyline points
     let mut points = ""
     let n_pts = if nv < nc { nv } else { nc }
     for ci in 0..<n_pts {
@@ -582,7 +528,6 @@ fn render_line_chart(
         "\" fill=\"none\" stroke=\"" +
         color +
         "\" stroke-width=\"2\"/>"
-      // Draw markers
       for ci in 0..<n_pts {
         let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
         let y = py + ph - mul_div(values[ci], ph, max_val)
@@ -599,7 +544,6 @@ fn render_line_chart(
       }
     }
   }
-  // Data labels (check group-level and series-level)
   let has_xy_dl = group.data_labels.is_visible() ||
     ({
       let mut found = false
@@ -613,19 +557,14 @@ fn render_line_chart(
   if has_xy_dl {
     svg = svg + render_xy_data_labels(group, px_, py, pw, ph, max_val, nc)
   }
-  // Trendlines + error bars
   svg = svg + render_trendlines(group, px_, py, pw, ph, max_val, nc, colors)
   svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   svg
 }
 
-// ── Radar chart ─────────────────────────────────────────────────────────────
-
 ///|
-/// Render a radar (spider) chart: N axes radiating from the center, one per
-/// category, concentric gridline polygons, and one closed polygon per series.
-/// Layout: square plot area inscribed in `(px_, py, pw, ph)`, with a margin
-/// reserved for category labels at the outer vertices.
+/// Render a radar chart: one spoke per category, gridline polygons, and a closed polygon
+/// per series, in a square plot area with a margin for the vertex labels.
 fn render_radar_chart(
   group : @ooxml.ChartGroup,
   px_ : Int32,
@@ -645,7 +584,6 @@ fn render_radar_chart(
   if nc < 3 || max_val == 0 {
     return ""
   }
-  // Reserve margin for category labels at each vertex
   let label_margin = 36
   let cx = px_ + pw / 2
   let cy = py + ph / 2
@@ -662,7 +600,6 @@ fn render_radar_chart(
   for i in 0..<nc {
     angles_h[i] = -9000 + 36000 * i / nc
   }
-  // Concentric gridline polygons
   for ti in 1..<=n_ticks {
     let rt = r * ti / n_ticks
     let mut pts = ""
@@ -682,7 +619,6 @@ fn render_radar_chart(
       chart_gridline_color +
       "\" stroke-width=\"0.5\"/>"
   }
-  // Radial spokes from center to outer vertex
   for i in 0..<nc {
     let ang = angles_h[i]
     let ex = cx + cos1000(ang) * r / 1000
@@ -700,7 +636,6 @@ fn render_radar_chart(
       chart_gridline_color +
       "\" stroke-width=\"0.5\"/>"
   }
-  // Category labels at each vertex
   let label_r = r + 12
   for i in 0..<nc {
     let ang = angles_h[i]
@@ -728,7 +663,6 @@ fn render_radar_chart(
       svg_escape(cats[i]) +
       "</text>"
   }
-  // Each series → closed polygon + per-point markers
   for si in 0..<ns {
     let ser = group.series[si]
     let color = series_color(ser, si, colors)
@@ -774,8 +708,6 @@ fn render_radar_chart(
   }
   svg
 }
-
-// ── Pie chart ───────────────────────────────────────────────────────────────
 
 ///|
 fn render_pie_chart(
@@ -860,9 +792,8 @@ fn render_donut_chart(
 }
 
 ///|
-/// Render pie/donut slices as SVG arc paths.
-/// Angles use hundredths-of-degrees (e.g. -9000 = -90° = top of circle).
-/// inner_r > 0 produces donut slices; inner_r == 0 produces pie slices.
+/// Render pie (inner_r = 0) or donut slices as arc paths; angles in hundredths of a
+/// degree (-9000 = top).
 fn render_pie_slices(
   values : Array[Int32],
   nv : Int32,
@@ -873,7 +804,6 @@ fn render_pie_slices(
   data_points : Array[@ooxml.ChartDataPoint],
   colors : Array[String],
 ) -> String {
-  // Sum values
   let mut total = 0
   for i in 0..<nv {
     total = total + values[i]
@@ -889,13 +819,11 @@ fn render_pie_slices(
       let color = get_dpt_color(data_points, i, colors)
       let end_angle = start_angle + sweep
       let large_arc = if sweep > 18000 { "1" } else { "0" }
-      // Outer arc
       let sx = cx + r * cos1000(start_angle) / 1000
       let sy = cy + r * sin1000(start_angle) / 1000
       let ex = cx + r * cos1000(end_angle) / 1000
       let ey = cy + r * sin1000(end_angle) / 1000
       if inner_r > 0 {
-        // Donut slice
         let isx = cx + inner_r * cos1000(start_angle) / 1000
         let isy = cy + inner_r * sin1000(start_angle) / 1000
         let iex = cx + inner_r * cos1000(end_angle) / 1000
@@ -935,7 +863,6 @@ fn render_pie_slices(
           chart_slice_stroke +
           "\" stroke-width=\"1\"/>"
       } else {
-        // Pie slice
         svg = svg +
           "<path d=\"M" +
           int_to_str(cx) +
@@ -966,8 +893,6 @@ fn render_pie_slices(
   }
   svg
 }
-
-// ── Scatter chart ───────────────────────────────────────────────────────────
 
 ///|
 fn render_scatter_chart(
@@ -1007,8 +932,6 @@ fn render_scatter_chart(
   svg
 }
 
-// ── Area chart ──────────────────────────────────────────────────────────────
-
 ///|
 fn render_area_chart(
   group : @ooxml.ChartGroup,
@@ -1035,7 +958,6 @@ fn render_area_chart(
     let values = get_num_values(ser.val)
     let nv = values.length()
     let actual = if nv < nc { nv } else { nc }
-    // Build polygon points: top line + baseline
     let mut points = ""
     for ci in 0..<actual {
       let x = px_ + (ci * 2 + 1) * pw / (nc * 2)
@@ -1045,7 +967,6 @@ fn render_area_chart(
       }
       points = points + int_to_str(x) + "," + int_to_str(y)
     }
-    // Close to baseline
     if actual > 0 {
       let last_x = px_ + ((actual - 1) * 2 + 1) * pw / (nc * 2)
       let first_x = px_ + pw / (nc * 2)
@@ -1070,8 +991,6 @@ fn render_area_chart(
   }
   svg
 }
-
-// ── Bubble chart ─────────────────────────────────────────────────────────
 
 ///|
 fn render_bubble_chart(
@@ -1122,12 +1041,9 @@ fn render_bubble_chart(
   svg
 }
 
-// ── Stock chart ──────────────────────────────────────────────────────────
-
 ///|
-/// Render stock chart (high-low-close).
-/// Expects 3 or 4 series: [open], high, low, close.
-/// Renders as vertical high-low lines with close markers.
+/// Render a stock chart from 3 (high, low, close) or 4 (open first) series as
+/// high-low lines with close (and open) ticks.
 fn render_stock_chart(
   group : @ooxml.ChartGroup,
   px_ : Int32,
@@ -1158,14 +1074,12 @@ fn render_stock_chart(
   if nc == 0 {
     return ""
   }
-  // Find max value for Y axis
   let mut max_val = 1
   for i in 0..<nc {
     if i < high_vals.length() && high_vals[i] > max_val {
       max_val = high_vals[i]
     }
   }
-  // Add 10% headroom
   max_val = max_val * 11 / 10
   let mut svg = ""
   let bar_w = pw / nc / 3 // width for open/close ticks
@@ -1177,7 +1091,6 @@ fn render_stock_chart(
     let hy = py + ph - mul_div(h_val, ph, max_val)
     let ly = py + ph - mul_div(l_val, ph, max_val)
     let cy_ = py + ph - mul_div(c_val, ph, max_val)
-    // High-low vertical line
     svg = svg +
       "<line x1=\"" +
       int_to_str(cx) +
@@ -1190,7 +1103,6 @@ fn render_stock_chart(
       "\" stroke=\"" +
       colors[0 % colors.length()] +
       "\" stroke-width=\"1.5\"/>"
-    // Close tick (right)
     svg = svg +
       "<line x1=\"" +
       int_to_str(cx) +
@@ -1203,7 +1115,6 @@ fn render_stock_chart(
       "\" stroke=\"" +
       colors[2 % colors.length()] +
       "\" stroke-width=\"2\"/>"
-    // Open tick (left) if 4 series
     if open_idx >= 0 && ci < open_vals.length() {
       let o_val = open_vals[ci]
       let oy = py + ph - mul_div(o_val, ph, max_val)
@@ -1224,12 +1135,8 @@ fn render_stock_chart(
   svg
 }
 
-// ── Surface chart (2D heatmap approximation) ────────────────────────────────
-
 ///|
-/// Render surface chart as a 2D heatmap grid.
-/// Each series represents one row; data points are columns.
-/// Colors interpolate from cool (blue) to warm (red) based on value.
+/// Render a surface chart as a 2D heatmap: a row per series, blue (low) to red (high).
 fn render_surface_chart(
   group : @ooxml.ChartGroup,
   px_ : Int32,
@@ -1242,7 +1149,6 @@ fn render_surface_chart(
   if ns == 0 {
     return ""
   }
-  // Collect all values and find global min/max
   let all_values : Array[Array[Int32]] = []
   let mut global_max = 0
   let mut global_min = chart_heatmap_min_sentinel
@@ -1305,8 +1211,6 @@ fn render_surface_chart(
   svg
 }
 
-// ── Axes rendering ──────────────────────────────────────────────────────────
-
 ///|
 fn render_axes(
   axes : Array[@ooxml.ChartAxis],
@@ -1316,13 +1220,11 @@ fn render_axes(
   ph : Int32,
   groups : Array[@ooxml.ChartGroup],
 ) -> String {
-  // If no axes, this might be a pie/donut chart — skip
   if axes.is_empty() {
     return ""
   }
   let h_bar = is_horizontal_bar(groups)
   let mut svg = ""
-  // Plot area border
   svg = svg +
     "<rect x=\"" +
     int_to_str(px_) +
@@ -1335,7 +1237,6 @@ fn render_axes(
     "\" fill=\"none\" stroke=\"" +
     chart_border_color +
     "\" stroke-width=\"0.5\"/>"
-  // Category / X-axis labels
   let is_xy = if !groups.is_empty() {
     match groups[0].chart_type {
       @ooxml.ChartKind::ScatterChart | @ooxml.ChartKind::BubbleChart => true
@@ -1345,7 +1246,6 @@ fn render_axes(
     false
   }
   if is_xy {
-    // Scatter/bubble: numeric X-axis tick labels
     let x_max = get_x_axis_max(groups)
     for ti in 0..<=chart_axis_ticks {
       let x = px_ + ti * pw / chart_axis_ticks
@@ -1370,7 +1270,6 @@ fn render_axes(
     let nc = cats.length()
     if nc > 0 {
       if h_bar {
-        // Horizontal bar: category labels on left (Y axis)
         for ci in 0..<nc {
           let y = py + (ci * 2 + 1) * ph / (nc * 2)
           svg = svg +
@@ -1421,14 +1320,12 @@ fn render_axes(
       }
     }
   }
-  // Value axis labels + gridlines
   for ai in 0..<axes.length() {
     let ax = axes[ai]
     if ax.is_val && !ax.delete {
       let raw_max = get_value_axis_max(groups)
       let val_fmt = ax.num_fmt
       let max_val = compute_axis_max(raw_max, axes)
-      // Determine tick count from majorUnit if specified
       let major_unit = if ax.major_unit.is_empty() {
         0
       } else {
@@ -1448,7 +1345,6 @@ fn render_axes(
       }
       for ti in 0..<=n_ticks {
         if h_bar {
-          // Horizontal bar: value labels at bottom (X axis), vertical gridlines
           let x = px_ + ti * pw / n_ticks
           if ax.major_gridlines && ti > 0 && ti < n_ticks {
             svg = svg +
@@ -1476,7 +1372,6 @@ fn render_axes(
             format_chart_val(label_val, val_fmt) +
             "</text>"
         } else {
-          // Vertical: value labels on left (Y axis), horizontal gridlines
           let y = py + ph - ti * ph / n_ticks
           if ax.major_gridlines && ti > 0 && ti < n_ticks {
             svg = svg +
@@ -1510,8 +1405,6 @@ fn render_axes(
   svg
 }
 
-// ── Legend rendering ─────────────────────────────────────────────────────────
-
 ///|
 fn render_legend(
   groups : Array[@ooxml.ChartGroup],
@@ -1530,7 +1423,6 @@ fn render_legend(
       _ => false
     }
     if is_pie {
-      // Show category labels with per-slice colors (respecting c:dPt overrides)
       if !group.series.is_empty() {
         let cats = get_cat_labels(group.series[0].cat)
         let dpts = group.series[0].data_points
@@ -1582,8 +1474,6 @@ fn render_legend_entry(
   svg_escape(label) +
   "</text>"
 }
-
-// ── Helper functions ────────────────────────────────────────────────────────
 
 ///|
 /// Get series color — from spPr fill or stroke (line charts) if set, otherwise from theme palette.
@@ -1656,7 +1546,6 @@ fn get_num_values(src : @ooxml.AxisDataSource) -> Array[Int32] {
 /// Get category labels from AxisDataSource.
 fn get_cat_labels(src : @ooxml.AxisDataSource) -> Array[String] {
   let result : Array[String] = []
-  // Both StrSource and NumSource have points with .value
   let points = match src {
     @ooxml.AxisDataSource::StrSource(_, data) => data.points
     @ooxml.AxisDataSource::NumSource(_, data) => data.points
@@ -1761,12 +1650,10 @@ fn nice_ceil(val : Int32) -> Int32 {
   if val <= 0 {
     return 1
   }
-  // Find magnitude
   let mut mag = 1
   while mag * 10 <= val {
     mag = mag * 10
   }
-  // val / mag is 1..9; pick the next nice number
   let leading = (val + mag - 1) / mag // ceil(val/mag)
   if leading <= 1 {
     mag
@@ -1862,7 +1749,6 @@ fn get_xy_range(series : Array[@ooxml.ChartSeries]) -> (Int32, Int32, Int32) {
 /// Compute effective axis max from raw data max, using majorUnit if available,
 /// otherwise round_up_nice.
 fn compute_axis_max(raw_max : Int32, axes : Array[@ooxml.ChartAxis]) -> Int32 {
-  // Find the value axis majorUnit
   let mut major_unit = 0
   for ai in 0..<axes.length() {
     if axes[ai].is_val && !axes[ai].major_unit.is_empty() {
@@ -1900,7 +1786,6 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int32 {
           }
         }
       }
-      // Add 10% headroom for stock charts
       max_val = max_val * 11 / 10
       if max_val == 0 {
         1
@@ -1909,12 +1794,10 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int32 {
       }
     }
     _ => {
-      // Consider all groups for composite charts
       let mut max_val = 0
       for gi in 0..<groups.length() {
         let g = groups[gi]
         if g.grouping == "percentStacked" {
-          // percentStacked: max is always 100%
           max_val = chart_val_scale
         } else if g.grouping == "stacked" {
           let (_, gmax) = get_stacked_series_range(g.series)
@@ -1948,17 +1831,13 @@ fn get_x_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int32 {
 }
 
 ///|
-/// Parse a numeric string to fixed-point integer (×chart_val_scale).
-/// Handles: "0.381" → 3810, "38.1" → 381000, "500" → 5000000.
-/// Also handles scientific notation: "1.77E-2" → 177.
+/// Parse a number (including "1.77E-2") to fixed point ×chart_val_scale ("38.1" → 381000).
 fn parse_chart_num(s : String) -> Int32 {
   if s.is_empty() {
     return 0
   }
   let len = s.length()
-  // Handle negative
   let start = if len > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
-  // Detect scientific notation (E or e)
   let mut e_pos = -1
   let mut si = start
   while si < len {
@@ -1990,7 +1869,6 @@ fn parse_chart_num(s : String) -> Int32 {
       }
       si = si + 1
     }
-    // Parse exponent (may be negative)
     let mut exp = 0
     let mut exp_neg = false
     si = e_pos + 1
@@ -2013,11 +1891,8 @@ fn parse_chart_num(s : String) -> Int32 {
     if exp_neg {
       exp = -exp
     }
-    // Net decimal shift: number of decimal places after applying exponent
-    // E.g. 1.7738E-2: mantissa=17738, mant_dec_digits=4, exp=-2
-    // Actual value = 17738 × 10^(-4-2) = 17738 × 10^-6 = 0.017738
-    // We need result × 10^-4 (chart_val_scale = 10^4)
-    // So result = mantissa × 10^(exp - mant_dec_digits + 4)
+    // value = mantissa × 10^(exp - mant_dec_digits); scaled by 10^4 that is
+    // mantissa × 10^(exp - mant_dec_digits + 4).
     let shift = exp - mant_dec_digits + 4
     let mut result = mantissa
     if shift >= 0 {
@@ -2045,7 +1920,6 @@ fn parse_chart_num(s : String) -> Int32 {
     }
     i = i + 1
   }
-  // Parse integer part
   let mut int_part = 0
   i = start
   while i < dot_pos {
@@ -2055,7 +1929,6 @@ fn parse_chart_num(s : String) -> Int32 {
     }
     i = i + 1
   }
-  // Parse decimal part (up to 4 digits for scale=10000)
   let mut dec_part = 0
   let mut dec_digits = 0
   i = dot_pos + 1
@@ -2067,7 +1940,6 @@ fn parse_chart_num(s : String) -> Int32 {
     }
     i = i + 1
   }
-  // Pad remaining decimal places with zeros
   while dec_digits < 4 {
     dec_part = dec_part * 10
     dec_digits = dec_digits + 1
@@ -2106,7 +1978,6 @@ fn mul_div(a : Int32, b : Int32, c : Int32) -> Int32 {
   let g2 = gcd(b, c1)
   let b1 = b / g2
   let c2 = c1 / g2
-  // Now a1 * b1 / c2 with minimal overflow risk
   if c2 == 0 {
     return 0
   }
@@ -2117,16 +1988,13 @@ fn mul_div(a : Int32, b : Int32, c : Int32) -> Int32 {
 /// Format a scaled chart value for axis/data label display.
 /// Handles "0%", "0.0%", "0.00%", "General", etc.
 fn format_chart_val(val : Int32, num_fmt : String) -> String {
-  // Check if percentage format
   let is_pct = !num_fmt.is_empty() &&
     ({
       let last = num_fmt.get_char(num_fmt.length() - 1).unwrap()
       last == '%'
     })
   if is_pct {
-    // Percentage: multiply by 100 then format
-    // val is scaled ×10000, so 0.381 = 3810.
-    // ×100 = 381000 / 10000 = 38.1
+    // Percentage: val is ×10000, so 0.381 (3810) shows as 38.1.
     let pct_scaled = val * 100 // now scaled ×10000 of percentage value
     // Count decimal places in format (e.g. "0%" = 0, "0.0%" = 1, "0.00%" = 2)
     let mut dec_places = 0
@@ -2144,7 +2012,6 @@ fn format_chart_val(val : Int32, num_fmt : String) -> String {
       fi = fi + 1
     }
     if dec_places == 0 {
-      // Round to integer percentage
       let int_pct = (pct_scaled + chart_val_scale / 2) / chart_val_scale
       int_to_str(int_pct) + "%"
     } else {
@@ -2183,13 +2050,10 @@ fn format_chart_val(val : Int32, num_fmt : String) -> String {
       int_to_str(int_pct) + "." + frac_str + "%"
     }
   } else {
-    // General format: just show the integer part
     let int_val = val / chart_val_scale
     int_to_str(int_val)
   }
 }
-
-// ── Data label rendering ─────────────────────────────────────────────────────
 
 ///|
 /// Build data label text for a single data point.
@@ -2258,7 +2122,6 @@ fn render_bar_data_labels(
     ns * 100 + gap_pct
   }
   let cat_totals = compute_cat_totals(group, nc)
-  // Track stacked offset for label positioning
   let stack_offset : Array[Int32] = Array::make(nc, 0)
   let mut svg = ""
   for si in 0..<ns {
@@ -2369,7 +2232,6 @@ fn render_bar_data_labels(
             }
           }
         }
-        // Update stacked offset (must be outside label visibility check)
         if is_stacked {
           stack_offset[ci] = stack_offset[ci] +
             pct_stacked_val(values[ci], cat_totals[ci], is_pct_stacked)
@@ -2516,8 +2378,6 @@ fn render_pie_data_labels(
   svg
 }
 
-// ── Trendline rendering ─────────────────────────────────────────────────────
-
 ///|
 /// Render trendlines for a chart group (category-based: bar/line/area).
 /// Currently supports linear trendlines (least-squares fit).
@@ -2571,11 +2431,9 @@ fn render_trendlines(
             let numer = n * sum_xy - sum_x * sum_y
             let m = numer / denom // slope in scaled units per x index
             let b = (sum_y - m * sum_x) / n // y-intercept in scaled units
-            // Start point (x=0)
             let y0 = b
             let x_start = px_ + pw / (nc * 2)
             let y_start = py + ph - mul_div(y0, ph, max_val)
-            // End point (x=n-1)
             let yn = m * (n - 1) + b
             let x_end = px_ + ((n - 1) * 2 + 1) * pw / (nc * 2)
             let y_end = py + ph - mul_div(yn, ph, max_val)
@@ -2593,8 +2451,7 @@ fn render_trendlines(
               "\" stroke-width=\"1.5\" stroke-dasharray=\"6,3\"/>"
           }
         }
-        // Other trendline types (exp/log/poly/power/movingAvg)
-        // rendered as a simple straight line from first to last point
+        // exp/log/poly/power/movingAvg trendlines are approximated by a straight line.
         _ => {
           let n = if nv < nc { nv } else { nc }
           if n >= 2 {
@@ -2621,8 +2478,6 @@ fn render_trendlines(
   }
   svg
 }
-
-// ── Error bar rendering ──────────────────────────────────────────────────────
 
 ///|
 /// Render error bars for a chart group (category-based: bar/line).
@@ -2651,7 +2506,6 @@ fn render_err_bars(
         continue
       }
       let val = values[ci]
-      // Calculate error magnitude
       let err = match eb.err_val_type {
         "fixedVal" => eb.val * chart_val_scale
         "percentage" => mul_div(val, eb.val, 100)
@@ -2674,7 +2528,6 @@ fn render_err_bars(
       } else {
         y_center
       }
-      // Vertical line
       svg = svg +
         "<line x1=\"" +
         int_to_str(x) +
@@ -2687,7 +2540,6 @@ fn render_err_bars(
         "\" stroke=\"" +
         color +
         "\" stroke-width=\"1\"/>"
-      // Top cap
       if show_plus {
         svg = svg +
           "<line x1=\"" +
@@ -2702,7 +2554,6 @@ fn render_err_bars(
           color +
           "\" stroke-width=\"1\"/>"
       }
-      // Bottom cap
       if show_minus {
         svg = svg +
           "<line x1=\"" +
@@ -2721,8 +2572,6 @@ fn render_err_bars(
   }
   svg
 }
-
-// ── Trigonometry (integer, hundredths of degrees) ───────────────────────────
 
 // cos(0°..90°) × 1000, lookup table for accurate integer trig
 
@@ -2763,8 +2612,6 @@ fn sin1000(angle_hundredths : Int32) -> Int32 {
   cos1000(angle_hundredths - 9000) // sin(x) = cos(x - 90°)
 }
 
-// ── ChartEx (cx: namespace) renderers ───────────────────────────────────────
-
 ///|
 /// Check if an index is in the subtotals array.
 fn is_subtotal(subtotals : Array[Int32], idx : Int32) -> Bool {
@@ -2797,7 +2644,6 @@ fn render_waterfall_chart(
   if nv == 0 {
     return ""
   }
-  // Compute cumulative positions and find global min/max for axis scaling
   let cumulative : Array[Int32] = Array::make(nv, 0)
   let bar_bottom : Array[Int32] = Array::make(nv, 0)
   let bar_top : Array[Int32] = Array::make(nv, 0)
@@ -2806,7 +2652,6 @@ fn render_waterfall_chart(
   let mut global_max = 0
   for i in 0..<nv {
     if is_subtotal(group.subtotals, i) {
-      // Subtotal: bar from 0 to running total
       bar_bottom[i] = 0
       bar_top[i] = running
     } else {
@@ -2834,16 +2679,13 @@ fn render_waterfall_chart(
   } else {
     compute_axis_max(val_range, axes)
   }
-  // Gap between bars
   let gap_pct = chart_waterfall_gap_pct
   let total_units = nv * 100 + (nv + 1) * gap_pct
   let mut svg = ""
-  // Connector color
   let conn_color = chart_gridline_color
   for i in 0..<nv {
     let bar_x = px_ + mul_div(i * 100 + (i + 1) * gap_pct, pw, total_units)
     let bar_w = mul_div(100, pw, total_units)
-    // Y coordinates (inverted: higher values = lower Y)
     let top_val = if bar_top[i] > bar_bottom[i] {
       bar_top[i]
     } else {
@@ -2883,7 +2725,6 @@ fn render_waterfall_chart(
       "\" fill=\"" +
       color +
       "\"/>"
-    // Connector line from this bar's top to next bar's start
     if i < nv - 1 {
       let next_bar_x = px_ +
         mul_div((i + 1) * 100 + (i + 2) * gap_pct, pw, total_units)
@@ -2901,7 +2742,6 @@ fn render_waterfall_chart(
         conn_color +
         "\" stroke-width=\"1\" stroke-dasharray=\"3,2\"/>"
     }
-    // Category label
     if i < cats.length() {
       svg = svg +
         "<text x=\"" +
@@ -2938,12 +2778,10 @@ fn render_treemap_chart(
   if nv == 0 {
     return ""
   }
-  // Sort indices by value descending (for better layout)
   let indices : Array[Int32] = Array::make(nv, 0)
   for i in 0..<nv {
     indices[i] = i
   }
-  // Simple selection sort (small n)
   for i in 0..<nv {
     let mut max_idx = i
     for j in (i + 1)..<nv {
@@ -3005,7 +2843,6 @@ fn treemap_layout(
       "\" fill=\"" +
       color +
       "\" stroke=\"white\" stroke-width=\"1\"/>"
-    // Label if large enough
     if w > 30 && h > 14 && idx < cats.length() {
       result = result +
         "<text x=\"" +
@@ -3018,7 +2855,6 @@ fn treemap_layout(
     }
     return result
   }
-  // Split roughly in half by value
   let mut half_total = 0
   let mut split = 0
   let half_target = total / 2
@@ -3139,7 +2975,6 @@ fn render_sunburst_chart(
   let cy = py + ph / 2
   let r = (if pw < ph { pw } else { ph }) / 2 - chart_pie_pad
   let inner_r = r * chart_sunburst_inner_pct / 100
-  // Render as donut slices
   let mut svg = ""
   let mut start_angle = chart_pie_start_angle
   for i in 0..<nv {
@@ -3150,12 +2985,10 @@ fn render_sunburst_chart(
     let end_angle = start_angle + sweep
     let color = get_dpt_color(ser.data_points, i, colors)
     let large_arc = if sweep > 18000 { "1" } else { "0" }
-    // Outer arc points
     let sx = cx + mul_div(r, cos1000(start_angle), 1000)
     let sy = cy + mul_div(r, sin1000(start_angle), 1000)
     let ex = cx + mul_div(r, cos1000(end_angle), 1000)
     let ey = cy + mul_div(r, sin1000(end_angle), 1000)
-    // Inner arc points
     let isx = cx + mul_div(inner_r, cos1000(start_angle), 1000)
     let isy = cy + mul_div(inner_r, sin1000(start_angle), 1000)
     let iex = cx + mul_div(inner_r, cos1000(end_angle), 1000)
@@ -3250,7 +3083,6 @@ fn render_funnel_chart(
       "\" fill=\"" +
       color +
       "\" rx=\"2\"/>"
-    // Label
     if i < cats.length() {
       svg = svg +
         "<text x=\"" +
@@ -3286,9 +3118,7 @@ fn render_box_whisker_chart(
   if nv == 0 {
     return ""
   }
-  // For box-whisker we expect data in groups:
-  // Simple approach: if only 1 series, sort values and compute quartiles
-  // per category. If multiple series, treat each series as one box.
+  // One series: quartiles per category. Several series: one box per series.
   let ns = group.series.length()
   if ns >= 2 {
     // Multiple series: each series is one box category
@@ -3311,7 +3141,6 @@ fn render_box_whisker_chart(
       all_quartiles, cats, ns, px_, py, pw, ph, max_val, colors,
     )
   }
-  // Single series: treat values directly as raw data for one box
   let q = compute_quartiles(values)
   if q.length() < 5 {
     return ""
@@ -3353,13 +3182,11 @@ fn render_box_whisker_boxes(
     let box_w = mul_div(100, pw, total_units)
     let cx = box_x + box_w / 2
     let color = colors[ci % colors.length()]
-    // Y coordinates (inverted)
     let min_y = py + ph - mul_div(min_v, ph, max_val)
     let q1_y = py + ph - mul_div(q1, ph, max_val)
     let med_y = py + ph - mul_div(med, ph, max_val)
     let q3_y = py + ph - mul_div(q3, ph, max_val)
     let max_y = py + ph - mul_div(max_v, ph, max_val)
-    // Whisker: vertical line from min to max
     svg = svg +
       "<line x1=\"" +
       int_to_str(cx) +
@@ -3384,7 +3211,6 @@ fn render_box_whisker_boxes(
       "\" stroke=\"" +
       color +
       "\" stroke-width=\"1\"/>"
-    // Whisker caps (horizontal lines at min and max)
     let cap_w = box_w / 3
     svg = svg +
       "<line x1=\"" +
@@ -3410,7 +3236,6 @@ fn render_box_whisker_boxes(
       "\" stroke=\"" +
       color +
       "\" stroke-width=\"1\"/>"
-    // Box: Q1 to Q3
     let box_h = q1_y - q3_y
     let box_h_clamped = if box_h < 1 { 1 } else { box_h }
     svg = svg +
@@ -3427,7 +3252,6 @@ fn render_box_whisker_boxes(
       "\" fill-opacity=\"0.3\" stroke=\"" +
       color +
       "\" stroke-width=\"1.5\"/>"
-    // Median line
     svg = svg +
       "<line x1=\"" +
       int_to_str(box_x) +
@@ -3440,7 +3264,6 @@ fn render_box_whisker_boxes(
       "\" stroke=\"" +
       color +
       "\" stroke-width=\"2\"/>"
-    // Category label
     if ci < cats.length() {
       svg = svg +
         "<text x=\"" +
@@ -3464,12 +3287,10 @@ fn compute_quartiles(values : Array[Int32]) -> Array[Int32] {
   if n == 0 {
     return []
   }
-  // Copy and sort
   let sorted : Array[Int32] = Array::make(n, 0)
   for i in 0..<n {
     sorted[i] = values[i]
   }
-  // Simple insertion sort (typically small n for chart data)
   for i in 1..<n {
     let key = sorted[i]
     let mut j = i - 1

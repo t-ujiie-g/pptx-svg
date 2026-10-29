@@ -1,12 +1,6 @@
 /**
- * Wasm js-string builtins compatibility layer.
- *
- * Provides 4-tier fallback for instantiating MoonBit Wasm modules
- * that use `use-js-builtin-string: true`:
- *   - Tier 1: Native `{ builtins: ['js-string'] }` (Chrome 117+, FF 120+, Safari 17+)
- *   - Tier 1b: `{ builtins: ['js-string'] }` + manual '_' module as plain strings (Node.js 22+)
- *   - Tier 2: `{ importedStringConstants: '_' }` + manual wasm:js-string (Chrome 115-116)
- *   - Tier 3: Fully manual Global(externref) for '_' module (Chrome 111+)
+ * Instantiation fallbacks for `use-js-builtin-string` Wasm across browsers and Node.js;
+ * the tiers are described in CLAUDE.md.
  */
 
 /** Manual implementations of wasm:js-string builtin functions. */
@@ -17,10 +11,7 @@ const JS_STRING_MODULE: Record<string, Function> = {
   concat:     (a: string | null, b: string | null) => (a ?? '') + (b ?? ''),
 };
 
-/**
- * Parse the Wasm binary's import section to extract all '_' module
- * string-constant field names dynamically.
- */
+/** The `_` module string-constant names, read from the Wasm import section. */
 export function parseWasmStringConstants(buffer: ArrayBuffer): string[] {
   const data = new Uint8Array(buffer);
   let pos = 8; // skip 4-byte magic + 4-byte version
@@ -72,10 +63,7 @@ export function parseWasmStringConstants(buffer: ArrayBuffer): string[] {
   return constants;
 }
 
-/**
- * Build the '_' import module as WebAssembly.Global(externref) objects.
- * Used for Tier 3 fallback in browsers (Chrome 111+).
- */
+/** The `_` module as `WebAssembly.Global(externref)` values (Tier 3, Chrome 111+). */
 function makeUnderscoreModule(constants: string[]): Record<string, WebAssembly.Global> {
   const mod: Record<string, WebAssembly.Global> = {};
   for (const s of constants) {
@@ -84,11 +72,7 @@ function makeUnderscoreModule(constants: string[]): Record<string, WebAssembly.G
   return mod;
 }
 
-/**
- * Build the '_' import module as plain string values.
- * Used for Tier 1b fallback (Node.js 22+ where builtins works but
- * importedStringConstants does not automatically resolve '_' module).
- */
+/** The `_` module as plain strings (Tier 1b: Node.js 22+ supports builtins but won't resolve `_`). */
 function makeUnderscoreModulePlain(constants: string[]): Record<string, string> {
   const mod: Record<string, string> = {};
   for (const s of constants) {
@@ -97,13 +81,7 @@ function makeUnderscoreModulePlain(constants: string[]): Record<string, string> 
   return mod;
 }
 
-/**
- * Instantiate a Wasm module with three-tier js-string builtins fallback.
- *
- * @param bytes - Raw .wasm bytes
- * @param importObject - Base import object (pptx_ffi, moonbit:ffi)
- * @returns Instantiated Wasm source
- */
+/** Instantiate the module, trying each js-string tier in turn. */
 export async function instantiateWasmWithFallback(
   bytes: ArrayBuffer,
   importObject: Record<string, Record<string, unknown>>,
@@ -122,9 +100,7 @@ export async function instantiateWasmWithFallback(
   } catch (e1: any) {
     l.info('Tier-1 failed:', e1.message, '— trying tier-1b');
 
-    // Tier 1b: builtins + manual '_' module as plain strings (Node.js 22+)
-    // Node.js supports builtins:['js-string'] but does not auto-resolve '_' module,
-    // and requires plain string values instead of Global(externref).
+    // Tier 1b (Node.js 22+): builtins, with `_` supplied as plain strings.
     const imports1b = { ...importObject, '_': makeUnderscoreModulePlain(stringConstants) };
     try {
       const r = await (WebAssembly as any).instantiate(bytes, imports1b, { builtins: ['js-string'] });

@@ -1,11 +1,7 @@
-// `assert_eq` from `@test` uses the `Debug` trait for failure messages.
-// The deprecated builtin `assert_eq` falls back to `Show`, which is no longer
-// derived for option / collection types in current MoonBit.
+// @test.assert_eq reports through Debug; the deprecated builtin needs Show.
 
 ///|
 using @test {assert_eq}
-
-// ── Color constructors ──────────────────────────────────────────────────────
 
 ///|
 test "Color::white" {
@@ -30,8 +26,6 @@ test "Color::none" {
   let c = @ooxml.Color::none()
   assert_true(c.is_none())
 }
-
-// ── parse_hex_color ─────────────────────────────────────────────────────────
 
 ///|
 test "parse_hex_color 6-char" {
@@ -59,8 +53,6 @@ test "parse_hex_color short string" {
   assert_eq(c.g, 0)
   assert_eq(c.b, 0)
 }
-
-// ── Color::to_hex / to_hex_rgb / to_css ─────────────────────────────────────
 
 ///|
 test "Color::to_hex roundtrip" {
@@ -100,16 +92,12 @@ test "Color::to_css none" {
   assert_eq(@ooxml.Color::none().to_css(), "none")
 }
 
-// ── alpha_to_css_str ────────────────────────────────────────────────────────
-
 ///|
 test "alpha_to_css_str" {
   assert_eq(@ooxml.alpha_to_css_str(255), "1")
   assert_eq(@ooxml.alpha_to_css_str(0), "0")
   assert_eq(@ooxml.alpha_to_css_str(128), "0.50")
 }
-
-// ── resolve_scheme_color ────────────────────────────────────────────────────
 
 ///|
 test "resolve_scheme_color basic" {
@@ -128,9 +116,7 @@ test "resolve_scheme_color basic" {
 }
 
 ///|
-/// Regression: applying an inverted ColorMap (bg1="dk1", tx1="lt1") must not
-/// corrupt the theme's physical slots. Direct `<a:schemeClr val="dk1"/>` must
-/// still resolve to the original theme.dk1 (#000000), not the lt1 color.
+/// An inverted ColorMap must not change the physical slots: `dk1` stays theme.dk1.
 test "apply_color_map preserves physical slot identity" {
   let theme : @ooxml.ThemeData = {
     ..@ooxml.ThemeData::default(),
@@ -164,8 +150,6 @@ test "apply_color_map preserves physical slot identity" {
   let tx1 = @ooxml.resolve_scheme_color("tx1", remapped)
   assert_eq(tx1.r, 238)
 }
-
-// ── apply_color_modifiers ───────────────────────────────────────────────────
 
 ///|
 test "apply_color_modifiers empty" {
@@ -209,13 +193,9 @@ test "apply_color_modifiers tint" {
 }
 
 ///|
-/// Regression: a:hueOff val is in 60000ths of a degree. The conversion to the
-/// internal hue scale (tenths of a degree) must divide by 6000 — not by 60.
-/// The previous formula (val / 600 * 10) over-shifted hue by 100x.
+/// hueOff is in 1/60000°: divide by 6000 for tenths of a degree (val / 600 · 10 was 100× off).
 test "apply_color_modifiers hueOff is in correct degrees" {
-  // Pure red (h=0). Apply hueOff val=60000 (= 1° offset). Result should be
-  // *almost* red, not yellow/green. With the old buggy formula val/600*10
-  // = 1000, the hue would jump to 100°, turning red into green.
+  // 1° off pure red is still red; the 100× error turned it green.
   let c = @ooxml.parse_hex_color("FF0000")
   let nodes = @xml.parse_xml("<a:hueOff val=\"60000\"/>")
   let result = @ooxml.apply_color_modifiers(c, nodes)
@@ -224,8 +204,6 @@ test "apply_color_modifiers hueOff is in correct degrees" {
   assert_true(result.g < 10)
   assert_true(result.b < 10)
 }
-
-// ── parse_geom / to_prst ────────────────────────────────────────────────────
 
 ///|
 test "parse_geom basic shapes" {
@@ -267,8 +245,6 @@ test "parse_connector_geom" {
   )
 }
 
-// ── parse_rels ──────────────────────────────────────────────────────────────
-
 ///|
 test "parse_rels basic" {
   let xml = "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image1.png\"/></Relationships>"
@@ -281,8 +257,6 @@ test "parse_rels basic" {
   assert_eq(@ooxml.find_rel_target(rels, "rId2"), "../media/image1.png")
   assert_eq(@ooxml.find_rel_target(rels, "rId99"), "")
 }
-
-// ── parse_slide_size ────────────────────────────────────────────────────────
 
 ///|
 test "parse_slide_size standard" {
@@ -298,8 +272,6 @@ test "parse_slide_size widescreen" {
   let size = @ooxml.parse_slide_size(xml)
   assert_eq(size.cx, 12192000)
 }
-
-// ── EffectList / Shadow / Glow ──────────────────────────────────────────────
 
 ///|
 test "EffectList::none" {
@@ -404,11 +376,8 @@ test "Blur::none and is_none" {
 
 ///|
 test "parse_slide captures endParaRPr into paragraph epr_* fields" {
-  // endParaRPr color/size/font should be stored on the paragraph as
-  // last-resort fallbacks, NOT pre-merged into runs. A run with no explicit
-  // color must still parse with Color::none() so layout/master inheritance
-  // can run first; the epr_* values are only applied as the final fallback
-  // in main_inherit.mbt::apply_epr_fallbacks().
+  // endParaRPr stays on the paragraph (epr_*), not merged into runs: placeholder
+  // inheritance must run first.
   let slide_xml =
     #|<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -442,8 +411,6 @@ test "parse_slide captures endParaRPr into paragraph epr_* fields" {
   assert_eq(paras[0].epr_color.g, 255)
   assert_eq(paras[0].epr_color.b, 255)
   assert_eq(paras[0].epr_font_face, "Arial")
-  // The run itself must still have no explicit color/size — those are only
-  // applied later in apply_epr_fallbacks, after layout/master inheritance.
   assert_true(paras[0].runs[0].color.is_none())
   assert_eq(paras[0].runs[0].font_size, 0)
   // Paragraph 1 has no endParaRPr — epr_* stays empty.
@@ -491,9 +458,7 @@ test "BlipFill::is_none considers svg_rid" {
   // Raster-only (r:embed) — not none
   let bf_raster : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), rid: "rId7", }
   assert_false(bf_raster.is_none())
-  // SVG-only (asvg:svgBlip, no r:embed) — not none. This is the regression
-  // fixed for cover-slide SVG logos: previously is_none() returned true and
-  // the picture shape rendered as a placeholder rectangle.
+  // An SVG-only blip (no r:embed) is not none (it rendered as a placeholder rect).
   let bf_svg : @ooxml.BlipFill = { ..@ooxml.BlipFill::none(), svg_rid: "rId8", }
   assert_false(bf_svg.is_none())
   // Both set — not none
@@ -538,10 +503,7 @@ test "EffectList with single effect is not none" {
 
 ///|
 test "parse_theme captures fmtScheme fill/ln style lists" {
-  // Minimal theme with one fillStyleLst entry (gradient using phClr) and one
-  // lnStyleLst entry. Both should survive into ThemeData as raw XML with the
-  // `phClr` placeholder intact, so that resolve_fill_ref / resolve_ln_ref can
-  // later substitute the referenced scheme color.
+  // fmtScheme entries are kept as raw XML with phClr, for fillRef/lnRef to substitute.
   let theme_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
@@ -578,7 +540,6 @@ test "parse_theme captures fmtScheme fill/ln style lists" {
     #|  </a:themeElements>
     #|</a:theme>
   let theme = @ooxml.parse_theme(theme_xml)
-  // Two fill styles captured, one ln style captured.
   assert_eq(theme.fill_style_xmls.length(), 2)
   assert_eq(theme.ln_style_xmls.length(), 1)
   // phClr placeholder must still be present (substitution happens at resolve time).
@@ -589,9 +550,7 @@ test "parse_theme captures fmtScheme fill/ln style lists" {
 
 ///|
 test "parse_slide resolves p:style/a:fillRef via theme fmtScheme" {
-  // Shape has no explicit fill/line in spPr, only a <p:style>/<a:fillRef idx=2>
-  // pointing at the theme's fmtScheme. The gradient fill should be substituted
-  // in and applied to the shape.
+  // With no spPr fill, the p:style fillRef idx=2 gradient applies.
   let theme_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
@@ -662,9 +621,7 @@ test "parse_slide resolves p:style/a:fillRef via theme fmtScheme" {
 
 ///|
 test "parse_slide resolves p:style/a:fontRef color via theme" {
-  // A free shape (no placeholder) with no explicit text color but
-  // <p:style>/<a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef>.
-  // Shape.font_ref_color should resolve to the theme's lt1 (white).
+  // A free shape's p:style fontRef (lt1) gives font_ref_color white.
   let theme_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
@@ -711,18 +668,12 @@ test "parse_slide resolves p:style/a:fontRef color via theme" {
   assert_eq(shape.font_ref_color.r, 255)
   assert_eq(shape.font_ref_color.g, 255)
   assert_eq(shape.font_ref_color.b, 255)
-  // The run itself has no explicit color at parse time — the fallback is
-  // applied later in main_inherit.apply_font_ref_fallback.
   assert_true(shape.paragraphs[0].runs[0].color.is_none())
 }
 
 ///|
 test "parse_slide captures lstStyle buAutoNum into level defaults" {
-  // a:lstStyle/a:lvl1pPr/a:buAutoNum type="arabicPeriod" should populate
-  // Shape.lst_style.levels[0].bullet_auto so that placeholder inheritance can
-  // apply it to slide paragraphs.  The earlier bug: we parsed a:buChar but not
-  // a:buAutoNum, so numbered-list layouts inherited nothing and fell back to
-  // the default "•" bullet.
+  // lvl1pPr/a:buAutoNum must reach lst_style, or numbered layouts fall back to "•".
   let slide_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -755,8 +706,7 @@ test "parse_slide captures lstStyle buAutoNum into level defaults" {
 
 ///|
 test "parse_slide explicit fill wins over p:style/a:fillRef" {
-  // When spPr carries an explicit fill (solidFill or noFill), the p:style
-  // fillRef must be ignored — explicit properties always take precedence.
+  // An explicit spPr fill (solidFill or noFill) overrides the p:style fillRef.
   let theme_xml =
     #|<?xml version="1.0" encoding="UTF-8"?>
     #|<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Test">
@@ -910,8 +860,6 @@ test "EffectList with fill_overlay is not none" {
   assert_eq(e.fill_overlay.blend, "screen")
 }
 
-// ── GradientFill / BlipFill / PatternFill ───────────────────────────────────
-
 ///|
 test "GradientFill::none" {
   assert_true(@ooxml.GradientFill::none().is_none())
@@ -928,8 +876,6 @@ test "PatternFill::none" {
   assert_true(@ooxml.PatternFill::none().is_none())
 }
 
-// ── Shape3d / Scene3d / Bevel ───────────────────────────────────────────────
-
 ///|
 test "Shape3d::none" {
   assert_true(@ooxml.Shape3d::none().is_none())
@@ -944,8 +890,6 @@ test "Scene3d::none" {
 test "Bevel::none" {
   assert_true(@ooxml.Bevel::none().is_none())
 }
-
-// ── ChartEx parsing ─────────────────────────────────────────────────────────
 
 ///|
 test "parse_chartex_xml waterfall" {
@@ -997,7 +941,6 @@ test "parse_chartex_xml waterfall" {
   assert_eq(chart.groups[0].subtotals.length(), 1)
   assert_eq(chart.groups[0].subtotals[0], 2)
   assert_eq(chart.groups[0].series.length(), 1)
-  // Check data was mapped correctly
   let cats = match chart.groups[0].series[0].cat {
     StrSource(_, data) => data.points
     _ => []
@@ -1078,7 +1021,6 @@ test "parse_chartex_xml treemap" {
 
 ///|
 test "parse_chartex_xml all layout types" {
-  // Test all 6 layout types map to correct ChartKind
   let layout_ids = [
     "waterfall", "treemap", "sunburst", "boxWhisker", "funnel", "clusteredColumn",
   ]
@@ -1178,7 +1120,6 @@ test "parse_chartex_xml waterfall values and multiple subtotals" {
   assert_eq(chart.groups[0].subtotals.length(), 2)
   assert_eq(chart.groups[0].subtotals[0], 2)
   assert_eq(chart.groups[0].subtotals[1], 4)
-  // Values parsed correctly
   let vals = match chart.groups[0].series[0].val {
     NumSource(_, data) => data.points
     _ => []
@@ -1236,12 +1177,8 @@ test "parse_chartex_xml histogram no strDim" {
   )
 }
 
-// ── SmartArt diagram (dsp:) cached-drawing parsing ──────────────────────────
-
 ///|
-/// A SmartArt cached drawing (ppt/drawings/drawingN.xml) uses the `dsp:`
-/// namespace, which maps 1:1 onto `p:` shapes. `parse_diagram_drawing` should
-/// extract the laid-out shapes (geometry, fill, text) from the dsp:spTree.
+/// parse_diagram_drawing reads the laid-out dsp: shapes (geometry, fill, text).
 test "parse_diagram_drawing extracts dsp shapes" {
   let xml =
     #|<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -1253,27 +1190,21 @@ test "parse_diagram_drawing extracts dsp shapes" {
     #|</dsp:spTree></dsp:drawing>
   let shapes = @ooxml.parse_diagram_drawing(xml, @ooxml.ThemeData::default())
   assert_eq(shapes.length(), 1)
-  // Geometry is a roundRect
   assert_true(
     match shapes[0].kind {
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::RoundRect(_)) => true
       _ => false
     },
   )
-  // Transform parsed from a:xfrm
   assert_eq(shapes[0].transform.x, 100)
   assert_eq(shapes[0].transform.cx, 1000)
-  // Text run extracted
   assert_eq(shapes[0].paragraphs[0].runs[0].text, "Research")
   // Empty <a:bodyPr/> defaults to center anchor for SmartArt text
   assert_eq(shapes[0].body_props.anchor, "ctr")
 }
 
 ///|
-/// SmartArt cached drawings usually omit run colors; the text color comes from
-/// the diagram colors part (dgm:txLinClrLst). `parse_diagram_text_color` should
-/// resolve the first text color, and `apply_diagram_text_color` should fill it
-/// into runs that lack an explicit color (leaving explicit ones untouched).
+/// The SmartArt text color comes from the colors part and fills only uncolored runs.
 test "diagram text color resolution + apply" {
   let colors_xml =
     #|<dgm:colorsDef xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">

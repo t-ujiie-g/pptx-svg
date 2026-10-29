@@ -1,11 +1,4 @@
-// OOXML / PPTX types, color utilities, and parser entry points
-//
-// Extracts shape data from slide XML and .rels files.
-// All positions/sizes are in EMUs (English Metric Units).
-//   1 inch = 914400 EMU,  1 pt = 12700 EMU,  1 cm = 360000 EMU
-// Standard slide: 9144000 x 6858000 EMU (10in x 7.5in)
-
-// ── Shared constants ─────────────────────────────────────────────────────────
+// Positions and sizes are in EMU: 1 in = 914400, 1 pt = 12700, 1 cm = 360000.
 
 ///|
 /// 1 pt = 12700 EMU.
@@ -34,8 +27,6 @@ pub let char_spc_dpi : Int32 = 96
 ///|
 /// Hundredths-of-a-point per inch (for char spacing conversion).
 pub let hundredth_pt_per_inch : Int32 = 7200
-
-// ── Color ─────────────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct Color {
@@ -218,8 +209,6 @@ fn hex_nibble(n : Int32) -> String {
   }
 }
 
-// ── Gradient fill ────────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct GradientStop {
   pos : Int32 // 0-100000 (1/1000%)
@@ -258,8 +247,6 @@ pub fn GradientFill::none() -> GradientFill {
 pub fn GradientFill::is_none(self : GradientFill) -> Bool {
   self.stops.is_empty()
 }
-
-// ── Blip (image) fill ───────────────────────────────────────────────────
 
 ///|
 pub(all) struct BlipFill {
@@ -321,8 +308,6 @@ pub fn BlipFill::has_crop(self : BlipFill) -> Bool {
   self.src_l > 0 || self.src_t > 0 || self.src_r > 0 || self.src_b > 0
 }
 
-// ── Pattern fill ────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct PatternFill {
   prst : String // preset pattern name; "" = none
@@ -339,8 +324,6 @@ pub fn PatternFill::none() -> PatternFill {
 pub fn PatternFill::is_none(self : PatternFill) -> Bool {
   self.prst.is_empty()
 }
-
-// ── Theme data ───────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct ThemeData {
@@ -364,9 +347,8 @@ pub(all) struct ThemeData {
   // Indexed 0-based; <p:style>/<a:fillRef idx="N"> uses 1-based (and idx 0 = no fill).
   fill_style_xmls : Array[String]
   ln_style_xmls : Array[String]
-  // Effective ColorMap for resolving logical names (bg1/tx1/bg2/tx2, accents, hlink).
-  // The physical slots above stay unchanged so that direct references like
-  // `<a:schemeClr val="dk1"/>` always return the theme's original dk1.
+  // Maps logical names (bg1/tx1/…) onto the slots above, which stay physical: `dk1` is
+  // always the theme's own dk1.
   clr_map : ColorMap
 }
 
@@ -396,10 +378,8 @@ pub fn ThemeData::default() -> ThemeData {
 }
 
 ///|
-/// Resolve a scheme color name to a Color from the theme.
-/// Logical names (bg1/tx1/bg2/tx2, accent1-6, hlink, folHlink) go through the
-/// theme's effective `clr_map`; physical names (dk1/lt1/dk2/lt2) resolve
-/// directly. This matches ECMA-376 §19.5.0 / §20.1.6.2.
+/// A scheme color from the theme: logical names go through `clr_map`, physical ones
+/// (dk1/lt1/dk2/lt2) resolve directly (ECMA-376 §20.1.6.2).
 pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
   let cmap = theme.clr_map
   let resolved = if name == "bg1" {
@@ -432,8 +412,6 @@ pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
   resolve_slot(resolved, theme)
 }
 
-// ── RGB ↔ HSL conversion ────────────────────────────────────────────────────
-
 ///|
 fn min3(a : Int32, b : Int32, c : Int32) -> Int32 {
   let m = if a < b { a } else { b }
@@ -454,8 +432,6 @@ fn max3(a : Int32, b : Int32, c : Int32) -> Int32 {
   }
 }
 
-// ── Integer square root (for gamma approximation) ───────────────────────────
-
 ///|
 /// Integer square root via Newton's method.
 fn int_sqrt(n : Int32) -> Int32 {
@@ -471,7 +447,6 @@ fn int_sqrt(n : Int32) -> Int32 {
   x
 }
 
-// ── HSL color space constants (integer-scaled) ──────────────────────────────
 // Hue: 0-3600 (tenths of a degree), Saturation/Lightness: 0-1000 (tenths of %)
 
 ///|
@@ -499,8 +474,7 @@ let hue_two_thirds : Int32 = 2400 // hue_full * 2 / 3
 let rgb_sum_max : Int32 = 510 // rgb_max * 2
 
 ///|
-/// Convert RGB (0-255) to HSL (h: 0-3600, s: 0-1000, l: 0-1000).
-///  Uses integer arithmetic scaled by 1000 to avoid floating point.
+/// RGB (0-255) to integer HSL (h 0-3600, s and l 0-1000).
 fn rgb_to_hsl(r : Int32, g : Int32, b : Int32) -> (Int32, Int32, Int32) {
   let max_c = max3(r, g, b)
   let min_c = min3(r, g, b)
@@ -573,11 +547,9 @@ fn hsl_to_rgb(h : Int32, s : Int32, l : Int32) -> Color {
   { r: clamp(r), g: clamp(g), b: clamp(b), alpha: 255, }
 }
 
-// ── Color modifiers ─────────────────────────────────────────────────────────
-
 ///|
-/// Apply OOXML color modifier children (lumMod, lumOff, shade, tint, etc.)
-///  to a base color. modifier_nodes are children of <a:schemeClr> or <a:srgbClr>.
+/// Apply the color modifiers (lumMod, shade, tint, …) among `modifier_nodes`, the
+/// children of an `a:schemeClr` / `a:srgbClr`.
 pub fn apply_color_modifiers(
   color : Color,
   modifier_nodes : Array[@xml.XmlNode],
@@ -602,8 +574,7 @@ pub fn apply_color_modifiers(
           g = g * val / pct_100
           b = b * val / pct_100
         } else if tag == "a:tint" {
-          // tint: val% of original + (100-val)% of white
-          // ECMA-376: "A 10% tint is 10% of the input color combined with 90% white"
+          // tint: val% of the color mixed with (100 - val)% white (ECMA-376).
           r = rgb_max - (rgb_max - r) * val / pct_100
           g = rgb_max - (rgb_max - g) * val / pct_100
           b = rgb_max - (rgb_max - b) * val / pct_100
@@ -612,7 +583,6 @@ pub fn apply_color_modifiers(
         } else if tag == "a:lumOff" {
           lum_off = val
         } else if tag == "a:satMod" {
-          // Saturation modification via HSL
           let (h, s, l) = rgb_to_hsl(r, g, b)
           let new_s = s * val / pct_100
           let ns = if new_s > hsl_scale { hsl_scale } else { new_s }
@@ -624,10 +594,8 @@ pub fn apply_color_modifiers(
           // alpha: val is in 1/1000th percent (0-100000)
           alpha_val = val * 255 / pct_100
         } else if tag == "a:alphaModFix" {
-          // Fixed alpha modulation
           alpha_val = alpha_val * val / pct_100
         } else if tag == "a:comp" {
-          // Complement: rotate hue by 180°
           let (h, s, l) = rgb_to_hsl(r, g, b)
           let new_h = (h + 1800) % 3600
           let c2 = hsl_to_rgb(new_h, s, l)
@@ -635,20 +603,16 @@ pub fn apply_color_modifiers(
           g = c2.g
           b = c2.b
         } else if tag == "a:inv" {
-          // Invert RGB channels
           r = rgb_max - r
           g = rgb_max - g
           b = rgb_max - b
         } else if tag == "a:gamma" {
-          // Gamma correction — sRGB linearize (approximate)
-          // Standard gamma ≈ 2.2; this maps sRGB → linear
-          // Use integer approximation: (v/255)^2.2 * 255 ≈ v*v/255
+          // gamma: sRGB → linear, approximating (v/255)^2.2 · 255 as v²/255.
           r = r * r / rgb_max
           g = g * g / rgb_max
           b = b * b / rgb_max
         } else if tag == "a:invGamma" {
-          // Inverse gamma — linear → sRGB (approximate)
-          // (v/255)^(1/2.2) * 255 ≈ isqrt(v*255)
+          // invGamma: linear → sRGB, approximating (v/255)^(1/2.2) · 255 as √(255v).
           r = int_sqrt(r * rgb_max)
           g = int_sqrt(g * rgb_max)
           b = int_sqrt(b * rgb_max)
@@ -661,8 +625,7 @@ pub fn apply_color_modifiers(
           g = c2.g
           b = c2.b
         } else if tag == "a:hueOff" {
-          // Hue offset: val is in 60000ths of a degree, h is in tenths of a degree.
-          // 1 degree = 60000 val-units = 10 h-units, so divide by 6000.
+          // hueOff is in 1/60000°, h in tenths of a degree: divide by 6000.
           let (h, s, l) = rgb_to_hsl(r, g, b)
           let offset = val / 6000
           let mut new_h = h + offset
@@ -708,7 +671,6 @@ pub fn apply_color_modifiers(
     g = c2.g
     b = c2.b
   }
-  // Clamp
   if r < 0 {
     r = 0
   } else if r > rgb_max {
@@ -731,8 +693,6 @@ pub fn apply_color_modifiers(
   }
   { r, g, b, alpha: alpha_val, }
 }
-
-// ── Master / Layout types ────────────────────────────────────────────────────
 
 ///|
 pub(all) struct LevelTextDefaults {
@@ -810,8 +770,6 @@ pub fn MasterTextStyles::empty() -> MasterTextStyles {
   }
 }
 
-// ── Color map (scheme color remapping) ───────────────────────────────────────
-
 ///|
 pub(all) struct ColorMap {
   bg1 : String
@@ -868,8 +826,6 @@ pub(all) struct SlideLayoutData {
   clr_map_ovr : ColorMap? // None = inherit master's color map
 }
 
-// ── Text model ────────────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct TextRun {
   text : String
@@ -892,12 +848,9 @@ pub(all) struct TextRun {
   hlink_rid : String // hyperlink relationship ID from <a:hlinkClick r:id="...">; "" = none
   hlink_mouse_over_rid : String // hover hyperlink from <a:hlinkHover r:id="...">; "" = none
   effects : EffectList // a:effectLst on a:rPr; text-level effects (shadow, glow, etc.)
-  // Text outline: a:rPr/a:ln — stroke on text glyphs
   outline_color : Color // solid fill color; Color::none() = no outline
   outline_w : Int32 // width in EMU (a:ln w="..."); 0 = default (12700)
-  // Text gradient fill: a:rPr/a:gradFill — gradient on text glyphs
   text_grad_fill : GradientFill // gradient fill; GradientFill::none() = no gradient
-  // Text pattern fill: a:rPr/a:pattFill
   text_patt_fill : PatternFill // pattern fill; PatternFill::none() = no pattern
   // OMML math equation: raw XML for round-trip; "" = normal text run
   math_xml : String // raw m:oMath or m:oMathPara XML; "" = not a math run
@@ -928,16 +881,13 @@ pub(all) struct TextParagraph {
   bullet_img_rid : String // a:buBlip r:embed; "" = none
   tab_stops : Array[TabStop] // a:tabLst/a:tab
   rtl : Bool // right-to-left paragraph direction (a:pPr rtl="1")
-  // endParaRPr fallbacks — applied as last-resort defaults for runs missing
-  // values, AFTER layout/master inheritance has had a chance to fill them.
-  // A value of 0 / "" / Color::none() means "endParaRPr did not supply this".
+  // endParaRPr values, applied to runs only after layout/master inheritance;
+  // 0 / "" / Color::none() = not supplied.
   epr_font_size : Int32
   epr_color : Color
   epr_font_face : String
   epr_ea_font : String
 }
-
-// ── Text body properties ────────────────────────────────────────────────────
 
 ///|
 /// Default text outline width: 12700 EMU = 1 pt (OOXML default for a:ln on a:rPr).
@@ -959,8 +909,7 @@ pub let cust_dash_prefix_len : Int32 = 9
 pub let max_outline_levels : Int32 = 9
 
 ///|
-/// OOXML default `adj` for `prstGeom prst="roundRect"` (16.667% of the short side).
-/// Per ECMA-376 presetShapeDefinitions/roundRect: `<a:gd name="adj" fmla="val 16667"/>`.
+/// Default roundRect `adj` (16.667% of the short side, ECMA-376 presetShapeDefinitions).
 pub let round_rect_default_adj : Int32 = 16667
 
 ///|
@@ -978,7 +927,6 @@ pub(all) struct BodyProps {
   vert : String // vertical text: "vert"/"eaVert"/"vert270"/"wordArtVert"; "" = horizontal
   num_cols : Int32 // number of text columns; 0 = default (1)
   col_spacing : Int32 // spacing between columns in EMU; 0 = default
-  // Text warp: a:prstTxWarp prst="..." — preset text warp effect
   warp_prst : String // preset name e.g. "textWave1"; "" = none
   warp_av1 : Int32 // adjust value 1 (from a:avLst a:gd fmla="val N"); -1 = default
   warp_av2 : Int32 // adjust value 2; -1 = default
@@ -1006,14 +954,11 @@ pub fn BodyProps::default() -> BodyProps {
   }
 }
 
-// ── Table model ──────────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct TableCell {
   paragraphs : Array[TextParagraph]
   fill : Color
   grad_fill : GradientFill
-  // Cell merge
   grid_span : Int32 // horizontal merge span (1 = no merge)
   row_span : Int32 // vertical merge span (1 = no merge)
   v_merge : Bool // true = this cell is merged into the cell above
@@ -1027,7 +972,6 @@ pub(all) struct TableCell {
   bdr_r_color : Color
   bdr_t_color : Color
   bdr_b_color : Color
-  // Diagonal borders
   bdr_tl_br_w : Int32 // top-left to bottom-right
   bdr_tl_br_color : Color
   bdr_bl_tr_w : Int32 // bottom-left to top-right
@@ -1042,8 +986,7 @@ pub(all) struct TableCell {
 }
 
 ///|
-/// An empty table cell with parser defaults (no text, no merge, no fill/borders,
-/// default margins/anchor). Used when adding rows/columns.
+/// An empty table cell with parser defaults, for inserted rows and columns.
 pub fn TableCell::empty() -> TableCell {
   {
     paragraphs: [],
@@ -1083,7 +1026,6 @@ pub(all) struct TableRow {
 pub(all) struct TableData {
   col_widths : Array[Int32] // EMU per column
   rows : Array[TableRow]
-  // Table properties from a:tblPr
   style_id : String // tblStyleId UUID (empty = none)
   first_row : Bool
   last_row : Bool
@@ -1092,8 +1034,6 @@ pub(all) struct TableData {
   band_row : Bool
   band_col : Bool
 }
-
-// ── Table style model ────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct TableStyleCell {
@@ -1173,8 +1113,6 @@ pub fn TableStyleDef::none() -> TableStyleDef {
   }
 }
 
-// ── Shape geometry ────────────────────────────────────────────────────────────
-
 ///|
 pub(all) enum ShapeGeom {
   Rect
@@ -1239,11 +1177,8 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
   }
 }
 
-// ── Effects ──────────────────────────────────────────────────────────────────
-
 ///|
-/// Outer shadow (a:outerShdw).
-/// blurRad/dist in EMU, dir in 60000ths of a degree (0=right, 5400000=bottom).
+/// Outer shadow (a:outerShdw): blurRad/dist in EMU, dir in 1/60000° (0 = right).
 pub(all) struct OuterShadow {
   blur_rad : Int32 // blurRad in EMU; 0 = no blur
   dist : Int32 // dist in EMU; 0 = no offset
@@ -1343,8 +1278,7 @@ pub fn Blur::is_none(self : Blur) -> Bool {
 }
 
 ///|
-/// Preset shadow effect (a:prstShdw).
-/// Maps to predefined outer shadow parameters based on preset name.
+/// Preset shadow effect (a:prstShdw), mapped onto outer-shadow parameters by name.
 pub(all) struct PresetShadow {
   prst : String // preset name: "shdw1".."shdw20"; "" = none
   dist : Int32 // dist in EMU
@@ -1363,14 +1297,9 @@ pub fn PresetShadow::is_none(self : PresetShadow) -> Bool {
 }
 
 ///|
-/// Get blur radius for a preset shadow (shdw1-shdw20).
-/// Values based on ECMA-376 §20.1.10.52 preset shadow definitions.
+/// Blur radius of a preset shadow shdw1-shdw20 (ECMA-376 §20.1.10.52).
 pub fn PresetShadow::blur_rad(self : PresetShadow) -> Int32 {
-  // shdw1-shdw8: offset shadows — moderate blur
-  // shdw9: center shadow — large blur
-  // shdw10-shdw12: perspective shadows — moderate blur
-  // shdw13-shdw16: inside shadows — moderate blur
-  // shdw17-shdw20: below perspective — large blur
+  // shdw9 (centre) and shdw17-20 (below perspective) blur more than the rest.
   if self.prst == "shdw9" {
     76200 // 6pt
   } else if self.prst == "shdw17" ||
@@ -1420,8 +1349,7 @@ pub fn Reflection::is_none(self : Reflection) -> Bool {
 }
 
 ///|
-/// Fill overlay effect (a:fillOverlay).
-/// Overlays a fill on top of the shape with a specified blend mode.
+/// Fill overlay effect (a:fillOverlay): a fill blended over the shape.
 pub(all) struct FillOverlay {
   blend : String // blend mode: "over", "mult", "screen", "darken", "lighten"; "" = none
   color : Color // overlay solid fill color with alpha
@@ -1475,8 +1403,6 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
   self.prst_shadow.is_none() &&
   self.fill_overlay.is_none()
 }
-
-// ── 3D ───────────────────────────────────────────────────────────────────────
 
 ///|
 /// Bevel definition (a:bevelT / a:bevelB).
@@ -1548,8 +1474,6 @@ pub fn Scene3d::none() -> Scene3d {
 pub fn Scene3d::is_none(self : Scene3d) -> Bool {
   self.camera_prst.is_empty() && self.light_rig.is_empty()
 }
-
-// ── Shape ─────────────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct ShapeTransform {
@@ -1731,8 +1655,6 @@ pub fn Shape::default_with_blip(
   { ..Shape::default_with(kind, transform), blip_fill, }
 }
 
-// ── Slide data ────────────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct SlideSize {
   cx : Int32
@@ -1758,8 +1680,6 @@ pub(all) struct SlideData {
   hidden : Bool // <p:sld show="0"> — hidden slide
   bg_inherited : Bool // background came from the layout/master (or default white); not written as <p:bg>
 }
-
-// ── Relationship type ─────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct Relationship {

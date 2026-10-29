@@ -1,8 +1,3 @@
-/**
- * ZIP extraction and building for PPTX files.
- *
- * Uses browser-native DecompressionStream/CompressionStream for DEFLATE.
- */
 
 import { crc32 } from './utils.js';
 
@@ -18,11 +13,7 @@ function isTextEntry(name: string): boolean {
          lower === '[content_types].xml';
 }
 
-/**
- * Hard cap on the decompressed size of any single ZIP entry.
- * Guards against decompression bombs from untrusted PPTX input.
- * 256 MiB is well above any realistic slide/media asset.
- */
+/** Per-entry inflate cap against decompression bombs (well above any real asset). */
 const MAX_INFLATE_BYTES = 256 * 1024 * 1024;
 
 /** Total cap across all decompressed entries in one archive. */
@@ -34,9 +25,8 @@ async function inflate(compressed: Uint8Array, maxBytes = MAX_INFLATE_BYTES): Pr
   const writer = stream.writable.getWriter();
   const reader = stream.readable.getReader();
 
-  // Track the writer's pending promises so we can settle them on cancel and
-  // avoid unhandled-rejection noise (the writer's queue rejects with
-  // AbortError when the reader cancels mid-stream).
+  // Keep the writer's promises: they reject with AbortError when the reader cancels,
+  // and must be settled to avoid unhandled-rejection noise.
   const writePromise = writer.write(compressed as BufferSource).catch(() => {});
   const closePromise = writer.close().catch(() => {});
 
@@ -56,8 +46,6 @@ async function inflate(compressed: Uint8Array, maxBytes = MAX_INFLATE_BYTES): Pr
       chunks.push(value);
     }
   } finally {
-    // Drain pending writer promises so they can't surface as
-    // unhandledRejection after the caller has moved on.
     await writePromise;
     await closePromise;
   }
@@ -147,11 +135,8 @@ function parseCentralDirectory(view: DataView, bytes: Uint8Array): Map<string, C
 }
 
 /**
- * Extract all entries from a ZIP archive.
- *
- * Uses the Central Directory for reliable entry sizes, which handles
- * ZIP files with data descriptors (flag bit 3) where local header
- * sizes are set to 0 (e.g. files produced by Google Slides).
+ * Extract all entries. Sizes come from the central directory, since data-descriptor
+ * entries (Google Slides) have 0 sizes in their local headers.
  */
 export async function extractZip(
   buffer: ArrayBuffer,
@@ -163,12 +148,10 @@ export async function extractZip(
   const binaryFiles = new Map<string, Uint8Array>();
   const decoder = new TextDecoder('utf-8');
 
-  // Parse Central Directory for reliable sizes
   const cdEntries = parseCentralDirectory(view, bytes);
 
   let totalInflated = 0;
 
-  // Walk local file headers using CD info for sizes
   for (const [name, cd] of cdEntries) {
     const offset = cd.localHeaderOffset;
     if (offset + 30 > bytes.length) continue;
@@ -184,7 +167,6 @@ export async function extractZip(
     const extraLen    = view.getUint16(offset + 28, true);
     const dataOffset  = offset + 30 + fileNameLen + extraLen;
 
-    // Use sizes from Central Directory (always reliable)
     const compressed = bytes.slice(dataOffset, dataOffset + cd.compressedSize);
 
     let decompressed: Uint8Array;
@@ -231,13 +213,8 @@ interface ZipEntry {
 }
 
 /**
- * Build a new ZIP by iterating the original ZIP entries and replacing
- * modified text entries with new content.
- *
- * @param originalBuffer - The original PPTX bytes
- * @param modifications - path → new XML content (replaces or adds entries)
- * @param removals - set of paths to remove from the ZIP
- * @returns Rebuilt ZIP as ArrayBuffer
+ * Rebuild the ZIP from the original with text entries replaced or added
+ * (`modifications`), entries removed, and binary entries replaced or added.
  */
 export async function buildZip(
   originalBuffer: ArrayBuffer,
@@ -249,10 +226,8 @@ export async function buildZip(
   const origView = new DataView(originalBuffer);
   const encoder = new TextEncoder();
 
-  // Parse Central Directory for reliable sizes (handles data descriptor flag)
   const cdEntries = parseCentralDirectory(origView, origBytes);
 
-  // Collect all entries using CD info
   const entries: ZipEntry[] = [];
   for (const [name, cd] of cdEntries) {
     const offset = cd.localHeaderOffset;
@@ -277,7 +252,6 @@ export async function buildZip(
     });
   }
 
-  // Remove entries marked for deletion
   if (removals && removals.size > 0) {
     for (let i = entries.length - 1; i >= 0; i--) {
       if (removals.has(entries[i].name)) {
@@ -286,7 +260,6 @@ export async function buildZip(
     }
   }
 
-  // Process modifications: replace existing entry data
   const existingNames = new Set(entries.map(e => e.name));
   for (const entry of entries) {
     if (modifications.has(entry.name)) {
@@ -328,7 +301,6 @@ export async function buildZip(
       });
     }
   }
-  // Add new binary entries
   if (binaryModifications) {
     for (const [name, content] of binaryModifications) {
       if (!existingNames.has(name)) {
@@ -345,7 +317,6 @@ export async function buildZip(
     }
   }
 
-  // Build the new ZIP
   const parts: Uint8Array[] = [];
   const centralDir: Uint8Array[] = [];
   let localOffset = 0;
@@ -416,7 +387,6 @@ export async function buildZip(
   eocdView.setUint32(16, cdOffset, true);
   eocdView.setUint16(20, 0, true);
 
-  // Combine all parts
   let totalSize = 0;
   for (const p of parts) totalSize += p.length;
   totalSize += cdSize + 22;

@@ -12,7 +12,6 @@ test("structure & master/layout/theme inheritance", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Basic structure ──
   section('test_features.pptx — basic structure');
   const prsXml = textFiles.get('ppt/presentation.xml');
   assert('presentation.xml exists', !!prsXml);
@@ -26,7 +25,6 @@ test("structure & master/layout/theme inheritance", async () => {
     assert(`slide${i}.xml exists`, textFiles.has(path));
   }
 
-  // ── Slide .rels ──
   section('test_features.pptx — slide relationships');
   for (let i = 1; i <= 105; i++) {
     const relsPath = `ppt/slides/_rels/slide${i}.xml.rels`;
@@ -39,7 +37,6 @@ test("structure & master/layout/theme inheritance", async () => {
     }
   }
 
-  // ── Master/Layout chain ──
   section('test_features.pptx — master/layout chain');
   const prsRels = textFiles.get('ppt/_rels/presentation.xml.rels');
   assert('presentation.xml.rels exists', !!prsRels);
@@ -80,7 +77,6 @@ test("structure & master/layout/theme inheritance", async () => {
     assert('layout2 references slideMaster', masterTargets.length > 0);
   }
 
-  // ── Slide 6: No explicit background ──
   section('test_features.pptx — Slide 6: background inheritance');
   const slide6 = textFiles.get('ppt/slides/slide6.xml');
   if (slide6) {
@@ -89,7 +85,6 @@ test("structure & master/layout/theme inheritance", async () => {
     assert('slide6 has NO explicit p:bg (relies on master)', !hasBg);
   }
 
-  // ── Slide 7: Placeholder shapes ──
   section('test_features.pptx — Slide 7: placeholder shapes');
   const slide7 = textFiles.get('ppt/slides/slide7.xml');
   if (slide7) {
@@ -112,7 +107,6 @@ test("structure & master/layout/theme inheritance", async () => {
       layouts.join(', '));
   }
 
-  // ── Slide 8: Explicit background overrides master ──
   section('test_features.pptx — Slide 8: explicit background');
   const slide8 = textFiles.get('ppt/slides/slide8.xml');
   if (slide8) {
@@ -120,7 +114,6 @@ test("structure & master/layout/theme inheritance", async () => {
     assert('slide8 bg is green (#228B22)', slide8.includes('228B22'));
   }
 
-  // ── Slide 1-5: existing features regression ──
   section('test_features.pptx — Slides 1-5: feature regression');
   const slide1 = textFiles.get('ppt/slides/slide1.xml');
   if (slide1) {
@@ -154,7 +147,6 @@ test("structure & master/layout/theme inheritance", async () => {
     assert('slide5 bg is navy (#1B3A6B)', slide5.includes('1B3A6B'));
   }
 
-  // ── Layout placeholder transforms ──
   section('test_features.pptx — layout placeholder transforms');
   if (layoutXml) {
     // Layout should have placeholder shapes with transforms
@@ -164,7 +156,6 @@ test("structure & master/layout/theme inheritance", async () => {
     assert('layout2 has a:ext (size)', hasTag(layoutXml, 'a:ext'));
   }
 
-  // ── Theme ──
   section('test_features.pptx — theme');
   const themeXml = textFiles.get('ppt/theme/theme1.xml');
   assert('theme1.xml exists', !!themeXml);

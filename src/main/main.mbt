@@ -1,42 +1,5 @@
-// pptx-svg: Round-trip PPTX ↔ SVG engine
-//
-// Architecture:
-//   JavaScript host:
-//     - Parses the ZIP archive (reads local file headers)
-//     - Decompresses entries using DecompressionStream API
-//     - Exposes decompressed content via FFI (pptx_ffi.get_file, etc.)
-//
-//   MoonBit (this module):
-//     - Receives OOXML XML strings via FFI
-//     - Parses XML to build document model (SlideData)
-//     - Generates SVG output with data-ooxml-* attributes
-//     - Parses SVG back to SlideData (round-trip)
-//     - Serializes SlideData to OOXML slide XML
-
-// ── Global state ─────────────────────────────────────────────────────────────
-//
-// All mutable state is stored in Ref cells. Populated by initialize_pptx().
-//
-// Slide data:
-//   g_slide_count    — total number of slides
-//   g_slide_size     — slide dimensions from presentation.xml
-//   g_slides         — parsed SlideData cache (0-indexed), updated by round-trip
-//   g_modified       — per-slide dirty flag for export
-//   g_parsed         — per-slide flag: has the slide XML been parsed into g_slides?
-//                      (g_slides starts as empty placeholders; editing APIs need a
-//                       real parse first — see ensure_slide_parsed)
-//   g_bg_rels        — per-slide rels of the part the background was inherited
-//                      from (slide / layout / master), so a blipFill rId resolves
-//                      against the right .rels; empty = use the slide's own rels
-//   g_theme          — parsed theme1.xml color/font scheme
-//
-// Inheritance chain (slide → layout → master → theme):
-//   g_slide_layout_paths — slide idx → layout file path
-//   g_layout_paths       — unique layout paths (parallel with g_layouts)
-//   g_layouts            — parsed SlideLayoutData + path pairs
-//   g_master_paths       — unique master paths (parallel with g_masters)
-//   g_masters            — parsed SlideMasterData + path pairs
-//   g_layout_to_master   — (layout_path, master_path) mapping
+// Document state, filled by initialize_pptx. Per-slide arrays are 0-indexed;
+// the *_paths arrays run parallel to the data arrays after them.
 
 ///|
 let g_slide_count : Ref[Int32] = { val: 0, }
@@ -51,9 +14,11 @@ let g_slides : Ref[Array[@ooxml.SlideData]] = { val: [], }
 let g_modified : Ref[Array[Bool]] = { val: [], }
 
 ///|
+/// Whether the slide's XML has been parsed into g_slides (see ensure_slide_parsed).
 let g_parsed : Ref[Array[Bool]] = { val: [], }
 
 ///|
+/// Rels of the part each slide's background came from; empty = the slide's own.
 let g_bg_rels : Ref[Array[Array[@ooxml.Relationship]]] = { val: [], }
 
 ///|
@@ -89,14 +54,10 @@ let g_master_themes : Ref[Array[@ooxml.ThemeData]] = { val: [], }
 ///|
 let g_table_styles : Ref[Array[@ooxml.TableStyleDef]] = { val: [], }
 
-// ── Package-local string/int helpers ─────────────────────────────────────────
-
 ///|
 fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
 }
-
-// ── Slide counting ──────────────────────────────────────────────────────────
 
 ///|
 fn count_slide_ids(xml : String) -> Int32 {
@@ -137,15 +98,11 @@ fn match_at(text : String, pattern : String, pos : Int32) -> Bool {
   true
 }
 
-// ── Theme path resolution ────────────────────────────────────────────────────
-
 ///|
 /// Find the theme file path from presentation.xml.rels.
 fn find_theme_path(rels : Array[@ooxml.Relationship]) -> String {
   for rel in rels {
-    // Theme relationship type ends with "/theme"
     if @xml.str_ends_with(rel.type_, "/theme") {
-      // Target is relative to ppt/ directory
       if @xml.str_starts_with(rel.target, "/") {
         return @xml.str_suffix(rel.target, 1)
       } else {
@@ -163,10 +120,8 @@ fn load_master_theme(
   master_path : String,
   mrels : Array[@ooxml.Relationship],
 ) -> @ooxml.ThemeData {
-  // Find theme rel in master rels
   for rel in mrels {
     if @xml.str_ends_with(rel.type_, "/theme") {
-      // Resolve target relative to master's directory
       let slash = last_index_of(master_path, '/')
       let base_dir = if slash >= 0 {
         substring(master_path, 0, slash)
@@ -195,28 +150,22 @@ fn get_master_theme(master_path : String) -> @ooxml.ThemeData {
   }
 }
 
-// ── Path resolution helpers ──────────────────────────────────────────────────
-
 ///|
-/// Resolve a relative target path against a base directory.
-///  e.g. resolve_rel_path("ppt/slides", "../slideLayouts/slideLayout1.xml")
-///    → "ppt/slideLayouts/slideLayout1.xml"
+/// Resolve a relative target against a base directory
+/// (`"ppt/slides"` + `"../slideLayouts/x.xml"` → `"ppt/slideLayouts/x.xml"`).
 fn resolve_rel_path(base_dir : String, target : String) -> String {
   if @xml.str_starts_with(target, "/") {
     return @xml.str_suffix(target, 1)
   }
-  // Handle ../ prefixes
   let mut dir = base_dir
   let mut tgt = target
   while @xml.str_starts_with(tgt, "../") {
-    // Remove trailing "/" from dir if present
     let dlen = dir.length()
     let d2 = if dlen > 0 && dir.get_char(dlen - 1).unwrap() == '/' {
       substring(dir, 0, dlen - 1)
     } else {
       dir
     }
-    // Go up one directory
     let slash = last_index_of(d2, '/')
     if slash >= 0 {
       dir = substring(d2, 0, slash)
@@ -233,8 +182,7 @@ fn resolve_rel_path(base_dir : String, target : String) -> String {
 }
 
 ///|
-/// Walk shapes to find ChartShape placeholders (with rid stored in chart_xml)
-/// and resolve them by loading the actual chart XML file.
+/// Load and parse the chart part of every unresolved ChartShape, recursing into groups.
 fn resolve_chart_shapes(
   shapes : Array[@ooxml.Shape],
   rels : Array[@ooxml.Relationship],
@@ -244,8 +192,7 @@ fn resolve_chart_shapes(
   for i in 0..<n {
     match shapes[i].kind {
       @ooxml.ShapeKind::ChartShape(cd) =>
-        // chart_xml field temporarily holds the relationship ID
-        // (prefixed with "cx:" for ChartEx charts)
+        // Until resolved, chart_xml holds the chart's rId ("cx:"-prefixed for ChartEx).
         if !cd.chart_xml.is_empty() && cd.groups.is_empty() {
           let raw_rid = cd.chart_xml
           let is_chartex = @xml.str_starts_with(raw_rid, "cx:")
@@ -264,7 +211,6 @@ fn resolve_chart_shapes(
               } else {
                 @ooxml.parse_chart_xml(chart_xml, theme)
               }
-              // Replace the shape in-place
               shapes[i] = {
                 ..shapes[i],
                 kind: @ooxml.ShapeKind::ChartShape(parsed),
@@ -273,7 +219,6 @@ fn resolve_chart_shapes(
           }
         }
       @ooxml.ShapeKind::GroupShape(grp) =>
-        // Recurse into group children
         resolve_chart_shapes(grp.children, rels, theme)
       _ => ()
     }
@@ -295,12 +240,8 @@ fn relids_attr(gf_nodes : Array[@xml.XmlNode], attr : String) -> String {
 }
 
 ///|
-/// Resolve a SmartArt graphicFrame (preserved raw in `ole_xml`) into its cached
-/// drawing's shapes. Returns `[]` when any link in the chain is missing.
-///
-/// Resolution chain: graphicFrame `dgm:relIds/@r:dm` → slide rels → data part
-/// (`ppt/diagrams/dataN.xml`) → `dsp:dataModelExt/@relId` → data rels →
-/// cached drawing (`ppt/drawings/drawingN.xml`).
+/// The shapes of a SmartArt frame's cached drawing (`ppt/drawings/drawingN.xml`), reached
+/// via `dgm:relIds/@r:dm` → data part → `dsp:dataModelExt/@relId`; `[]` if any link is missing.
 fn resolve_diagram_children(
   ole_xml : String,
   rels : Array[@ooxml.Relationship],
@@ -364,9 +305,7 @@ fn resolve_diagram_children(
 }
 
 ///|
-/// Walk shapes to find SmartArt diagram placeholders (GroupShape with empty
-/// children and the raw graphicFrame preserved in `ole_xml`) and resolve them by
-/// loading the cached drawing part and parsing its `dsp:` shapes.
+/// Fill every unresolved SmartArt group (no children, frame in `ole_xml`) from its cached drawing.
 fn resolve_diagram_shapes(
   shapes : Array[@ooxml.Shape],
   rels : Array[@ooxml.Relationship],
@@ -389,7 +328,6 @@ fn resolve_diagram_shapes(
             }
           }
         } else {
-          // Normal group: recurse into children.
           resolve_diagram_shapes(grp.children, rels, theme)
         }
       _ => ()
@@ -481,7 +419,6 @@ fn find_master_for_layout(layout_path : String) -> String {
       return mp
     }
   }
-  // Fallback: first master
   if !g_master_paths.val.is_empty() {
     g_master_paths.val[0]
   } else {
@@ -584,10 +521,7 @@ fn find_master_theme_for_layout(
 }
 
 ///|
-/// Initialize the PPTX processor.
-///
-/// Reads presentation.xml via FFI and counts the number of slides.
-/// Returns "OK:<count>" on success, "ERROR:<message>" on failure.
+/// Load the presentation through the FFI. Returns "OK:<slide count>" or "ERROR:<message>".
 pub fn initialize_pptx() -> String {
   @ffi.ffi_log("initialize_pptx: reading ppt/presentation.xml")
   let prs_xml = @ffi.ffi_get_file("ppt/presentation.xml")
@@ -598,7 +532,6 @@ pub fn initialize_pptx() -> String {
   let count = count_slide_ids(prs_xml)
   g_slide_count.val = count
   g_slide_size.val = @ooxml.parse_slide_size(prs_xml)
-  // Load theme from presentation rels
   let prs_rels_xml = @ffi.ffi_get_file("ppt/_rels/presentation.xml.rels")
   if !prs_rels_xml.is_empty() {
     let prs_rels = @ooxml.parse_rels(prs_rels_xml)
@@ -611,7 +544,6 @@ pub fn initialize_pptx() -> String {
       }
     }
   }
-  // ── Parse table styles from ppt/tableStyles.xml ──
   let tbl_styles_xml = @ffi.ffi_get_file("ppt/tableStyles.xml")
   if !tbl_styles_xml.is_empty() {
     g_table_styles.val = @ooxml.parse_table_styles(tbl_styles_xml, g_theme.val)
@@ -621,12 +553,10 @@ pub fn initialize_pptx() -> String {
       )
     }
   }
-  // ── Resolve slide → layout → master relationships ──
   let slide_layout_paths : Array[String] = []
   let layout_paths : Array[String] = []
   let layout_to_master : Array[(String, String)] = []
   let master_paths : Array[String] = []
-  // For each slide, find its layout from the slide's .rels
   for si = 0; si < count; si = si + 1 {
     let slide_num = si + 1
     let slide_rels_path = "ppt/slides/_rels/slide" +
@@ -649,7 +579,6 @@ pub fn initialize_pptx() -> String {
       layout_paths.push(layout_path)
     }
   }
-  // For each unique layout, find its master from the layout's .rels
   let nlay = layout_paths.length()
   for li in 0..<nlay {
     let lpath = layout_paths[li]
@@ -671,7 +600,6 @@ pub fn initialize_pptx() -> String {
       master_paths.push(mpath)
     }
   }
-  // Parse all unique masters
   let masters : Array[(@ooxml.SlideMasterData, String)] = []
   let master_rels_arr : Array[Array[@ooxml.Relationship]] = []
   let master_themes : Array[@ooxml.ThemeData] = []
@@ -679,7 +607,6 @@ pub fn initialize_pptx() -> String {
   for mi in 0..<nmas {
     let mp = master_paths[mi]
     let mxml = @ffi.ffi_get_file(mp)
-    // Parse master rels
     let mrels_path = rels_path_for(mp)
     let mrels_xml = @ffi.ffi_get_file(mrels_path)
     let mrels = if mrels_xml.is_empty() {
@@ -687,7 +614,6 @@ pub fn initialize_pptx() -> String {
     } else {
       @ooxml.parse_rels(mrels_xml)
     }
-    // Load per-master theme (falls back to g_theme)
     let m_theme = load_master_theme(mp, mrels)
     master_themes.push(m_theme)
     if !mxml.is_empty() {
@@ -709,12 +635,11 @@ pub fn initialize_pptx() -> String {
       master_rels_arr.push(mrels)
     }
   }
-  // Parse all unique layouts
   let layouts : Array[(@ooxml.SlideLayoutData, String)] = []
   let layout_rels_arr : Array[Array[@ooxml.Relationship]] = []
   for lp in layout_paths {
     let lxml = @ffi.ffi_get_file(lp)
-    // Parse layout rels (needed for bg_shapes image resolution)
+    // Layout rels resolve the images of the layout's non-placeholder shapes.
     let layout_rels_path = rels_path_for(lp)
     let layout_rels_xml = @ffi.ffi_get_file(layout_rels_path)
     let cur_layout_rels = if layout_rels_xml.is_empty() {
@@ -723,9 +648,8 @@ pub fn initialize_pptx() -> String {
       @ooxml.parse_rels(layout_rels_xml)
     }
     if !lxml.is_empty() {
-      // Compute effective theme: layout's own clrMapOvr > master's clrMap
       let layout_effective_theme = {
-        // Use the master's own theme (not g_theme) for color map application
+        // Each master has its own theme; g_theme is only the presentation default.
         let base_theme = find_master_theme_for_layout(
           layout_to_master, master_themes, master_paths, lp,
         )
@@ -757,7 +681,6 @@ pub fn initialize_pptx() -> String {
       layout_rels_arr.push(cur_layout_rels)
     }
   }
-  // Store in globals
   g_slide_layout_paths.val = slide_layout_paths
   g_layout_paths.val = layout_paths
   g_layouts.val = layouts
@@ -767,7 +690,6 @@ pub fn initialize_pptx() -> String {
   g_master_rels.val = master_rels_arr
   g_master_themes.val = master_themes
   g_layout_to_master.val = layout_to_master
-  // Initialize slide cache
   let slides : Array[@ooxml.SlideData] = []
   let modified : Array[Bool] = []
   let parsed : Array[Bool] = []
@@ -816,11 +738,9 @@ pub fn is_slide_hidden(slide_idx : Int32) -> Int32 {
   if slide_idx < 0 || slide_idx >= g_slide_count.val {
     return 0
   }
-  // If slide is already cached, use cached data
   if g_modified.val[slide_idx] {
     return if g_slides.val[slide_idx].hidden { 1 } else { 0 }
   }
-  // Otherwise check the raw XML
   let slide_num = slide_idx + 1
   let slide_path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
   let slide_xml = @ffi.ffi_get_file(slide_path)
@@ -905,9 +825,8 @@ fn slide_context(slide_idx : Int32) -> SlideContext {
 }
 
 ///|
-/// `base_theme` with the master's clrMap applied, replaced by the layout's
-/// clrMapOvr when it has one. (A slide's own clrMapOvr is applied on top by
-/// `resolve_slide_data`.)
+/// `base_theme` under the layout's clrMapOvr, else the master's clrMap. A slide's own
+/// clrMapOvr is applied by `resolve_slide_data`.
 fn layout_effective_theme(
   base_theme : @ooxml.ThemeData,
   master_opt : @ooxml.SlideMasterData?,
@@ -934,15 +853,9 @@ fn has_background(
 }
 
 ///|
-/// Parse slide XML into a fully-resolved `SlideData`: effective theme + color
-/// map overrides, chart shapes, placeholder inheritance, auto-content injection,
-/// background inheritance, and text-style defaults.
-///
-/// Shared by `render_slide_svg` (fresh parse path) and `restore_slide_ooxml`
-/// (Undo/Redo history). The inheritance/auto-content steps only fill values that
-/// are still missing and `inject_placeholder_auto_content` only injects into
-/// placeholders with no text, so re-running this on already-serialized slide XML
-/// is idempotent — Undo/Redo restores keep full visual fidelity.
+/// Parse slide XML into a fully resolved `SlideData` (theme, charts, SmartArt, placeholder
+/// and background inheritance, text defaults). Idempotent on its own serialized output,
+/// which Undo/Redo (`restore_slide_ooxml`) relies on.
 fn resolve_slide_data(
   slide_num : Int32,
   slide_xml : String,
@@ -955,7 +868,6 @@ fn resolve_slide_data(
 ) -> (@ooxml.SlideData, Array[@ooxml.Relationship]) {
   let effective_theme = {
     let mut eff = layout_effective_theme(base_theme, master_opt, layout_opt)
-    // Apply slide's own clrMapOvr if present
     let slide_nodes = @xml.parse_xml(slide_xml)
     let slide_root_ch = match @xml.find_child(slide_nodes, "p:sld") {
       Some(n) => @xml.get_children(n)
@@ -966,26 +878,20 @@ fn resolve_slide_data(
     }
     eff
   }
-  // Parse slide and cache it
   let slide_data = @ooxml.parse_slide(
     slide_xml,
     g_slide_size.val,
     effective_theme,
   )
-  // ── Resolve chart shapes: load chart XML and parse ChartML ──
   resolve_chart_shapes(slide_data.shapes, rels, effective_theme)
-  // ── Resolve SmartArt diagrams: load cached drawing and parse dsp: shapes ──
   resolve_diagram_shapes(slide_data.shapes, rels, effective_theme)
-  // ── Placeholder inheritance: resolve transforms from layout/master ──
   resolve_placeholder_inheritance(slide_data.shapes, layout_opt, master_opt)
-  // ── Placeholder auto-content: inject slide number/date/footer text ──
   inject_placeholder_auto_content(
     slide_data.shapes,
     slide_num,
     layout_opt,
     master_opt,
   )
-  // ── Background inheritance: slide → layout → master → white ──
   // `bg_rels` follows the part the background came from: an inherited
   // blipFill rId belongs to the layout's / master's .rels, not the slide's.
   let mut bg = slide_data.background
@@ -1023,24 +929,17 @@ fn resolve_slide_data(
       bg = @ooxml.Color::white()
     }
   }
-  // ── Apply text style defaults: layout first (more specific), then master ──
   for shape in slide_data.shapes {
-    // Apply the shape's own inline lstStyle (p:txBody/a:lstStyle) first
-    // This applies to all shapes (both placeholders and free-standing text boxes)
+    // Text defaults, most specific first: the shape's own lstStyle, the layout placeholder,
+    // the master placeholder, then the master's p:txStyles.
     apply_inline_lst_style(shape)
-    // Layout placeholder defaults first (more specific)
     apply_layout_text_defaults(shape, layout_opt)
-    // Master placeholder's lstStyle as second fallback
     apply_master_ph_text_defaults(shape, master_opt)
-    // Master text styles (p:txStyles) as final fallback
     if master_opt is Some(master) {
       apply_text_defaults(shape, master.text_styles)
     }
-    // endParaRPr as last-resort fallback for free textboxes whose runs
-    // still lack color/font after placeholder inheritance.
+    // Last resorts for runs still uncolored: endParaRPr, then the p:style fontRef color.
     apply_epr_fallbacks(shape)
-    // <p:style>/<a:fontRef> color as final default for any run that still
-    // has no color (matches PowerPoint behavior for accent-styled shapes).
     apply_font_ref_fallback(shape)
   }
   let resolved : @ooxml.SlideData = {
@@ -1059,9 +958,7 @@ fn resolve_slide_data(
 }
 
 ///|
-/// Render slide `slide_idx` (0-indexed) as an SVG string.
-///
-/// Returns the SVG markup on success, or "ERROR:<message>" on failure.
+/// Render slide `slide_idx` (0-indexed) as SVG markup, or "ERROR:<message>".
 pub fn render_slide_svg(slide_idx : Int32) -> String {
   let n = g_slide_count.val
   if n == 0 {
@@ -1077,11 +974,9 @@ pub fn render_slide_svg(slide_idx : Int32) -> String {
   let layout_opt = ctx.layout_opt
   let master_path = ctx.master_path
   let master_opt = ctx.master_opt
-  // ── If slide is modified, skip XML re-parse and use cached SlideData ──
   let resolved_slide = if g_modified.val[slide_idx] {
     g_slides.val[slide_idx]
   } else {
-    // Load slide XML
     let slide_path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
     let slide_xml = @ffi.ffi_get_file(slide_path)
     if slide_xml.is_empty() {
@@ -1107,7 +1002,6 @@ pub fn render_slide_svg(slide_idx : Int32) -> String {
     master_opt,
     layout_opt,
   )
-  // ── Collect master/layout background shapes (non-placeholder) ──
   let bg_shapes : Array[@ooxml.Shape] = []
   let bg_shapes_rels : Array[Array[@ooxml.Relationship]] = []
   let m_rels = if !master_path.is_empty() {
@@ -1136,7 +1030,6 @@ pub fn render_slide_svg(slide_idx : Int32) -> String {
       }
     }
   }
-  // Render to SVG
   @renderer.render_slide_svg(
     resolved_slide,
     rels,
@@ -1150,10 +1043,8 @@ pub fn render_slide_svg(slide_idx : Int32) -> String {
 }
 
 ///|
-/// Update a slide's internal data from an edited SVG string.
-///
-/// Parses the SVG's data-ooxml-* attributes back into SlideData.
-/// Returns "OK" on success, "ERROR:<message>" on failure.
+/// Replace a slide's data with an edited SVG, read back from its `data-ooxml-*`.
+/// Returns "OK" or "ERROR:<message>".
 pub fn update_slide_from_svg(slide_idx : Int32, svg_string : String) -> String {
   let n = g_slide_count.val
   if n == 0 {
@@ -1163,8 +1054,7 @@ pub fn update_slide_from_svg(slide_idx : Int32, svg_string : String) -> String {
     return "ERROR:slide index out of range"
   }
   let slide_data = @svg_parser.parse_svg_to_slide(svg_string)
-  // The SVG carries no chart data: re-read each chart from its preserved
-  // graphicFrame (data-ooxml-ole) so it renders again after the round-trip.
+  // The SVG carries no chart data: re-read each chart from its preserved frame.
   let ctx = slide_context(slide_idx)
   let shapes = slide_data.shapes
   for i in 0..<shapes.length() {
@@ -1187,11 +1077,7 @@ pub fn update_slide_from_svg(slide_idx : Int32, svg_string : String) -> String {
 }
 
 ///|
-/// Get the OOXML slide XML for a slide (0-indexed).
-///
-/// If the slide has been modified via update_slide_from_svg(),
-/// returns the serialized modified data. Otherwise returns the
-/// original slide XML from the PPTX.
+/// A slide's OOXML: serialized from g_slides if modified, otherwise the original part.
 pub fn get_slide_ooxml(slide_idx : Int32) -> String {
   let n = g_slide_count.val
   if n == 0 {
@@ -1203,7 +1089,6 @@ pub fn get_slide_ooxml(slide_idx : Int32) -> String {
   if g_modified.val[slide_idx] {
     @serializer.serialize_slide(g_slides.val[slide_idx])
   } else {
-    // Return original XML
     let slide_num = slide_idx + 1
     let path = "ppt/slides/slide" + int_to_str(slide_num) + ".xml"
     let xml = @ffi.ffi_get_file(path)
@@ -1216,10 +1101,7 @@ pub fn get_slide_ooxml(slide_idx : Int32) -> String {
 }
 
 ///|
-/// Get tab-separated list of modified entries for ZIP rebuild.
-///
-/// Format: "path\tcontent\n" for each modified slide.
-/// JS uses this to replace entries in the ZIP archive.
+/// The modified slides as `"path\tcontent\n"` records, for the host to rebuild the ZIP.
 pub fn get_modified_entries() -> String {
   let n = g_slide_count.val
   let mut result = ""
@@ -1233,16 +1115,13 @@ pub fn get_modified_entries() -> String {
   result
 }
 
-// ── Shape-level editing API ──────────────────────────────────────────────────
-
 ///|
 /// Compute the EMU-to-pixel scale factor for the current presentation.
 fn get_scale() -> Int32 {
   let sw = g_slide_size.val.cx
-  let w = 960 // svg_target_width
   if sw > 0 {
-    sw / w
+    sw / @renderer.svg_target_width
   } else {
-    9525
+    @renderer.default_emu_per_px
   }
 }

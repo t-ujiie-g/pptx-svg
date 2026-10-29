@@ -45,8 +45,6 @@ test('WMF converter', async () => {
   finishAssertions();
 });
 
-// ── Fixture builders ─────────────────────────────────────────────────────────
-
 function buildTestWmfWithRect() {
   // METAHEADER(18) + SetWindowOrg(10) + SetWindowExt(10) +
   // CreateBrushIndirect(14) + SelectObject(8) + Rectangle(14) + EOF(6)

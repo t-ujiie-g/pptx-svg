@@ -1,9 +1,4 @@
-/**
- * Node.js compatibility test — verifies that pptx-svg works on Node.js 22+.
- *
- * Run: node test_fixtures/test_node_compat.mjs
- * Requires: Node.js 22+ (WasmGC support)
- */
+/** Node.js 22+ (WasmGC) integration tests: `node test_fixtures/test_node_compat.mjs`. */
 
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -695,8 +690,8 @@ console.log('Test 28: Add text to invalid shape');
   console.log('  OK: Error handling for invalid indices');
 }
 
-// --- Test 29: Text editing E2.5 — paragraph and run CRUD ---
-console.log('Test 29: Text editing E2.5 — paragraph and run CRUD');
+// --- Test 29: Text editing — paragraph and run CRUD ---
+console.log('Test 29: Text editing — paragraph and run CRUD');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -740,8 +735,8 @@ console.log('Test 29: Text editing E2.5 — paragraph and run CRUD');
   console.log('  OK: Paragraph and run CRUD');
 }
 
-// --- Test 30: Text editing E2.5 — style, font size, color ---
-console.log('Test 30: Text editing E2.5 — style, font size, color');
+// --- Test 30: Text editing — style, font size, color ---
+console.log('Test 30: Text editing — style, font size, color');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -781,8 +776,8 @@ console.log('Test 30: Text editing E2.5 — style, font size, color');
   console.log('  OK: Style, font size, color updates');
 }
 
-// --- Test 31: Text editing E2.5 — font family, alignment, decoration ---
-console.log('Test 31: Text editing E2.5 — font family, alignment, decoration');
+// --- Test 31: Text editing — font family, alignment, decoration ---
+console.log('Test 31: Text editing — font family, alignment, decoration');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -832,8 +827,8 @@ console.log('Test 31: Text editing E2.5 — font family, alignment, decoration')
   console.log('  OK: Font family, alignment, decoration updates');
 }
 
-// --- Test 32: Text editing E2.5 — round-trip export ---
-console.log('Test 32: Text editing E2.5 — round-trip export');
+// --- Test 32: Text editing — round-trip export ---
+console.log('Test 32: Text editing — round-trip export');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -1001,11 +996,7 @@ console.log('Test 35: Image API — deleteImage');
   console.log('  OK: deleteImage');
 }
 
-// --- Test 36: Edit immediately after loadPptx (no prior renderSlideSvg) ---
-// Regression: editing APIs read the g_slides cache, which is populated lazily on
-// the first render. Before the ensure_slide_parsed guard, an edit issued before any
-// renderSlideSvg() silently no-op'd ("ERROR:shape index out of range") and never
-// reached the export. minimal.pptx slide 0 shape 0 is a title with inline text.
+// An edit before any renderSlideSvg() must still reach the export (ensure_slide_parsed).
 console.log('Test 36: Edit immediately after loadPptx (no prior render)');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
@@ -1029,7 +1020,6 @@ console.log('Test 36: Edit immediately after loadPptx (no prior render)');
   console.log('  OK: edit without pre-render persists to OOXML and export');
 }
 
-// ── Undo / Redo (E6.1) ───────────────────────────────────────────────────────
 // Shared helper: a freshly loaded renderer on minimal.pptx.
 async function freshRenderer(opts = { logLevel: 'silent' }) {
   const renderer = new PptxRenderer(opts);
@@ -1175,7 +1165,6 @@ console.log('Test 43: maxHistory cap + export after undo');
   console.log('  OK: maxHistory cap and export-after-undo');
 }
 
-// ── Inline text editing (E6.2) ───────────────────────────────────────────────
 // Build a shape with two runs: "Hello " (normal) + "World" (bold), in one paragraph.
 async function shapeWithTwoRuns() {
   const r = await freshRenderer();
@@ -1277,7 +1266,7 @@ console.log('Test 48: replaceTextRange paragraph merge + newline split');
   console.log('  OK: paragraph merge + newline split');
 }
 
-// --- Test 49: replaceTextRange is undoable (E6.1 integration) ---
+// --- Test 49: replaceTextRange is undoable ---
 console.log('Test 49: replaceTextRange undo');
 {
   const { r, sIdx } = await shapeWithTwoRuns();
@@ -1291,7 +1280,6 @@ console.log('Test 49: replaceTextRange undo');
   console.log('  OK: replaceTextRange undo');
 }
 
-// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
 // Serialized shape order == z-order (later = front). Find each shape by its fill
 // color's position in the slide OOXML.
 function fillPos(ooxml, hex) {
@@ -1365,7 +1353,6 @@ console.log('Test 53: z-order undo');
   console.log('  OK: z-order undo');
 }
 
-// ── Multi-shape transform (E6.4) ─────────────────────────────────────────────
 function shapeX(r, idx) {
   const m = r.renderShapeSvg(0, idx).match(/data-ooxml-x="(-?\d+)"/);
   return m ? parseInt(m[1]) : NaN;
@@ -1402,7 +1389,6 @@ console.log('Test 54: updateShapesTransform (atomic + undo)');
   console.log('  OK: updateShapesTransform atomic batch + single undo');
 }
 
-// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
 const MINI_PNG = new Uint8Array([
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
   0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -1492,7 +1478,6 @@ console.log('Test 58: copy/paste boundary errors');
   console.log('  OK: boundary errors');
 }
 
-// ── Table editing (E6.6) ─────────────────────────────────────────────────────
 // test_features.pptx slide 41 (0-indexed) has a plain 3×3 table at shape index 0.
 const FEATURES_PATH = join(__dirname, 'test_features.pptx');
 const TABLE_SLIDE = 41, TABLE_SHAPE = 0;
@@ -1577,7 +1562,6 @@ if (!existsSync(FEATURES_PATH)) {
   }
 }
 
-// ── Header/footer field placeholders (date / footer / slide number) ──────────
 // test_features.pptx slide 97 (index 96) carries dt/ftr/sldNum placeholders with
 // <a:fld> fields and a STALE cached slide number ("1"), mirroring sample.pptx s20.
 {

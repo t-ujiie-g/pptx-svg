@@ -12,7 +12,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 52: Column chart ──
   {
     const slide52 = textFiles.get('ppt/slides/slide52.xml') || '';
     const rels52 = textFiles.get('ppt/slides/_rels/slide52.xml.rels') || '';
@@ -38,7 +37,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 53: Line chart ──
   {
     const slide53 = textFiles.get('ppt/slides/slide53.xml') || '';
     section('test_features.pptx — Slide 53: line chart');
@@ -55,7 +53,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 54: Pie chart ──
   {
     const slide54 = textFiles.get('ppt/slides/slide54.xml') || '';
     section('test_features.pptx — Slide 54: pie chart');
@@ -71,7 +68,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 55: Bar + Donut chart ──
   {
     const slide55 = textFiles.get('ppt/slides/slide55.xml') || '';
     section('test_features.pptx — Slide 55: bar + donut chart');
@@ -83,7 +79,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     assert('slide55 has 2 chart refs', chartTargets55.length >= 2);
   }
 
-  // ── Slide 56: Column chart with data labels ──
   {
     const slide56 = textFiles.get('ppt/slides/slide56.xml') || '';
     section('test_features.pptx — Slide 56: column chart with data labels');
@@ -100,7 +95,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 57: Pie chart with dPt colors + % labels ──
   {
     const slide57 = textFiles.get('ppt/slides/slide57.xml') || '';
     section('test_features.pptx — Slide 57: pie chart with dPt + % labels');
@@ -118,7 +112,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 58: Line chart with series colors + data labels ──
   {
     const slide58 = textFiles.get('ppt/slides/slide58.xml') || '';
     section('test_features.pptx — Slide 58: line chart with series colors');
@@ -135,21 +128,18 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 59: Scatter chart + Area chart ──
   {
     const slide59 = textFiles.get('ppt/slides/slide59.xml') || '';
     section('test_features.pptx — Slide 59: scatter + area');
     assert('slide59 has p:graphicFrame', slide59.includes('p:graphicFrame'));
   }
 
-  // ── Slide 60: Radar chart ──
   {
     const slide60 = textFiles.get('ppt/slides/slide60.xml') || '';
     section('test_features.pptx — Slide 60: radar chart');
     assert('slide60 has p:graphicFrame', slide60.includes('p:graphicFrame'));
   }
 
-  // ── Slide 61: Bubble chart ──
   {
     const slide61 = textFiles.get('ppt/slides/slide61.xml') || '';
     section('test_features.pptx — Slide 61: bubble chart');
@@ -166,7 +156,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 62: Stock chart ──
   {
     const slide62 = textFiles.get('ppt/slides/slide62.xml') || '';
     section('test_features.pptx — Slide 62: stock chart');
@@ -184,14 +173,12 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 63: All chart types overview ──
   {
     const slide63 = textFiles.get('ppt/slides/slide63.xml') || '';
     section('test_features.pptx — Slide 63: all chart types overview');
     assert('slide63 has p:graphicFrame', slide63.includes('p:graphicFrame'));
   }
 
-  // ── Slide 64: Line chart with trendline ──
   {
     const slide64 = textFiles.get('ppt/slides/slide64.xml') || '';
     section('test_features.pptx — Slide 64: line chart with trendline');
@@ -207,7 +194,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 65: Column chart with error bars ──
   {
     const slide65 = textFiles.get('ppt/slides/slide65.xml') || '';
     section('test_features.pptx — Slide 65: column chart with error bars');
@@ -223,7 +209,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 66: Composite chart (column + line) ──
   {
     const slide66 = textFiles.get('ppt/slides/slide66.xml') || '';
     section('test_features.pptx — Slide 66: composite chart');
@@ -239,7 +224,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 67: Surface chart ──
   {
     const slide67 = textFiles.get('ppt/slides/slide67.xml') || '';
     section('test_features.pptx — Slide 67: surface chart');
@@ -256,7 +240,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 68: Pie of pie chart ──
   {
     const slide68 = textFiles.get('ppt/slides/slide68.xml') || '';
     section('test_features.pptx — Slide 68: ofPieChart');
@@ -273,7 +256,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-  // ── Slide 69: 3D bar chart with view3D ──
   {
     const slide69 = textFiles.get('ppt/slides/slide69.xml') || '';
     section('test_features.pptx — Slide 69: 3D bar chart');
@@ -291,8 +273,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-
-  // ── Slide 73: Stacked / Percent-stacked bar charts ─────────────────────────
   {
     section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
     // Should have chart references
@@ -312,7 +292,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     assert('has stacked grouping', foundStacked);
   }
 
-  // ── Slides 89-94: ChartEx (cx: namespace) ──────────────────────────────────
   {
     section('test_features.pptx — Slides 89-94: ChartEx (cx: namespace)');
     const chartExTypes = ['waterfall', 'treemap', 'sunburst', 'clusteredColumn', 'boxWhisker', 'funnel'];

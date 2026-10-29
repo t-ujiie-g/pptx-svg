@@ -12,7 +12,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 9: East Asian fonts + font theme references ──
   section('test_features.pptx — Slide 9: EA fonts & theme refs');
   const slide9 = textFiles.get('ppt/slides/slide9.xml');
   if (slide9) {
@@ -30,7 +29,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide9 has a:latin element', hasTag(slide9, 'a:latin'));
   }
 
-  // ── Slide 10: Line spacing ──
   section('test_features.pptx — Slide 10: line spacing');
   const slide10 = textFiles.get('ppt/slides/slide10.xml');
   if (slide10) {
@@ -43,7 +41,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide10 has spcPct 80000', slide10.includes('80000'));
   }
 
-  // ── Slide 12: normAutofit ──
   section('test_features.pptx — Slide 12: normAutofit');
   const slide12 = textFiles.get('ppt/slides/slide12.xml');
   if (slide12) {
@@ -61,7 +58,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide12 has multiple normAutofit elements', (slide12.match(/normAutofit/g) || []).length >= 3);
   }
 
-  // ── Slide 11: Character spacing + lstStyle ──
   section('test_features.pptx — Slide 11: char spacing & lstStyle');
   const slide11 = textFiles.get('ppt/slides/slide11.xml');
   if (slide11) {
@@ -76,7 +72,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide11 lstStyle has #003366 color', slide11.includes('003366'));
   }
 
-  // ── Slide 13: Text wrapping ──
   section('test_features.pptx — Slide 13: text wrapping');
   const slide13 = textFiles.get('ppt/slides/slide13.xml');
   if (slide13) {
@@ -92,7 +87,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide13 has word_wrap bodyPr', hasTag(slide13, 'a:bodyPr'));
   }
 
-  // ── Slide 14: Bullet formatting ──
   section('test_features.pptx — Slide 14: bullet formatting');
   const slide14 = textFiles.get('ppt/slides/slide14.xml');
   if (slide14) {
@@ -115,7 +109,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide14 has blue bullet (0000FF)', slide14.includes('0000FF'));
   }
 
-  // ── Slide 15: Capitalization ──
   section('test_features.pptx — Slide 15: capitalization');
   const slide15 = textFiles.get('ppt/slides/slide15.xml');
   if (slide15) {
@@ -126,7 +119,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide15 has small caps text', slide15.includes('Small Caps Text'));
   }
 
-  // ── Slide 16: Color map override ──
   section('test_features.pptx — Slide 16: clrMapOvr');
   const slide16 = textFiles.get('ppt/slides/slide16.xml');
   if (slide16) {
@@ -142,7 +134,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide16 has dark bg color', slide16.includes('1A1A2E'));
   }
 
-  // ── Slide 17: CS/Sym fonts + kerning ──
   section('test_features.pptx — Slide 17: CS/Sym fonts + kern');
   const slide17 = textFiles.get('ppt/slides/slide17.xml');
   if (slide17) {
@@ -155,7 +146,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide17 has Symbol text content', slide17.includes('Symbol Font'));
   }
 
-  // ── Slide 18: Text rotation + tab stops ──
   section('test_features.pptx — Slide 18: rotation + tabs');
   const slide18 = textFiles.get('ppt/slides/slide18.xml');
   if (slide18) {
@@ -168,7 +158,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide18 has tab content', slide18.includes('Col1'));
   }
 
-  // ── Slide 19: Vertical text + columns ──
   section('test_features.pptx — Slide 19: vert text + columns');
   const slide19 = textFiles.get('ppt/slides/slide19.xml');
   if (slide19) {
@@ -179,7 +168,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide19 has vertical text content', slide19.includes('Vertical text'));
   }
 
-  // ── Slide 20: Hyperlink + RTL ──
   section('test_features.pptx — Slide 20: hyperlink + RTL');
   const slide20 = textFiles.get('ppt/slides/slide20.xml');
   if (slide20) {
@@ -196,7 +184,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide20 rels has example.com', slide20Rels.includes('example.com'));
   }
 
-  // ── Slide 21: Image bullet ──
   section('test_features.pptx — Slide 21: image bullet');
   const slide21 = textFiles.get('ppt/slides/slide21.xml');
   if (slide21) {
@@ -206,7 +193,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide21 has bullet text', slide21.includes('Image bullet'));
   }
 
-  // ── Slide 22: Hover link + link color ──
   {
     section('test_features.pptx — slide 22 (hover link)');
     const slide22 = textFiles.get('ppt/slides/slide22.xml');
@@ -218,7 +204,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide22 has Both links text', slide22.includes('Both links'));
   }
 
-  // ── Slide 70: Text outline ──────────────────────────────────────────────────
   {
     const slide70 = textFiles.get('ppt/slides/slide70.xml') || '';
     section('test_features.pptx — Slide 70: Text outline');
@@ -229,7 +214,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide70 has Red Outlined Text', slide70.includes('Red Outlined Text'));
   }
 
-  // ── Slide 71: Text gradient fill ────────────────────────────────────────────
   {
     const slide71 = textFiles.get('ppt/slides/slide71.xml') || '';
     section('test_features.pptx — Slide 71: Text gradient fill');
@@ -243,7 +227,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide71 has Pattern Text', slide71.includes('Pattern Text'));
   }
 
-  // ── Slide 72: Text warp ─────────────────────────────────────────────────────
   {
     const slide72 = textFiles.get('ppt/slides/slide72.xml') || '';
     section('test_features.pptx — Slide 72: Text warp');
@@ -255,9 +238,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide72 has Wave Text', slide72.includes('Wave Text'));
   }
 
-
-
-  // ── Slide 88: Justified text ───────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 88: justified text');
     const slide88 = textFiles.get('ppt/slides/slide89.xml') || '';

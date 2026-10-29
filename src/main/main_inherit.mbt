@@ -1,11 +1,5 @@
-// Main — Placeholder inheritance + text style defaults
-//
-// Same package as main.mbt — all globals and helpers are shared.
-
-// ── Placeholder inheritance ──────────────────────────────────────────────────
-
 ///|
-/// Find a matching placeholder shape in a shapes array by ph_type and ph_idx.
+/// The placeholder in `shapes` matching by ph_idx, else by ph_type.
 fn find_placeholder(
   shapes : Array[@ooxml.Shape],
   ph_type : String,
@@ -13,7 +7,6 @@ fn find_placeholder(
 ) -> @ooxml.Shape? {
   let n = shapes.length()
   let mut i = 0
-  // First try matching by ph_idx (if set)
   if ph_idx >= 0 {
     while i < n {
       if shapes[i].ph_idx == ph_idx {
@@ -22,7 +15,6 @@ fn find_placeholder(
       i = i + 1
     }
   }
-  // Fallback: match by ph_type
   i = 0
   while i < n {
     if shapes[i].ph_type == ph_type {
@@ -34,8 +26,7 @@ fn find_placeholder(
 }
 
 ///|
-/// Resolve placeholder transforms and fills from layout/master for a slide's shapes.
-///  Modifies shapes in-place by replacing zero-size transforms with inherited ones.
+/// Give placeholders with a zero-size transform (or no body props) the layout's, else the master's.
 
 ///|
 /// Try to inherit transform and body_props from a source placeholder.
@@ -89,7 +80,6 @@ fn resolve_placeholder_inheritance(
       i = i + 1
       continue
     }
-    // Try layout first
     if layout_opt is Some(layout) {
       let (got_t, got_bp) = try_inherit_from_source(
         shapes,
@@ -106,7 +96,6 @@ fn resolve_placeholder_inheritance(
         needs_body_props = false
       }
     }
-    // Try master for anything still needed
     if needs_transform || needs_body_props {
       if master_opt is Some(master) {
         ignore(
@@ -125,15 +114,10 @@ fn resolve_placeholder_inheritance(
   }
 }
 
-// ── Inline lstStyle application ──────────────────────────────────────────────
-
 ///|
-/// Apply the shape's own inline lstStyle (from p:txBody/a:lstStyle) to its
-/// paragraphs. This handles non-placeholder text boxes that define their own
-/// per-level text defaults (font size, line spacing, bullets, etc.).
+/// Apply the shape's own `a:lstStyle` levels to its paragraphs.
 fn apply_inline_lst_style(shape : @ooxml.Shape) -> Unit {
   let style = shape.lst_style
-  // Check if the style has any non-empty levels
   let nl = style.levels.length()
   if nl == 0 {
     return
@@ -142,8 +126,6 @@ fn apply_inline_lst_style(shape : @ooxml.Shape) -> Unit {
   apply_para_alignment_from_style(shape.paragraphs, style)
   apply_para_spacing_from_style(shape.paragraphs, style)
 }
-
-// ── Text style defaults application ─────────────────────────────────────────
 
 ///|
 /// Apply text style defaults from a source (layout placeholder or master style)
@@ -209,9 +191,7 @@ fn apply_text_style_to_runs(
 }
 
 ///|
-/// Apply a placeholder's lst_style to a shape's paragraphs as fallback.
-/// Searches source_shapes for a matching placeholder, then applies its
-/// lst_style for run defaults (font_size, color, bold) and alignment.
+/// Apply the lst_style of the matching placeholder in `source_shapes` as a fallback.
 fn apply_ph_lst_style_defaults(
   shape : @ooxml.Shape,
   source_shapes : Array[@ooxml.Shape],
@@ -263,9 +243,7 @@ fn apply_para_alignment_from_style(
 }
 
 ///|
-/// Apply paragraph-level spacing and bullet defaults from a TextStyleGroup.
-/// Inherits line_spacing, spc_before, spc_after, mar_l, indent, and bullet
-/// properties when the paragraph has no explicit value.
+/// Fill a paragraph's unset spacing, margins and bullet from a TextStyleGroup.
 fn apply_para_spacing_from_style(
   paragraphs : Array[@ooxml.TextParagraph],
   style : @ooxml.TextStyleGroup,
@@ -281,43 +259,35 @@ fn apply_para_spacing_from_style(
     let defaults = style.levels[lvl_idx]
     let mut changed = false
     let mut new_para = para
-    // line_spacing: 0 = unset
     if para.line_spacing == 0 && defaults.line_spacing != 0 {
       new_para = { ..new_para, line_spacing: defaults.line_spacing, }
       changed = true
     }
-    // spc_before: 0 = unset
     if para.spc_before == 0 && defaults.spc_before != 0 {
       new_para = { ..new_para, spc_before: defaults.spc_before, }
       changed = true
     }
-    // spc_after: 0 = unset
     if para.spc_after == 0 && defaults.spc_after != 0 {
       new_para = { ..new_para, spc_after: defaults.spc_after, }
       changed = true
     }
-    // mar_l: -1 = unset
     if para.mar_l < 0 && defaults.mar_l >= 0 {
       new_para = { ..new_para, mar_l: defaults.mar_l, }
       changed = true
     }
-    // indent: 0 = unset
     if para.indent == 0 && defaults.indent != 0 {
       new_para = { ..new_para, indent: defaults.indent, }
       changed = true
     }
-    // Bullet: inherit from style only when the paragraph has no bullet specification at all.
-    // If bullet, bullet_auto, or bullet_none is set, the paragraph controls its own bullets.
+    // Bullets are inherited only when the paragraph sets none of bullet / buAutoNum / buNone.
     let has_any_bullet_spec = !para.bullet.is_empty() ||
       !para.bullet_auto.is_empty() ||
       para.bullet_none
     if !has_any_bullet_spec {
       if defaults.bullet_none {
-        // Style explicitly disables bullets (a:buNone)
         new_para = { ..new_para, bullet_none: true, }
         changed = true
       } else if !defaults.bullet_auto.is_empty() {
-        // Style provides an auto-number bullet (a:buAutoNum)
         new_para = {
           ..new_para,
           bullet_auto: defaults.bullet_auto,
@@ -339,7 +309,6 @@ fn apply_para_spacing_from_style(
         }
         changed = true
       } else if !defaults.bullet.is_empty() {
-        // Style provides a default bullet character
         new_para = {
           ..new_para,
           bullet: defaults.bullet,
@@ -404,19 +373,10 @@ fn apply_text_defaults(
 }
 
 ///|
-/// Apply endParaRPr values as a LAST-RESORT fallback to runs in each paragraph
-/// that still have no font_size / color / font_face / ea_font after all other
-/// inheritance (shape lstStyle → layout/master placeholder → master txStyles).
-///
-/// This mirrors PowerPoint's behavior where a run in a free textbox with no
-/// explicit color picks up the paragraph's endParaRPr color (the "remembered
-/// run state"), but layout/master inheritance still takes priority so that
-/// placeholder runs use their style chain.
+/// Last-resort run defaults from endParaRPr, after all placeholder inheritance: PowerPoint
+/// carries this "remembered run state" across a free textbox's paragraphs.
 fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
-  // Compute shape-wide fallback values: the first non-empty endParaRPr value
-  // of each kind, taken from any paragraph in the shape. PowerPoint's
-  // "remembered run state" persists across paragraphs, so a paragraph with no
-  // endParaRPr still inherits from its siblings.
+  // Shape-wide fallback: the first endParaRPr value of each kind in any paragraph.
   let mut fb_fs = 0
   let mut fb_clr = @ooxml.Color::none()
   let mut fb_ff = ""
@@ -438,8 +398,7 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
   if fb_fs == 0 && fb_clr.is_none() && fb_ff.is_empty() && fb_ea.is_empty() {
     return
   }
-  // Apply: each paragraph's own epr_* wins over the shape-wide fallback,
-  // and each run's explicit value wins over the paragraph's epr_*.
+  // Precedence: run value > the paragraph's epr_* > the shape-wide fallback.
   for para in shape.paragraphs {
     let eff_fs = if para.epr_font_size > 0 { para.epr_font_size } else { fb_fs }
     let eff_clr = if !para.epr_color.is_none() {
@@ -494,11 +453,8 @@ fn apply_epr_fallbacks(shape : @ooxml.Shape) -> Unit {
 }
 
 ///|
-/// Apply the shape's <p:style>/<a:fontRef> color as a final fallback to any
-/// text run that still has no color after all other inheritance.
-/// PowerPoint uses fontRef as the default text color for free shapes whose
-/// style links to a theme font scheme (e.g. accent rectangles get white text
-/// because their fontRef points at lt1).
+/// Color still-uncolored runs with the shape's `p:style/a:fontRef` color, as PowerPoint
+/// does (accent rectangles get white text through a fontRef to lt1).
 fn apply_font_ref_fallback(shape : @ooxml.Shape) -> Unit {
   if shape.font_ref_color.is_none() {
     return
@@ -514,8 +470,6 @@ fn apply_font_ref_fallback(shape : @ooxml.Shape) -> Unit {
     }
   }
 }
-
-// ── Placeholder auto-content ─────────────────────────────────────────────
 
 ///|
 /// Check if all paragraphs in a shape have no text.
@@ -536,18 +490,9 @@ fn has_no_text(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
 }
 
 ///|
-/// Inject auto-content for date / footer / slide-number placeholders.
-/// `slide_num` is 1-indexed.
-///
-/// - `sldNum`: always reflect the actual slide index (the slide may cache a stale
-///   literal in `<a:fld><a:t>`, e.g. "1").
-/// - `dt`: show the current date (host-provided via FFI); falls back to a literal
-///   date in the layout/master placeholder when no host date is available.
-/// - `ftr`: keep the slide's own footer text; inject the layout/master text only
-///   when the slide left it empty.
-///
-/// The injected run preserves the existing field run's formatting (size/color
-/// from the master's otherStyle); runs with no size render at the generic default.
+/// Fill date / footer / slide-number placeholders (`slide_num` 1-indexed): sldNum always
+/// shows the real number, dt the host date (else the layout/master literal), and ftr
+/// keeps its own text or inherits it. The existing field run's formatting is kept.
 fn inject_placeholder_auto_content(
   shapes : Array[@ooxml.Shape],
   slide_num : Int32,
@@ -563,7 +508,7 @@ fn inject_placeholder_auto_content(
       i = i + 1
       continue
     }
-    // Resolve the replacement text (empty = keep the shape's existing content).
+    // Empty = keep the shape's existing content.
     let auto_text = if ph == "sldNum" {
       int_to_str(slide_num)
     } else if ph == "dt" {
@@ -574,7 +519,6 @@ fn inject_placeholder_auto_content(
         find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
       }
     } else if has_no_text(shape.paragraphs) {
-      // ftr with no own text — inherit from layout/master.
       find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
     } else {
       ""
@@ -590,9 +534,7 @@ fn inject_placeholder_auto_content(
 }
 
 ///|
-/// Build the replacement paragraph for an auto-content placeholder, preserving
-/// the formatting of the placeholder's existing first run (e.g. a cached
-/// slide-number field run carrying master styling) and swapping only its text.
+/// The auto-content paragraph: the placeholder's first run with only its text replaced.
 fn replace_auto_content_text(
   paragraphs : Array[@ooxml.TextParagraph],
   text : String,
@@ -606,14 +548,13 @@ fn replace_auto_content_text(
 }
 
 ///|
-/// Find text content from a placeholder in layout or master.
+/// The text of the matching placeholder in the layout, else the master.
 fn find_ph_text(
   ph_type : String,
   ph_idx : Int32,
   layout_opt : @ooxml.SlideLayoutData?,
   master_opt : @ooxml.SlideMasterData?,
 ) -> String {
-  // Try layout first
   if layout_opt is Some(layout) {
     if find_placeholder(layout.shapes, ph_type, ph_idx) is Some(ph) {
       let text = extract_text(ph.paragraphs)
@@ -622,7 +563,6 @@ fn find_ph_text(
       }
     }
   }
-  // Try master
   match master_opt {
     Some(master) =>
       match find_placeholder(master.shapes, ph_type, ph_idx) {

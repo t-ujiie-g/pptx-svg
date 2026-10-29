@@ -1,9 +1,3 @@
-// OOXML Theme / ColorMap / Master-Layout parsing
-//
-// Same package as ooxml.mbt — all types and helpers are shared.
-
-// ── Theme color node parser ──────────────────────────────────────────────────
-
 ///|
 /// Parse the first color child of a clrScheme element (sysClr or srgbClr).
 fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
@@ -11,7 +5,6 @@ fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
     None => None
     Some(node) => {
       let ch = @xml.get_children(node)
-      // Try <a:srgbClr val="RRGGBB">
       match @xml.find_child(ch, "a:srgbClr") {
         Some(clr) =>
           match @xml.get_attr(clr, "val") {
@@ -19,7 +12,6 @@ fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
             None => None
           }
         None =>
-          // Try <a:sysClr lastClr="RRGGBB">
           match @xml.find_child(ch, "a:sysClr") {
             Some(sys) =>
               match @xml.get_attr(sys, "lastClr") {
@@ -33,14 +25,11 @@ fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
   }
 }
 
-// ── Theme parser ────────────────────────────────────────────────────────────
-
 ///|
 /// Parse theme1.xml into ThemeData.
 pub fn parse_theme(xml_str : String) -> ThemeData {
   let def = ThemeData::default()
   let nodes = @xml.parse_xml(xml_str)
-  // Navigate: a:theme → a:themeElements
   let theme_el = match @xml.find_child(nodes, "a:theme") {
     None => return def
     Some(t) =>
@@ -50,7 +39,6 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
       }
   }
   let te_ch = @xml.get_children(theme_el)
-  // ── Color scheme ──
   let slot_tags = [
     "a:dk1", "a:lt1", "a:dk2", "a:lt2", "a:accent1", "a:accent2", "a:accent3", "a:accent4",
     "a:accent5", "a:accent6", "a:hlink", "a:folHlink",
@@ -89,7 +77,6 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   let accent6 = slot_colors[9]
   let hlink = slot_colors[10]
   let fol_hlink = slot_colors[11]
-  // ── Font scheme ──
   let mut major_font = def.major_font
   let mut minor_font = def.minor_font
   let mut major_ea_font = def.major_ea_font
@@ -123,12 +110,8 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
       }
     }
   }
-  // ── Format scheme (fillStyleLst / lnStyleLst) ──
-  //
-  //  Each entry is stored as raw XML with the `phClr` placeholder intact,
-  //  so `resolve_fill_ref` / `resolve_ln_ref` can substitute in the actual
-  //  scheme color referenced by a shape's `<p:style>`.  Text nodes
-  //  (whitespace between elements) are skipped.
+  // Entries keep their `phClr` placeholder for resolve_fill_ref / resolve_ln_ref to
+  // substitute the referencing shape's scheme color.
   let fill_style_xmls : Array[String] = []
   let ln_style_xmls : Array[String] = []
   if @xml.find_child(te_ch, "a:fmtScheme") is Some(fmt) {
@@ -155,13 +138,10 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     minor_ea_font,
     fill_style_xmls,
     ln_style_xmls,
-    // Effective ColorMap is attached later by `apply_color_map` once the
-    // master / layout / slide override chain has been resolved.
+    // The effective ColorMap is attached later by `apply_color_map`.
     clr_map: ColorMap::default(),
   }
 }
-
-// ── Color map helpers ────────────────────────────────────────────────────────
 
 ///|
 /// Get an XML attribute with a fallback default value.
@@ -193,8 +173,7 @@ pub fn parse_clr_map_from_node(node : @xml.XmlNode) -> ColorMap {
 }
 
 ///|
-/// Resolve a direct theme slot name (dk1, lt1, accent1, etc.) to a Color.
-///  Unlike `resolve_scheme_color`, this does NOT apply bg1→lt1 / tx1→dk1 aliasing.
+/// A theme slot (dk1, lt1, accent1, …) by its physical name, without clrMap aliasing.
 fn resolve_slot(name : String, theme : ThemeData) -> Color {
   if name == "dk1" {
     theme.dk1
@@ -226,18 +205,14 @@ fn resolve_slot(name : String, theme : ThemeData) -> Color {
 }
 
 ///|
-/// Apply a ColorMap to a ThemeData by attaching it as the theme's effective
-/// `clr_map`. Physical slots (dk1, lt1, accents, ...) are preserved as-is so
-/// that direct references like `<a:schemeClr val="dk1"/>` always resolve to
-/// the theme's original colors. Aliasing for logical names (bg1/tx1/etc.) is
-/// performed dynamically in `resolve_scheme_color` against this `clr_map`.
+/// Attach `cmap` as the theme's effective `clr_map`; resolve_scheme_color aliases the
+/// logical names through it while physical slots stay as they are.
 pub fn apply_color_map(theme : ThemeData, cmap : ColorMap) -> ThemeData {
   { ..theme, clr_map: cmap, }
 }
 
 ///|
-/// Extract `p:clrMapOvr` from already-parsed XML nodes.
-///  Returns `None` if not present or if `<a:masterClrMapping/>` is used (= inherit master).
+/// The p:clrMapOvr among `nodes`, or None when absent or a:masterClrMapping (inherit).
 pub fn extract_clr_map_ovr_from_nodes(
   root_ch : Array[@xml.XmlNode],
 ) -> ColorMap? {
@@ -253,11 +228,8 @@ pub fn extract_clr_map_ovr_from_nodes(
   }
 }
 
-// ── Format scheme helpers ───────────────────────────────────────────────────
-
 ///|
-/// Append serialized XML for each element child of `<parent>/<list_tag>` to
-/// `out`. Whitespace text nodes are skipped.
+/// Append each element child of `<parent>/<list_tag>` to `out` as XML.
 fn collect_style_xmls(
   parent_ch : Array[@xml.XmlNode],
   list_tag : String,
@@ -272,8 +244,6 @@ fn collect_style_xmls(
     }
   }
 }
-
-// ── Level text defaults parsing ──────────────────────────────────────────────
 
 ///|
 /// Parse a level paragraph properties node (e.g. a:lvl1pPr) into LevelTextDefaults.
@@ -291,7 +261,6 @@ fn parse_level_defaults(
   }
   let indent = attr_int(ppr, "indent")
   let ppr_ch = @xml.get_children(ppr)
-  // Bullet
   let bu_char = match @xml.find_child(ppr_ch, "a:buChar") {
     None => ""
     Some(bc) =>
@@ -343,7 +312,6 @@ fn parse_level_defaults(
       parse_solid_fill(bc_ch, theme)
     }
   }
-  // Line spacing & spacing before/after
   let lnspc = match @xml.find_child(ppr_ch, "a:lnSpc") {
     Some(n) => parse_spacing(n)
     None => 0
@@ -356,7 +324,6 @@ fn parse_level_defaults(
     Some(n) => parse_spacing(n)
     None => 0
   }
-  // Default run properties from a:defRPr
   let (bold, italic, font_size, color, font_face, ea_font) = match
     @xml.find_child(ppr_ch, "a:defRPr") {
     None => (false, false, 0, Color::none(), "", "")
@@ -439,8 +406,6 @@ fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
   { title_style, body_style, other_style, }
 }
 
-// ── Slide master parser ──────────────────────────────────────────────────────
-
 ///|
 /// Parse a slide master XML string into SlideMasterData.
 pub fn parse_slide_master(
@@ -448,7 +413,6 @@ pub fn parse_slide_master(
   theme : ThemeData,
 ) -> SlideMasterData {
   let nodes = @xml.parse_xml(xml_str)
-  // Parse p:clrMap and apply to theme
   let clr_map = match @xml.find_child(nodes, "p:sldMaster") {
     None => ColorMap::default()
     Some(master_node) => {
@@ -482,7 +446,6 @@ pub fn parse_slide_master(
       }
     }
   }
-  // Parse p:txStyles
   let text_styles = match @xml.find_child(nodes, "p:sldMaster") {
     None => MasterTextStyles::empty()
     Some(master_node) => {
@@ -503,8 +466,6 @@ pub fn parse_slide_master(
     clr_map,
   }
 }
-
-// ── Slide layout parser ──────────────────────────────────────────────────────
 
 ///|
 /// Parse a slide layout XML string into SlideLayoutData.

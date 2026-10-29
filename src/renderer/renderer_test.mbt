@@ -1,8 +1,6 @@
 ///|
 using @test {assert_eq}
 
-// ── render_slide_svg basic ───────────────────────────────────────────────────
-
 ///|
 fn make_empty_slide() -> @ooxml.SlideData {
   {
@@ -32,10 +30,8 @@ test "render_slide_svg empty slide" {
     [],
     [],
   )
-  // Should produce valid SVG with metadata
   assert_true(@xml.str_starts_with(svg, "<svg"))
   assert_true(@xml.str_ends_with(svg, "</svg>"))
-  // Should contain data-ooxml-slide-cx
   let nodes = @xml.parse_xml(svg)
   assert_eq(nodes.length(), 1)
   assert_eq(@xml.get_tag(nodes[0]), "svg")
@@ -114,10 +110,8 @@ test "render_slide_svg with rect shape" {
     [],
     [],
   )
-  // Should contain a group for the shape
   let nodes = @xml.parse_xml(svg)
   let svg_children = @xml.get_children(nodes[0])
-  // Find a <g> with data-ooxml-shape-type
   let mut found_shape = false
   for i in 0..<svg_children.length() {
     if @xml.get_tag(svg_children[i]) == "g" {
@@ -155,7 +149,6 @@ test "render_slide_svg with ellipse" {
     [],
     [],
   )
-  // SVG should contain an ellipse element
   let nodes = @xml.parse_xml(svg)
   let svg_children = @xml.get_children(nodes[0])
   let mut found_ellipse = false
@@ -195,12 +188,7 @@ test "render_slide_svg colored background" {
 }
 
 ///|
-/// Regression: group with chExt much smaller than ext (e.g. chExt=10000 mapped
-/// onto a multi-million-EMU ext). The naive `px(child_coord, outer_scale)` path
-/// truncates every child dimension to 0px and skips the shape via the
-/// `cx_p <= 0` guard, producing an empty `<g transform="...">` element. The
-/// `render_group` fix introduces a finer `child_scale` so children render at
-/// non-zero pixel sizes, with the SVG scale() factor compensating.
+/// A chExt far smaller than ext must not truncate children to 0 px (empty `<g>`).
 test "render_group with small chExt renders children" {
   // Child in chExt-space units (4000 wide, 10000 tall)
   let child = @ooxml.Shape::default_with(
@@ -214,7 +202,6 @@ test "render_group with small chExt renders children" {
     ch_ext_cy: 10000,
     children: [child],
   }
-  // Group occupies a real (large) area on the slide
   let grp = @ooxml.Shape::default_with(@ooxml.ShapeKind::GroupShape(grp_data), {
     x: 3657600,
     y: 3771900,
@@ -235,15 +222,11 @@ test "render_group with small chExt renders children" {
     [],
     [],
   )
-  // The child rect must appear in the SVG — the old behavior emitted an empty
-  // <g transform="..."></g> (no rect inside).
+  // The child rect must be there, with a non-zero size.
   assert_true(svg.contains("<rect"))
-  // And it must have non-zero width/height (i.e. not `width="0"` / `height="0"`)
   assert_true(!svg.contains("width=\"0\""))
   assert_true(!svg.contains("height=\"0\""))
 }
-
-// ── Round-trip: render → parse → compare ────────────────────────────────────
 
 ///|
 test "roundtrip empty slide" {
@@ -756,9 +739,7 @@ test "roundtrip justify alignment" {
     [],
     [],
   )
-  // SVG should contain para-align="just"
   assert_true(svg.contains("para-align=\"just\""))
-  // Round-trip: parse back
   let parsed = @svg_parser.parse_svg_to_slide(svg)
   assert_eq(parsed.shapes[0].paragraphs[0].align, "just")
 }
@@ -861,13 +842,10 @@ test "text run gradient and pattern fill render as defs + url refs" {
     [],
     [],
   )
-  // Gradient: def emitted with per-run ID and referenced by the tspan
   assert_true(svg.contains("<linearGradient id=\"tgrad-s1-0-0-0\""))
   assert_true(svg.contains("fill=\"url(#tgrad-s1-0-0-0)\""))
-  // Pattern: def emitted with per-run ID and referenced by the tspan
   assert_true(svg.contains("<pattern id=\"tpatt-s1-0-0-1\""))
   assert_true(svg.contains("fill=\"url(#tpatt-s1-0-0-1)\""))
-  // Round-trip: fills survive parse back from SVG
   let parsed = @svg_parser.parse_svg_to_slide(svg)
   let p_runs = parsed.shapes[0].paragraphs[0].runs
   assert_eq(p_runs[0].text_grad_fill.stops.length(), 2)
@@ -949,10 +927,7 @@ fn make_bulleted_shape(indent : Int32) -> @ooxml.Shape {
 
 ///|
 test "bullet repositioning only applies to hanging indent" {
-  // With hanging indent (indent < 0) the renderer must reposition the first
-  // line's text anchor to marL so it lines up under continuation lines.
-  // With positive first-line indent the text must flow naturally after the
-  // bullet (regression fix: previous behavior made bullet + text overlap).
+  // Hanging indent moves the first line's text to marL; a positive indent flows after the bullet.
   let theme = @ooxml.ThemeData::default()
   let hanging_slide : @ooxml.SlideData = {
     ..make_empty_slide(),
@@ -982,24 +957,16 @@ test "bullet repositioning only applies to hanging indent" {
     [],
     [],
   )
-  // Both must contain the bullet glyph and text.
   assert_true(hanging_svg.contains("•"))
   assert_true(hanging_svg.contains("Hello"))
   assert_true(positive_svg.contains("•"))
   assert_true(positive_svg.contains("Hello"))
-  // Regression guard: the two renderings must differ. The hanging-indent
-  // variant emits an extra reposition tspan (to line up wrapped continuation
-  // with the first line under marL), while the positive-indent variant must
-  // skip that reposition so text flows naturally after the bullet.
-  // If the renderer ever reintroduces the unconditional reposition, both
-  // SVGs would become byte-identical and this assertion catches it.
+  // Only the hanging indent emits the reposition tspan, so the two must differ.
   assert_true(hanging_svg != positive_svg)
 }
 
 ///|
-/// Construct a minimal text shape with the given shape-level rotation.
-/// Uses noFill/noStroke so only the text itself is visible — matches the
-/// slide 6 regression where rotation wasn't applied to the text.
+/// A text shape with no fill or stroke, so only the text shows the rotation.
 fn make_rotated_text_shape(
   rot : Int32,
   flip_h~ : Bool = false,
@@ -1066,10 +1033,7 @@ fn make_rotated_text_shape(
 
 ///|
 test "shape xfrm rot rotates text, not only the shape rect" {
-  // Regression: slide 6 of rails_study_updated.pptx used text boxes with
-  // <a:xfrm rot="..."/> but noFill/noStroke. The renderer rotated the
-  // (invisible) rect only and emitted the <text> upright. Fix: compose
-  // t.rot + body_props.rot into the text's rotate() transform.
+  // Shape rotation must reach the <text> even when the shape itself draws nothing.
   let theme = @ooxml.ThemeData::default()
   let rotated : @ooxml.SlideData = {
     ..make_empty_slide(),
@@ -1099,31 +1063,25 @@ test "shape xfrm rot rotates text, not only the shape rect" {
     [],
     [],
   )
-  // Rotated shape must emit a rotate(...) transform inside its <text>.
   assert_true(rotated_svg.contains("<text"))
   assert_true(rotated_svg.contains("transform=\"rotate(5.00"))
-  // Straight shape must not emit any rotate() transform.
   assert_false(straight_svg.contains("transform=\"rotate"))
 }
 
 ///|
 test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
-  // Regression: flipH/flipV were dropped — only rotate() was emitted. The
-  // shape rect and its text must be mirrored with a negative-scale transform.
+  // flipH/flipV mirror both the rect and its text with a negative-scale transform.
   let theme = @ooxml.ThemeData::default()
 
-  // flipH: scale(-1,1) about the shape center.
   let fh : @ooxml.SlideData = {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0, flip_h=true)],
   }
   let fh_svg = @renderer.render_slide_svg(fh, [], 1, theme, [], [], [], [])
   assert_true(fh_svg.contains("scale(-1,1)"))
-  // Both the rect and the text carry the mirror.
   assert_true(fh_svg.contains("<text"))
   assert_true(fh_svg.contains("<rect"))
 
-  // flipV: scale(1,-1).
   let fv : @ooxml.SlideData = {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0, flip_v=true)],
@@ -1131,7 +1089,6 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
   let fv_svg = @renderer.render_slide_svg(fv, [], 1, theme, [], [], [], [])
   assert_true(fv_svg.contains("scale(1,-1)"))
 
-  // No flip → no scale() mirror.
   let none : @ooxml.SlideData = {
     ..make_empty_slide(),
     shapes: [make_rotated_text_shape(0)],
@@ -1149,8 +1106,6 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
   assert_true(fhr_svg.contains("rotate(5.00"))
   assert_true(fhr_svg.contains("scale(-1,1)"))
 }
-
-// ── ChartEx rendering tests ──────────────────────────────────────────────────
 
 ///|
 fn make_chart_shape(chart : @ooxml.ChartData) -> @ooxml.Shape {
@@ -1267,11 +1222,8 @@ test "render sunburst chart produces arc paths" {
 }
 
 ///|
-/// Radar chart should render on a polar plot area: one closed polygon per
-/// series plus concentric gridline polygons and labels at each vertex.
-/// Previously it fell through to render_line_chart, producing a Cartesian
-/// `<polyline>` and laying the category names along the x-axis. The fix
-/// switches the dispatch to a dedicated render_radar_chart.
+/// Radar charts are polar: a closed polygon per series, gridline polygons, vertex labels
+/// (not a line chart's Cartesian polyline).
 test "render radar chart produces closed polygon and vertex labels" {
   let xml =
     #|<?xml version="1.0"?>
@@ -1316,7 +1268,6 @@ test "render radar chart produces closed polygon and vertex labels" {
   // Vertex labels appear in the polar layout, not collapsed onto an x-axis.
   assert_true(svg.contains("Speed"))
   assert_true(svg.contains("Comfort"))
-  // Regression guard: no <polyline> means the line-chart fallback is gone.
   assert_true(!svg.contains("<polyline"))
 }
 
@@ -1442,8 +1393,6 @@ test "roundtrip multiple shapes" {
   assert_eq(parsed.shapes[1].transform.x, 300000)
 }
 
-// ── sanitize_url (security: H1/H3) ──────────────────────────────────────────
-
 ///|
 test "sanitize_url accepts safe schemes" {
   assert_eq(
@@ -1505,8 +1454,6 @@ test "sanitize_url strips leading whitespace and control bytes" {
   assert_eq(@renderer.sanitize_url(""), "")
 }
 
-// ── End-to-end attribute escape (security: H2) ──────────────────────────────
-
 ///|
 /// Helper: find first occurrence of `pat` in `s`, or -1 if not found.
 fn find_substring(s : String, pat : String) -> Int32 {
@@ -1539,8 +1486,7 @@ fn find_substring(s : String, pat : String) -> Int32 {
 
 ///|
 test "rendered SVG escapes malicious ph_type in data attribute" {
-  // ph_type flows through `da("ph-type", ...)`. After H2's fix, da() must
-  // XML-escape, so a literal `"` in the value cannot break the attribute.
+  // da() must XML-escape, so a `"` in ph_type cannot break out of the attribute.
   let shape : @ooxml.Shape = {
     ..@ooxml.Shape::default_with(
       @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
@@ -1569,15 +1515,12 @@ test "rendered SVG escapes malicious ph_type in data attribute" {
   )
   // The literal injection sequence must NOT appear unescaped.
   assert_eq(find_substring(svg, "\" onload=\""), -1)
-  // The escaped form should appear (proves the value made it through).
   assert_true(find_substring(svg, "&quot; onload=&quot;") >= 0)
 }
 
 ///|
 test "rendered SVG drops javascript: hyperlink target" {
-  // After H1's fix, an unsafe-scheme hyperlink target is dropped from the
-  // <a href> wrapper entirely. The resulting SVG must contain neither
-  // `javascript:` nor an <a href> wrapper around the run text.
+  // An unsafe-scheme target drops the <a href> wrapper entirely.
   let run : @ooxml.TextRun = {
     text: "click",
     bold: false,
@@ -1666,8 +1609,6 @@ test "rendered SVG drops javascript: hyperlink target" {
   assert_eq(find_substring(svg, "<a href="), -1)
 }
 
-// ── Geometry-specific regression tests ──────────────────────────────────────
-
 ///|
 /// roundRect must use OOXML default adj 16667 and apply it to min(w,h) — not w/20.
 /// Regression: a wide-thin shape (cx >> cy) used to render as a full pill.
@@ -1697,13 +1638,8 @@ test "roundRect default adj uses min(w,h) * 16667 / 100000" {
     [],
     [],
   )
-  // The rendered <rect> should NOT have rx >= cy_p / 2 (pill).
-  // With shape width 11520000 EMU and SVG width scaling to 960 px, cy_p ≈ 28
-  // and the pill threshold rx >= 14. A correct radius should be ≈ 4-5 px.
-  // Easier to verify: rx is far less than the rendered width.
+  // cy_p ≈ 28 px, so a pill would have rx ≥ 14; the right radius is ≈ 4-5 px.
   assert_true(find_substring(svg, "<rect") >= 0)
-  // Pill shape would have rx equal to half the height (~14). Look for
-  // suspicious large rx — e.g. rx="576" (the old buggy width/20 pixel result).
   assert_eq(find_substring(svg, "rx=\"576\""), -1)
   assert_eq(find_substring(svg, "rx=\"288\""), -1)
 }
@@ -1822,9 +1758,7 @@ test "roundRect custom adj round-trips" {
 }
 
 ///|
-/// stripedRightArrow and leftRightArrowCallout used to fall back to a 4-corner
-/// rectangle path. Verify the renderer now emits a complex path with multiple
-/// segments per the OOXML preset definitions.
+/// stripedRightArrow and leftRightArrowCallout draw their preset outline, not a rectangle.
 test "stripedRightArrow renders as multi-segment path" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(
@@ -1854,7 +1788,6 @@ test "stripedRightArrow renders as multi-segment path" {
   // Three subpaths separated by `M` after first move.
   // Plain rect fallback would have only one subpath with 4 line segments.
   assert_true(find_substring(svg, "<path") >= 0)
-  // Three subpaths (3 stripes + body+head) → at least 3 `Z` close commands.
   let mut count = 0
   for idx in 0..<svg.length() {
     if svg.get_char(idx).unwrap() == 'Z' {
@@ -1893,9 +1826,7 @@ test "leftRightArrowCallout renders as preset path" {
     [],
   )
   assert_true(find_substring(svg, "<path") >= 0)
-  // Plain rectangle fallback path has only 4 `L` line commands. The OOXML
-  // preset for leftRightArrowCallout has 17 line segments. Count `L` chars
-  // (followed by a digit or `-` to avoid matching `Lt;`/`<`).
+  // A rectangle has 4 `L` commands, leftRightArrowCallout 17 (count `L` before a digit or `-`).
   let mut count = 0
   for idx = 0; idx < svg.length() - 1; idx = idx + 1 {
     if svg.get_char(idx).unwrap() == 'L' {
@@ -1910,12 +1841,8 @@ test "leftRightArrowCallout renders as preset path" {
   assert_true(count > 4)
 }
 
-// ── Bullet color inheritance (OOXML) ────────────────────────────────────────
-
 ///|
-/// When a paragraph has no <a:buClr>, the bullet must inherit the first run's
-/// color (per ECMA-376). Regression: bullets used to fall back to <text fill=
-/// "black"> default and render as black on dark backgrounds.
+/// Without a:buClr the bullet takes the first run's color (ECMA-376), not black.
 test "bullet inherits first run color when buClr is absent" {
   let run : @ooxml.TextRun = {
     text: "hello",
@@ -1999,12 +1926,8 @@ test "bullet inherits first run color when buClr is absent" {
 }
 
 ///|
-/// Regression: Google Slides emits bentConnector3 with adj1 values like
-/// -39687500 to push the bend point well beyond the bounding box, producing
-/// a long visible trunk after rotation. The bend math
-/// `(x2 - x1) * adj1 / 100000` overflows Int32 when (x2-x1) and adj1 are both
-/// large in opposite signs, AND the legacy pixel-based math also collapsed to
-/// zero when the bbox was thinner than one pixel. Both must be handled.
+/// bentConnector3 with Google Slides' huge adj1 (-39687500): the bend math must not
+/// overflow Int32 nor collapse in a sub-pixel-wide box.
 test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
   let shape = @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(
@@ -2031,23 +1954,15 @@ test "bentConnector3 with extreme adj1 keeps bend outside the bbox" {
     [],
     [],
   )
-  // Look for the connector path. With Int32 overflow it would wrap to ~349;
-  // with proper Int64 math the bend lands at ~317 (38 px outside the bbox).
-  // We check that the path contains a coordinate clearly outside the (355±0)
-  // bbox column.
+  // Int32 overflow would put the bend at ~349; correctly it lands at ~317, outside the box.
   assert_true(find_substring(svg, "<path") >= 0)
-  // x=355 is the bbox column; bend should be visibly to the left, e.g. 317.
   assert_true(
     find_substring(svg, "317") >= 0 || find_substring(svg, "318") >= 0,
   )
 }
 
 ///|
-/// Regression: an empty paragraph in an `<a:spAutoFit/>` text box used to
-/// reserve the default 24 pt (~28 px) line height, ignoring the font size
-/// declared on its `<a:endParaRPr>`. That made the auto-fit shape much
-/// taller than its stored cy, pushing visible content downward and into
-/// neighbouring footer shapes (slide 22 of HTL Japan deck).
+/// An empty paragraph in an spAutoFit box takes its line height from endParaRPr, not 24 pt.
 test "empty paragraph uses endParaRPr font size for autofit height" {
   // Empty paragraph (no runs) with epr_font_size = 800 (= 8 pt).
   let empty_para : @ooxml.TextParagraph = {
@@ -2104,16 +2019,12 @@ test "empty paragraph uses endParaRPr font size for autofit height" {
     [],
     [],
   )
-  // The shape's bounding rect should keep its stored height (74 px), not
-  // grow to the 4 × 28 = 112 px the bug produced.
+  // The box keeps its stored 74 px height instead of growing to 4 × 28 px.
   assert_true(find_substring(svg, "height=\"74\"") >= 0)
 }
 
 ///|
-/// Regression: bullet markers without an explicit `<a:buSzPct>` / `<a:buSzPts>`
-/// used to inherit the parent `<text>` element's default 18 pt size, making
-/// them visibly larger than the (smaller) run text. Per ECMA-376 they should
-/// match the run's font size when no bullet size is specified.
+/// Without buSzPct/buSzPts a bullet matches the run size (ECMA-376), not the 18 pt default.
 test "bullet font-size matches run when bu_size is unspecified" {
   let run : @ooxml.TextRun = {
     text: "hello",
@@ -2198,9 +2109,7 @@ test "bullet font-size matches run when bu_size is unspecified" {
 
 ///|
 test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
-  // Regression for issue #39: a custGeom with no path commands previously
-  // produced a filled <rect> fallback, leading to unwanted colored blocks.
-  // After the fix, the shape should render nothing visible.
+  // An empty custGeom renders nothing, not a filled fallback rect (#39).
   let custom : @ooxml.CustomGeomData = {
     gdlst: "",
     paths: "", // empty pathLst — no draw commands
@@ -2238,20 +2147,13 @@ test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
     [],
     [],
   )
-  // The slide background still emits its own <rect> wrapper, so we check the
-  // shape's fill color directly. The empty shape's color (#00B4D8 →
-  // rgb(0,180,216)) must NOT appear anywhere in the output — neither as a
-  // <path d="..." fill="rgb(0,180,216)"/> nor as a <rect ... fill="..."/>
-  // fallback.
+  // The shape color rgb(0,180,216) must not appear anywhere (path or fallback rect).
   assert_eq(find_substring(svg, "rgb(0,180,216)"), -1)
   assert_eq(find_substring(svg, "<path "), -1)
 }
 
-// ── build_text_layout geometry ───────────────────────────────────────────────
-// The renderer-package FFI stub returns measure_text = 0.0, so per-char widths
-// collapse to 0; these tests assert the structural geometry (line/run/char counts
-// and char offsets), which is independent of measurement. Real x/w geometry is
-// covered by the Node integration suite (proportional measure fallback).
+// The FFI stub measures text as 0 wide, so these check structure (counts, offsets);
+// real widths are covered by the Node suite.
 
 ///|
 fn tl_run(text : String) -> @ooxml.TextRun {
@@ -2326,7 +2228,6 @@ fn tl_transform() -> @ooxml.ShapeTransform {
 
 ///|
 fn tl_body_props() -> @ooxml.BodyProps {
-  // Reuse a default shape's BodyProps (no wrap restriction).
   @ooxml.Shape::default_with(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
     tl_transform(),
@@ -2390,7 +2291,6 @@ test "build_text_layout two paragraphs stack vertically" {
   assert_eq(tl.lines.length(), 2)
   assert_eq(tl.lines[0].para_idx, 0)
   assert_eq(tl.lines[1].para_idx, 1)
-  // Second line is below the first.
   assert_true(tl.lines[1].y > tl.lines[0].y)
 }
 
@@ -2452,13 +2352,9 @@ test "hit_test_layout on empty layout returns origin" {
   assert_eq(po, 0)
 }
 
-// ── Text decoration fidelity (underline color round-trip) ────────────────────
-
 ///|
-/// An underline renders the decoration line; its style/color survive a
-/// render → parse round-trip (underline_color preserved). The CSS
-/// text-decoration-style/color are intentionally NOT emitted — browsers ignore
-/// them on SVG <text> — so the values live only in data-ooxml-* for export.
+/// The underline line renders and its style/color round-trip; CSS -style/-color aren't
+/// emitted since browsers ignore them on SVG <text>.
 test "underline style + color round-trip" {
   let run : @ooxml.TextRun = {
     text: "Underlined",
@@ -2539,7 +2435,6 @@ test "underline style + color round-trip" {
   assert_true(svg.contains("text-decoration=\"underline\""))
   // CSS style/color are intentionally not emitted (browsers ignore them on SVG).
   assert_false(svg.contains("text-decoration-style"))
-  // Round-trip: the underline color is preserved via data-ooxml-underline-color.
   let parsed = @svg_parser.parse_svg_to_slide(svg)
   let pr = parsed.shapes[0].paragraphs[0].runs[0]
   assert_eq(pr.underline, "wavy")

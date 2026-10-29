@@ -1,14 +1,4 @@
-/**
- * Lightweight EMF (Enhanced Metafile) to SVG converter.
- *
- * Handles the subset of EMF records commonly used by PowerPoint:
- * vector paths (bezier curves, lines), brushes, pens, clip paths,
- * text output, and embedded bitmaps.
- *
- * Falls back gracefully — returns empty string if parsing fails.
- */
-
-// ── EMF Record Types (from MS-EMF specification) ────────────────────────────
+/** EMF → SVG for the records PowerPoint uses: paths, pens/brushes, text, bitmaps. */
 
 const EMR_HEADER = 0x01;
 const EMR_POLYGON = 0x03;
@@ -55,8 +45,6 @@ const WHITE_BRUSH = 0;
 const NULL_BRUSH = 5;
 // Stock pen indices
 const NULL_PEN = 8;
-
-// ── GDI State ───────────────────────────────────────────────────────────────
 
 interface GdiPen {
   kind: 'pen';
@@ -125,8 +113,6 @@ function cloneState(s: GdiState): GdiState {
   };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 function colorFromBGR(dv: DataView, offset: number): string {
   const r = dv.getUint8(offset);
   const g = dv.getUint8(offset + 1);
@@ -143,12 +129,7 @@ function escapeXml(s: string): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// ── Main converter ──────────────────────────────────────────────────────────
-
-/**
- * Convert EMF binary data to an SVG string.
- * Returns empty string if the data cannot be parsed.
- */
+/** Convert EMF bytes to SVG markup, or "" if they can't be parsed. */
 export function emfToSvg(data: Uint8Array): string {
   try {
     return parseEmf(data);
@@ -161,7 +142,6 @@ function parseEmf(data: Uint8Array): string {
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   if (data.length < 88) return '';
 
-  // Verify header
   const recType = dv.getUint32(0, true);
   if (recType !== EMR_HEADER) return '';
 
@@ -177,7 +157,6 @@ function parseEmf(data: Uint8Array): string {
 
   const headerSize = dv.getUint32(4, true);
 
-  // GDI objects table
   const objects = new Map<number, GdiObject>();
   const state: GdiState = {
     textColor: '#000000',
@@ -195,11 +174,9 @@ function parseEmf(data: Uint8Array): string {
   let winOrgX = boundsL, winOrgY = boundsT;
   let winExtCx = width, winExtCy = height;
 
-  // Path building
   let pathData = '';
   let inPath = false;
 
-  // SVG output fragments
   const svgParts: string[] = [];
 
   let offset = headerSize;
@@ -428,10 +405,8 @@ function parseEmf(data: Uint8Array): string {
         // +16: width(4), +20: escapement(4), +24: orientation(4), +28: weight(4)
         const fontWeight = dv.getUint32(offset + 28, true);
         const fontItalic = dv.getUint8(offset + 32) !== 0;
-        // Face name starts at +40 (after lfOutPrecision, lfClipPrecision, lfQuality, lfPitchAndFamily)
-        // Actually: lfItalic(1), lfUnderline(1), lfStrikeOut(1), lfCharSet(1) = 4 bytes at +32
-        // lfOutPrecision(1), lfClipPrecision(1), lfQuality(1), lfPitchAndFamily(1) = 4 bytes at +36
-        // lfFaceName starts at +40, 32 UTF-16LE chars
+        // +32..+39: italic, underline, strikeOut, charSet, out/clip precision, quality, pitch;
+        // lfFaceName is 32 UTF-16LE chars at +40.
         let faceName = '';
         const nameStart = offset + 40;
         for (let i = 0; i < 32; i++) {
@@ -517,10 +492,8 @@ function parseEmf(data: Uint8Array): string {
       }
 
       case EMR_STRETCHDIBITS: {
-        // +8: bounds(16), +24: xDest(4), +28: yDest(4), +32: xSrc(4), +36: ySrc(4)
-        // +40: cxSrc(4), +44: cySrc(4), +48: offBmiSrc(4), +52: cbBmiSrc(4)
-        // +56: offBitsSrc(4), +60: cbBitsSrc(4), +64: iUsageSrc(4), +68: dwRop(4)
-        // +72: cxDest(4), +76: cyDest(4)
+        // +8 bounds(16), +24 xDest, yDest, xSrc, ySrc, cxSrc, cySrc, offBmiSrc, cbBmiSrc,
+        // +56 offBitsSrc, cbBitsSrc, iUsageSrc, dwRop, +72 cxDest, cyDest (4 bytes each).
         const xDest = dv.getInt32(offset + 24, true);
         const yDest = dv.getInt32(offset + 28, true);
         const cxDest = dv.getInt32(offset + 72, true);
@@ -530,8 +503,7 @@ function parseEmf(data: Uint8Array): string {
         const offBits = dv.getUint32(offset + 56, true);
         const cbBits = dv.getUint32(offset + 60, true);
 
-        // Validate offsets/lengths fit within this record (defends against
-        // malicious EMF where cbBmi/cbBits sum could allocate gigabytes).
+        // Offsets and lengths must fit in the record: hostile cbBmi/cbBits could allocate gigabytes.
         const recEnd = offset + size;
         const bmiEnd = offset + offBmi + cbBmi;
         const bitsEnd = offset + offBits + cbBits;
@@ -579,13 +551,7 @@ function parseEmf(data: Uint8Array): string {
   );
 }
 
-// ── Point readers ───────────────────────────────────────────────────────────
-
-/**
- * Hard cap on points per EMF record.
- * Guards against malicious EMF where `count` is set to ~2^32, which would
- * cause a multi-billion-iteration loop and OOM on the points array.
- */
+/** Points per record cap: a hostile `count` near 2^32 would loop for billions and OOM. */
 const MAX_POINTS_PER_RECORD = 100_000;
 
 /** Read points from polygon/polyline/polybezier records (with bounds + count header). */

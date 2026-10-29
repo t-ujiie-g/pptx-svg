@@ -1,15 +1,6 @@
-// pptx-svg: text geometry for inline editing
-//
-// `build_text_layout` reproduces `render_text`'s line/run/char positioning as a
-// structured geometry (EMU) so the consumer can draw a caret / selection over the
-// rendered SVG and hit-test clicks. It shares `solve_text_autofit`, `wrap_paragraph`,
-// and `measure_line_width` with the renderer, so line and run counts match the
-// rendered output by construction.
-//
-// v1 scope: horizontal LTR text (left/center/right/justify). Vertical text, warp,
-// OMML math, and multi-column bodies return only the bounding box with no lines
-// (the consumer falls back to coarse positioning for those). Bullets are accounted
-// for approximately (left-anchored lines only).
+// Text geometry for inline editing, sharing render_text's autofit and wrapping so line
+// and run counts match the SVG. Horizontal text only: vertical/warp/math/multi-column
+// bodies get just the box, and bullets are approximated.
 
 ///|
 pub(all) struct GlyphBox {
@@ -94,7 +85,6 @@ pub fn build_text_layout(
   }
   let scale_d = scale.to_double()
 
-  // Insets / text rectangle (mirror render_text)
   let l_ins = if body_props.l_ins >= 0 {
     body_props.l_ins
   } else {
@@ -149,7 +139,6 @@ pub fn build_text_layout(
     avail_h,
   )
 
-  // Vertical anchor offset (mirror render_text)
   let trailing_space = if last_para_line_h > last_para_font_sz {
     last_para_line_h - last_para_font_sz + last_para_spc_after
   } else {
@@ -207,7 +196,6 @@ pub fn build_text_layout(
       pi = pi + 1
       continue
     }
-    // Indent + alignment (mirror render_text)
     let mar_l_emu = if para.mar_l >= 0 {
       para.mar_l
     } else {
@@ -227,7 +215,6 @@ pub fn build_text_layout(
     }
     let bullet_w = layout_bullet_width_px(para, p_font_sz, theme)
 
-    // Per-run paragraph offset prefix + consumed tracker
     let run_para_off : Array[Int32] = []
     let mut acc_off = 0
     for ro in 0..<nr {
@@ -249,7 +236,6 @@ pub fn build_text_layout(
       let (line_w, _) = measure_line_width(
         vline, para, scale, def_sz, fs, theme,
       )
-      // Left edge of the line content (px, Double)
       let ind = if vli == 0 { first_line_indent } else { indent }
       let bullet_off = if vli == 0 { bullet_w } else { 0.0 }
       let line_start : Double = if effective_align == "ctr" ||
@@ -260,10 +246,8 @@ pub fn build_text_layout(
       } else if effective_align == "r" {
         (text_x + text_w).to_double() - line_w
       } else {
-        // left / justify / default
         (text_x + ind).to_double() + bullet_off
       }
-      // Walk segments left→right, merging consecutive same-run segments.
       let run_boxes : Array[RunBox] = []
       let mut cur_run_idx = -1
       let mut cur_box_x = 0.0
@@ -297,7 +281,6 @@ pub fn build_text_layout(
           frag_text
         }
         let seg_run_char_start = consumed[run_idx]
-        // Start a new run box on run change
         if run_idx != cur_run_idx {
           flush_run()
           cur_run_idx = run_idx
@@ -306,7 +289,6 @@ pub fn build_text_layout(
           cur_chars = []
           cur_run_char_start = seg_run_char_start
         }
-        // Per-char advance via cumulative prefix measurement
         let tlen = text.length()
         let mut ci = 0
         let mut prev_w = 0.0
@@ -412,9 +394,8 @@ pub fn text_layout_to_json(tl : TextLayout) -> String {
 }
 
 ///|
-/// Hit-test a point (EMU) against a layout → caret insertion position.
-/// Returns `(para_idx, run_idx, char_in_run, para_offset)`.
-/// Falls back to the nearest line / line end when the point is outside content.
+/// The caret at an EMU point: (para_idx, run_idx, char_in_run, para_offset); outside the
+/// content it snaps to the nearest line / line end.
 pub fn hit_test_layout(
   tl : TextLayout,
   x_emu : Int32,
@@ -424,7 +405,6 @@ pub fn hit_test_layout(
   if nl == 0 {
     return (0, 0, 0, 0)
   }
-  // Pick the line whose vertical band contains y, else the nearest by center.
   let mut line_idx = -1
   for li in 0..<nl {
     let l = tl.lines[li]
@@ -445,7 +425,6 @@ pub fn hit_test_layout(
   if nr == 0 {
     return (line.para_idx, 0, 0, 0)
   }
-  // Before the line start → caret at the first run's start.
   let first = line.runs[0]
   if x_emu <= first.x {
     return (
@@ -458,7 +437,6 @@ pub fn hit_test_layout(
   for ri in 0..<nr {
     let rb = line.runs[ri]
     if x_emu <= rb.x + rb.w {
-      // Within this run: find the char by midpoint.
       let nc = rb.chars.length()
       for ci in 0..<nc {
         let g = rb.chars[ci]
@@ -471,7 +449,6 @@ pub fn hit_test_layout(
           )
         }
       }
-      // Past the last char of this run box.
       return (
         line.para_idx,
         rb.run_idx,
@@ -480,7 +457,6 @@ pub fn hit_test_layout(
       )
     }
   }
-  // Past the line end → caret after the last run box.
   let last = line.runs[nr - 1]
   let lc = last.chars.length()
   (

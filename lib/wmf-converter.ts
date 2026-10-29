@@ -1,16 +1,4 @@
-/**
- * Lightweight WMF (Windows Metafile) to SVG converter.
- *
- * Handles the subset of WMF records commonly used by PowerPoint:
- * vector paths (lines, polygons, polylines), brushes, pens, text output,
- * and embedded bitmaps (StretchDIBits).
- *
- * Supports both Standard and Placeable WMF formats.
- *
- * Falls back gracefully — returns empty string if parsing fails.
- */
-
-// ── WMF Record Types (from MS-WMF specification) ────────────────────────────
+/** WMF (standard or placeable) → SVG for the records PowerPoint uses: paths, pens/brushes, text, bitmaps. */
 
 const META_EOF                  = 0x0000;
 const META_SETBKCOLOR           = 0x0201;
@@ -46,8 +34,6 @@ const META_ESCAPE               = 0x0626;
 
 // Placeable WMF magic
 const PLACEABLE_KEY = 0x9AC6CDD7;
-
-// ── GDI State (reused types from emf-converter) ─────────────────────────────
 
 interface WmfPen {
   style: number;  // 0=solid, 1=dash, 5=null
@@ -107,8 +93,6 @@ function cloneState(s: WmfState): WmfState {
   };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 /** Read a WMF COLORREF (4 bytes: R, G, B, reserved) */
 function colorFromRGB(dv: DataView, offset: number): string {
   const r = dv.getUint8(offset);
@@ -126,12 +110,7 @@ function escapeXml(s: string): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// ── Main converter ──────────────────────────────────────────────────────────
-
-/**
- * Convert WMF binary data to an SVG string.
- * Returns empty string if the data cannot be parsed.
- */
+/** Convert WMF bytes to SVG markup, or "" if they can't be parsed. */
 export function wmfToSvg(data: Uint8Array): string {
   try {
     return parseWmf(data);
@@ -146,16 +125,14 @@ function parseWmf(data: Uint8Array): string {
 
   let offset = 0;
 
-  // ── Detect Placeable WMF ──
   let bboxL = 0, bboxT = 0, bboxR = 0, bboxB = 0;
   let unitsPerInch = 96;
   let isPlaceable = false;
 
   if (data.length >= 22 && dv.getUint32(0, true) === PLACEABLE_KEY) {
     isPlaceable = true;
-    // Placeable WMF header (22 bytes)
-    // +4: HWmf(2), +6: BboxLeft(2), +8: BboxTop(2), +10: BboxRight(2),
-    // +12: BboxBottom(2), +14: Inch(2), +16: Reserved(4), +20: Checksum(2)
+    // Placeable header (22 bytes): +4 HWmf, +6 bbox L/T/R/B (int16 each), +14 inch,
+    // +16 reserved(4), +20 checksum.
     bboxL = dv.getInt16(6, true);
     bboxT = dv.getInt16(8, true);
     bboxR = dv.getInt16(10, true);
@@ -165,7 +142,6 @@ function parseWmf(data: Uint8Array): string {
     offset = 22;
   }
 
-  // ── Standard WMF header (METAHEADER, 18 bytes) ──
   if (offset + 18 > data.length) return '';
   const mtType = dv.getUint16(offset, true);          // 1=memory, 2=disk
   const mtHeaderSize = dv.getUint16(offset + 2, true); // Size in words (should be 9)
@@ -177,9 +153,7 @@ function parseWmf(data: Uint8Array): string {
   const headerBytes = mtHeaderSize * 2;
   offset += headerBytes;
 
-  // ── GDI state ──
   const objects = new Map<number, WmfObject>();
-  // Object table: next available slot
   let nextObjIdx = 0;
   const maxObjects = mtNoObjects || 256;
 
@@ -196,7 +170,6 @@ function parseWmf(data: Uint8Array): string {
   };
   const stateStack: WmfState[] = [];
 
-  // Window/viewport coordinates
   let winOrgX = isPlaceable ? bboxL : 0;
   let winOrgY = isPlaceable ? bboxT : 0;
   let winExtCx = isPlaceable ? (bboxR - bboxL) : 0;
@@ -204,7 +177,6 @@ function parseWmf(data: Uint8Array): string {
 
   const svgParts: string[] = [];
 
-  // ── Record loop ──
   while (offset + 6 <= data.length) {
     const recSizeWords = dv.getUint32(offset, true);
     const recFunc = dv.getUint16(offset + 4, true);
@@ -229,8 +201,7 @@ function parseWmf(data: Uint8Array): string {
         break;
 
       case META_SETMAPMODE:
-        // We only handle MM_ANISOTROPIC/MM_ISOTROPIC via window org/ext
-        // For other modes, the window org/ext values are used as-is
+        // Only the window org/ext are honoured, whatever the mapping mode.
         break;
 
       case META_SETTEXTCOLOR:
@@ -425,14 +396,12 @@ function parseWmf(data: Uint8Array): string {
         const arx = (ar - al) / 2;
         const ary = (ab - at) / 2;
         if (arx > 0 && ary > 0) {
-          // Compute start/end angles from reference points
           const startAngle = Math.atan2((ys - acy) / ary, (xs - acx) / arx);
           const endAngle = Math.atan2((ye - acy) / ary, (xe - acx) / arx);
           const sx = acx + arx * Math.cos(startAngle);
           const sy = acy + ary * Math.sin(startAngle);
           const ex2 = acx + arx * Math.cos(endAngle);
           const ey2 = acy + ary * Math.sin(endAngle);
-          // Determine large-arc flag
           let sweep = endAngle - startAngle;
           if (sweep < 0) sweep += Math.PI * 2;
           const largeArc = sweep > Math.PI ? 1 : 0;
@@ -451,7 +420,6 @@ function parseWmf(data: Uint8Array): string {
               `fill="${fill}" stroke="${stroke}" stroke-width="${state.pen.width}" />`
             );
           } else {
-            // CHORD
             svgParts.push(
               `<path d="M${sx.toFixed(1)} ${sy.toFixed(1)} A${arx} ${ary} 0 ${largeArc} 1 ${ex2.toFixed(1)} ${ey2.toFixed(1)} Z" ` +
               `fill="${fill}" stroke="${stroke}" stroke-width="${state.pen.width}" />`
@@ -484,18 +452,13 @@ function parseWmf(data: Uint8Array): string {
       }
 
       case META_CREATEFONTINDIRECT: {
-        // Parameters: LOGFONT structure (int16-based fields)
-        // Height(16), Width(16), Escapement(16), Orientation(16), Weight(16),
-        // Italic(8), Underline(8), StrikeOut(8), CharSet(8),
-        // OutPrecision(8), ClipPrecision(8), Quality(8), PitchAndFamily(8),
-        // FaceName (char[]) — rest of record
+        // LOGFONT: height, width, escapement, orientation, weight (int16 each), then italic,
+        // underline, strikeOut, charSet, out/clip precision, quality, pitch (1 byte each), face name.
         const fontHeight = Math.abs(dv.getInt16(p, true));
-        // Width at p+2 ignored
-        // Escapement at p+4, Orientation at p+6 ignored
+        // Width, escapement and orientation (+2..+7) are ignored.
         const fontWeight = dv.getUint16(p + 8, true);
         const fontItalic = dv.getUint8(p + 10) !== 0;
-        // Skip underline(+11), strikeout(+12), charset(+13),
-        //   outprecision(+14), clipprecision(+15), quality(+16), pitch(+17)
+        // Underline through pitch (+11..+17) are ignored.
         let faceName = '';
         const nameStart = p + 18;
         const nameEnd = offset + recSizeBytes;
@@ -529,7 +492,6 @@ function parseWmf(data: Uint8Array): string {
       case META_DELETEOBJECT: {
         const ihDel = dv.getUint16(p, true);
         objects.delete(ihDel);
-        // Allow reuse of this slot
         if (ihDel < nextObjIdx) nextObjIdx = ihDel;
         break;
       }
@@ -615,12 +577,8 @@ function parseWmf(data: Uint8Array): string {
 
       case META_STRETCHDIB:
       case META_DIBSTRETCHBLT: {
-        // META_STRETCHDIB:
-        //   dwRop(4), ColorUsage(2), SrcH(2), SrcW(2), YSrc(2), XSrc(2),
-        //   DestH(2), DestW(2), YDest(2), XDest(2), DeviceIndependentBitmap
-        // META_DIBSTRETCHBLT (no color usage):
-        //   dwRop(4), SrcH(2), SrcW(2), YSrc(2), XSrc(2),
-        //   DestH(2), DestW(2), YDest(2), XDest(2), DeviceIndependentBitmap
+        // META_STRETCHDIB: dwRop(4), colorUsage, srcH, srcW, ySrc, xSrc, destH, destW, yDest, xDest,
+        // then the DIB; META_DIBSTRETCHBLT is the same without colorUsage (all 2 bytes).
         let dibParamOff = p;
         dibParamOff += 4; // skip dwRop
         if (recFunc === META_STRETCHDIB) dibParamOff += 2; // skip ColorUsage
@@ -642,7 +600,6 @@ function parseWmf(data: Uint8Array): string {
           if (biSize >= 12 && biSize <= dibSize) {
             const biBitCount = dv.getUint16(dibStart + 14, true);
             const biClrUsed = biSize >= 36 ? dv.getUint32(dibStart + 32, true) : 0;
-            // Calculate color table size
             let paletteEntries = biClrUsed;
             if (paletteEntries === 0 && biBitCount <= 8) {
               paletteEntries = 1 << biBitCount;
