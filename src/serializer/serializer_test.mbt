@@ -664,3 +664,32 @@ test "custGeom per-path fill / stroke / coordinate space round-trip" {
   assert_true(xml.contains("<a:path w=\"50\" h=\"50\" fill=\"none\">"))
   assert_true(xml.contains("<a:path w=\"100\" h=\"100\" fill=\"darken\">"))
 }
+
+///|
+/// A chart's graphicFrame is preserved on parse and written back with the
+/// shape's current transform (charts used to serialize to nothing).
+test "chart graphicFrame round-trips with its current transform" {
+  let frame = "<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id=\"4\" name=\"Chart 3\"/>" +
+    "<p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr>" +
+    "<p:xfrm><a:off x=\"100\" y=\"200\"/><a:ext cx=\"300\" cy=\"400\"/></p:xfrm>" +
+    "<a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/chart\">" +
+    "<c:chart r:id=\"rId2\"/></a:graphicData></a:graphic></p:graphicFrame>"
+  let shapes = @ooxml.parse_shapes_xml(frame, @ooxml.ThemeData::default())
+  assert_eq(shapes.length(), 1)
+  assert_true(shapes[0].kind is @ooxml.ShapeKind::ChartShape(_))
+  // Unmoved: written back unchanged.
+  assert_eq(@serializer.serialize_shape(shapes[0]), frame)
+  // Moved and resized: only the p:xfrm changes.
+  let moved = {
+    ..shapes[0],
+    transform: { ..shapes[0].transform, x: 914400, cy: 2743200, },
+  }
+  let xml = @serializer.serialize_shape(moved)
+  assert_true(
+    xml.contains(
+      "<p:xfrm><a:off x=\"914400\" y=\"200\"/><a:ext cx=\"300\" cy=\"2743200\"/></p:xfrm>",
+    ),
+  )
+  assert_true(xml.contains("<c:chart r:id=\"rId2\"/>"))
+  assert_true(xml.contains("<p:cNvPr id=\"4\" name=\"Chart 3\"/>"))
+}

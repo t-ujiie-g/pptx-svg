@@ -1033,7 +1033,8 @@ export class PptxRenderer {
    * any referenced images inline (base64), so it survives a clipboard round-trip
    * and can be pasted onto another slide (or another presentation).
    * @returns JSON-encoded {@link ShapeSpec} string, or `"ERROR:..."` on failure
-   *          (e.g. charts, which serialize out-of-band, are not copyable in v1).
+   *          (e.g. charts, whose chart part and embedded workbook a paste
+   *          cannot carry over, are not copyable).
    */
   getShapeSpec(slideIdx: number, shapeIdx: number): string {
     const xml = this.exports.get_shape_ooxml(slideIdx, shapeIdx);

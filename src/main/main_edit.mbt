@@ -1112,9 +1112,14 @@ pub fn send_backward(slide_idx : Int32, shape_idx : Int32) -> String {
 
 ///|
 /// Serialize a single shape to its OOXML fragment (for copy). Returns the XML, or
-/// "ERROR:<message>" (e.g. charts, which are preserved out-of-band, serialize to "").
+/// "ERROR:<message>" (e.g. charts, whose chart part a paste cannot carry over).
 pub fn get_shape_ooxml(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
+    // A chart's graphicFrame references a chart part (plus its embedded
+    // workbook) that a paste does not carry over.
+    if arr[local_idx].kind is @ooxml.ShapeKind::ChartShape(_) {
+      return "ERROR:charts are not copyable"
+    }
     let xml = @serializer.serialize_shape(arr[local_idx])
     if xml.is_empty() {
       "ERROR:shape not serializable"

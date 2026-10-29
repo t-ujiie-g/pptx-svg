@@ -253,7 +253,7 @@ EMF コンバータと同様の手法で WMF (16-bit GDI) をパースし SVG �
 
 ### E4: チャート操作
 
-- [ ] **チャートデータの編集** — シリーズ値・カテゴリの変更。現在 ChartShape のシリアライザは空文字列を返す (`serializer.mbt:1390`)。チャート XML は外部ファイル参照 (`chartX.xml`) で保持されるが、編集→再シリアライズのパスがない
+- [ ] **チャートデータの編集** — シリーズ値・カテゴリの変更。graphicFrame は保持・書き戻し済み（位置/サイズの編集も反映）だが、チャートパート (`chartX.xml`) 自体を再生成するパスがない
 - [ ] **チャート種別の変更**
 - [ ] **データシリーズの追加・削除**
 
@@ -278,7 +278,7 @@ PowerPoint / Google スライド級の直接操作編集に必要な基盤プリ
   - [ ] (将来) 縦書き/warp/math/多段組の per-char 厳密幾何（v1 は box のみ概算）
 - [x] **E6.3 z-order（重なり順）操作** (P3) — 本セッションで完了。`bringToFront`/`sendToBack`/`bringForward`/`sendBackward`。z-order = shape 配列順（末尾＝最前面）。含有配列（slide.shapes / group.children）内で並べ替え、`OK:<new_composite_idx>` を返す。E6.1 履歴に統合（undo 可能）。汎用 `reorderShape` は4メソッドで要件充足のため見送り。
 - [x] **E6.4 複数シェイプの一括 transform** (P4) — 本セッションで完了。`updateShapesTransform(slideIdx, items:[{shapeIdx,x,y,cx,cy,rot}])`。全 shapeIdx を検証してから適用（原子的・部分適用なし）・1 undo 単位。失敗時は履歴に残さない guarded checkpoint（`commitCheckpoint`）を追加。
-- [x] **E6.5 シェイプのコピー&ペースト（スライド跨ぎ）** (P5) — 本セッションで完了。`getShapeSpec`（シェイプの OOXML + 参照画像を base64 内包した移植可能 JSON）/ `insertShapeSpec`（別スライドへ貼付、メディア再追加 + rId 再リンク、オフセット対応、undo 可能）。MoonBit: `serialize_shape` pub 化 + `parse_shapes_xml` + `get_shape_ooxml`/`add_shape_from_ooxml`。TS: `base64ToBytes`。**v1 制約**: chart は非対応（serialize 不可）、OLE/SmartArt は画像メディアのみ再リンク。
+- [x] **E6.5 シェイプのコピー&ペースト（スライド跨ぎ）** (P5) — 本セッションで完了。`getShapeSpec`（シェイプの OOXML + 参照画像を base64 内包した移植可能 JSON）/ `insertShapeSpec`（別スライドへ貼付、メディア再追加 + rId 再リンク、オフセット対応、undo 可能）。MoonBit: `serialize_shape` pub 化 + `parse_shapes_xml` + `get_shape_ooxml`/`add_shape_from_ooxml`。TS: `base64ToBytes`。**v1 制約**: chart は非対応（chart パートと埋め込みブックをペースト先へ複製しないため `ERROR:charts are not copyable`）、OLE/SmartArt は画像メディアのみ再リンク。
 - [x] **E6.6 テーブルセル編集** (P6, 既存 E3 と整合) — 本セッションで完了。`updateTableCellText`（セルの first-run 書式を継承）+ `addTableRow`/`deleteTableRow`/`addTableColumn`/`deleteTableColumn`（最低1行/1列保持）。`TableCell::empty()` 追加。すべて undo 可能。**v1 制約**: 結合セル（gridSpan/rowSpan/hMerge/vMerge）は span 調整しないため、結合を含む表の行列操作は構造が崩れる可能性あり。`mergeCells`/`splitCells` は見送り（将来タスク）。
   - **→ これで E6（直接操作編集 P1〜P6）完了。** consumer リクエスト `pptx-svg-editing-api-request.md` の全項目に対応。
 
