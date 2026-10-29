@@ -1,16 +1,9 @@
-// SVG renderer — Text warp rendering
-//
-// Implements visual rendering of prstTxWarp presets using SVG <textPath> for
-// curved warps and SVG transforms for linear warps (slant, fade, cascade).
-//
-// Same package as renderer.mbt — all constants and helpers are shared.
+// prstTxWarp: curved presets follow a <textPath>; slant/fade/cascade are transforms.
 
 ///|
-/// Return default adjustment value for a warp preset (OOXML 60000th-degree for
-/// angles, 0-100000 for percentages).  idx=1 for av1, idx=2 for av2.
+/// A warp preset's default av1 / av2 (`idx` 1 or 2), in 1/60000° or 0-100000.
 fn warp_default_av(prst : String, idx : Int32) -> Int32 {
   if idx == 1 {
-    // av1 defaults
     if prst == "textArchUp" || prst == "textArchUpPour" {
       return 10800000
     }
@@ -76,7 +69,6 @@ fn warp_default_av(prst : String, idx : Int32) -> Int32 {
     return 50000 // generic default
   }
   if idx == 2 {
-    // av2 defaults — most presets only use av1
     if prst == "textWave1" ||
       prst == "textWave2" ||
       prst == "textWave4" ||
@@ -95,8 +87,7 @@ fn warp_default_av(prst : String, idx : Int32) -> Int32 {
 }
 
 ///|
-/// Flatten all paragraph/run text into a single string for warp rendering.
-/// Returns (text, font_size_px, font_family, fill_color, bold, italic).
+/// All the body's text as one string, with the first run's size, font, fill, bold, italic.
 fn flatten_warp_text(
   paragraphs : Array[@ooxml.TextParagraph],
   scale : Int32,
@@ -141,14 +132,12 @@ fn flatten_warp_text(
       }
     }
   }
-  // Resolve font size
   let def_sz = px(default_font_size_emu, scale)
   let fs_raw = if first_font_size > 0 {
     px(first_font_size * @ooxml.emu_per_hundredth_pt, scale)
   } else {
     def_sz
   }
-  // Apply font scale from normAutofit
   let font_sc = body_props.font_scale
   let fs = apply_font_scale(fs_raw, font_sc)
   let ff = if first_ff.is_empty() { theme.minor_font } else { first_ff }
@@ -156,10 +145,8 @@ fn flatten_warp_text(
 }
 
 ///|
-/// Returns true if the warp preset needs SVG <textPath> (curved path).
-/// Returns false for transform-only warps (slant, fade, cascade).
+/// Whether a warp follows a path (false for the transform-only slant/fade/cascade).
 fn is_path_warp(prst : String) -> Bool {
-  // Transform-only warps
   if prst == "textSlantUp" ||
     prst == "textSlantDown" ||
     prst == "textFadeRight" ||
@@ -170,14 +157,11 @@ fn is_path_warp(prst : String) -> Bool {
     prst == "textCascadeDown" {
     return false
   }
-  // Everything else is path-based
   true
 }
 
 ///|
-/// Generate SVG path d-string for a warp preset.
-/// w, h are shape dimensions in pixels (as Double).
-/// av1, av2 are resolved adjustment values (OOXML units).
+/// The path `d` for a warp preset in a w × h px box, with resolved av1/av2.
 fn generate_warp_path(
   prst : String,
   w : Double,
@@ -188,7 +172,6 @@ fn generate_warp_path(
   let cx = w / 2.0
   let cy = h / 2.0
   if prst == "textArchUp" {
-    // Semicircular arc, text follows top half
     let rx = cx
     let ry = cy
     return "M " +
@@ -221,7 +204,6 @@ fn generate_warp_path(
       dts(cy)
   }
   if prst == "textArchUpPour" {
-    // Same as archUp but with adjustable radius
     let ratio = av2 / 100000.0
     let rx = cx * ratio
     let ry = cy * ratio
@@ -264,7 +246,6 @@ fn generate_warp_path(
   if prst == "textCircle" || prst == "textCirclePour" {
     let rx = cx
     let ry = cy
-    // Full circle = two semicircular arcs
     return "M " +
       dts(cx - rx) +
       "," +
@@ -319,7 +300,6 @@ fn generate_warp_path(
       dts(cy)
   }
   if prst == "textButton" || prst == "textButtonPour" {
-    // Button = arch across top
     let rx = cx
     let ry = h * 0.25
     return "M " +
@@ -370,7 +350,6 @@ fn generate_warp_path(
       dts(cy)
   }
   if prst == "textWave4" {
-    // More pronounced wave
     let amp = h * av1 / 100000.0
     return "M 0," +
       dts(cy) +
@@ -400,7 +379,6 @@ fn generate_warp_path(
       dts(cy)
   }
   if prst == "textDoubleWave1" {
-    // Double wave = two periods
     let amp = h * av1 / 100000.0
     return "M 0," +
       dts(cy) +
@@ -632,7 +610,6 @@ fn generate_warp_path(
       dts(h * 0.25)
   }
   if prst == "textDeflateInflate" {
-    // Two-segment: deflate then inflate
     let dip = h * av1 / 100000.0
     return "M 0," +
       dts(cy) +
@@ -724,8 +701,7 @@ fn generate_warp_path(
 }
 
 ///|
-/// Generate SVG transform string for linear (non-path) warps.
-/// Returns the transform attribute content (without the "transform=" wrapper).
+/// The transform list for a transform-only warp.
 fn generate_warp_transform(
   prst : String,
   w : Double,
@@ -733,7 +709,6 @@ fn generate_warp_transform(
   av1 : Double,
 ) -> String {
   if prst == "textSlantUp" {
-    // Skew upward: map av1 (0-100000) to skew angle
     let ratio = av1 / 100000.0
     let angle = -ratio * 30.0 // max 30 degrees
     return "skewY(" + dts(angle) + ")"
@@ -798,13 +773,11 @@ fn generate_warp_transform(
       dts(-h) +
       ")"
   }
-  // Fallback: no transform
   ""
 }
 
 ///|
-/// Render warped text as SVG. Called when body_props.warp_prst is a non-trivial
-/// preset (not empty, not textNoShape, not textPlain).
+/// Render text with a non-trivial warp (not "", textNoShape or textPlain).
 fn render_warp_text(
   paragraphs : Array[@ooxml.TextParagraph],
   t : @ooxml.ShapeTransform,
@@ -822,7 +795,6 @@ fn render_warp_text(
     return ""
   }
   let prst = body_props.warp_prst
-  // Resolve adjustment values
   let av1 = if body_props.warp_av1 >= 0 {
     body_props.warp_av1
   } else {
@@ -841,7 +813,6 @@ fn render_warp_text(
   let h = h_p.to_double()
   let av1_d = av1.to_double()
   let av2_d = av2.to_double()
-  // Build style attributes
   let fill_attr = if !color.is_none() {
     " fill=\"" + color.to_css() + "\""
   } else {
@@ -853,7 +824,6 @@ fn render_warp_text(
   if is_path_warp(prst) {
     let path_id = "warp-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
     let d = generate_warp_path(prst, w, h, av1_d, av2_d)
-    // Determine text-anchor and startOffset based on warp type
     let (start_offset, text_anchor) = if prst == "textChevron" ||
       prst == "textChevronInverted" ||
       prst == "textTriangle" ||
@@ -874,7 +844,6 @@ fn render_warp_text(
     } else {
       ("0%", "start")
     }
-    // dominant-baseline for vertical positioning
     let baseline = " dominant-baseline=\"central\""
     "<defs><path id=\"" +
     path_id +
@@ -912,8 +881,7 @@ fn render_warp_text(
         paragraphs, t, scale, theme, body_props, rels, slide_num, shape_idx,
       )
     }
-    // Wrap normal text rendering in a transform group
-    // Use a modified body_props with cleared warp to avoid infinite recursion
+    // Render normally (warp cleared, or this would recurse) inside the transform.
     let plain_bp : @ooxml.BodyProps = {
       anchor: body_props.anchor,
       l_ins: body_props.l_ins,
@@ -935,7 +903,6 @@ fn render_warp_text(
     let inner = render_text(
       paragraphs, t, scale, theme, plain_bp, rels, slide_num, shape_idx,
     )
-    // Apply transform centered on the shape
     let tcx = x_p + w_p / 2
     let tcy = y_p + h_p / 2
     "<g transform=\"translate(" +

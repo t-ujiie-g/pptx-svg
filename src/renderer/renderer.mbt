@@ -1,16 +1,3 @@
-// SVG renderer for PPTX slides — Round-trip capable
-//
-// All OOXML coordinates are in EMU (English Metric Units).
-// This renderer converts EMU → pixels at a fixed target width of 960 px,
-// producing an SVG with explicit pixel dimensions and NO viewBox transform.
-//
-// Round-trip support: each SVG element carries data-ooxml-* attributes
-// preserving original OOXML values (EMU, hundredths-of-a-point, etc.)
-// so the SVG can be parsed back to SlideData losslessly.
-//
-// NOTE: No StringBuilder.  All strings built via `+` (wasm:js-string "concat"),
-// which is polyfillable in Tier-2/3 browsers.
-
 // 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
 ///|
@@ -290,7 +277,6 @@ fn stroke_dasharray(dash : String, sw : Int32) -> String {
   if dash.is_empty() {
     return ""
   }
-  // Dash/gap values scaled relative to stroke width
   let s = int_to_str(sw)
   let s2 = int_to_str(sw * 2)
   let s4 = int_to_str(sw * 4)
@@ -318,14 +304,12 @@ fn stroke_dasharray(dash : String, sw : Int32) -> String {
   } else if dash == "lgDashDotDot" {
     s8 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
   } else if @xml.str_starts_with(dash, @ooxml.cust_dash_prefix) {
-    // Custom dash format: "custDash:d1,sp1;d2,sp2;..." (percentages * 100 of line width)
-    // Convert to SVG stroke-dasharray by scaling with stroke width
+    // custDash is "custDash:d1,sp1;..." in 1/1000 % of the line width.
     let data = @xml.str_suffix(dash, @ooxml.cust_dash_prefix_len)
     let mut result = ""
     let data_len = data.length()
     let mut pos = 0
     while pos < data_len {
-      // Parse next number (before , or ;)
       let mut num_end = pos
       while num_end < data_len {
         let c = data.get_char(num_end).unwrap()
@@ -376,8 +360,7 @@ fn stroke_linejoin(join : String, miter_limit : Int32) -> String {
     a("stroke-linejoin", "bevel")
   } else if join == "miter" {
     let ml = if miter_limit > 0 {
-      // OOXML miter limit is percentage * 1000 (e.g. 800000 = 800%)
-      // SVG miterlimit is a plain ratio
+      // OOXML miter limit is in 1/1000 % (800000 = 8); SVG takes the plain ratio.
       let ratio = miter_limit / ooxml_pct_denom
       if ratio > 1 {
         a("stroke-miterlimit", int_to_str(ratio))
@@ -513,10 +496,8 @@ fn ascii_lower(s : String) -> String {
 }
 
 ///|
-/// Filter a URL to a safe scheme for hyperlink / image href output.
-/// Allows http(s), mailto, tel, ftp(s), data:image/*, fragment, and relative URLs.
-/// Rejects javascript:, vbscript:, data:text/*, etc. — returns "" if unsafe.
-/// Trims leading whitespace and control characters that browsers ignore in scheme parsing.
+/// `url` if its scheme is safe for href output (http(s), mailto, tel, ftp(s), data:image/*,
+/// fragment or relative), else "". Leading whitespace/control bytes are stripped first.
 pub fn sanitize_url(url : String) -> String {
   if url.is_empty() {
     return ""
@@ -536,7 +517,6 @@ pub fn sanitize_url(url : String) -> String {
     return ""
   }
   let trimmed = if start == 0 { url } else { @xml.str_suffix(url, start) }
-  // Find ':' before any '/', '?', '#' to detect a scheme
   let tlen = trimmed.length()
   let mut colon = -1
   for j in 0..<tlen {
@@ -649,11 +629,8 @@ fn rotation_transform(rot_60k : Int32, cx : Int32, cy : Int32) -> String {
 }
 
 ///|
-/// Build the inner transform operations (rotation followed by mirror) without
-/// the surrounding ` transform="..."` wrapper. Returns "" when neither applies.
-/// OOXML applies flipH/flipV in the unrotated bounding box, then rotates about
-/// the shape center, so the SVG transform list is `rotate(...) <mirror>` (SVG
-/// applies the rightmost operation to coordinates first).
+/// The transform list without its attribute wrapper ("" if none). OOXML mirrors in the
+/// unrotated box, then rotates, so the list is `rotate(...) <mirror>` (SVG applies right to left).
 fn transform_ops(
   rot_60k : Int32,
   flip_h : Bool,
@@ -718,9 +695,8 @@ fn rotation_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
 }
 
 ///|
-/// Like `rotation_attr` but also applies flipH/flipV mirroring. Used for shape
-/// geometry, images and text — anything that does not already account for flip
-/// by other means (lines/connectors swap their endpoints instead).
+/// `rotation_attr` plus flipH/flipV, for everything except lines and connectors
+/// (which encode flips by swapping their endpoints).
 fn transform_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
   let cx_p = px(t.x + t.cx / 2, scale)
   let cy_p = px(t.y + t.cy / 2, scale)
@@ -798,7 +774,6 @@ fn resolve_image_href(
   let img_path = resolve_image_path(target)
   let mime = mime_from_ext(img_path)
   if mime.is_empty() {
-    // EMF/WMF: try converting to SVG via FFI
     let svg_uri = @ffi.ffi_convert_emf(img_path)
     return svg_uri
   }
@@ -873,7 +848,6 @@ fn resolve_blip_href(
   rels : Array[@ooxml.Relationship],
   bf : @ooxml.BlipFill,
 ) -> String {
-  // Prefer SVG image if available
   if !bf.svg_rid.is_empty() {
     let svg_href = resolve_image_href(rels, bf.svg_rid)
     if !svg_href.is_empty() {
@@ -886,8 +860,6 @@ fn resolve_blip_href(
 ///|
 /// Check if BlipFill has any image effects that need SVG filters.
 fn blip_has_effects(bf : @ooxml.BlipFill) -> Bool {
-  // Note: clrChange is NOT included — it can't be rendered via SVG filters
-  // (requires exact pixel color matching). Data is preserved in round-trip only.
   bf.bright != 0 || bf.contrast != 0 || !bf.duotone_1.is_none()
 }
 
@@ -903,12 +875,8 @@ fn render_blip_filter(
   }
   let mut filters = ""
   let mut result_name = "SourceGraphic"
-  // Brightness / contrast (a:lum)
   if bf.bright != 0 || bf.contrast != 0 {
-    // bright: -100000..100000 → offset -1..1 (additive)
-    // contrast: -100000..100000 → slope 0..2 (multiplicative)
-    // SVG feComponentTransfer: slope * value + intercept
-    // slope = 1 + contrast/100000 (range: 0..2)
+    // a:lum → feComponentTransfer: intercept = bright, slope = 1 + contrast (both ±100000).
     let slope = if bf.contrast != 0 {
       format_pct_decimal(ooxml_pct_denom + bf.contrast)
     } else {
@@ -939,18 +907,14 @@ fn render_blip_filter(
       "</feComponentTransfer>"
     result_name = "lum"
   }
-  // Duotone (a:duotone)
   if !bf.duotone_1.is_none() && !bf.duotone_2.is_none() {
     let c1 = bf.duotone_1
     let c2 = bf.duotone_2
-    // Step 1: Convert to grayscale
     filters = filters +
       "<feColorMatrix type=\"saturate\" values=\"0\" in=\"" +
       result_name +
       "\" result=\"gray\"/>"
-    // Step 2: Map grayscale to duotone via component transfer
-    // dark pixels → color1, light pixels → color2
-    // slope = (c2 - c1) / 255, intercept = c1 / 255
+    // Map gray to duotone: slope = (c2 - c1) / 255, intercept = c1 / 255.
     let r1 = format_ratio(c1.r, 255)
     let g1 = format_ratio(c1.g, 255)
     let b1 = format_ratio(c1.b, 255)
@@ -993,8 +957,7 @@ fn format_ratio(num : Int32, den : Int32) -> String {
   if den == 0 || num == den {
     return "1"
   }
-  // Compute ratio * 10000 without 32-bit overflow.
-  // Split: whole = num/den, then fractional digits via remainder*100 steps.
+  // Compute ratio * 10000 without 32-bit overflow: whole part, then remainder digits.
   let q1 = num / den
   let r1 = num - q1 * den
   let q2 = r1 * 100 / den
@@ -1007,7 +970,6 @@ fn format_ratio(num : Int32, den : Int32) -> String {
   if abs_frac == 0 {
     return int_to_str(whole)
   }
-  // Build fractional part, trimming trailing zeros
   let d1 = abs_frac / 1000
   let d2 = abs_frac / 100 % 10
   let d3 = abs_frac / 10 % 10
@@ -1134,20 +1096,16 @@ fn adj_val(avs : Array[Int32], idx : Int32) -> Int32 {
 }
 
 ///|
-/// Compute `start + span * adj / 100000` without 32-bit overflow.
-/// Connectors written by Google Slides occasionally use very large adj values
-/// (e.g. -39687500); the intermediate `span * adj` can exceed Int32 range.
+/// Compute `start + span * adj / 100000` without Int32 overflow (Google Slides writes
+/// adj values like -39687500).
 fn bend_offset(start : Int32, span : Int32, adj : Int32) -> Int32 {
   let prod = span.to_int64() * adj.to_int64()
   start + (prod / 100000L).to_int()
 }
 
 ///|
-/// Render bent/curved connector as SVG <path>.
-/// All bend arithmetic is performed in EMU and converted to pixels at output
-/// time so that very thin bounding boxes (e.g. cx≈0 with a 90° rotation —
-/// common for connectors written by Google Slides) keep sub-pixel precision
-/// when a non-zero adj value is supplied.
+/// Render a bent/curved connector as a `<path>`. Bend math stays in EMU until output so
+/// near-zero-width boxes keep sub-pixel precision.
 fn render_connector_path(
   prst : String,
   avs : Array[Int32],
@@ -1169,7 +1127,6 @@ fn render_connector_path(
   } else if is_curved_connector(prst) {
     render_curved_path(prst, avs, x1, y1, x2, y2, scale)
   } else {
-    // Fallback: straight line
     "M" +
     int_to_str(px(x1, scale)) +
     " " +
@@ -1199,11 +1156,7 @@ fn is_curved_connector(prst : String) -> Bool {
 }
 
 ///|
-/// Render bent connector SVG path (right-angle polyline).
-/// `x1/y1/x2/y2` are in EMU; bend points are computed in EMU and converted to
-/// pixels via `scale` only at output. This preserves sub-pixel offsets when
-/// `(x2-x1)` would round to zero in pixel space (e.g. a connector whose cx is
-/// 900 EMU with a non-zero adj1).
+/// Right-angle polyline for bentConnector2-5 (EMU in, pixels only at output).
 fn render_bent_path(
   prst : String,
   avs : Array[Int32],
@@ -1216,7 +1169,6 @@ fn render_bent_path(
   let s = " "
   let p = fn(emu : Int32) -> String { int_to_str(px(emu, scale)) }
   if prst == "bentConnector2" {
-    // L-shape: horizontal then vertical
     "M" + p(x1) + s + p(y1) + "L" + p(x2) + s + p(y1) + "L" + p(x2) + s + p(y2)
   } else if prst == "bentConnector3" {
     // Z-shape: adj1 controls the horizontal split point
@@ -1573,9 +1525,8 @@ pub fn render_shape(
     @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Connector(_, _)) => true
     _ => false
   }
-  // Apply autoFit: expand shape height if text overflows (never shrink)
-  // Also auto-size when cy is 0 and shape has text (common in generated PPTXs)
-  // Skip lines/connectors — cy=0 means horizontal line, not "auto-size"
+  // autoFit grows (never shrinks) the height to fit the text; cy = 0 with text also
+  // auto-sizes, except for lines, where cy = 0 means horizontal.
   if !is_line &&
     (shape.body_props.auto_fit || t.cy == 0) &&
     !shape.paragraphs.is_empty() {
@@ -1590,14 +1541,10 @@ pub fn render_shape(
   if cy_p <= 0 && !is_line {
     return ""
   }
-  // Pure rotation transform — used by lines/connectors, which encode flip by
-  // swapping their endpoints rather than mirroring the geometry.
+  // Lines/connectors encode flips by swapping endpoints, so they only rotate.
   let rot = rotation_attr(t, scale)
-  // Rotation + flipH/flipV mirror — used by everything else (rect, ellipse,
-  // preset/custom geometry, images, picture borders).
   let xform = transform_attr(t, scale)
 
-  // Build data-ooxml-* attributes for the <g> wrapper
   let g_attrs = da("shape-type", shape_type_str(shape.kind)) +
     da("geom", geom_str(shape.kind)) +
     dai("x", t.x) +
@@ -1641,7 +1588,6 @@ pub fn render_shape(
     } else {
       ""
     }) +
-    // Effect data attributes for round-trip
     (if !shape.effects.is_none() {
       let eff = shape.effects
       let mut ea = ""
@@ -1708,7 +1654,6 @@ pub fn render_shape(
     } else {
       ""
     }) +
-    // 3D data attributes for round-trip
     (if !shape.scene_3d.is_none() {
       da("3d-cam", shape.scene_3d.camera_prst) +
       da("3d-rig", shape.scene_3d.light_rig) +
@@ -1774,7 +1719,6 @@ pub fn render_shape(
     grad_fill_attrs("", shape.grad_fill) +
     blip_fill_attrs("", shape.blip_fill) +
     patt_fill_attrs("", shape.patt_fill) +
-    // Group shape / connector-specific attributes
     (match shape.kind {
       @ooxml.ShapeKind::GroupShape(grp) =>
         dai("grp-ch-off-x", grp.ch_off_x) +
@@ -1919,7 +1863,6 @@ pub fn render_shape(
         @ooxml.ShapeGeom::Custom(data) =>
           render_custom_geom(data, cx_p, cy_p, x_p, y_p, fill, stroke, xform)
         _ => {
-          // Rect / RoundRect
           let rx = match geom {
             @ooxml.ShapeGeom::RoundRect(adj) => {
               // OOXML roundRect: radius = min(width, height) * adj / 100000
@@ -1943,7 +1886,6 @@ pub fn render_shape(
           }
         }
       }
-      // BlipFill: render image inside shape
       let blip_svg = if !shape.blip_fill.is_none() {
         let bf = shape.blip_fill
         let href = resolve_blip_href(rels, bf)
@@ -1954,7 +1896,6 @@ pub fn render_shape(
           let filter_id = blip_filter_id(slide_num, shape_idx)
           let (filter_defs, filter_attr) = render_blip_filter(bf, filter_id)
           if !bf.stretch && bf.tile_sx > 0 {
-            // Tile mode: create <pattern> definition
             let tile_w = cx_p * bf.tile_sx / ooxml_pct_denom
             let tile_h = cy_p * bf.tile_sy / ooxml_pct_denom
             let tw = int_to_str(if tile_w > 0 { tile_w } else { cx_p })
@@ -2004,7 +1945,6 @@ pub fn render_shape(
       } else {
         ""
       }
-      // Compute text rectangle for non-rectangular shapes
       let (tr_l, tr_t, tr_w, tr_h) = match geom {
         @ooxml.ShapeGeom::Other(prst, avs) =>
           compute_preset_text_rect(prst, avs, cx_p, cy_p)
@@ -2080,7 +2020,6 @@ pub fn render_shape(
           xform +
           "/>"
         }
-        // Render border if picture has a stroke (a:ln)
         let border = if !shape.stroke.is_none() && !shape.stroke_no_fill {
           let stroke_emu = if shape.stroke_w > 0 {
             shape.stroke_w
@@ -2175,14 +2114,11 @@ fn render_group(
   if nc == 0 {
     return ""
   }
-  // Build SVG transform: translate(off) scale(ext/chExt) translate(-chOff)
+  // Group transform: translate(off) scale(ext/chExt) translate(-chOff).
   let off_x = px(t.x, scale)
   let off_y = px(t.y, scale)
-  // When chExt is much smaller than ext (e.g. child coord space 10000 EMU
-  // mapped onto a 4_876_800 EMU group), `px(child_coord, outer_scale)` truncates
-  // every child dimension to 0px. Use a finer-grained `child_scale` for child
-  // rendering and compensate via the SVG scale() factor. Cap at outer scale so
-  // existing behavior (chExt == ext) is unchanged.
+  // A tiny chExt would truncate px(child, scale) to 0; render children at a finer
+  // child_scale (capped at scale) and compensate in scale(). See CLAUDE.md.
   let scale_64 = scale.to_int64()
   let has_scaling = grp.ch_ext_cx > 0 &&
     grp.ch_ext_cy > 0 &&
@@ -2258,12 +2194,10 @@ fn render_group(
       ") " +
       transform_str
   }
-  // Group rotation
   if t.rot != 0 {
     let cx_p = px(t.cx / 2, scale)
     let cy_p = px(t.cy / 2, scale)
-    // Rotation is applied around the group center (before the translate)
-    // We prepend the rotation to the transform
+    // Rotate about the group center, before the translate.
     transform_str = "translate(" +
       int_to_str(off_x + cx_p) +
       "," +
@@ -2277,7 +2211,6 @@ fn render_group(
       ") " +
       transform_str
   }
-  // Render child defs (gradient, pattern, arrow markers) and shapes in one pass
   let mut defs = ""
   let mut children_svg = ""
   for ci in 0..<nc {
@@ -2424,7 +2357,6 @@ pub fn render_slide_svg(
     " style=\"background:" +
     slide.background.to_css() +
     ";display:block\"" +
-    // data-ooxml-* metadata on SVG root for round-trip
     dai("slide-cx", sw) +
     dai("slide-cy", sh) +
     da("bg", slide.background.to_hex()) +
@@ -2447,14 +2379,11 @@ pub fn render_slide_svg(
       ""
     }) +
     ">"
-  // Collect all <defs> in a single pass per shape set
   let mut defs = ""
-  // Background gradient
   if !slide.bg_grad.is_none() {
     defs = defs +
       render_gradient_def(slide.bg_grad, "grad-bg-s" + int_to_str(slide_num))
   }
-  // Background pattern
   if !slide.bg_patt_fill.is_none() {
     defs = defs +
       render_pattern_def(
@@ -2462,7 +2391,6 @@ pub fn render_slide_svg(
         "patt-bg-s" + int_to_str(slide_num),
       )
   }
-  // Background blip fill filter
   if !slide.bg_blip_fill.is_none() && blip_has_effects(slide.bg_blip_fill) {
     let (fd, _) = render_blip_filter(
       slide.bg_blip_fill,
@@ -2470,7 +2398,6 @@ pub fn render_slide_svg(
     )
     defs = defs + fd
   }
-  // Background shapes defs (master/layout non-placeholder shapes)
   let nbg = bg_shapes.length()
   for bdi in 0..<nbg {
     let bs = bg_shapes[bdi]
@@ -2480,7 +2407,6 @@ pub fn render_slide_svg(
         render_gradient_def(bs.grad_fill, grad_id(slide_num, bs_idx))
     }
   }
-  // Slide shapes defs (gradient, pattern, arrows)
   let n = slide.shapes.length()
   for di in 0..<n {
     let sh = slide.shapes[di]
@@ -2490,7 +2416,6 @@ pub fn render_slide_svg(
     if !sh.patt_fill.is_none() {
       defs = defs + render_pattern_def(sh.patt_fill, patt_id(slide_num, di))
     }
-    // Stroke gradient/pattern defs
     if !sh.stroke_grad_fill.is_none() {
       defs = defs +
         render_gradient_def(sh.stroke_grad_fill, stroke_grad_id(slide_num, di))
@@ -2519,7 +2444,6 @@ pub fn render_slide_svg(
           sh.stroke,
         )
     }
-    // Effect filter defs
     if !sh.effects.is_none() {
       let (eff_def, _) = render_effect_filter(
         sh.effects,
@@ -2527,7 +2451,6 @@ pub fn render_slide_svg(
         scale,
       )
       defs = defs + eff_def
-      // Reflection mask gradient
       if !sh.effects.reflection.is_none() {
         defs = defs +
           render_reflection_mask_def(
@@ -2555,7 +2478,6 @@ pub fn render_slide_svg(
     ai("height", h) +
     a("fill", bg_fill) +
     "/>"
-  // Background blip fill (image)
   let bg_blip_svg = if !slide.bg_blip_fill.is_none() {
     let bf = slide.bg_blip_fill
     let bg_resolve_rels = if !bg_fill_rels.is_empty() {
@@ -2593,7 +2515,6 @@ pub fn render_slide_svg(
   } else {
     ""
   }
-  // Render master/layout background shapes (non-placeholder)
   let mut bg_shapes_svg = ""
   for bi in 0..<nbg {
     let bg_shape_rels = if bi < bg_shapes_rels.length() {
@@ -2612,7 +2533,6 @@ pub fn render_slide_svg(
         table_styles,
       )
   }
-  // Render slide shapes
   let mut shapes_svg = ""
   for i in 0..<n {
     shapes_svg = shapes_svg +

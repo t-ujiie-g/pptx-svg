@@ -1,10 +1,3 @@
-// SVG renderer — Preset geometry evaluator
-//
-// Implements the DrawingML guide formula system (ECMA-376 §20.1.10)
-// to convert preset shapes to SVG <path> elements.
-//
-// Same package as renderer.mbt — all constants and helpers are shared.
-
 ///|
 /// OOXML angles are in 60000ths of a degree.
 let ooxml_angle_to_rad : Double = 3.14159265358979323846 / 10800000.0
@@ -14,8 +7,7 @@ let ooxml_angle_to_rad : Double = 3.14159265358979323846 / 10800000.0
 let half_circle_angle : Double = 10800000.0
 
 ///|
-/// Simple variable store using parallel arrays. Linear lookup is fine
-///  since preset shapes have at most ~50 variables.
+/// Guide variables as parallel arrays; presets have at most ~50, so lookup is linear.
 priv struct GuideEnv {
   names : Array[String]
   values : Array[Double]
@@ -81,17 +73,14 @@ fn is_int_literal(s : String) -> Bool {
 ///|
 /// Initialize built-in variables for a shape with given pixel dimensions.
 fn GuideEnv::init_builtins(self : GuideEnv, w : Double, h : Double) -> Unit {
-  // Dimensions
   self.set("w", w)
   self.set("h", h)
-  // Edges
   self.set("l", 0.0)
   self.set("t", 0.0)
   self.set("r", w)
   self.set("b", h)
   self.set("hc", w / 2.0)
   self.set("vc", h / 2.0)
-  // Half dimensions
   self.set("wd2", w / 2.0)
   self.set("hd2", h / 2.0)
   self.set("wd3", w / 3.0)
@@ -109,7 +98,6 @@ fn GuideEnv::init_builtins(self : GuideEnv, w : Double, h : Double) -> Unit {
   self.set("wd12", w / 12.0)
   self.set("hd12", h / 12.0)
   self.set("wd32", w / 32.0)
-  // Short side
   let ss = if w < h { w } else { h }
   self.set("ss", ss)
   self.set("ssd2", ss / 2.0)
@@ -118,14 +106,11 @@ fn GuideEnv::init_builtins(self : GuideEnv, w : Double, h : Double) -> Unit {
   self.set("ssd8", ss / 8.0)
   self.set("ssd16", ss / 16.0)
   self.set("ssd32", ss / 32.0)
-  // Long side
   let ls = if w > h { w } else { h }
   self.set("ls", ls)
-  // Angle constants (in 60000ths of degree)
   self.set("cd2", 10800000.0) // 180°
   self.set("cd4", 5400000.0) // 90°
   self.set("cd8", 2700000.0) // 45°
-  // Full circle
   self.set("3cd4", 16200000.0) // 270°
   self.set("3cd8", 8100000.0) // 135°
   self.set("5cd8", 13500000.0) // 225°
@@ -379,10 +364,8 @@ priv struct SubPath {
 }
 
 ///|
-/// Parse one compact sub-path: "M x y", "L x y", "C x1 y1 x2 y2 x3 y3",
-///  "Q x1 y1 x2 y2", "A wR hR stAng swAng", "Z", "W pw ph" for the sub-path's
-///  own coordinate space, "F mode" for its fill and "S false" when it is not
-///  stroked. Unrecognised tokens are skipped.
+/// Parse one compact sub-path ("M x y", "L", "C", "Q", "A wR hR stAng swAng", "Z", plus
+/// "W pw ph" / "F mode" / "S false" attributes; formats in scripts/gen_preset_geom.py).
 fn parse_path(cmds : String) -> SubPath {
   let o = Operand::parse
   let tokens = @xml.split_by_space(cmds)
@@ -439,16 +422,12 @@ fn render_geom_path(
 ) -> String {
   let ox = x_off.to_double()
   let oy = y_off.to_double()
-  // Scale factors if path has its own coordinate space
   let mut sx = if path_w > 0.0 { shape_w / path_w } else { 1.0 }
   let mut sy = if path_h > 0.0 { shape_h / path_h } else { 1.0 }
-  // Point in shape-local pixels (before the x/y offset)
   let pt = fn(x : Operand, y : Operand) {
     (env.value(x) * sx, env.value(y) * sy)
   }
-  // "x y" in slide pixels, for the SVG output
   let fmt = fn(p : (Double, Double)) { dts(p.0 + ox) + " " + dts(p.1 + oy) }
-  // Current position for arcTo endpoint calculation
   let mut cur = (0.0, 0.0)
   let mut d = ""
   for cmd in cmds {
@@ -513,8 +492,7 @@ fn dts(v : Double) -> String {
 }
 
 ///|
-/// Convert OOXML arcTo to SVG arc command.
-///  Returns (svg_arc_string, end_x, end_y) in local coordinates.
+/// OOXML arcTo as SVG arc commands, with the end point (local coordinates).
 fn arcto_svg(
   cur_x : Double,
   cur_y : Double,
@@ -571,10 +549,8 @@ fn arcto_svg(
 }
 
 ///|
-/// Point on an ellipse centred at the origin at OOXML angle `ang`.
-///  arcTo angles are visual: the direction of the ray from the centre, not the
-///  ellipse's parametric angle (ECMA-376 §20.1.9.3). The two agree only on a
-///  circle or at multiples of 90°.
+/// The point at OOXML angle `ang` on an origin-centred ellipse. arcTo angles are visual
+/// (the ray's direction), not parametric (ECMA-376 §20.1.9.3).
 fn ellipse_point(wr : Double, hr : Double, ang : Double) -> (Double, Double) {
   let rad = ang * ooxml_angle_to_rad
   let c = @ffi.ffi_cos(rad)
@@ -633,11 +609,8 @@ fn styled_path_svg(
 }
 
 ///|
-/// Render sub-paths as SVG elements, honouring each a:path's fill mode
-///  and stroke flag. Adjacent sub-paths with the same style share one <path>,
-///  so a plain filled-and-stroked preset is a single element. Stroke-only
-///  (fill="none") sub-paths are drawn after the filled ones: chartPlus / chartX /
-///  chartStar list their lines before the box that would otherwise cover them.
+/// Render sub-paths honouring each a:path's fill mode and stroke flag; same-style runs
+/// share a <path>. Stroke-only sub-paths go last so a later box can't cover them (chartPlus).
 fn render_styled_paths(
   env : GuideEnv,
   paths : Array[SubPath],
@@ -729,9 +702,7 @@ fn preset_geom(prst : String) -> ParsedGeom? {
 }
 
 ///|
-/// Evaluate a preset geometry and return the SVG element string.
-///  Returns the full <path> element with fill, stroke, and transform attributes.
-///  If the preset is not implemented, returns a fallback rectangle.
+/// The SVG element(s) for a preset geometry, falling back to a rectangle if unknown.
 fn render_preset_geom(
   prst : String,
   adj_values : Array[Int32],
@@ -799,9 +770,7 @@ fn render_custom_geom(
   let h = cy_p.to_double()
   let env = GuideEnv::new()
   env.init_builtins(w, h)
-  // Evaluate guide list (includes both avLst and gdLst)
   eval_guides(env, parse_guides(data.gdlst))
-  // Render paths with coordinate space scaling
   let pw = data.path_w.to_double()
   let ph = data.path_h.to_double()
   // An empty custGeom path draws nothing: a fallback rect would cover the
@@ -822,9 +791,7 @@ fn render_custom_geom(
 }
 
 ///|
-/// Compute text rectangle for a preset geometry shape.
-/// Returns (l, t, w, h) in pixels, where l/t are offsets from shape origin.
-/// If the shape has no custom text rect, returns (0, 0, cx_p, cy_p).
+/// A preset's text rectangle (l, t, w, h) in px relative to the shape (whole shape if none).
 fn compute_preset_text_rect(
   prst : String,
   adj_values : Array[Int32],
@@ -844,7 +811,6 @@ fn compute_preset_text_rect(
   let rt = env.value(rt)
   let rr = env.value(rr)
   let rb = env.value(rb)
-  // Clamp to shape bounds
   let l = if rl < 0.0 { 0 } else { rl.to_int() }
   let t = if rt < 0.0 { 0 } else { rt.to_int() }
   let r_val = if rr > w { cx_p } else { rr.to_int() }
@@ -853,8 +819,7 @@ fn compute_preset_text_rect(
 }
 
 ///|
-/// Compute text rectangle for custom geometry.
-/// Uses guide formulas and the a:rect definition from the custom geom data.
+/// A custom geometry's text rectangle from its a:rect and guides.
 fn compute_custom_text_rect(
   data : @ooxml.CustomGeomData,
   cx_p : Int32,

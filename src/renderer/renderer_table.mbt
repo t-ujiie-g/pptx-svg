@@ -1,7 +1,3 @@
-// SVG renderer — Table rendering
-//
-// Same package as renderer.mbt — all constants and helpers are shared.
-
 ///|
 let default_cell_mar_lr : Int32 = 91440 // OOXML default L/R margin: 0.1 inch
 
@@ -40,13 +36,11 @@ fn render_table_cell_text(
   }
   let content_w = cell_w - pad_l - pad_r
   let np = paragraphs.length()
-  // Pre-compute per-paragraph: line height, wrapped lines count, bullet indent
   let para_line_hs : Array[Int32] = []
   let para_wrap_counts : Array[Int32] = []
   let para_bul_mars : Array[Int32] = []
   for pi in 0..<np {
     let para = paragraphs[pi]
-    // Line height from max run font size
     let mut max_run_sz = 0
     let nr = para.runs.length()
     for run in para.runs {
@@ -60,7 +54,6 @@ fn render_table_cell_text(
     }
     let font_sz = if max_run_sz > 0 { max_run_sz } else { def_sz }
     let lh = if para.line_spacing > 0 {
-      // Absolute spacing in EMU
       px(para.line_spacing, scale)
     } else if para.line_spacing < 0 {
       // Percentage spacing (-100000 = 100% = single spacing)
@@ -70,10 +63,8 @@ fn render_table_cell_text(
       font_sz * line_height_numer / line_height_denom
     }
     para_line_hs.push(lh)
-    // Bullet indent
     let bul_mar = if para.mar_l >= 0 { px(para.mar_l, scale) } else { 0 }
     para_bul_mars.push(bul_mar)
-    // Wrapped line count
     let wrap_w = content_w - bul_mar
     if nr == 0 {
       para_wrap_counts.push(1)
@@ -84,11 +75,9 @@ fn render_table_cell_text(
       para_wrap_counts.push(1)
     }
   }
-  // Total text height (all wrapped lines)
   let mut text_height = 0
   for thi in 0..<np {
     text_height = text_height + para_line_hs[thi] * para_wrap_counts[thi]
-    // Space before/after
     if paragraphs[thi].spc_before > 0 && thi > 0 {
       text_height = text_height + px(paragraphs[thi].spc_before, scale)
     }
@@ -96,7 +85,6 @@ fn render_table_cell_text(
       text_height = text_height + px(paragraphs[thi].spc_after, scale)
     }
   }
-  // Vertical anchor offset (clamp to pad_t so text doesn't overflow above the cell)
   let y_raw = if anchor == "ctr" {
     pad_t + (available_h - text_height) / 2
   } else if anchor == "b" {
@@ -105,7 +93,6 @@ fn render_table_cell_text(
     pad_t
   }
   let y_offset = if y_raw < pad_t { pad_t } else { y_raw }
-  // Default text color: style > auto-contrast > black
   let style_fill = if !style_cell.font_color.is_none() {
     style_cell.font_color.to_css()
   } else if !cell_fill.is_none() {
@@ -133,7 +120,6 @@ fn render_table_cell_text(
     let lh = para_line_hs[p_idx]
     let nr = para.runs.length()
     let bul_mar = para_bul_mars[p_idx]
-    // Space before
     if para.spc_before > 0 && p_idx > 0 {
       cur_y = cur_y + px(para.spc_before, scale)
     }
@@ -142,17 +128,13 @@ fn render_table_cell_text(
       p_idx = p_idx + 1
       continue
     }
-    // Paragraph alignment
     let algn = para.align
     let bul_indent = if para.indent != 0 { px(para.indent, scale) } else { 0 }
-    // Text start x after bullet indent
     let text_x = cell_x + pad_l + bul_mar
-    // Wrap text into visual lines
     let wrap_w = content_w - bul_mar
     let wrapped = if wrap_w > 0 {
       wrap_paragraph(para, wrap_w, scale, def_sz, -1, theme)
     } else {
-      // Fallback: all segments on one line
       let segs : Array[(Int32, String)] = []
       for ri in 0..<nr {
         segs.push((ri, para.runs[ri].text))
@@ -163,7 +145,6 @@ fn render_table_cell_text(
     for li in 0..<nlines {
       cur_y = cur_y + lh
       let line = wrapped[li]
-      // Compute x position based on alignment
       let (line_x, text_anchor) = if algn == "ctr" {
         (cell_x + cell_w / 2, "middle")
       } else if algn == "r" {
@@ -171,7 +152,6 @@ fn render_table_cell_text(
       } else {
         (text_x, "start")
       }
-      // Render bullet on first line only
       if li == 0 && !para.bullet.is_empty() && algn != "ctr" && algn != "r" {
         let bul_x = cell_x + pad_l + bul_mar + bul_indent
         out = out +
@@ -182,13 +162,11 @@ fn render_table_cell_text(
           para.bullet +
           " </tspan>"
       }
-      // Line tspan
       out = out + "<tspan" + ai("x", line_x) + ai("y", cur_y)
       if text_anchor != "start" {
         out = out + a("text-anchor", text_anchor)
       }
       out = out + ">"
-      // Render segments
       for frag in line {
         let (run_idx, seg_text) = frag
         if run_idx < nr {
@@ -198,14 +176,12 @@ fn render_table_cell_text(
           } else {
             seg_text
           }
-          // Use render_run_tspan with segment text instead of full run text
           out = out +
             render_run_tspan(run, run_idx, display, scale, -1, rels, theme, "")
         }
       }
       out = out + "</tspan>"
     }
-    // Space after
     if para.spc_after > 0 {
       cur_y = cur_y + px(para.spc_after, scale)
     }
@@ -292,8 +268,7 @@ fn resolve_table_style_cell(
   nrows : Int32,
   ncols : Int32,
 ) -> @ooxml.TableStyleCell {
-  // Priority: firstRow/lastRow/firstCol/lastCol > band > wholeTbl
-  // Check special row/column positions first
+  // Priority: firstRow/lastRow/firstCol/lastCol > bands > wholeTbl.
   if table.first_row && row_idx == 0 {
     if !style.first_row.is_none() {
       return style.first_row
@@ -314,7 +289,6 @@ fn resolve_table_style_cell(
       return style.last_col
     }
   }
-  // Band rows (skip header row if firstRow is enabled)
   if table.band_row {
     let effective_row = if table.first_row { row_idx - 1 } else { row_idx }
     if effective_row >= 0 {
@@ -327,7 +301,6 @@ fn resolve_table_style_cell(
       }
     }
   }
-  // Band columns (skip first col if firstCol is enabled)
   if table.band_col {
     let effective_col = if table.first_col { col_idx - 1 } else { col_idx }
     if effective_col >= 0 {
@@ -340,7 +313,6 @@ fn resolve_table_style_cell(
       }
     }
   }
-  // Fallback to wholeTbl
   style.whole_tbl
 }
 
@@ -356,7 +328,6 @@ fn render_table(
   let base_x = px(t.x, scale)
   let base_y = px(t.y, scale)
   let mut out = ""
-  // Precompute column x-offsets in EMU
   let ncols = table.col_widths.length()
   let col_x_emu : Array[Int32] = []
   let mut cx_accum = 0
@@ -364,7 +335,6 @@ fn render_table(
     col_x_emu.push(cx_accum)
     cx_accum = cx_accum + table.col_widths[ci]
   }
-  // Precompute row heights in EMU (auto-size rows with h=0)
   let nrows = table.rows.length()
   let row_heights_emu : Array[Int32] = []
   // Minimum row height: default font size + top/bottom margins
@@ -374,8 +344,7 @@ fn render_table(
     default_cell_mar_tb * 2
   for rhi in 0..<nrows {
     let h = table.rows[rhi].height
-    // PowerPoint treats a:tr/@h as a minimum row height — rows still grow to
-    // fit wrapped text, so always compute content height and take the max.
+    // a:tr/@h is a minimum: rows grow to fit wrapped text, as in PowerPoint.
     let row = table.rows[rhi]
     let mut max_cell_h_emu = if h > 0 { h } else { min_row_h_emu }
     let nc = row.cells.length()
@@ -404,19 +373,16 @@ fn render_table(
         } else {
           default_cell_mar_lr
         }
-        // Compute cell width from grid spans
         let gs = if cell.grid_span > 1 { cell.grid_span } else { 1 }
         let mut cell_w_emu = 0
         for gsi = 0; gsi < gs && col2 + gsi < ncols; gsi = gsi + 1 {
           cell_w_emu = cell_w_emu + table.col_widths[col2 + gsi]
         }
         let content_w_emu = cell_w_emu - mar_l_emu - mar_r_emu
-        // Estimate text height from paragraphs
         let np = cell.paragraphs.length()
         let mut text_h_emu = 0
         for pi in 0..<np {
           let para = cell.paragraphs[pi]
-          // Find max font size in this paragraph
           let mut max_fs_emu = 0
           let nr = para.runs.length()
           for run in para.runs {
@@ -432,12 +398,10 @@ fn render_table(
             max_fs_emu = default_table_font_size_emu
           }
           let lh_emu = max_fs_emu * line_height_numer / line_height_denom
-          // Estimate wrapped line count
           let bul_mar_emu = if para.mar_l >= 0 { para.mar_l } else { 0 }
           let wrap_w_emu = content_w_emu - bul_mar_emu
           let mut wrap_lines = 1
           if nr > 0 && wrap_w_emu > 0 {
-            // Estimate total text width and compute line count
             let wrap_w_px = px(wrap_w_emu, scale)
             let vlines = wrap_paragraph(
               para,
@@ -480,16 +444,13 @@ fn render_table(
     }
     row_heights_emu.push(max_cell_h_emu)
   }
-  // Precompute row y-offsets in EMU
   let row_y_emu : Array[Int32] = []
   let mut ry_accum = 0
   for ri2 in 0..<nrows {
     row_y_emu.push(ry_accum)
     ry_accum = ry_accum + row_heights_emu[ri2]
   }
-  // Look up table style definition
   let style = find_table_style(table.style_id, table_styles)
-  // Render cells (vMerge=true cells are skipped)
   let mut ri = 0
   while ri < nrows {
     let row = table.rows[ri]
@@ -499,7 +460,6 @@ fn render_table(
     let mut col_idx = 0 // actual grid column index
     while cj < ncells && col_idx < ncols {
       let cell = row.cells[cj]
-      // Skip merged continuation cells
       if cell.v_merge {
         col_idx = col_idx + cell.grid_span
         cj = cj + 1
@@ -510,13 +470,11 @@ fn render_table(
         cj = cj + 1
         continue
       }
-      // Compute merged cell width (sum of grid_span columns)
       let span = cell.grid_span
       let mut merged_w_emu = 0
       for si = 0; si < span && col_idx + si < ncols; si = si + 1 {
         merged_w_emu = merged_w_emu + table.col_widths[col_idx + si]
       }
-      // Compute merged cell height (sum of row_span rows)
       let rspan = cell.row_span
       let mut merged_h_emu = 0
       for sri = 0; sri < rspan && ri + sri < nrows; sri = sri + 1 {
@@ -525,11 +483,9 @@ fn render_table(
       let cx_px = base_x + px(col_x_emu[col_idx], scale)
       let cw = px(merged_w_emu, scale)
       let ch = px(merged_h_emu, scale)
-      // Resolve table style for this cell position
       let style_cell = resolve_table_style_cell(
         style, table, ri, col_idx, nrows, ncols,
       )
-      // Cell background: explicit fill > style fill > none
       let cell_fill = if !cell.fill.is_none() {
         cell.fill.to_css()
       } else if !style_cell.fill.is_none() {
@@ -545,7 +501,6 @@ fn render_table(
         ai("height", ch) +
         a("fill", cell_fill) +
         " stroke=\"none\"/>"
-      // Cell borders: explicit > style > default (top, bottom, left, right)
       out = out +
         render_table_border_line(
           cx_px,
@@ -586,7 +541,6 @@ fn render_table(
           eff_bdr_c(cell.bdr_r_color, style_cell.bdr_r_color),
           scale,
         )
-      // Diagonal borders
       if cell.bdr_tl_br_w > 0 {
         out = out +
           render_table_border_line(
@@ -611,7 +565,6 @@ fn render_table(
             scale,
           )
       }
-      // Compute cell margins in pixels
       let pad_l = px(
         if cell.mar_l >= 0 {
           cell.mar_l
@@ -636,7 +589,6 @@ fn render_table(
         },
         scale,
       )
-      // Cell text
       let pad_r = px(
         if cell.mar_r >= 0 {
           cell.mar_r
@@ -645,7 +597,6 @@ fn render_table(
         },
         scale,
       )
-      // Resolve effective cell fill for auto-contrast text color
       let eff_fill = if !cell.fill.is_none() {
         cell.fill
       } else if !style_cell.fill.is_none() {

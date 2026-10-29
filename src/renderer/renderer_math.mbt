@@ -1,24 +1,5 @@
-// OMML (Office Math Markup Language) → SVG renderer.
-//
-// Converts m:oMath / m:oMathPara XML into positioned SVG elements
-// using a recursive layout engine. Each OMML element is measured and
-// rendered as a MathBox (svg fragment, width, height, baseline).
-//
-// Supported elements:
-//   m:r       — math run (text leaf)
-//   m:f       — fraction (numerator / denominator)
-//   m:sSup    — superscript
-//   m:sSub    — subscript
-//   m:sSubSup — sub + superscript
-//   m:rad     — radical (square root)
-//   m:nary    — large operator (∫ Σ ∏)
-//   m:d       — delimiters (brackets)
-//   m:acc     — accent (hat, tilde, bar)
-//   m:m       — matrix
-//   m:bar     — over/under bar
-//
-// Round-trip: the raw OMML XML is preserved via data-ooxml-math-xml
-// attributes on a hidden <text> element alongside the visual rendering.
+// OMML layout: each element becomes a MathBox (SVG fragment, width, height, baseline).
+// The raw OMML round-trips on a hidden <text> (data-ooxml-math-xml).
 
 ///|
 priv struct MathBox {
@@ -132,8 +113,7 @@ fn math_children(node : @xml.XmlNode, tag : String) -> Array[@xml.XmlNode] {
 }
 
 ///|
-/// Get a property value from the element's properties child.
-/// e.g. math_prop(node, "m:fPr", "m:type") → value of m:val on m:type inside m:fPr.
+/// The m:val of `prop` inside `node`'s `pr_tag` child (`math_prop(n, "m:fPr", "m:type")`).
 fn math_prop(node : @xml.XmlNode, pr_tag : String, prop_tag : String) -> String {
   match math_child(node, pr_tag) {
     Some(pr) =>
@@ -150,8 +130,7 @@ fn math_prop(node : @xml.XmlNode, pr_tag : String, prop_tag : String) -> String 
 }
 
 ///|
-/// Layout all children of a container element (m:e, m:num, m:den, etc.)
-/// as a horizontal row.
+/// Lay out a container's children (m:e, m:num, …) as a horizontal row.
 fn layout_math_children(
   node : @xml.XmlNode,
   fs : Double,
@@ -179,7 +158,6 @@ fn math_hbox(boxes : Array[MathBox]) -> MathBox {
   if n == 1 {
     return boxes[0]
   }
-  // Find max baseline (ascent) and max descent
   let mut max_bl : Double = 0.0
   let mut max_desc : Double = 0.0
   let mut i = 0
@@ -261,7 +239,6 @@ fn layout_math_node(
     tag == "m:deg" {
     return layout_math_children(node, fs, ff, color)
   }
-  // Unknown element: try to lay out children
   layout_math_children(node, fs, ff, color)
 }
 
@@ -272,7 +249,6 @@ fn layout_math_run(
   ff : String,
   color : String,
 ) -> MathBox {
-  // Extract text from m:t child
   let mut text = ""
   let children = @xml.get_children(node)
   for child in children {
@@ -309,14 +285,12 @@ fn layout_math_frac(
   let frac_pad : Double = 4.0 // horizontal padding around fraction bar
   let bar_w = if num_box.w > den_box.w { num_box.w } else { den_box.w }
   let total_w = bar_w + frac_pad
-  // Layout: numerator centered above fraction bar, denominator below
   let num_y : Double = 0.0
   let bar_y = num_box.h + math_frac_gap
   let den_y = bar_y + math_frac_bar_thick + math_frac_gap
   let total_h = den_y + den_box.h
   // Baseline: at fraction bar (middle of surrounding text)
   let baseline = bar_y + math_frac_bar_thick / 2.0
-  // Center numerator and denominator
   let num_x = (total_w - num_box.w) / 2.0
   let den_x = (total_w - den_box.w) / 2.0
   let svg = math_g(num_x, num_y, num_box.svg) +
@@ -351,7 +325,6 @@ fn layout_math_sup(
     Some(s) => layout_math_children(s, sup_fs, ff, color)
     None => math_empty_box
   }
-  // Superscript shifted up relative to base baseline
   let sup_shift = base_box.baseline * math_sup_shift_ratio
   let sup_y = base_box.baseline - sup_shift - sup_box.h + sup_box.baseline * 0.5
   let sup_y_clamped = if sup_y < 0.0 { 0.0 } else { sup_y }
@@ -417,7 +390,6 @@ fn layout_math_subsup(
     Some(s) => layout_math_children(s, script_fs, ff, color)
     None => math_empty_box
   }
-  // Superscript above baseline, subscript below
   let sup_shift = base_box.baseline * math_sup_shift_ratio
   let sup_y = base_box.baseline - sup_shift - sup_box.h + sup_box.baseline * 0.5
   let sup_y_clamped = if sup_y < 0.0 { 0.0 } else { sup_y }
@@ -456,7 +428,6 @@ fn layout_math_rad(
     Some(e) => layout_math_children(e, fs, ff, color)
     None => math_empty_box
   }
-  // Check if degree should be hidden
   let deg_hide = math_prop(node, "m:radPr", "m:degHide")
   let deg_box = if deg_hide != "1" {
     match math_child(node, "m:deg") {
@@ -475,7 +446,6 @@ fn layout_math_rad(
   }
   let gap = math_rad_gap
   let vinculum_thick : Double = 1.0
-  // Radical symbol dimensions
   let rad_tail_w = fs * 0.15 // short tail
   let rad_body_w = fs * 0.35 // V-shape width
   let rad_w = rad_tail_w + rad_body_w
@@ -488,7 +458,6 @@ fn layout_math_rad(
   let vinculum_y = gap
   let content_y = vinculum_y + vinculum_thick
   let total_h = content_y + content_box.h
-  // Radical sign SVG path: tail → V bottom → top → vinculum start
   let rx = deg_offset_x // radical start x
   let tail_y = total_h * 0.55 // tail starts at middle-ish
   let v_bottom_y = total_h - 1.0 // V bottom near bottom
@@ -520,7 +489,6 @@ fn layout_math_rad(
     "\" stroke-width=\"" +
     dts(vinculum_thick) +
     "\"/>"
-  // Degree (if present) positioned at top-left
   let deg_svg = if deg_box.w > 0.0 { math_g(0.0, 0.0, deg_box.svg) } else { "" }
   let content_x = deg_offset_x + rad_w + 1.0
   let svg = deg_svg + svg_path + math_g(content_x, content_y, content_box.svg)
@@ -534,17 +502,14 @@ fn layout_math_nary(
   ff : String,
   color : String,
 ) -> MathBox {
-  // Get operator character (default: integral ∫)
   let chr_val = math_prop(node, "m:naryPr", "m:chr")
   let op_char = if chr_val.is_empty() { "\u{222B}" } else { chr_val } // ∫
   let lim_loc = math_prop(node, "m:naryPr", "m:limLoc") // "subSup" or "undOvr"
   let op_fs = fs * math_nary_scale
   let limit_fs = fs * math_nary_limit_scale
-  // Layout operator
   let op_w = math_text_w(op_char, ff, op_fs)
   let op_h = op_fs * math_text_height_ratio
   let op_bl = op_fs * math_text_baseline_ratio
-  // Layout limits
   let sub_box = match math_child(node, "m:sub") {
     Some(s) => layout_math_children(s, limit_fs, ff, color)
     None => math_empty_box
@@ -553,13 +518,11 @@ fn layout_math_nary(
     Some(s) => layout_math_children(s, limit_fs, ff, color)
     None => math_empty_box
   }
-  // Layout content
   let content_box = match math_child(node, "m:e") {
     Some(e) => layout_math_children(e, fs, ff, color)
     None => math_empty_box
   }
   if lim_loc == "undOvr" {
-    // Limits above and below operator
     let col_w_candidates = [op_w, sub_box.w, sup_box.w]
     let mut col_w : Double = 0.0
     for col_w_candidate in col_w_candidates {
@@ -646,7 +609,6 @@ fn layout_math_delim(
   ff : String,
   color : String,
 ) -> MathBox {
-  // Get delimiter characters
   let beg_chr_val = match math_child(node, "m:dPr") {
     Some(pr) =>
       match math_child(pr, "m:begChr") {
@@ -671,13 +633,11 @@ fn layout_math_delim(
       }
     None => ")"
   }
-  // Layout content (may have multiple m:e children separated by separator)
   let e_nodes = math_children(node, "m:e")
   let content_boxes : Array[MathBox] = []
   let ne = e_nodes.length()
   for ei in 0..<ne {
     if ei > 0 {
-      // Add separator (comma by default)
       let sep_w = math_text_w(",", ff, fs)
       let sep_h = fs * math_text_height_ratio
       let sep_bl = fs * math_text_baseline_ratio
@@ -687,7 +647,6 @@ fn layout_math_delim(
     content_boxes.push(layout_math_children(e_nodes[ei], fs, ff, color))
   }
   let content = math_hbox(content_boxes)
-  // Scale delimiters to content height
   let delim_fs = if content.h > fs * math_text_height_ratio {
     content.h * 0.9
   } else {
@@ -722,7 +681,6 @@ fn layout_math_acc(
     Some(e) => layout_math_children(e, fs, ff, color)
     None => math_empty_box
   }
-  // Get accent character (default: combining circumflex accent)
   let acc_chr = match math_child(node, "m:accPr") {
     Some(pr) =>
       match math_child(pr, "m:chr") {
@@ -735,9 +693,7 @@ fn layout_math_acc(
       }
     None => "\u{0302}"
   }
-  // Map combining characters to non-combining display characters
-  // Combining chars (U+0300 range) render poorly standalone in SVG <text>;
-  // use full-width non-combining equivalents instead.
+  // Combining accents (U+0300…) render poorly alone in SVG <text>: use spacing forms.
   let display_acc = if acc_chr == "\u{0302}" || acc_chr == "\u{005E}" {
     "\u{02C6}" // modifier letter circumflex accent
   } else if acc_chr == "\u{0303}" || acc_chr == "\u{007E}" {
@@ -757,10 +713,8 @@ fn layout_math_acc(
   } else {
     acc_chr
   }
-  // Draw accent as SVG line/path for common accents that don't render well as text
   let use_line = display_acc == "\u{00AF}" // macron → draw as line
   if use_line {
-    // Draw overline as SVG <line>
     let line_thick : Double = 1.2
     let line_gap : Double = 1.0
     let content_y = line_thick + line_gap
@@ -780,8 +734,7 @@ fn layout_math_acc(
       math_g(0.0, content_y, content_box.svg)
     return { svg, w: content_box.w, h: total_h, baseline, }
   }
-  // Draw common accents as SVG paths for precise positioning.
-  // SVG <text> y is the baseline, causing glyphs to float above — paths are more reliable.
+  // Common accents are drawn as paths: a <text> glyph sits on the baseline and floats.
   let is_circumflex = display_acc == "\u{02C6}" || display_acc == "\u{005E}"
   let is_tilde = display_acc == "\u{02DC}" || display_acc == "\u{007E}"
   let is_dot = display_acc == "\u{02D9}"
@@ -789,7 +742,6 @@ fn layout_math_acc(
   let acc_thick : Double = 1.2
   let acc_gap2 : Double = 1.0
   if is_circumflex {
-    // Draw ^ as SVG path: /\ shape
     let cw = content_box.w
     let peak_h = fs * 0.18
     let half_w = cw * 0.25
@@ -817,7 +769,6 @@ fn layout_math_acc(
     return { svg, w: cw, h: total_h, baseline, }
   }
   if is_tilde {
-    // Draw ~ as SVG path: sinusoidal curve
     let cw = content_box.w
     let wave_h = fs * 0.1
     let cx = cw / 2.0
@@ -853,7 +804,6 @@ fn layout_math_acc(
     return { svg, w: cw, h: total_h, baseline, }
   }
   if is_dot {
-    // Draw dot as SVG circle
     let cw = content_box.w
     let dot_r = fs * 0.04
     let content_y = dot_r * 2.0 + acc_gap2
@@ -872,7 +822,6 @@ fn layout_math_acc(
     return { svg, w: cw, h: total_h, baseline, }
   }
   if is_diaeresis {
-    // Draw diaeresis as two dots
     let cw = content_box.w
     let dot_r = fs * 0.035
     let dot_spacing = cw * 0.2
@@ -924,7 +873,6 @@ fn layout_math_matrix(
   if nrows == 0 {
     return math_empty_box
   }
-  // Measure all cells
   let cell_boxes : Array[Array[MathBox]] = []
   let mut max_cols = 0
   let mut ri = 0
@@ -944,7 +892,6 @@ fn layout_math_matrix(
   if max_cols == 0 {
     return math_empty_box
   }
-  // Compute column widths and row heights
   let col_widths : Array[Double] = Array::make(max_cols, 0.0)
   let row_heights : Array[Double] = Array::make(nrows, 0.0)
   let row_baselines : Array[Double] = Array::make(nrows, 0.0)
@@ -969,7 +916,6 @@ fn layout_math_matrix(
     ri = ri + 1
   }
   let gap = fs * math_matrix_gap_ratio
-  // Compute total size
   let mut total_w : Double = 0.0
   for ci = 0; ci < max_cols; ci = ci + 1 {
     total_w = total_w + col_widths[ci]
@@ -986,7 +932,6 @@ fn layout_math_matrix(
     }
     ri = ri + 1
   }
-  // Render cells
   let mut svg = ""
   let mut cur_y : Double = 0.0
   ri = 0
@@ -1026,7 +971,6 @@ fn layout_math_bar(
   let bar_thick : Double = 1.5
   let bar_gap : Double = 2.0
   if pos == "bot" {
-    // Underbar
     let bar_y = content_box.h + bar_gap
     let total_h = bar_y + bar_thick
     let svg = content_box.svg +
@@ -1043,7 +987,6 @@ fn layout_math_bar(
       "\"/>"
     { svg, w: content_box.w, h: total_h, baseline: content_box.baseline, }
   } else {
-    // Overbar (default)
     let bar_y = bar_thick
     let content_y = bar_y + bar_gap
     let total_h = content_y + content_box.h
@@ -1082,8 +1025,7 @@ fn is_all_math(paragraphs : Array[@ooxml.TextParagraph]) -> Bool {
       if !run.math_xml.is_empty() {
         has_math = true
       } else if !run.text.is_empty() {
-        // Non-empty text run without math → mixed content
-        // Allow whitespace-only runs
+        // A non-whitespace run without math makes the content mixed.
         let mut all_ws = true
         let mut k = 0
         let tlen = run.text.length()
@@ -1116,7 +1058,6 @@ fn render_math_text(
   _slide_num : Int32,
   _shape_idx : Int32,
 ) -> String {
-  // Collect all math XML from runs
   let np = paragraphs.length()
   let mut all_math_xml = ""
   let mut first_run_color : @ooxml.Color = { r: -1, g: 0, b: 0, alpha: 255, }
@@ -1140,7 +1081,6 @@ fn render_math_text(
   if all_math_xml.is_empty() {
     return ""
   }
-  // Determine font size in pixels
   let fs_emu = if first_run_fs > 0 {
     hundredth_pt_to_emu(first_run_fs)
   } else {
@@ -1153,18 +1093,15 @@ fn render_math_text(
   } else {
     default_text_fill
   }
-  // Font family
   let ff = if !first_run_font.is_empty() {
     first_run_font + ", " + math_font_family
   } else {
     math_font_family
   }
-  // Parse the math XML
   let nodes = @xml.parse_xml(all_math_xml)
   if nodes.is_empty() {
     return ""
   }
-  // Layout the math
   let boxes : Array[MathBox] = []
   for node in nodes {
     boxes.push(layout_math_node(node, fs_px, ff, color_str))
@@ -1173,7 +1110,6 @@ fn render_math_text(
   if math_box.w <= 0.0 {
     return ""
   }
-  // Position within shape
   let l_ins = if body_props.l_ins >= 0 { body_props.l_ins } else { 91440 }
   let t_ins = if body_props.t_ins >= 0 { body_props.t_ins } else { 45720 }
   let r_ins = if body_props.r_ins >= 0 { body_props.r_ins } else { 91440 }
@@ -1188,26 +1124,21 @@ fn render_math_text(
   let avail_h = shape_h -
     px(t_ins, scale).to_double() -
     px(b_ins, scale).to_double()
-  // Center horizontally within available area
   let math_x = shape_x +
     px(l_ins, scale).to_double() +
     (avail_w - math_box.w) / 2.0
-  // Vertical alignment
   let math_y = if body_props.anchor == "ctr" {
     shape_y + px(t_ins, scale).to_double() + (avail_h - math_box.h) / 2.0
   } else if body_props.anchor == "b" {
     shape_y + shape_h - px(b_ins, scale).to_double() - math_box.h
   } else {
-    // top (default)
     shape_y + px(t_ins, scale).to_double()
   }
-  // Build SVG: visual math rendering + hidden text for round-trip
   let visual_svg = "<g" +
     da("math-xml", all_math_xml) +
     ">" +
     math_g(math_x, math_y, math_box.svg) +
     "</g>"
-  // Hidden text element preserving round-trip data attributes
   let hidden_svg = "<text" +
     " x=\"" +
     dts(shape_x) +

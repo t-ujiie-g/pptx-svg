@@ -1,15 +1,9 @@
-// SVG renderer — Fill rendering (gradient, pattern, blip tile)
-//
-// Same package as renderer.mbt — all constants and helpers are shared.
-
 ///|
 let pattern_tile_sz : Int32 = 8 // default SVG <pattern> tile size in px
 
 ///|
-/// Render a single gradient <defs> definition.
-///  Returns a <linearGradient> or <radialGradient> element string.
+/// A `<linearGradient>` or `<radialGradient>` def.
 fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
-  // Build stop elements
   let mut stops_svg = ""
   for stop in gf.stops {
     // pos is 0..100000 (0.001% precision); emit as 0-1 SVG offset to preserve sub-percent stops.
@@ -45,9 +39,7 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     ""
   }
   if gf.angle >= 0 && gf.path_type.is_empty() {
-    // Linear gradient
-    // OOXML angle is in 60000th of a degree. SVG gradientTransform rotate()
-    // uses degrees centered at (0.5, 0.5). Direct division gives the SVG angle.
+    // OOXML angles are 1/60000°; gradientTransform rotates in degrees about (0.5, 0.5).
     let deg = gf.angle / ooxml_angle_unit
     "<linearGradient id=\"" +
     grad_id +
@@ -82,7 +74,6 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
     stops_svg +
     "</radialGradient>"
   } else {
-    // Fallback linear
     "<linearGradient id=\"" +
     grad_id +
     "\" gradientUnits=\"objectBoundingBox\"" +
@@ -94,8 +85,7 @@ fn render_gradient_def(gf : @ooxml.GradientFill, grad_id : String) -> String {
 }
 
 ///|
-/// Serialize gradient stop data for data-ooxml-grad-stops attribute.
-///  Format: "pos,RRGGBB;pos,RRGGBB;..."
+/// Stops for `data-ooxml-grad-stops`: "pos,RRGGBB;...".
 fn grad_stops_attr(gf : @ooxml.GradientFill) -> String {
   let mut out = ""
   let ns = gf.stops.length()
@@ -181,18 +171,15 @@ fn patt_svg_content(
   let h = int_to_str(sz / 2)
   let q = int_to_str(sz / 4)
   let q3 = int_to_str(sz * 3 / 4)
-  // Offsets for half-spaced ("light"/"dark", GDI+ 4px) parallel diagonals and
-  // eighth positions for "narrow" (GDI+ 2px) line variants
+  // Offsets for half-spaced (lt/dk, GDI+ 4px) and eighth-spaced (nar, 2px) hatches.
   let nh = int_to_str(-(sz / 2))
   let s3h = int_to_str(sz * 3 / 2)
   let e1 = int_to_str(sz / 8)
   let e3 = int_to_str(sz * 3 / 8)
   let e5 = int_to_str(sz * 5 / 8)
   let e7 = int_to_str(sz * 7 / 8)
-  // Half-spaced line sets shared by the lt/dk variants (sw = stroke width):
-  // main diagonal + two parallels shifted ±half tile (clipped at the tile
-  // edge, so the offset diagonal tiles seamlessly), or two lines at quarter
-  // positions for horizontal/vertical.
+  // lt/dk line sets: the diagonal plus parallels at ±half a tile (clipped, so they tile
+  // seamlessly), or two lines at quarter positions.
   fn dn_diag_half(sw : String) -> String {
     patt_line("0", "0", s, s, fg, sw) +
     patt_line(nh, "0", h, s, fg, sw) +
@@ -212,7 +199,6 @@ fn patt_svg_content(
   fn vert_half(sw : String) -> String {
     patt_line(q, "0", q, s, fg, sw) + patt_line(q3, "0", q3, s, fg, sw)
   }
-  // Background rect
   let br = "<rect width=\"" +
     s +
     "\" height=\"" +
@@ -220,7 +206,6 @@ fn patt_svg_content(
     "\" fill=\"" +
     bg +
     "\"/>"
-  // Foreground-filled rect (for inverted patterns)
   let fr = "<rect width=\"" +
     s +
     "\" height=\"" +
@@ -253,8 +238,7 @@ fn patt_svg_content(
   } else if prst == "pct90" {
     fr + patt_dot(h, q, "1", bg)
 
-    // lt/dk variants are half-spaced vs the plain preset (GDI+ hatch: 4px vs
-    // 8px); dk doubles the line width.
+    // lt/dk are half-spaced vs the plain preset (GDI+ 4px vs 8px); dk doubles the width.
   } else if prst == "ltDnDiag" {
     br + dn_diag_half("1")
   } else if prst == "dkDnDiag" {
@@ -522,8 +506,7 @@ fn render_drop_shadow_filter(
 }
 
 ///|
-/// Render SVG filter definition for shape effects (a:effectLst).
-/// Returns (filter_defs, filter_attr) — defs SVG string and filter="url(#id)" attribute.
+/// The `<filter>` defs and `filter="url(#…)"` attribute for a shape's a:effectLst.
 fn render_effect_filter(
   eff : @ooxml.EffectList,
   filter_id : String,
@@ -533,7 +516,6 @@ fn render_effect_filter(
     return ("", "")
   }
   let mut filters = ""
-  // Outer shadow: SVG feDropShadow
   if !eff.outer_shadow.is_none() {
     let os = eff.outer_shadow
     filters = filters +
@@ -545,7 +527,6 @@ fn render_effect_filter(
     filters = filters +
       render_drop_shadow_filter(ps.blur_rad(), ps.dist, ps.dir, ps.color, scale)
   }
-  // Glow: feGaussianBlur + feFlood + feComposite + feMerge
   if !eff.glow.is_none() {
     let rad = emu_to_filter_px(eff.glow.rad, scale)
     let std_dev = rad / 2
@@ -564,7 +545,6 @@ fn render_effect_filter(
       "<feMerge><feMergeNode in=\"glowFill\"/><feMergeNode in=\"SourceGraphic\"/></feMerge>"
     ()
   }
-  // Soft edge: feGaussianBlur on alpha, composite with source
   if !eff.soft_edge.is_none() {
     let rad = emu_to_filter_px(eff.soft_edge.rad, scale)
     let std_dev = rad / 2
@@ -575,7 +555,6 @@ fn render_effect_filter(
       "<feComposite in=\"SourceGraphic\" in2=\"softAlpha\" operator=\"in\"/>"
     ()
   }
-  // Inner shadow: feGaussianBlur+feOffset on inverted alpha, flood+composite, merge
   if !eff.inner_shadow.is_none() {
     let ishdw = eff.inner_shadow
     let blur = emu_to_filter_px(ishdw.blur_rad, scale)
@@ -586,7 +565,6 @@ fn render_effect_filter(
     let std_dev = blur / 2
     let clr = ishdw.color
     let alpha_str = eff_alpha_str(clr, "0.5")
-    // Inner shadow: blur source alpha, offset, invert, flood+composite, merge with source
     filters = filters +
       "<feComponentTransfer in=\"SourceAlpha\" result=\"invAlpha\">" +
       "<feFuncA type=\"table\" tableValues=\"1 0\"/>" +
@@ -609,7 +587,6 @@ fn render_effect_filter(
       "<feMerge><feMergeNode in=\"SourceGraphic\"/><feMergeNode in=\"isClip\"/></feMerge>"
     ()
   }
-  // Blur: simple feGaussianBlur on SourceGraphic
   if !eff.blur.is_none() {
     let rad = emu_to_filter_px(eff.blur.rad, scale)
     let std_dev = rad / 2
@@ -619,7 +596,6 @@ fn render_effect_filter(
       "\"/>"
     ()
   }
-  // Fill overlay: feFlood + feBlend with blend mode
   if !eff.fill_overlay.is_none() {
     let fo = eff.fill_overlay
     let clr = fo.color
@@ -646,7 +622,6 @@ fn render_effect_filter(
       mode +
       "\"/>"
   }
-  // Note: Reflection requires structural approach (shape duplication), not SVG filter.
   let def = "<filter id=\"" +
     filter_id +
     "\" x=\"-50%\" y=\"-50%\" width=\"200%\" height=\"200%\">" +
@@ -656,8 +631,7 @@ fn render_effect_filter(
 }
 
 ///|
-/// Render a <linearGradient> + <mask> def for reflection fade.
-/// The gradient goes from st_alpha (top of reflection) to end_alpha (bottom).
+/// The gradient mask fading a reflection from st_alpha (top) to end_alpha (bottom).
 fn render_reflection_mask_def(
   r : @ooxml.Reflection,
   mask_id : String,
@@ -697,13 +671,9 @@ fn render_reflection_element(
   cy_p : Int32,
   scale : Int32,
 ) -> String {
-  // sy is scale % (typically -100000 for full vertical flip, but OOXML default is 100000)
-  // For reflection, we flip vertically: scaleY(-1) relative to the bottom of the shape
+  // The reflection is the shape flipped about its bottom edge (plus the gap).
   let gap = emu_to_filter_px(r.dist, scale)
-  // The reflection appears below the shape, flipped
-  // Position: translate to bottom of shape + gap, then scaleY(-1) to flip
   let refl_y = y_p + cy_p + gap
-  // blur (optional)
   let blur_attr = if r.blur_rad > 0 {
     let blur_px = emu_to_filter_px(r.blur_rad, scale)
     " filter=\"blur(" +
@@ -744,7 +714,6 @@ fn cos_deg(deg : Int32) -> Int32 {
   } else if d == 270 {
     0
   } else if d < 90 {
-    // Linear interpolation: cos(45)≈71
     100 - d * 100 / 90
   } else if d < 180 {
     -(d - 90) * 100 / 90
