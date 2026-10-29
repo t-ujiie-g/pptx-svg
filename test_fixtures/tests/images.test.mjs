@@ -12,7 +12,6 @@ test("images & shape effects (slides 43-51)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 43: Image crop + alpha ──
   {
     console.log('\n── test_features.pptx — Slide 43: image crop + alpha ──');
     const slide43 = textFiles.get('ppt/slides/slide43.xml');
@@ -32,7 +31,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide43 has blipFill crop t="50000"', slide43.includes('t="50000"'));
   }
 
-  // ── Slide 44: External image reference ──
   {
     console.log('\n── test_features.pptx — Slide 44: external image reference ──');
     const slide44 = textFiles.get('ppt/slides/slide44.xml');
@@ -45,7 +43,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide44 has picsum URL', rels44.includes('picsum.photos'));
   }
 
-  // ── Slide 45: Image effects — brightness/contrast (a:lum) ──
   section('test_features.pptx — Slide 45: brightness/contrast');
   {
     const slide45 = textFiles.get('ppt/slides/slide45.xml') ?? '';
@@ -57,7 +54,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide45 has contrast="40000"', slide45.includes('contrast="40000"'));
   }
 
-  // ── Slide 46: Duotone + color change ──
   section('test_features.pptx — Slide 46: duotone + clrChange');
   {
     const slide46 = textFiles.get('ppt/slides/slide46.xml') ?? '';
@@ -70,7 +66,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide46 has a:clrTo', hasTag(slide46, 'a:clrTo'));
   }
 
-  // ── Slide 47: Background pattern fill ──
   section('test_features.pptx — Slide 47: background pattern fill');
   {
     const slide47 = textFiles.get('ppt/slides/slide47.xml') ?? '';
@@ -81,7 +76,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide47 has fg color 3366CC', slide47.includes('3366CC'));
   }
 
-  // ── Slide 48: Line gradient/pattern fill ──
   section('test_features.pptx — Slide 48: line gradient/pattern fill');
   {
     const slide48 = textFiles.get('ppt/slides/slide48.xml') ?? '';
@@ -91,7 +85,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide48 has gradient stop 0000FF', slide48.includes('0000FF'));
   }
 
-  // ── Slide 49: Shape hyperlinks + color modifiers ──
   section('test_features.pptx — Slide 49: shape hyperlinks + color modifiers');
   {
     const slide49 = textFiles.get('ppt/slides/slide49.xml') ?? '';
@@ -102,7 +95,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide49 has hueMod val 50000', slide49.includes('50000'));
   }
 
-  // ── Slide 50: Shape effects ──
   section('test_features.pptx — Slide 50: shape effects');
   {
     const slide50 = textFiles.get('ppt/slides/slide50.xml') ?? '';
@@ -116,7 +108,6 @@ test("images & shape effects (slides 43-51)", async () => {
     assert('slide50 glow rad', slide50.includes('rad="228600"'));
   }
 
-  // ── Slide 51: 3D effects + text shadow ──
   section('test_features.pptx — Slide 51: 3D effects + text shadow');
   {
     const slide51 = textFiles.get('ppt/slides/slide51.xml') ?? '';

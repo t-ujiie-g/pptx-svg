@@ -1,8 +1,3 @@
-/**
- * PptxRenderer — main API class for rendering PPTX files.
- *
- * Handles Wasm lifecycle, PPTX loading, SVG rendering, and export.
- */
 
 import { bytesToBase64, base64ToBytes } from './utils.js';
 import { emfToSvg } from './emf-converter.js';
@@ -111,40 +106,22 @@ export type LogLevel = 'silent' | 'error' | 'warn' | 'info' | 'debug';
 export interface PptxRendererOptions {
   /** Custom text measurement function. If not provided, uses Canvas 2D (browser only). */
   measureText?: MeasureTextFn;
-  /**
-   * Custom font fallback mappings. Merged with built-in defaults (lib/font-fallbacks.ts).
-   * User entries override built-in entries for the same font name.
-   */
+  /** Font fallbacks merged over the built-in defaults (same-name entries win). */
   fontFallbacks?: FontFallbackMap;
-  /**
-   * Log level for console output. Default: `'error'`.
-   * - `'silent'`: No console output at all
-   * - `'error'`:  Errors only (default)
-   * - `'warn'`:   Errors + warnings
-   * - `'info'`:   Errors + warnings + info messages
-   * - `'debug'`:  All messages including debug details
-   */
+  /** Console verbosity, from `'silent'` to `'debug'`. Default: `'error'`. */
   logLevel?: LogLevel;
-  /**
-   * Maximum number of undo steps retained in the edit history. Default: `50`.
-   * Older steps are discarded once the limit is exceeded. Set to `0` to disable
-   * history (undo/redo become no-ops).
-   */
+  /** Undo steps kept (default 50); `0` disables history. */
   maxHistory?: number;
   /**
-   * Date used to fill auto-updating date placeholders (`<a:fld type="datetime1">`).
-   * Provide a fixed value for reproducible output (e.g. snapshot tests / exports).
-   * Accepts a `Date`, a preformatted string, or a function returning either.
-   * Default: the current date formatted via `toLocaleDateString()`.
+   * Date for auto-updating date placeholders (`<a:fld type="datetime1">`); fix it for
+   * reproducible output. Default: today via `toLocaleDateString()`.
    */
   currentDate?: Date | string | (() => Date | string);
 }
 
 /**
- * Result of an {@link PptxRenderer.undo} / {@link PptxRenderer.redo} call,
- * returned as a JSON string. `slides` lists the 0-indexed slides whose content
- * changed (so the caller can re-render just those); `slideCount` is the slide
- * count after the operation (changes when undoing/redoing add/delete slide).
+ * Result of {@link PptxRenderer.undo} / {@link PptxRenderer.redo} (as JSON): the
+ * 0-indexed slides to re-render, and the slide count afterwards.
  */
 export interface HistoryResult {
   slides: number[];
@@ -175,21 +152,15 @@ export interface TextLine {
   runs: TextRunBox[];
 }
 
-/**
- * Text geometry returned by {@link PptxRenderer.getTextLayout} (parsed from JSON).
- * All coordinates are in EMU.
- */
+/** Text geometry from {@link PptxRenderer.getTextLayout} (EMU). */
 export interface TextLayout {
   box: { x: number; y: number; cx: number; cy: number };
   lines: TextLine[];
 }
 
 /**
- * A portable, self-contained shape spec for cross-slide (or cross-document)
- * copy/paste, produced by {@link PptxRenderer.getShapeSpec} and consumed by
- * {@link PptxRenderer.insertShapeSpec}. `xml` is the shape's OOXML fragment;
- * `media` carries any referenced images inline (base64) so the spec survives a
- * clipboard round-trip. (JSON-encoded as a string at the API boundary.)
+ * A shape's OOXML plus its images inline (base64), from {@link PptxRenderer.getShapeSpec}
+ * for {@link PptxRenderer.insertShapeSpec}; passed as a JSON string.
  */
 export interface ShapeSpec {
   xml: string;
@@ -207,11 +178,8 @@ export interface TextHit {
 }
 
 /**
- * Internal snapshot of all document state that diverges from the original ZIP.
- * Captured before each mutating operation so it can be restored on undo/redo.
- * File contents and image byte arrays are shared by reference (cheap clone);
- * `persistFile` replaces map entries rather than mutating them, so snapshots
- * stay immutable.
+ * Document state diverging from the original ZIP, for undo/redo. Contents are shared
+ * by reference: `persistFile` replaces map entries instead of mutating them.
  */
 interface DocSnapshot {
   files: Map<string, string>;
@@ -247,8 +215,6 @@ function createLogger(level: LogLevel): Logger {
 /** Default Wasm URL resolved relative to this module. */
 const DEFAULT_WASM_URL = new URL('./main.wasm', import.meta.url).href;
 
-// ── OOXML constants ──────────────────────────────────────────────────────────
-
 const RELS_XMLNS = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const REL_TYPE_SLIDE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide';
 const REL_TYPE_SLIDE_LAYOUT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout';
@@ -262,11 +228,7 @@ const DEFAULT_SLIDE_CX = 9144000;
 const DEFAULT_SLIDE_CY = 5143500;
 const REL_TYPE_IMAGE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
 
-/**
- * Escape RegExp metacharacters so untrusted strings (rIds, targets, etc.
- * from PPTX) can be embedded in dynamic patterns without breaking them.
- * Without this, malicious input can throw `SyntaxError` or alter matching.
- */
+/** Escape RegExp metacharacters: rIds and targets come from untrusted PPTX input. */
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -294,7 +256,6 @@ function extToMime(ext: string): string {
 /** First slide ID used in presentation.xml sldIdLst (OOXML convention). */
 const FIRST_SLIDE_ID = 256;
 
-/** Regex patterns for slide file paths. */
 const RE_SLIDE_FILE = /^ppt\/slides\/slide\d+\.xml$/;
 const RE_SLIDE_RELS_FILE = /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/;
 
@@ -307,13 +268,10 @@ const RID_ATTR_PATTERN = 'r:(?:embed|link|id)';
 export class PptxRenderer {
   private wasm: WebAssembly.Instance | null = null;
 
-  /** Decompressed text ZIP entries (path → UTF-8 string) */
   private files = new Map<string, string>();
 
-  /** Raw binary ZIP entries (path → bytes) */
   private rawFiles = new Map<string, Uint8Array>();
 
-  /** Original PPTX bytes for export */
   private originalBuffer: ArrayBuffer | null = null;
 
   /** Files added after loadPptx (not in original ZIP) */
@@ -325,29 +283,25 @@ export class PptxRenderer {
   /** Binary files added/replaced after loadPptx (e.g. images) */
   private addedBinaryFiles = new Map<string, Uint8Array>();
 
-  /** Canvas for text measurement (lazily created) */
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
 
-  /** Custom text measurement function */
   private measureTextFn: MeasureTextFn | null = null;
 
   /** Font fallback lookup map (source → comma-separated fallbacks) */
   private fontFallbackCache = new Map<string, string>();
 
-  /** Internal logger */
   private log: Logger;
 
-  // ── Undo/Redo history ──────────────────────────────────────────────────────
   /** Past document states (top = most recent state before the current one). */
   private undoStack: DocSnapshot[] = [];
-  /** Future document states for redo. */
+
   private redoStack: DocSnapshot[] = [];
-  /** Nesting depth of beginBatch()/endBatch(). */
+
   private batchDepth = 0;
   /** Whether the current batch has already recorded its pre-edit snapshot. */
   private batchRecorded = false;
-  /** Max retained undo steps. */
+
   private maxHistory: number;
 
   /** Source for date-placeholder auto-content (see PptxRendererOptions.currentDate). */
@@ -360,7 +314,6 @@ export class PptxRenderer {
     if (options?.measureText) {
       this.measureTextFn = options.measureText;
     }
-    // Build font fallback cache: merge defaults with user overrides
     const merged: FontFallbackMap = { ...DEFAULT_FONT_FALLBACKS, ...options?.fontFallbacks };
     for (const [font, fallbacks] of Object.entries(merged)) {
       this.fontFallbackCache.set(font, fallbacks.join(', '));
@@ -374,17 +327,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Initialize the renderer by loading the Wasm module.
-   *
-   * When called without arguments, the bundled Wasm binary is loaded
-   * automatically via `import.meta.url` resolution. This works with
-   * Vite, webpack, Rollup, and CDN imports (unpkg, jsdelivr).
-   *
-   * In Node.js, pass an ArrayBuffer (e.g. from `fs.readFileSync(path).buffer`)
-   * or a file:// URL / http(s):// URL string.
-   *
-   * @param wasmSource - Optional URL string, file path (Node.js), or ArrayBuffer of .wasm bytes.
-   *                     If omitted, the bundled Wasm is used.
+   * Load the Wasm module: by default the bundled `main.wasm` (resolved via `import.meta.url`),
+   * or a URL / Node.js file path, or the `.wasm` bytes.
    */
   async init(wasmSource?: string | ArrayBuffer | Uint8Array): Promise<void> {
     let bytes: ArrayBuffer;
@@ -404,15 +348,12 @@ export class PptxRenderer {
     this.wasm = result.instance;
   }
 
-  /**
-   * Load a PPTX file from an ArrayBuffer.
-   * @returns Object with slideCount
-   */
+  /** Load a PPTX file. */
   async loadPptx(arrayBuffer: ArrayBuffer): Promise<{ slideCount: number }> {
     if (!this.wasm) {
       throw new Error('Wasm not initialized — wait for init() to complete before loading files.');
     }
-    this.originalBuffer = arrayBuffer.slice(0); // keep a copy for export
+    this.originalBuffer = arrayBuffer.slice(0);
     this.addedFiles.clear();
     this.addedBinaryFiles.clear();
     this.removedFiles.clear();
@@ -452,41 +393,27 @@ export class PptxRenderer {
     return this.exports.get_entry_list().split('\n').filter(Boolean);
   }
 
-  /**
-   * Render a slide as an SVG string (0-indexed).
-   * @returns SVG markup, or a string starting with "ERROR:" on failure
-   */
+  /** Render a slide (0-indexed) as SVG markup, or `"ERROR:..."`. */
   renderSlideSvg(slideIdx: number): string {
     return this.exports.render_slide_svg(slideIdx);
   }
 
-  /**
-   * Update a slide's internal data from an edited SVG string.
-   * Parses the SVG's data-ooxml-* attributes back into SlideData.
-   * @returns "OK" on success, "ERROR:..." on failure
-   */
+  /** Replace a slide's data with an edited SVG (read back from its `data-ooxml-*`). Returns `"OK"` or `"ERROR:..."`. */
   updateSlideFromSvg(slideIdx: number, svgString: string): string {
     return this.exports.update_slide_from_svg(slideIdx, svgString);
   }
 
-  /**
-   * Get the OOXML slide XML for a slide (0-indexed).
-   * Returns modified XML if the slide was updated, otherwise original.
-   */
+  /** A slide's OOXML: the edited version if the slide changed, otherwise the original. */
   getSlideOoxml(slideIdx: number): string {
     return this.exports.get_slide_ooxml(slideIdx);
   }
 
-  /**
-   * Export the (possibly modified) presentation as a PPTX ArrayBuffer.
-   * Replaces modified slide XML entries in the original ZIP and rebuilds it.
-   */
+  /** Export the presentation, with all edits, as PPTX bytes. */
   async exportPptx(): Promise<ArrayBuffer> {
     if (!this.originalBuffer) {
       throw new Error('No PPTX loaded — call loadPptx() first.');
     }
 
-    // Get modified entries from Wasm: "path\tcontent\n..."
     const modifiedStr = this.exports.get_modified_entries();
     const modifications = new Map<string, string>();
     if (modifiedStr) {
@@ -501,7 +428,6 @@ export class PptxRenderer {
       }
     }
 
-    // Merge in files added/modified by slide operations
     for (const [path, content] of this.addedFiles) {
       if (!modifications.has(path)) {
         modifications.set(path, content);
@@ -516,13 +442,9 @@ export class PptxRenderer {
     );
   }
 
-  // ── Undo / Redo API ────────────────────────────────────────────────────────
-
   /**
-   * Start a batch: all mutations until the matching {@link endBatch} collapse
-   * into a single undo step. Calls may be nested; only the outermost pair has an
-   * effect. Use this to make a compound action (e.g. paste = add shape + set
-   * text + set fill) a single Ctrl+Z.
+   * Group the mutations until the matching {@link endBatch} into one undo step (e.g. a
+   * paste that adds a shape and sets its text). Nested calls are flattened.
    */
   beginBatch(): void {
     if (this.batchDepth === 0) this.batchRecorded = false;
@@ -552,11 +474,7 @@ export class PptxRenderer {
     this.batchRecorded = false;
   }
 
-  /**
-   * Undo the most recent edit (or batch).
-   * @returns JSON-encoded {@link HistoryResult} on success, or
-   *          `"ERROR:nothing to undo"` if the history is empty.
-   */
+  /** Undo the last edit or batch. Returns a JSON {@link HistoryResult} or `"ERROR:nothing to undo"`. */
   undo(): string {
     if (this.undoStack.length === 0) return 'ERROR:nothing to undo';
     const current = this.captureSnapshot();
@@ -566,11 +484,7 @@ export class PptxRenderer {
     return JSON.stringify(this.diffSnapshots(current, prev));
   }
 
-  /**
-   * Redo the most recently undone edit (or batch).
-   * @returns JSON-encoded {@link HistoryResult} on success, or
-   *          `"ERROR:nothing to redo"` if there is nothing to redo.
-   */
+  /** Redo the last undone edit or batch. Returns a JSON {@link HistoryResult} or `"ERROR:nothing to redo"`. */
   redo(): string {
     if (this.redoStack.length === 0) return 'ERROR:nothing to redo';
     const current = this.captureSnapshot();
@@ -580,21 +494,15 @@ export class PptxRenderer {
     return JSON.stringify(this.diffSnapshots(current, next));
   }
 
-  /**
-   * Record the pre-edit document state before a mutating operation. Called at
-   * the top of every mutating public method. Within a batch, only the first
-   * call records a snapshot. Any new edit clears the redo stack.
-   */
+  /** Record the pre-edit state; called first by every mutating method (once per batch). */
   private checkpoint(): void {
     if (!this.wasm || this.maxHistory === 0) return;
     this.commitCheckpoint(this.captureSnapshot());
   }
 
   /**
-   * Commit a previously captured pre-edit snapshot to the undo stack, respecting
-   * batch semantics. Lets callers capture the snapshot *before* a fallible op and
-   * only commit it once the op is known to have succeeded (so a failed/no-op edit
-   * leaves no phantom undo step). Returns true if a snapshot was recorded.
+   * Push a snapshot taken before a fallible op, once the op succeeded, so a failed edit
+   * leaves no phantom undo step. Returns whether a step was recorded.
    */
   private commitCheckpoint(snap: DocSnapshot): boolean {
     if (this.maxHistory === 0) return false;
@@ -610,12 +518,7 @@ export class PptxRenderer {
     return true;
   }
 
-  /**
-   * Run a mutating `op` that returns `"OK..."`/SVG on success or `"ERROR:..."` on
-   * failure, recording a history checkpoint **only when it succeeds** (so a failed
-   * or no-op edit leaves no phantom undo step). The pre-edit snapshot is captured
-   * before `op` runs. Used for fallible ops whose validation happens in Wasm.
-   */
+  /** Run `op` (returning `"OK..."`/SVG or `"ERROR:..."`) and record history only if it succeeded. */
   private runGuarded(op: () => string): string {
     const snap = (this.wasm && this.maxHistory > 0) ? this.captureSnapshot() : null;
     const result = op();
@@ -653,9 +556,7 @@ export class PptxRenderer {
     this.addedFiles = new Map(s.addedFiles);
     this.removedFiles = new Set(s.removedFiles);
     this.addedBinaryFiles = new Map(s.addedBinaryFiles);
-    // Rebuild Wasm from the restored files map (resets g_slides to placeholders).
     this.reinitializeWasm();
-    // Re-apply pending Wasm-side slide edits captured in the snapshot.
     for (const [slideIdx, xml] of s.modifiedSlides) {
       const r = this.exports.restore_slide_ooxml(slideIdx, xml);
       if (r.startsWith('ERROR:')) {
@@ -683,12 +584,7 @@ export class PptxRenderer {
     return { slides: [...slides].sort((a, b) => a - b), slideCount };
   }
 
-  // ── Notes & Comments API ──────────────────────────────────────────────────
-
-  /**
-   * Get speaker notes text for a slide (0-indexed).
-   * @returns Array of paragraph strings, or empty array if no notes exist.
-   */
+  /** Speaker notes of a slide, one string per paragraph (`[]` if none). */
   getSlideNotes(slideIdx: number): string[] {
     const notesPath = this.resolveRelTarget(slideIdx, 'notesSlide');
     if (!notesPath) return [];
@@ -697,10 +593,7 @@ export class PptxRenderer {
     return this.extractNotesText(xml);
   }
 
-  /**
-   * Get comments for a slide (0-indexed).
-   * @returns Array of comment objects, or empty array if no comments exist.
-   */
+  /** Comments on a slide (`[]` if none). */
   getSlideComments(slideIdx: number): SlideComment[] {
     const commentsPath = this.resolveRelTarget(slideIdx, 'comments');
     if (!commentsPath) return [];
@@ -709,30 +602,19 @@ export class PptxRenderer {
     return this.parseComments(xml);
   }
 
-  /**
-   * Get comment authors defined in the presentation.
-   * @returns Array of author objects, or empty array if none exist.
-   */
+  /** Comment authors of the presentation (`[]` if none). */
   getCommentAuthors(): CommentAuthor[] {
     const xml = this.files.get('ppt/commentAuthors.xml');
     if (!xml) return [];
     return this.parseCommentAuthors(xml);
   }
 
-  // ── Shape-level editing API ────────────────────────────────────────────────
-
-  /**
-   * Render a single shape as SVG (0-indexed slide and shape).
-   * Returns SVG fragment (`<defs>...` + `<g>...</g>`), or "ERROR:..." on failure.
-   */
+  /** Render one shape as an SVG fragment (`<defs>` + `<g>`), or `"ERROR:..."`. */
   renderShapeSvg(slideIdx: number, shapeIdx: number): string {
     return this.exports.render_shape_svg(slideIdx, shapeIdx);
   }
 
-  /**
-   * Update a shape's transform (position, size, rotation) and return re-rendered SVG.
-   * All values are in EMU. Marks the slide as modified.
-   */
+  /** Set a shape's position, size and rotation (EMU); returns the re-rendered shape SVG. */
   updateShapeTransform(slideIdx: number, shapeIdx: number,
     x: number, y: number, cx: number, cy: number, rot: number): string {
     this.checkpoint();
@@ -740,12 +622,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Update several shapes' transforms atomically as a single undo step (EMU; rot
-   * in 1/60000 deg). Every `shapeIdx` is validated before any change is applied,
-   * so an invalid index leaves the slide untouched (no partial application). Use
-   * for multi-select move/align. Re-render the slide afterwards with
-   * `renderSlideSvg(slideIdx)`.
-   * @returns `"OK:<count>"` on success, or `"ERROR:..."` on failure.
+   * Set several shapes' transforms (EMU, rot in 1/60000°) as one undo step. All indices are
+   * validated first, so a bad one changes nothing. Returns `"OK:<count>"` or `"ERROR:..."`.
    */
   updateShapesTransform(slideIdx: number,
     items: Array<{ shapeIdx: number; x: number; y: number; cx: number; cy: number; rot: number }>): string {
@@ -753,41 +631,29 @@ export class PptxRenderer {
     return this.runGuarded(() => this.exports.update_shapes_transform(slideIdx, data));
   }
 
-  /**
-   * Update a text run's content and return the shape's re-rendered SVG.
-   * Marks the slide as modified.
-   */
+  /** Set a text run's text; returns the re-rendered shape SVG. */
   updateShapeText(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, text: string): string {
     this.checkpoint();
     return this.exports.update_shape_text(slideIdx, shapeIdx, paraIdx, runIdx, text);
   }
 
-  /**
-   * Update a shape's solid fill color (RGB 0-255) and return re-rendered SVG.
-   * Marks the slide as modified.
-   */
+  /** Set a shape's solid fill (RGB 0-255); returns the re-rendered shape SVG. */
   updateShapeFill(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number): string {
     this.checkpoint();
     return this.exports.update_shape_fill(slideIdx, shapeIdx, r, g, b);
   }
 
-  /**
-   * Delete a shape from a slide.
-   * @returns "OK" on success, "ERROR:..." on failure.
-   */
+  /** Delete a shape. Returns `"OK"` or `"ERROR:..."`. */
   deleteShape(slideIdx: number, shapeIdx: number): string {
     this.checkpoint();
     return this.exports.delete_shape(slideIdx, shapeIdx);
   }
 
   /**
-   * Add a basic AutoShape to a slide.
-   * @param geomType - Preset geometry: "rect", "ellipse", "roundRect", "line", etc.
-   * @param x, y, cx, cy - Position and size in EMU.
-   * @param fillR, fillG, fillB - Fill color (0-255). Pass -1 for no fill.
-   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
+   * Add a preset AutoShape (`"rect"`, `"ellipse"`, `"roundRect"`, `"line"`, …) at an EMU
+   * position; a fill component of -1 means no fill. Returns `"OK:<shapeIdx>"` or `"ERROR:..."`.
    */
   addShape(slideIdx: number, geomType: string,
     x: number, y: number, cx: number, cy: number,
@@ -797,10 +663,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Add a text paragraph to a shape. Creates a single run with the given text.
-   * @param fontSize - Font size in hundredths of a point (e.g. 1800 = 18pt). 0 = inherit.
-   * @param colorR, colorG, colorB - Text color (0-255). Pass -1 for default/inherit.
-   * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
+   * Add a one-run paragraph to a shape. `fontSize` is in hundredths of a point (0 = inherit);
+   * a color component of -1 inherits. Returns `"OK:<paraIdx>"` or `"ERROR:..."`.
    */
   addShapeText(slideIdx: number, shapeIdx: number, text: string,
     fontSize = 0, colorR = -1, colorG = -1, colorB = -1): string {
@@ -808,10 +672,7 @@ export class PptxRenderer {
     return this.exports.add_shape_text(slideIdx, shapeIdx, text, fontSize, colorR, colorG, colorB);
   }
 
-  /**
-   * Duplicate a shape, offset by (dxEmu, dyEmu) from the original.
-   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
-   */
+  /** Duplicate a shape, offset by (dxEmu, dyEmu). Returns `"OK:<shapeIdx>"` or `"ERROR:..."`. */
   duplicateShape(slideIdx: number, shapeIdx: number,
     dxEmu = 457200, dyEmu = 457200): string {
     this.checkpoint();
@@ -819,9 +680,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Update a shape's fill to a linear gradient. Returns re-rendered SVG.
-   * @param angle - Gradient angle in 60000ths of a degree (e.g. 5400000 = 90deg).
-   * @param stops - Array of { pos, r, g, b } where pos is 0-100000.
+   * Set a linear gradient fill: `angle` in 60000ths of a degree, stops `{ pos, r, g, b }`
+   * with `pos` 0-100000. Returns the re-rendered shape SVG.
    */
   updateShapeGradientFill(slideIdx: number, shapeIdx: number,
     angle: number, stops: Array<{ pos: number; r: number; g: number; b: number }>): string {
@@ -831,10 +691,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Update a shape's stroke (outline). Returns re-rendered SVG.
-   * @param r, g, b - Stroke color (0-255). Pass -1 to remove stroke.
-   * @param widthEmu - Stroke width in EMU (default 12700 = 1pt).
-   * @param dash - Dash preset: "dash", "dot", "dashDot", "lgDash", etc. "" = solid.
+   * Set a shape's outline: RGB 0-255 (r = -1 removes it), width in EMU, dash preset
+   * (`"dash"`, `"dot"`, …; `""` = solid). Returns the re-rendered shape SVG.
    */
   updateShapeStroke(slideIdx: number, shapeIdx: number,
     r: number, g: number, b: number, widthEmu = 12700, dash = ''): string {
@@ -842,92 +700,59 @@ export class PptxRenderer {
     return this.exports.update_shape_stroke(slideIdx, shapeIdx, r, g, b, widthEmu, dash);
   }
 
-  // ── Text editing API ────────────────────────────────────────────────────────
-
-  /**
-   * Add a new paragraph to a shape with a single text run.
-   * @param align - "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
-   * @returns "OK:<paraIndex>" on success, "ERROR:..." on failure.
-   */
+  /** Add a one-run paragraph; `align` is `"l"`/`"ctr"`/`"r"`/`"just"` or `""` (inherit). Returns `"OK:<paraIdx>"`. */
   addParagraph(slideIdx: number, shapeIdx: number, text: string, align = ''): string {
     this.checkpoint();
     return this.exports.add_paragraph(slideIdx, shapeIdx, text, align);
   }
 
-  /**
-   * Delete a paragraph from a shape.
-   * @returns "OK" on success, "ERROR:..." on failure.
-   */
+  /** Delete a paragraph. Returns `"OK"` or `"ERROR:..."`. */
   deleteParagraph(slideIdx: number, shapeIdx: number, paraIdx: number): string {
     this.checkpoint();
     return this.exports.delete_paragraph(slideIdx, shapeIdx, paraIdx);
   }
 
-  /**
-   * Add a new text run to a paragraph.
-   * @returns "OK:<runIndex>" on success, "ERROR:..." on failure.
-   */
+  /** Append a text run to a paragraph. Returns `"OK:<runIdx>"` or `"ERROR:..."`. */
   addRun(slideIdx: number, shapeIdx: number, paraIdx: number, text: string): string {
     this.checkpoint();
     return this.exports.add_run(slideIdx, shapeIdx, paraIdx, text);
   }
 
-  /**
-   * Delete a text run from a paragraph.
-   * @returns "OK" on success, "ERROR:..." on failure.
-   */
+  /** Delete a text run. Returns `"OK"` or `"ERROR:..."`. */
   deleteRun(slideIdx: number, shapeIdx: number, paraIdx: number, runIdx: number): string {
     this.checkpoint();
     return this.exports.delete_run(slideIdx, shapeIdx, paraIdx, runIdx);
   }
 
-  /**
-   * Update a text run's bold/italic style. Returns re-rendered shape SVG.
-   * @param bold - 1 = set bold, 0 = unset bold, -1 = no change.
-   * @param italic - 1 = set italic, 0 = unset italic, -1 = no change.
-   */
+  /** Set bold / italic (1 = on, 0 = off, -1 = unchanged); returns the re-rendered shape SVG. */
   updateTextRunStyle(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, bold = -1, italic = -1): string {
     this.checkpoint();
     return this.exports.update_text_run_style(slideIdx, shapeIdx, paraIdx, runIdx, bold, italic);
   }
 
-  /**
-   * Update a text run's font size. Returns re-rendered shape SVG.
-   * @param fontSize - In hundredths of a point (e.g. 1800 = 18pt). 0 = inherit.
-   */
+  /** Set a run's size in hundredths of a point (0 = inherit); returns the re-rendered shape SVG. */
   updateTextRunFontSize(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, fontSize: number): string {
     this.checkpoint();
     return this.exports.update_text_run_font_size(slideIdx, shapeIdx, paraIdx, runIdx, fontSize);
   }
 
-  /**
-   * Update a text run's color (RGB 0-255). Returns re-rendered shape SVG.
-   * Pass r = -1 to clear (inherit from theme/master).
-   */
+  /** Set a run's color (RGB 0-255; r = -1 inherits); returns the re-rendered shape SVG. */
   updateTextRunColor(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, r: number, g: number, b: number): string {
     this.checkpoint();
     return this.exports.update_text_run_color(slideIdx, shapeIdx, paraIdx, runIdx, r, g, b);
   }
 
-  /**
-   * Update a text run's font family. Returns re-rendered shape SVG.
-   * @param fontFace - Latin font name. Empty string = no change.
-   * @param eaFont - East Asian font name. Empty string = no change.
-   * @param csFont - Complex Script font name. Empty string = no change.
-   */
+  /** Set a run's Latin / East Asian / complex-script fonts (`""` = unchanged); returns the re-rendered shape SVG. */
   updateTextRunFont(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, fontFace = '', eaFont = '', csFont = ''): string {
     this.checkpoint();
     return this.exports.update_text_run_font(slideIdx, shapeIdx, paraIdx, runIdx, fontFace, eaFont, csFont);
   }
 
-  /**
-   * Update a paragraph's alignment. Returns re-rendered shape SVG.
-   * @param align - "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
-   */
+  /** Set alignment: `"l"`/`"ctr"`/`"r"`/`"just"` or `""` (inherit); returns the re-rendered shape SVG. */
   updateParagraphAlign(slideIdx: number, shapeIdx: number,
     paraIdx: number, align: string): string {
     this.checkpoint();
@@ -935,11 +760,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Update a text run's decoration (underline, strikethrough, baseline shift).
-   * Returns re-rendered shape SVG.
-   * @param underline - "sng" (single), "dbl" (double), "" (no change), "none" (remove).
-   * @param strike - "sngStrike", "dblStrike", "" (no change), "none" (remove).
-   * @param baseline - 30000 = superscript, -25000 = subscript, 0 = normal, -1 = no change.
+   * Set underline (`"sng"`/`"dbl"`), strike (`"sngStrike"`/`"dblStrike"`) — `""` unchanged,
+   * `"none"` removes — and baseline (30000 super, -25000 sub, 0 normal, -1 unchanged).
    */
   updateTextRunDecoration(slideIdx: number, shapeIdx: number,
     paraIdx: number, runIdx: number, underline = '', strike = '', baseline = -1): string {
@@ -947,39 +769,25 @@ export class PptxRenderer {
     return this.exports.update_text_run_decoration(slideIdx, shapeIdx, paraIdx, runIdx, underline, strike, baseline);
   }
 
-  // ── Inline text editing API ──────────────────────────────────────────────────
-
   /**
-   * Get the text geometry of a shape's text body for caret / selection rendering.
-   * @returns JSON-encoded {@link TextLayout} string (coordinates in EMU), or
-   *          `"ERROR:..."` on failure.
-   *
-   * Scope: horizontal LTR text (left/center/right/justify). Vertical text, warp,
-   * OMML math, and multi-column bodies return only the bounding box with no lines.
-   * Line and run counts match the rendered SVG (shared wrapping/autofit).
+   * A shape's text geometry for caret/selection drawing: JSON {@link TextLayout} (EMU), or
+   * `"ERROR:..."`. Horizontal text only; vertical/warp/math/multi-column give just the box.
    */
   getTextLayout(slideIdx: number, shapeIdx: number): string {
     return this.exports.get_text_layout(slideIdx, shapeIdx);
   }
 
   /**
-   * Hit-test a point (EMU) against a shape's text to find the caret insertion point.
-   * @returns JSON-encoded {@link TextHit} string, or `"ERROR:..."` on failure.
-   *          `charOffset` is within the run; `paraOffset` is within the paragraph
-   *          (pass `paraOffset` values to {@link replaceTextRange}).
+   * The caret position at an EMU point: JSON {@link TextHit} or `"ERROR:..."`. Pass its
+   * `paraOffset` to {@link replaceTextRange}.
    */
   hitTestText(slideIdx: number, shapeIdx: number, xEmu: number, yEmu: number): string {
     return this.exports.hit_test_text(slideIdx, shapeIdx, xEmu, yEmu);
   }
 
   /**
-   * Replace a text range with `newText`, preserving the formatting of the runs at
-   * the range boundaries (splitting/merging runs as needed). Returns re-rendered
-   * shape SVG, or `"ERROR:..."` on failure.
-   *
-   * `startChar` / `endChar` are paragraph-level character offsets (use `paraOffset`
-   * from {@link hitTestText}). A collapsed range (start == end) inserts; an empty
-   * `newText` deletes. `\n` in `newText` splits into multiple paragraphs.
+   * Replace the paragraph-offset range with `newText`, keeping the boundary runs' formatting.
+   * start == end inserts, `""` deletes, `\n` splits paragraphs. Returns the shape SVG.
    */
   replaceTextRange(slideIdx: number, shapeIdx: number,
     startPara: number, startChar: number, endPara: number, endChar: number, newText: string): string {
@@ -987,54 +795,33 @@ export class PptxRenderer {
     return this.exports.replace_text_range(slideIdx, shapeIdx, startPara, startChar, endPara, endChar, newText);
   }
 
-  // ── Z-order API ──────────────────────────────────────────────────────────────
-
-  /**
-   * Move a shape to the front (top of the z-order).
-   * @returns `"OK:<newShapeIdx>"` (the shape's index changes when reordered, so the
-   *          caller can re-select it), or `"ERROR:..."` on failure.
-   */
+  /** Move a shape to the front. Returns `"OK:<newShapeIdx>"` (its index changes) or `"ERROR:..."`. */
   bringToFront(slideIdx: number, shapeIdx: number): string {
     this.checkpoint();
     return this.exports.bring_to_front(slideIdx, shapeIdx);
   }
 
-  /**
-   * Move a shape to the back (bottom of the z-order).
-   * @returns `"OK:<newShapeIdx>"`, or `"ERROR:..."` on failure.
-   */
+  /** Move a shape to the back. Returns `"OK:<newShapeIdx>"` or `"ERROR:..."`. */
   sendToBack(slideIdx: number, shapeIdx: number): string {
     this.checkpoint();
     return this.exports.send_to_back(slideIdx, shapeIdx);
   }
 
-  /**
-   * Move a shape one step toward the front (no-op if already front-most).
-   * @returns `"OK:<newShapeIdx>"`, or `"ERROR:..."` on failure.
-   */
+  /** Move a shape one step forward. Returns `"OK:<newShapeIdx>"` or `"ERROR:..."`. */
   bringForward(slideIdx: number, shapeIdx: number): string {
     this.checkpoint();
     return this.exports.bring_forward(slideIdx, shapeIdx);
   }
 
-  /**
-   * Move a shape one step toward the back (no-op if already back-most).
-   * @returns `"OK:<newShapeIdx>"`, or `"ERROR:..."` on failure.
-   */
+  /** Move a shape one step backward. Returns `"OK:<newShapeIdx>"` or `"ERROR:..."`. */
   sendBackward(slideIdx: number, shapeIdx: number): string {
     this.checkpoint();
     return this.exports.send_backward(slideIdx, shapeIdx);
   }
 
-  // ── Copy / paste API ─────────────────────────────────────────────────────────
-
   /**
-   * Extract a shape as a portable, self-contained spec for copy/paste — including
-   * any referenced images inline (base64), so it survives a clipboard round-trip
-   * and can be pasted onto another slide (or another presentation).
-   * @returns JSON-encoded {@link ShapeSpec} string, or `"ERROR:..."` on failure
-   *          (e.g. charts, whose chart part and embedded workbook a paste
-   *          cannot carry over, are not copyable).
+   * A shape as a portable JSON {@link ShapeSpec} for copy/paste, or `"ERROR:..."`. Charts are
+   * refused: a paste can't carry their chart part and embedded workbook.
    */
   getShapeSpec(slideIdx: number, shapeIdx: number): string {
     const xml = this.exports.get_shape_ooxml(slideIdx, shapeIdx);
@@ -1060,10 +847,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Paste a {@link ShapeSpec} (from {@link getShapeSpec}) onto a slide, offset by
-   * (dxEmu, dyEmu). Inlined media is re-added to the package and the shape's image
-   * relationships are re-linked to fresh rIds on the target slide. Undoable.
-   * @returns `"OK:<shapeIdx>"` on success, or `"ERROR:..."` on failure.
+   * Paste a {@link ShapeSpec} onto a slide, offset by (dxEmu, dyEmu), re-adding its images
+   * under fresh rIds. Undoable. Returns `"OK:<shapeIdx>"` or `"ERROR:..."`.
    */
   insertShapeSpec(slideIdx: number, spec: string, dxEmu = 0, dyEmu = 0): string {
     if (!this.wasm) return 'ERROR:not initialized';
@@ -1075,7 +860,6 @@ export class PptxRenderer {
     }
     if (!parsed || typeof parsed.xml !== 'string') return 'ERROR:invalid shape spec';
 
-    // Re-link media + parse the shape as one undo step; failure records no history.
     return this.runGuarded(() => {
       let xml = parsed.xml;
       const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
@@ -1104,22 +888,15 @@ export class PptxRenderer {
     });
   }
 
-  // ── Table editing API ────────────────────────────────────────────────────────
-
-  /**
-   * Set a table cell's text (plain text, replacing the cell's contents). The new
-   * text inherits the cell's existing first-run formatting when present.
-   * Returns re-rendered shape SVG, or `"ERROR:..."` (e.g. not a table).
-   */
+  /** Set a cell's text, keeping its first run's formatting. Returns the shape SVG or `"ERROR:..."`. */
   updateTableCellText(slideIdx: number, shapeIdx: number, row: number, col: number, text: string): string {
     this.checkpoint();
     return this.exports.update_table_cell_text(slideIdx, shapeIdx, row, col, text);
   }
 
   /**
-   * Insert an empty row. `afterRow = -1` inserts at the top; otherwise after the
-   * given row. Returns `"OK:<newRowIdx>"`, or `"ERROR:..."`.
-   * Note: tables with merged cells are not span-adjusted (v1 limitation).
+   * Insert an empty row after `afterRow` (-1 = top). Returns `"OK:<newRowIdx>"` or `"ERROR:..."`.
+   * Merged cells are not span-adjusted.
    */
   addTableRow(slideIdx: number, shapeIdx: number, afterRow = -1): string {
     this.checkpoint();
@@ -1133,9 +910,8 @@ export class PptxRenderer {
   }
 
   /**
-   * Insert an empty column. `afterCol = -1` inserts at the left; otherwise after
-   * the given column. `widthEmu = 0` copies a neighbour's width. Returns
-   * `"OK:<newColIdx>"`, or `"ERROR:..."`. Merged cells are not span-adjusted (v1).
+   * Insert an empty column after `afterCol` (-1 = left); `widthEmu = 0` copies a neighbour's
+   * width. Returns `"OK:<newColIdx>"` or `"ERROR:..."`. Merged cells are not span-adjusted.
    */
   addTableColumn(slideIdx: number, shapeIdx: number, afterCol = -1, widthEmu = 0): string {
     this.checkpoint();
@@ -1148,16 +924,9 @@ export class PptxRenderer {
     return this.exports.delete_table_column(slideIdx, shapeIdx, col);
   }
 
-  // ── Slide management API ────────────────────────────────────────────────────
-
   /**
-   * Add a blank slide at the specified position (0-indexed).
-   * If `afterIdx` is omitted, the slide is appended at the end.
-   * If `sourceSlideIdx` is provided, the new slide copies that slide's layout.
-   *
-   * @param afterIdx - Insert after this slide index (0-indexed). Use -1 to insert at the beginning.
-   * @param sourceSlideIdx - Copy layout from this slide (0-indexed). Defaults to last slide.
-   * @returns Object with the new slide count and the index of the inserted slide.
+   * Insert a blank slide after `afterIdx` (-1 = first; default last), using the layout of
+   * `sourceSlideIdx` (default the last slide).
    */
   async addSlide(afterIdx?: number, sourceSlideIdx?: number): Promise<{ slideCount: number; insertedIdx: number }> {
     if (!this.wasm) throw new Error('Not initialized — call init() and loadPptx() first.');
@@ -1165,7 +934,6 @@ export class PptxRenderer {
     const oldCount = this.exports.get_slide_count();
     if (oldCount === 0) throw new Error('No presentation loaded.');
 
-    // Determine insert position
     const insertIdx = afterIdx === undefined ? oldCount : afterIdx + 1;
     if (insertIdx < 0 || insertIdx > oldCount) {
       throw new Error(`Invalid insert position: ${insertIdx}`);
@@ -1173,57 +941,42 @@ export class PptxRenderer {
 
     this.checkpoint();
 
-    // Determine source layout info
     const srcIdx = sourceSlideIdx ?? Math.max(0, oldCount - 1);
     const srcRelsPath = `ppt/slides/_rels/slide${srcIdx + 1}.xml.rels`;
     const srcRelsXml = this.files.get(srcRelsPath) ?? '';
     const layoutTarget = this.extractRelTarget(srcRelsXml, '/slideLayout');
 
-    // Collect all current slide contents (path → xml) for renumbering
-    const slideContents: string[] = [];       // slide XML at index i
-    const slideRels: string[] = [];           // slide .rels at index i
+    const slideContents: string[] = [];
+    const slideRels: string[] = [];
     for (let i = 0; i < oldCount; i++) {
       slideContents.push(this.files.get(`ppt/slides/slide${i + 1}.xml`) ?? '');
       slideRels.push(this.files.get(`ppt/slides/_rels/slide${i + 1}.xml.rels`) ?? '');
     }
 
-    // Create blank slide XML
     const slideSize = this.extractSlideSize();
     const blankSlideXml = this.createBlankSlideXml(slideSize.cx, slideSize.cy);
 
-    // Create .rels for new slide pointing to its layout
     const blankRels = layoutTarget
       ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${RELS_XMLNS}"><Relationship Id="rId1" Type="${REL_TYPE_SLIDE_LAYOUT}" Target="${layoutTarget}"/></Relationships>`
       : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${RELS_XMLNS}"></Relationships>`;
 
-    // Insert into arrays
     slideContents.splice(insertIdx, 0, blankSlideXml);
     slideRels.splice(insertIdx, 0, blankRels);
 
     const newCount = oldCount + 1;
 
-    // Write back all slides with correct numbering
     this.rewriteSlideFiles(slideContents, slideRels, newCount);
 
-    // Update presentation.xml
     this.updatePresentationXmlForAdd(insertIdx);
 
-    // Update [Content_Types].xml if needed
     this.ensureContentTypeForSlide(newCount);
 
-    // Re-initialize Wasm
     this.reinitializeWasm();
 
     return { slideCount: newCount, insertedIdx: insertIdx };
   }
 
-  /**
-   * Delete a slide at the specified index (0-indexed).
-   * At least one slide must remain.
-   *
-   * @param slideIdx - The 0-indexed slide to delete.
-   * @returns Object with the new slide count.
-   */
+  /** Delete a slide; at least one must remain. */
   async deleteSlide(slideIdx: number): Promise<{ slideCount: number }> {
     if (!this.wasm) throw new Error('Not initialized — call init() and loadPptx() first.');
 
@@ -1235,7 +988,6 @@ export class PptxRenderer {
 
     this.checkpoint();
 
-    // Collect current slides
     const slideContents: string[] = [];
     const slideRels: string[] = [];
     for (let i = 0; i < oldCount; i++) {
@@ -1243,7 +995,6 @@ export class PptxRenderer {
       slideRels.push(this.files.get(`ppt/slides/_rels/slide${i + 1}.xml.rels`) ?? '');
     }
 
-    // Remove the slide at slideIdx
     slideContents.splice(slideIdx, 1);
     slideRels.splice(slideIdx, 1);
 
@@ -1255,25 +1006,16 @@ export class PptxRenderer {
     this.removedFiles.add(oldPath);
     this.removedFiles.add(oldRelsPath);
 
-    // Write back all slides with correct numbering
     this.rewriteSlideFiles(slideContents, slideRels, newCount);
 
-    // Update presentation.xml
     this.updatePresentationXmlForDelete(slideIdx);
 
-    // Re-initialize Wasm
     this.reinitializeWasm();
 
     return { slideCount: newCount };
   }
 
-  /**
-   * Reorder slides according to the given index mapping.
-   *
-   * @param newOrder - Array where newOrder[i] is the old index of the slide that should appear at position i.
-   *                   Must be a permutation of [0, 1, ..., slideCount-1].
-   * @returns Object with the slide count (unchanged).
-   */
+  /** Reorder slides: `newOrder[i]` is the old index of the slide placed at `i` (a permutation). */
   async reorderSlides(newOrder: number[]): Promise<{ slideCount: number }> {
     if (!this.wasm) throw new Error('Not initialized — call init() and loadPptx() first.');
 
@@ -1282,7 +1024,6 @@ export class PptxRenderer {
       throw new Error(`newOrder length (${newOrder.length}) must equal slide count (${count}).`);
     }
 
-    // Validate permutation
     const seen = new Set<number>();
     for (const idx of newOrder) {
       if (idx < 0 || idx >= count || seen.has(idx)) {
@@ -1293,7 +1034,6 @@ export class PptxRenderer {
 
     this.checkpoint();
 
-    // Collect current slides
     const slideContents: string[] = [];
     const slideRels: string[] = [];
     for (let i = 0; i < count; i++) {
@@ -1301,34 +1041,26 @@ export class PptxRenderer {
       slideRels.push(this.files.get(`ppt/slides/_rels/slide${i + 1}.xml.rels`) ?? '');
     }
 
-    // Reorder
     const reordered: string[] = newOrder.map(i => slideContents[i]);
     const reorderedRels: string[] = newOrder.map(i => slideRels[i]);
 
-    // Write back
     this.rewriteSlideFiles(reordered, reorderedRels, count);
 
-    // Reorder sldId entries in presentation.xml
     this.updatePresentationXmlForReorder(newOrder);
 
-    // Re-initialize Wasm
     this.reinitializeWasm();
 
     return { slideCount: count };
   }
 
-  // ── Slide management helpers ─────────────────────────────────────────────
-
   /** Rewrite slide files in the files map with correct 1..N numbering. */
   private rewriteSlideFiles(contents: string[], rels: string[], count: number): void {
-    // Remove all old slide files first
     for (const key of [...this.files.keys()]) {
       if (RE_SLIDE_FILE.test(key) || RE_SLIDE_RELS_FILE.test(key)) {
         this.files.delete(key);
       }
     }
 
-    // Write new files
     for (let i = 0; i < count; i++) {
       const num = i + 1;
       this.persistFile(`ppt/slides/slide${num}.xml`, contents[i]);
@@ -1402,7 +1134,6 @@ export class PptxRenderer {
     const newRId = this.nextRid(prsRels);
     const newSldId = this.findNextSlideId(prsXml);
 
-    // Add relationship for new slide
     const newRelEntry = `<Relationship Id="${newRId}" Type="${REL_TYPE_SLIDE}" Target="slides/slide${newSlideNum}.xml"/>`;
     prsRels = prsRels.replace('</Relationships>', newRelEntry + '</Relationships>');
 
@@ -1410,7 +1141,6 @@ export class PptxRenderer {
     // First, collect existing slide rId → target mappings
     const slideRIdMap = this.parseSlideRelationships(prsRels);
 
-    // Renumber: slides after insertIdx shift by +1
     for (const [rId, target] of slideRIdMap) {
       const m = target.match(/^slides\/slide(\d+)\.xml$/);
       if (m) {
@@ -1432,11 +1162,9 @@ export class PptxRenderer {
       }
     }
 
-    // Add sldId entry to presentation.xml
     const newSldIdEntry = `<p:sldId id="${newSldId}" r:id="${newRId}"/>`;
 
     if (insertIdx === 0) {
-      // Insert at the beginning of sldIdLst
       prsXml = prsXml.replace('<p:sldIdLst>', `<p:sldIdLst>${newSldIdEntry}`);
     } else {
       // Insert after the insertIdx-1 th sldId entry
@@ -1445,7 +1173,6 @@ export class PptxRenderer {
         const afterEntry = sldIdEntries[insertIdx - 1];
         prsXml = prsXml.replace(afterEntry, afterEntry + newSldIdEntry);
       } else {
-        // Append at end
         prsXml = prsXml.replace('</p:sldIdLst>', newSldIdEntry + '</p:sldIdLst>');
       }
     }
@@ -1461,7 +1188,6 @@ export class PptxRenderer {
 
     const deleteNum = deleteIdx + 1;
 
-    // Find the rId for the deleted slide
     const slideRIdMap = this.parseSlideRelationships(prsRels);
     let deleteRId = '';
     for (const [rId, target] of slideRIdMap) {
@@ -1471,7 +1197,6 @@ export class PptxRenderer {
       }
     }
 
-    // Remove sldId entry from presentation.xml
     if (deleteRId) {
       const sldIdEntries = this.parseSldIdEntries(prsXml);
       for (const entry of sldIdEntries) {
@@ -1482,7 +1207,6 @@ export class PptxRenderer {
       }
     }
 
-    // Remove relationship entry
     if (deleteRId) {
       const relRe = new RegExp(`<Relationship[^>]+Id="${escapeRegex(deleteRId)}"[^>]*/?>`, 'g');
       prsRels = prsRels.replace(relRe, '');
@@ -1522,14 +1246,12 @@ export class PptxRenderer {
     const sldIdEntries = this.parseSldIdEntries(prsXml);
     if (sldIdEntries.length !== newOrder.length) return;
 
-    // Build reordered sldId list
     const reordered = newOrder.map(i => sldIdEntries[i]);
 
     // Also need to update r:id → Target mappings for renumbered files
     // Each sldId's r:id now points to a different slide file number
     const slideRIdMap = this.parseSlideRelationships(prsRels);
 
-    // Extract rId from each sldId entry
     const rIds = sldIdEntries.map(entry => {
       const m = entry.match(/r:id="(rId\d+)"/);
       return m ? m[1] : '';
@@ -1558,7 +1280,6 @@ export class PptxRenderer {
       }
     }
 
-    // Replace sldIdLst content
     const sldIdListMatch = prsXml.match(/<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/);
     if (sldIdListMatch) {
       prsXml = prsXml.replace(sldIdListMatch[1], reordered.join(''));
@@ -1612,34 +1333,22 @@ export class PptxRenderer {
     this.persistFile('[Content_Types].xml', ct);
   }
 
-  // ── Image management API ───────────────────────────────────────────────────
-
-  /**
-   * Add an image to a slide as a Picture shape.
-   * @param slideIdx - Slide index (0-based).
-   * @param imageData - Raw image bytes (PNG, JPEG, GIF, etc.).
-   * @param mimeType - MIME type (e.g. "image/png", "image/jpeg").
-   * @param x, y, cx, cy - Position and size in EMU.
-   * @returns "OK:<shapeIndex>" on success, "ERROR:..." on failure.
-   */
+  /** Add an image (PNG, JPEG, GIF, …) as a picture at an EMU position. Returns `"OK:<shapeIdx>"` or `"ERROR:..."`. */
   addImage(slideIdx: number, imageData: Uint8Array, mimeType: string,
     x: number, y: number, cx: number, cy: number): string {
     if (!this.wasm) return 'ERROR:not initialized';
 
-    // Determine file extension from MIME type
     const ext = mimeToExt(mimeType);
     if (!ext) return 'ERROR:unsupported image type';
 
     this.checkpoint();
 
-    // Generate unique media filename
     const mediaPath = this.nextMediaPath(ext);
 
     // Store binary in rawFiles (for Wasm FFI) and addedBinaryFiles (for export)
     this.rawFiles.set(mediaPath, imageData);
     this.addedBinaryFiles.set(mediaPath, imageData);
 
-    // Add relationship to slide's .rels
     const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
     let relsXml = this.files.get(relsPath) ?? '';
     const rid = this.nextRid(relsXml);
@@ -1651,21 +1360,13 @@ export class PptxRenderer {
     }
     this.persistFile(relsPath, relsXml);
 
-    // Ensure content type for this extension
     this.ensureContentTypeForExtension(ext, mimeType);
 
     // Add Picture shape via Wasm (add_picture_shape parses the slide on demand).
     return this.exports.add_picture_shape(slideIdx, rid, x, y, cx, cy);
   }
 
-  /**
-   * Replace the image data of an existing Picture shape.
-   * @param slideIdx - Slide index (0-based).
-   * @param shapeIdx - Shape index (composite index for groups).
-   * @param imageData - New image bytes.
-   * @param mimeType - MIME type of the new image.
-   * @returns "OK" on success, "ERROR:..." on failure.
-   */
+  /** Replace a picture's image bytes. Returns `"OK"` or `"ERROR:..."`. */
   replaceImage(slideIdx: number, shapeIdx: number,
     imageData: Uint8Array, mimeType: string): string {
     if (!this.wasm) return 'ERROR:not initialized';
@@ -1673,8 +1374,6 @@ export class PptxRenderer {
     const ext = mimeToExt(mimeType);
     if (!ext) return 'ERROR:unsupported image type';
 
-    // Find the shape's current rid from SVG data attributes
-    // (render_shape_svg parses the slide on demand via ensure_slide_parsed).
     const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
     if (svg.startsWith('ERROR:')) return svg;
 
@@ -1684,7 +1383,6 @@ export class PptxRenderer {
 
     this.checkpoint();
 
-    // Resolve current image path from rels
     const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
     const relsXml = this.files.get(relsPath) ?? '';
     const oldTarget = this.resolveRidTarget(relsXml, currentRid);
@@ -1715,17 +1413,10 @@ export class PptxRenderer {
     return this.exports.replace_picture_rid(slideIdx, shapeIdx, newRid);
   }
 
-  /**
-   * Delete a Picture shape and mark its media file for removal.
-   * @param slideIdx - Slide index (0-based).
-   * @param shapeIdx - Shape index.
-   * @returns "OK" on success, "ERROR:..." on failure.
-   */
+  /** Delete a picture and, if nothing else uses it, its media file. Returns `"OK"` or `"ERROR:..."`. */
   deleteImage(slideIdx: number, shapeIdx: number): string {
     if (!this.wasm) return 'ERROR:not initialized';
 
-    // Find the shape's rid before deleting
-    // (render_shape_svg parses the slide on demand via ensure_slide_parsed).
     const svg = this.exports.render_shape_svg(slideIdx, shapeIdx);
     let mediaPath: string | null = null;
     if (!svg.startsWith('ERROR:')) {
@@ -1743,7 +1434,6 @@ export class PptxRenderer {
 
     this.checkpoint();
 
-    // Delete the shape
     const result = this.exports.delete_shape(slideIdx, shapeIdx);
     if (result.startsWith('ERROR:')) return result;
 
@@ -1809,8 +1499,6 @@ export class PptxRenderer {
     }
   }
 
-  // ── Private helpers ──────────────────────────────────────────────────────────
-
   /** Build the Wasm import object that satisfies MoonBit's FFI declarations. */
   private buildImportObject(): Record<string, Record<string, unknown>> {
     return {
@@ -1838,11 +1526,7 @@ export class PptxRenderer {
     };
   }
 
-  /**
-   * Resolve the date string for auto-updating date placeholders. Honors the
-   * `currentDate` option (Date | string | factory); defaults to the locale
-   * short date. Returns "" only if a custom source explicitly yields it.
-   */
+  /** Date text for date placeholders, from the `currentDate` option or today. */
   private currentDate(): string {
     let v = this.currentDateOption;
     if (typeof v === 'function') v = v();
@@ -1874,7 +1558,6 @@ export class PptxRenderer {
     if (this.measureTextFn) {
       return this.measureTextFn(text, fontFace, fontSizePx);
     }
-    // Default: Canvas 2D (browser only)
     if (!this.ctx) {
       if (typeof document === 'undefined') {
         // Non-browser environment — return approximate width
@@ -1890,19 +1573,12 @@ export class PptxRenderer {
     return this.ctx.measureText(text).width;
   }
 
-  // ── Notes & Comments helpers ─────────────────────────────────────────────
-
-  /**
-   * Resolve a relationship target path for a slide.
-   * @param slideIdx - 0-indexed slide index
-   * @param relType - last segment of the relationship type (e.g. 'notesSlide', 'comments')
-   */
+  /** A slide relationship's target, by the last segment of its type (`'notesSlide'`, …). */
   private resolveRelTarget(slideIdx: number, relType: string): string | null {
     const relsPath = `ppt/slides/_rels/slide${slideIdx + 1}.xml.rels`;
     const relsXml = this.files.get(relsPath);
     if (!relsXml) return null;
 
-    // Find Relationship with matching Type
     const rt = escapeRegex(relType);
     const re = new RegExp(
       `<Relationship[^>]+Type="[^"]*/${rt}"[^>]+Target="([^"]+)"`,
@@ -1932,11 +1608,7 @@ export class PptxRenderer {
     return resolved.join('/');
   }
 
-  /**
-   * Decode XML entity references in a raw inner-text string. Returns plain
-   * text suitable for `.textContent`. Callers must NOT pass the result to
-   * `.innerHTML` — use `.textContent` to avoid HTML re-interpretation.
-   */
+  /** Decode XML entities. The result is plain text: assign it to `.textContent`, never `.innerHTML`. */
   private decodeXmlEntities(s: string): string {
     return s.replace(/&(#x[0-9A-Fa-f]+|#\d+|amp|lt|gt|quot|apos);/g, (_, ent: string) => {
       if (ent === 'amp') return '&';

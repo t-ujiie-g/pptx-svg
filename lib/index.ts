@@ -1,18 +1,3 @@
-/**
- * pptx-svg — PPTX ↔ SVG conversion library
- *
- * @example
- * ```ts
- * import { PptxRenderer } from 'pptx-svg';
- *
- * const renderer = new PptxRenderer();
- * await renderer.init('./main.wasm');
- * await renderer.loadPptx(pptxArrayBuffer);
- *
- * const svgString = renderer.renderSlideSvg(0);
- * ```
- */
-
 export { PptxRenderer } from './pptx-renderer.js';
 export type {
   MeasureTextFn, PptxRendererOptions, LogLevel, SlideComment, CommentAuthor,

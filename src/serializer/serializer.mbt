@@ -5,8 +5,6 @@
 //
 // NOTE: No StringBuilder — all strings built via `+` (wasm:js-string "concat").
 
-// ── Non-visual property helpers ──────────────────────────────────────────────
-
 ///|
 /// Serialize p:cNvPr with optional hyperlinks.
 fn serialize_cnvpr(
@@ -34,8 +32,6 @@ fn serialize_cnvpr(
   }
 }
 
-// ── Shared helpers (from @xml) ───────────────────────────────────────────────
-
 ///|
 fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
@@ -62,14 +58,10 @@ fn serialize_arrow_end(
   "<" + tag + attrs + "/>"
 }
 
-// ── XML helpers ──────────────────────────────────────────────────────────────
-
 ///|
 fn xml_escape(s : String) -> String {
   @xml.xml_escape(s)
 }
-
-// ── Color serialization ─────────────────────────────────────────────────────
 
 ///|
 /// Serialize inner color element (a:srgbClr with optional a:alpha child).
@@ -96,8 +88,6 @@ fn serialize_color(color : @ooxml.Color) -> String {
     "<a:solidFill>" + serialize_color_inner(color) + "</a:solidFill>"
   }
 }
-
-// ── Gradient fill serialization ──────────────────────────────────────────────
 
 ///|
 fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
@@ -153,8 +143,6 @@ fn serialize_gradient_fill(gf : @ooxml.GradientFill) -> String {
   }
   out + "</a:gradFill>"
 }
-
-// ── Blip fill serialization ──────────────────────────────────────────────────
 
 ///|
 fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
@@ -259,8 +247,6 @@ fn serialize_blip_fill(bf : @ooxml.BlipFill) -> String {
   out + "</a:blipFill>"
 }
 
-// ── Pattern fill serialization ──────────────────────────────────────────────
-
 ///|
 fn serialize_pattern_fill(pf : @ooxml.PatternFill) -> String {
   let mut out = "<a:pattFill prst=\"" + pf.prst + "\">"
@@ -268,8 +254,6 @@ fn serialize_pattern_fill(pf : @ooxml.PatternFill) -> String {
   out = out + "<a:bgClr>" + serialize_color_inner(pf.bg_color) + "</a:bgClr>"
   out + "</a:pattFill>"
 }
-
-// ── Text body serialization ──────────────────────────────────────────────────
 
 ///|
 /// Serialize a:bodyPr element.
@@ -628,8 +612,6 @@ fn serialize_text_body(
   }
   serialize_text_body_inner(paragraphs, "p:txBody", body_props)
 }
-
-// ── Shape serialization ──────────────────────────────────────────────────────
 
 ///|
 /// Serialize a:xfrm with optional extra content (e.g. chOff/chExt for groups).
@@ -1601,8 +1583,6 @@ fn serialize_connector(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String 
   out = out + "</p:spPr>"
   out + "</p:cxnSp>"
 }
-
-// ── Public API ────────────────────────────────────────────────────────────────
 
 ///|
 /// Serialize a SlideData into a complete OOXML slide XML string.

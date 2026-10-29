@@ -2,8 +2,6 @@
 //
 // Same package as renderer.mbt — all constants and helpers are shared.
 
-// ── Table constants ─────────────────────────────────────────────────────────
-
 ///|
 let default_cell_mar_lr : Int32 = 91440 // OOXML default L/R margin: 0.1 inch
 
@@ -12,8 +10,6 @@ let default_cell_mar_tb : Int32 = 45720 // OOXML default T/B margin: 0.05 inch
 
 ///|
 let auto_contrast_lum_threshold : Int32 = 128000 // luminance threshold (×1000) for auto-contrast text color
-
-// ── Table cell text rendering ───────────────────────────────────────────────
 
 ///|
 fn render_table_cell_text(
@@ -218,8 +214,6 @@ fn render_table_cell_text(
   out + "</text>"
 }
 
-// ── Table border helpers ────────────────────────────────────────────────────
-
 ///|
 fn render_table_border_line(
   x1 : Int32,
@@ -272,8 +266,6 @@ fn eff_bdr_c(cell_c : @ooxml.Color, style_c : @ooxml.Color) -> @ooxml.Color {
     style_c
   }
 }
-
-// ── Table style resolution ──────────────────────────────────────────────────
 
 ///|
 fn find_table_style(
@@ -351,8 +343,6 @@ fn resolve_table_style_cell(
   // Fallback to wholeTbl
   style.whole_tbl
 }
-
-// ── Table rendering ─────────────────────────────────────────────────────────
 
 ///|
 fn render_table(

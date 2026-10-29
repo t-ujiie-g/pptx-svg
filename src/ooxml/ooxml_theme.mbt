@@ -2,8 +2,6 @@
 //
 // Same package as ooxml.mbt — all types and helpers are shared.
 
-// ── Theme color node parser ──────────────────────────────────────────────────
-
 ///|
 /// Parse the first color child of a clrScheme element (sysClr or srgbClr).
 fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
@@ -33,8 +31,6 @@ fn parse_theme_color_node(nodes : Array[@xml.XmlNode], tag : String) -> Color? {
   }
 }
 
-// ── Theme parser ────────────────────────────────────────────────────────────
-
 ///|
 /// Parse theme1.xml into ThemeData.
 pub fn parse_theme(xml_str : String) -> ThemeData {
@@ -50,7 +46,6 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
       }
   }
   let te_ch = @xml.get_children(theme_el)
-  // ── Color scheme ──
   let slot_tags = [
     "a:dk1", "a:lt1", "a:dk2", "a:lt2", "a:accent1", "a:accent2", "a:accent3", "a:accent4",
     "a:accent5", "a:accent6", "a:hlink", "a:folHlink",
@@ -89,7 +84,6 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
   let accent6 = slot_colors[9]
   let hlink = slot_colors[10]
   let fol_hlink = slot_colors[11]
-  // ── Font scheme ──
   let mut major_font = def.major_font
   let mut minor_font = def.minor_font
   let mut major_ea_font = def.major_ea_font
@@ -123,8 +117,6 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
       }
     }
   }
-  // ── Format scheme (fillStyleLst / lnStyleLst) ──
-  //
   //  Each entry is stored as raw XML with the `phClr` placeholder intact,
   //  so `resolve_fill_ref` / `resolve_ln_ref` can substitute in the actual
   //  scheme color referenced by a shape's `<p:style>`.  Text nodes
@@ -160,8 +152,6 @@ pub fn parse_theme(xml_str : String) -> ThemeData {
     clr_map: ColorMap::default(),
   }
 }
-
-// ── Color map helpers ────────────────────────────────────────────────────────
 
 ///|
 /// Get an XML attribute with a fallback default value.
@@ -253,8 +243,6 @@ pub fn extract_clr_map_ovr_from_nodes(
   }
 }
 
-// ── Format scheme helpers ───────────────────────────────────────────────────
-
 ///|
 /// Append serialized XML for each element child of `<parent>/<list_tag>` to
 /// `out`. Whitespace text nodes are skipped.
@@ -272,8 +260,6 @@ fn collect_style_xmls(
     }
   }
 }
-
-// ── Level text defaults parsing ──────────────────────────────────────────────
 
 ///|
 /// Parse a level paragraph properties node (e.g. a:lvl1pPr) into LevelTextDefaults.
@@ -439,8 +425,6 @@ fn parse_tx_styles(node : @xml.XmlNode, theme : ThemeData) -> MasterTextStyles {
   { title_style, body_style, other_style, }
 }
 
-// ── Slide master parser ──────────────────────────────────────────────────────
-
 ///|
 /// Parse a slide master XML string into SlideMasterData.
 pub fn parse_slide_master(
@@ -503,8 +487,6 @@ pub fn parse_slide_master(
     clr_map,
   }
 }
-
-// ── Slide layout parser ──────────────────────────────────────────────────────
 
 ///|
 /// Parse a slide layout XML string into SlideLayoutData.

@@ -1,8 +1,6 @@
 ///|
 using @test {assert_eq}
 
-// ── parse_svg_to_slide ───────────────────────────────────────────────────────
-
 ///|
 test "parse_svg_to_slide empty svg" {
   let slide = @svg_parser.parse_svg_to_slide("<svg></svg>")

@@ -20,8 +20,6 @@
 // Round-trip: the raw OMML XML is preserved via data-ooxml-math-xml
 // attributes on a hidden <text> element alongside the visual rendering.
 
-// ── Layout model ────────────────────────────────────────────────────────────
-
 ///|
 priv struct MathBox {
   svg : String
@@ -29,8 +27,6 @@ priv struct MathBox {
   h : Double
   baseline : Double // distance from top to baseline
 }
-
-// ── Constants ───────────────────────────────────────────────────────────────
 
 ///|
 let math_empty_box : MathBox = { svg: "", w: 0.0, h: 0.0, baseline: 0.0, }
@@ -76,8 +72,6 @@ let math_text_height_ratio : Double = 1.2 // text height = font_size × this
 
 ///|
 let math_text_baseline_ratio : Double = 0.85 // baseline = font_size × this
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
 
 ///|
 fn math_g(x : Double, y : Double, content : String) -> String {
@@ -216,8 +210,6 @@ fn math_hbox(boxes : Array[MathBox]) -> MathBox {
   { svg, w: x, h: total_h, baseline: max_bl, }
 }
 
-// ── Recursive layout engine ─────────────────────────────────────────────────
-
 ///|
 fn layout_math_node(
   node : @xml.XmlNode,
@@ -273,8 +265,6 @@ fn layout_math_node(
   layout_math_children(node, fs, ff, color)
 }
 
-// ── m:r — Math run (text leaf) ──────────────────────────────────────────────
-
 ///|
 fn layout_math_run(
   node : @xml.XmlNode,
@@ -299,8 +289,6 @@ fn layout_math_run(
   let svg = math_text_svg(text, 0.0, bl, fs, ff, color)
   { svg, w, h, baseline: bl, }
 }
-
-// ── m:f — Fraction ──────────────────────────────────────────────────────────
 
 ///|
 fn layout_math_frac(
@@ -347,8 +335,6 @@ fn layout_math_frac(
   { svg, w: total_w, h: total_h, baseline, }
 }
 
-// ── m:sSup — Superscript ────────────────────────────────────────────────────
-
 ///|
 fn layout_math_sup(
   node : @xml.XmlNode,
@@ -382,8 +368,6 @@ fn layout_math_sup(
   { svg, w: total_w, h: total_h, baseline: base_box.baseline + top_extra, }
 }
 
-// ── m:sSub — Subscript ──────────────────────────────────────────────────────
-
 ///|
 fn layout_math_sub(
   node : @xml.XmlNode,
@@ -412,8 +396,6 @@ fn layout_math_sub(
   let svg = base_box.svg + math_g(base_box.w, sub_y, sub_box.svg)
   { svg, w: total_w, h: bottom, baseline: base_box.baseline, }
 }
-
-// ── m:sSubSup — Subscript + Superscript ─────────────────────────────────────
 
 ///|
 fn layout_math_subsup(
@@ -462,8 +444,6 @@ fn layout_math_subsup(
     math_g(base_box.w, sub_y, sub_box.svg)
   { svg, w: total_w, h: total_h, baseline: base_box.baseline + top_extra, }
 }
-
-// ── m:rad — Radical (square root) ───────────────────────────────────────────
 
 ///|
 fn layout_math_rad(
@@ -546,8 +526,6 @@ fn layout_math_rad(
   let svg = deg_svg + svg_path + math_g(content_x, content_y, content_box.svg)
   { svg, w: total_w, h: total_h, baseline: content_y + content_box.baseline, }
 }
-
-// ── m:nary — Large operator (integral, sum, product) ────────────────────────
 
 ///|
 fn layout_math_nary(
@@ -661,8 +639,6 @@ fn layout_math_nary(
   }
 }
 
-// ── m:d — Delimiters (brackets) ─────────────────────────────────────────────
-
 ///|
 fn layout_math_delim(
   node : @xml.XmlNode,
@@ -734,8 +710,6 @@ fn layout_math_delim(
   let svg = beg_svg + math_g(beg_w, 0.0, content.svg) + end_svg
   { svg, w: total_w, h: total_h, baseline, }
 }
-
-// ── m:acc — Accent ──────────────────────────────────────────────────────────
 
 ///|
 fn layout_math_acc(
@@ -938,8 +912,6 @@ fn layout_math_acc(
   { svg, w: content_box.w, h: total_h, baseline, }
 }
 
-// ── m:m — Matrix ────────────────────────────────────────────────────────────
-
 ///|
 fn layout_math_matrix(
   node : @xml.XmlNode,
@@ -1039,8 +1011,6 @@ fn layout_math_matrix(
   { svg, w: total_w, h: total_h, baseline, }
 }
 
-// ── m:bar — Over/under bar ──────────────────────────────────────────────────
-
 ///|
 fn layout_math_bar(
   node : @xml.XmlNode,
@@ -1097,8 +1067,6 @@ fn layout_math_bar(
     }
   }
 }
-
-// ── Entry points ────────────────────────────────────────────────────────────
 
 ///|
 /// Check if all paragraphs contain only math runs.

@@ -1,24 +1,9 @@
-// pptx-svg: Shape and text editing API
-//
-// This file contains all shape-level editing exports:
-//   - render_shape_svg, update_shape_transform, update_shape_text, update_shape_fill
-//   - delete_shape, add_shape, add_shape_text, duplicate_shape
-//   - update_shape_gradient_fill, update_shape_stroke
-//   - Text editing: add/delete paragraph/run, style/font/color/align/decoration
-//   - History support: restore_slide_ooxml
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 ///|
-/// Composite shape-index radix: a group child is addressed as
-/// `parent_composite * group_index_base + child_local` (so up to 999 children per
-/// level). Top-level shapes use indices `0..group_index_base-1`.
+/// Composite shape-index radix: a group child is `parent * group_index_base + local`.
 let group_index_base : Int32 = 1000
 
 ///|
-/// Resolve a composite shape index (used by group children) to the containing
-/// array and the local index within it (see `group_index_base`).
-/// Returns (shapes_array, local_index) or None if out of range.
+/// The array holding composite shape index `idx`, and its local index there.
 fn resolve_shape_location(
   slide : @ooxml.SlideData,
   composite_idx : Int32,
@@ -49,30 +34,22 @@ fn resolve_shape_location(
 }
 
 ///|
-/// Ensure a slide's XML has been parsed into the `g_slides` cache.
-///
-/// After `initialize_pptx`, `g_slides[idx]` holds only an empty placeholder
-/// (`shapes: []`); the real parse + placeholder inheritance happens lazily on the
-/// first `render_slide_svg(idx)`. Editing APIs read `g_slides` directly, so calling
-/// one before the slide was ever rendered would silently no-op ("shape index out of
-/// range") and the edit would never reach the export. This guard parses the slide on
-/// demand so editing works regardless of call order.
+/// Parse a slide into `g_slides` if it hasn't been yet. Until its first render a slide
+/// is an empty placeholder, so an edit would silently find no shapes.
 fn ensure_slide_parsed(slide_idx : Int32) -> Unit {
   let n = g_slide_count.val
   if n == 0 || slide_idx < 0 || slide_idx >= n {
     return
   }
-  // Already edited (cache authoritative) or already parsed: nothing to do.
   if g_modified.val[slide_idx] || g_parsed.val[slide_idx] {
     return
   }
-  // render_slide_svg parses + inherits and caches into g_slides (sets g_parsed).
-  // The rendered SVG is discarded; we only want the side effect.
+  // Rendering parses and caches the slide; the SVG itself is not needed.
   let _ = render_slide_svg(slide_idx)
 }
 
 ///|
-/// Validate slide index and resolve shape. Returns error string or calls `f` with (arr, local_idx).
+/// Call `f` with the shape's containing array and local index, or return an error.
 fn with_shape(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -94,8 +71,7 @@ fn with_shape(
 }
 
 ///|
-/// Validate slide/shape/paragraph and resolve the text run.
-/// Returns error string or calls `f` with (shape, paragraph, run).
+/// Call `f` with the addressed shape, paragraph and run, or return an error.
 fn with_run(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -240,8 +216,6 @@ fn split_string(s : String, sep : Char) -> Array[String] {
   result
 }
 
-// ── Shape rendering and transform ──────────────────────────────────────────
-
 ///|
 /// Render a single shape as SVG (0-indexed slide and shape).
 /// Returns the shape SVG with `<defs>` prepended, or "ERROR:<message>".
@@ -279,8 +253,7 @@ pub fn render_shape_svg(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Update a shape's transform (position, size, rotation) and return re-rendered SVG.
-/// All values are in EMU.
+/// Set a shape's position, size and rotation (EMU); returns the re-rendered shape SVG.
 pub fn update_shape_transform(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -310,12 +283,8 @@ pub fn update_shape_transform(
 }
 
 ///|
-/// Update several shapes' transforms atomically in a single call.
-///
-/// `items_data` is `"shapeIdx,x,y,cx,cy,rot;..."` (all EMU; rot in 1/60000 deg).
-/// Every shape index is resolved and validated *before* any change is applied, so
-/// a bad index leaves the slide untouched (no partial application). Intended for
-/// multi-select move/align as one undo step. Returns "OK:<count>" or "ERROR:...".
+/// Set several transforms from `"shapeIdx,x,y,cx,cy,rot;..."` (EMU, rot in 1/60000°). All
+/// indices are validated before anything changes. Returns "OK:<count>" or "ERROR:...".
 pub fn update_shapes_transform(
   slide_idx : Int32,
   items_data : String,
@@ -329,7 +298,6 @@ pub fn update_shapes_transform(
   }
   ensure_slide_parsed(slide_idx)
   let slide = g_slides.val[slide_idx]
-  // Pass 1: parse + validate every item, collecting (array, local_idx, transform).
   let targets : Array[(Array[@ooxml.Shape], Int32, @ooxml.ShapeTransform)] = []
   let parts = split_string(items_data, ';')
   let np = parts.length()
@@ -365,7 +333,7 @@ pub fn update_shapes_transform(
   if targets.is_empty() {
     return "ERROR:no transform items"
   }
-  // Pass 2: apply (transform edits never change indices, so this is safe).
+  // Transform edits never change indices, so applying after validation is safe.
   let nt = targets.length()
   for j in 0..<nt {
     let (arr, local_idx, t) = targets[j]
@@ -410,8 +378,6 @@ pub fn update_shape_fill(
   })
 }
 
-// ── Shape CRUD ─────────────────────────────────────────────────────────────
-
 ///|
 /// Delete a shape from a slide. Returns "OK" or "ERROR:<message>".
 pub fn delete_shape(slide_idx : Int32, shape_idx : Int32) -> String {
@@ -423,9 +389,8 @@ pub fn delete_shape(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Add a basic shape to a slide. Returns "OK:<shape_index>" or "ERROR:<message>".
-/// `geom_type`: "rect", "ellipse", "roundRect", "line", etc.
-/// Position/size in EMU. fill_r/g/b: -1 = no fill.
+/// Add a preset shape (`"rect"`, `"ellipse"`, …) at an EMU position; fill -1 = none.
+/// Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn add_shape(
   slide_idx : Int32,
   geom_type : String,
@@ -489,8 +454,7 @@ pub fn add_shape(
 }
 
 ///|
-/// Add a Picture shape to a slide. The image binary must already be in the ZIP
-/// and referenced via the given relationship ID in the slide's .rels file.
+/// Add a picture whose image the slide's .rels already references as `rid`.
 /// Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn add_picture_shape(
   slide_idx : Int32,
@@ -549,9 +513,7 @@ pub fn add_picture_shape(
 }
 
 ///|
-/// Replace the image reference of a Picture shape.
-/// Updates the blip_fill rid and ShapeKind::Picture(rid).
-/// Returns "OK" or "ERROR:<message>".
+/// Point a picture at another image rId. Returns "OK" or "ERROR:<message>".
 pub fn replace_picture_rid(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -575,8 +537,7 @@ pub fn replace_picture_rid(
 }
 
 ///|
-/// Add a text paragraph with a single run to a shape.
-/// Returns "OK:<paraIndex>" or "ERROR:<message>".
+/// Add a one-run paragraph to a shape. Returns "OK:<paraIndex>" or "ERROR:<message>".
 pub fn add_shape_text(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -603,8 +564,7 @@ pub fn add_shape_text(
 }
 
 ///|
-/// Duplicate a shape on a slide, offset by (dx_emu, dy_emu).
-/// Returns "OK:<shape_index>" or "ERROR:<message>".
+/// Duplicate a shape, offset by (dx_emu, dy_emu). Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn duplicate_shape(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -637,12 +597,9 @@ pub fn duplicate_shape(
   })
 }
 
-// ── Fill and stroke ────────────────────────────────────────────────────────
-
 ///|
-/// Update a shape's gradient fill. Returns re-rendered SVG or "ERROR:<message>".
-/// `angle`: gradient angle in 60000ths of a degree (e.g. 5400000 = 90deg)
-/// `stops_data`: "pos,r,g,b;pos,r,g,b;..." where pos is 0-100000
+/// Set a linear gradient: `angle` in 60000ths of a degree, `stops_data` `"pos,r,g,b;..."`
+/// (pos 0-100000). Returns the re-rendered SVG or "ERROR:<message>".
 pub fn update_shape_gradient_fill(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -707,11 +664,8 @@ pub fn update_shape_stroke(
   })
 }
 
-// ── Text editing API ────────────────────────────────────────────────────────
-
 ///|
-/// Add a new paragraph to a shape. Creates a paragraph with a single run.
-/// Returns "OK:<paraIndex>" or "ERROR:<message>".
+/// Add a one-run paragraph. Returns "OK:<paraIndex>" or "ERROR:<message>".
 pub fn add_paragraph(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -785,9 +739,7 @@ pub fn delete_run(
 }
 
 ///|
-/// Update a text run's bold/italic style.
-/// bold/italic: 1 = set true, 0 = set false, -1 = no change.
-/// Returns re-rendered shape SVG or "ERROR:<message>".
+/// Set bold / italic (1 = on, 0 = off, -1 = unchanged). Returns the shape SVG or "ERROR:...".
 pub fn update_text_run_style(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -898,9 +850,7 @@ pub fn update_text_run_font(
 }
 
 ///|
-/// Update a paragraph's alignment.
-/// align: "l" (left), "ctr" (center), "r" (right), "just" (justify), "" (inherit).
-/// Returns re-rendered shape SVG or "ERROR:<message>".
+/// Set alignment: "l", "ctr", "r", "just", or "" (inherit). Returns the shape SVG or "ERROR:...".
 pub fn update_paragraph_align(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -919,11 +869,9 @@ pub fn update_paragraph_align(
 }
 
 ///|
-/// Update a text run's decoration (underline, strikethrough, baseline shift).
-/// underline: "sng", "dbl", "" (no change), "none" (remove).
-/// strike: "sngStrike", "dblStrike", "" (no change), "none" (remove).
-/// baseline: 30000 = superscript, -25000 = subscript, 0 = normal, -1 = no change.
-/// Returns re-rendered shape SVG or "ERROR:<message>".
+/// Set underline ("sng"/"dbl") and strike ("sngStrike"/"dblStrike") — "" unchanged, "none"
+/// removes — and baseline (30000 super, -25000 sub, 0 normal, -1 unchanged).
+/// Returns the shape SVG or "ERROR:...".
 pub fn update_text_run_decoration(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -963,25 +911,9 @@ pub fn update_text_run_decoration(
   })
 }
 
-// ── History support ──────────────────────────────────────────────────────────
-
 ///|
-/// Restore a slide's SlideData from a previously serialized OOXML slide XML.
-///
-/// Used by the TypeScript-layer Undo/Redo history (DocSnapshot): the history
-/// captures each modified slide's OOXML via `get_slide_ooxml`, and restoring a
-/// snapshot re-parses that XML back into `g_slides` here. Mirrors
-/// `update_slide_from_svg` (sets the cache directly, marks modified), but takes
-/// OOXML slide XML instead of SVG.
-///
-/// Runs the same full parse + resolve pipeline as `render_slide_svg`
-/// (`resolve_slide_data`): effective theme, chart shapes, placeholder
-/// inheritance, auto-content, background inheritance, and text-style defaults.
-/// Those steps are idempotent on already-serialized slide XML (they only fill
-/// missing values; auto-content only injects into empty placeholders), so the
-/// restored slide is visually identical to the live-edited one — Undo/Redo keeps
-/// full fidelity.
-///
+/// Restore a slide from OOXML captured by `get_slide_ooxml` (Undo/Redo). Runs the full
+/// `resolve_slide_data` pipeline, which is idempotent on serialized slides.
 /// Returns "OK" or "ERROR:<message>".
 pub fn restore_slide_ooxml(slide_idx : Int32, xml : String) -> String {
   let n = g_slide_count.val
@@ -1013,12 +945,7 @@ pub fn restore_slide_ooxml(slide_idx : Int32, xml : String) -> String {
   "OK"
 }
 
-// ── Z-order ──────────────────────────────────────────────────────────────────
-// z-order = position in the containing shape array: `render_slide_svg` and
-// `serialize_slide` both emit shapes in array order, so document order = paint
-// order — the LAST element is front-most, the FIRST is back-most. Reordering
-// happens within the shape's containing array (slide.shapes, or a group's
-// children), and the new composite index is returned so the caller can re-select.
+// z-order is array order (last = front-most), within the shape's containing array.
 
 ///|
 /// Insert `item` at `idx`, shifting later elements right (in-place).
@@ -1044,8 +971,7 @@ fn sibling_composite_idx(shape_idx : Int32, local_idx : Int32) -> Int32 {
 }
 
 ///|
-/// Move a shape to the front (top of the z-order = end of the array).
-/// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
+/// Move a shape to the front. Returns "OK:<new_composite_idx>" or "ERROR:<message>".
 pub fn bring_to_front(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let sh = arr[local_idx]
@@ -1057,8 +983,7 @@ pub fn bring_to_front(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Move a shape to the back (bottom of the z-order = start of the array).
-/// Returns "OK:<new_composite_idx>" or "ERROR:<message>".
+/// Move a shape to the back. Returns "OK:<new_composite_idx>" or "ERROR:<message>".
 pub fn send_to_back(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let sh = arr[local_idx]
@@ -1070,8 +995,7 @@ pub fn send_to_back(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Move a shape one step toward the front (swap with the next sibling).
-/// No-op if already front-most. Returns "OK:<new_composite_idx>".
+/// Move a shape one step forward (no-op at the front). Returns "OK:<new_composite_idx>".
 pub fn bring_forward(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let new_local = if local_idx < arr.length() - 1 {
@@ -1088,8 +1012,7 @@ pub fn bring_forward(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Move a shape one step toward the back (swap with the previous sibling).
-/// No-op if already back-most. Returns "OK:<new_composite_idx>".
+/// Move a shape one step backward (no-op at the back). Returns "OK:<new_composite_idx>".
 pub fn send_backward(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let new_local = if local_idx > 0 {
@@ -1105,18 +1028,12 @@ pub fn send_backward(slide_idx : Int32, shape_idx : Int32) -> String {
   })
 }
 
-// ── Copy / paste — cross-slide ───────────────────────────────────────────────
-// The shape's OOXML is the portable form. The TS layer extracts media/rels by
-// scanning the XML's rIds (see getShapeSpec), re-links them on paste, then calls
-// add_shape_from_ooxml on the target slide.
-
 ///|
 /// Serialize a single shape to its OOXML fragment (for copy). Returns the XML, or
 /// "ERROR:<message>" (e.g. charts, whose chart part a paste cannot carry over).
 pub fn get_shape_ooxml(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
-    // A chart's graphicFrame references a chart part (plus its embedded
-    // workbook) that a paste does not carry over.
+    // A paste cannot carry a chart's chart part and embedded workbook.
     if arr[local_idx].kind is @ooxml.ShapeKind::ChartShape(_) {
       return "ERROR:charts are not copyable"
     }
@@ -1130,9 +1047,8 @@ pub fn get_shape_ooxml(slide_idx : Int32, shape_idx : Int32) -> String {
 }
 
 ///|
-/// Parse a shape OOXML fragment and append it to a slide, offset by (dx, dy) EMU
-/// (for paste). rIds in `shape_xml` must already point at the target slide's rels.
-/// Returns "OK:<shape_index>" or "ERROR:<message>".
+/// Append a shape OOXML fragment, offset by (dx, dy) EMU, for paste; its rIds must
+/// already point at this slide's rels. Returns "OK:<shape_index>" or "ERROR:<message>".
 pub fn add_shape_from_ooxml(
   slide_idx : Int32,
   shape_xml : String,

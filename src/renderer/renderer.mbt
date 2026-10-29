@@ -11,7 +11,6 @@
 // NOTE: No StringBuilder.  All strings built via `+` (wasm:js-string "concat"),
 // which is polyfillable in Tier-2/3 browsers.
 
-// ── EMU constants ────────────────────────────────────────────────────────────
 // 1 pt = 12700 EMU, 1 inch = 914400 EMU
 
 ///|
@@ -71,8 +70,6 @@ let baseline_shift_extra_numer : Int32 = 2 // extra spacing for super/subscript 
 ///|
 let baseline_shift_extra_denom : Int32 = 5
 
-// ── OOXML unit constants ─────────────────────────────────────────────────────
-
 ///|
 let ooxml_pct_denom : Int32 = @ooxml.pct_100 // OOXML percentage denominator (100000 = 100%)
 
@@ -82,7 +79,6 @@ let ooxml_angle_unit : Int32 = 60000 // 1 degree = 60000 units in OOXML
 ///|
 let ooxml_fill_to_pct : Int32 = 2000 // fillToRect midpoint num/2000 → center % (decimal)
 
-// ── SVG element ID builders ─────────────────────────────────────────────────
 // Each SVG <defs> element (gradient, pattern, filter, mask) needs a unique ID.
 // All IDs follow the pattern: prefix + sep + slide_num + sep + shape_idx.
 
@@ -178,14 +174,10 @@ fn blip_clip_id(
   prefix + "_s" + int_to_str(slide_num) + "_" + int_to_str(shape_idx)
 }
 
-// ── Shared helpers (from @xml) ───────────────────────────────────────────────
-
 ///|
 fn int_to_str(n : Int32) -> String {
   @xml.int_to_str(n)
 }
-
-// ── SVG attribute helpers ─────────────────────────────────────────────────────
 
 ///|
 /// Build a single SVG attribute. Escapes the value to prevent attribute
@@ -213,7 +205,6 @@ fn dai(name : String, value : Int32) -> String {
   " data-ooxml-" + name + "=\"" + int_to_str(value) + "\""
 }
 
-// ── Fill round-trip attributes ───────────────────────────────────────────────
 // Shared by shapes (`prefix` "") and the slide background on the <svg> root
 // (`prefix` "bg-"); `svg_parser` reads them back with the same prefix.
 
@@ -292,8 +283,6 @@ fn bool_str(b : Bool) -> String {
     "0"
   }
 }
-
-// ── Stroke rendering helpers ────────────────────────────────────────────────
 
 ///|
 /// Convert OOXML preset dash name to SVG stroke-dasharray attribute.
@@ -592,8 +581,6 @@ pub fn sanitize_url(url : String) -> String {
   }
 }
 
-// ── EMU → pixel conversion ────────────────────────────────────────────────────
-
 ///|
 fn px(emu : Int32, scale : Int32) -> Int32 {
   if scale <= 0 {
@@ -625,14 +612,10 @@ fn px_frac(emu : Int32, scale : Int32) -> String {
   }
 }
 
-// ── Font size ─────────────────────────────────────────────────────────────────
-
 ///|
 fn hundredth_pt_to_emu(sz : Int32) -> Int32 {
   sz * @ooxml.emu_per_hundredth_pt
 }
-
-// ── Rotation transform ────────────────────────────────────────────────────────
 
 ///|
 /// Format rotation in 60000ths of a degree as "D.DD" string (e.g. "45.00").
@@ -743,8 +726,6 @@ fn transform_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
   let cy_p = px(t.y + t.cy / 2, scale)
   transform_with_flip(t.rot, t.flip_h, t.flip_v, cx_p, cy_p)
 }
-
-// ── Image helpers ─────────────────────────────────────────────────────────────
 
 ///|
 fn resolve_image_path(target : String) -> String {
@@ -1006,8 +987,6 @@ fn render_blip_filter(
   (defs, attr)
 }
 
-// ── Scale ratio formatting (for group transforms) ──────────────────────────
-
 ///|
 /// Used for SVG scale() transform values.
 fn format_ratio(num : Int32, den : Int32) -> String {
@@ -1100,8 +1079,6 @@ fn encode_adj_values(avs : Array[Int32]) -> String {
   }
   out
 }
-
-// ── Line / Connector rendering helpers ──────────────────────────────────────
 
 ///|
 /// Compute line endpoints considering flipH/flipV.
@@ -1462,8 +1439,6 @@ fn render_curved_path(
   }
 }
 
-// ── data-ooxml-* attribute helpers ───────────────────────────────────────────
-
 ///|
 fn shape_type_str(kind : @ooxml.ShapeKind) -> String {
   match kind {
@@ -1483,8 +1458,6 @@ fn geom_str(kind : @ooxml.ShapeKind) -> String {
     _ => "rect"
   }
 }
-
-// ── Bullet auto-numbering ─────────────────────────────────────────────────────
 
 ///|
 fn auto_number_text(type_ : String, idx : Int32) -> String {
@@ -1579,8 +1552,6 @@ fn roman_convert(n : Int32, lower : Bool) -> String {
   }
   result
 }
-
-// ── Shape rendering ───────────────────────────────────────────────────────────
 
 ///|
 pub fn render_shape(
@@ -2189,8 +2160,6 @@ pub fn render_shape(
   }
 }
 
-// ── Group rendering ─────────────────────────────────────────────────────────
-
 ///|
 fn render_group(
   grp : @ooxml.GroupShapeData,
@@ -2360,8 +2329,6 @@ fn render_group(
   "</g>"
 }
 
-// ── Single-shape defs generation ─────────────────────────────────────────────
-
 ///|
 /// Generate `<defs>` content for a single shape (gradient, pattern, arrows, effects).
 /// Returns the raw defs content (without wrapping `<defs>` tags).
@@ -2431,8 +2398,6 @@ pub fn render_shape_defs(
   }
   defs
 }
-
-// ── Public API ────────────────────────────────────────────────────────────────
 
 ///|
 /// Render a SlideData to an SVG string with data-ooxml-* attributes.

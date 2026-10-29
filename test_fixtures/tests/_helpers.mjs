@@ -20,8 +20,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export const FIXTURES_DIR = dirname(__dirname);
 export const DIST_DIR = join(FIXTURES_DIR, '..', 'dist');
 
-// ── Assertion state ─────────────────────────────────────────────────────────
-
 let failures = [];
 let total = 0;
 
@@ -52,8 +50,6 @@ export function finishAssertions() {
   }
 }
 
-// ── PPTX loading ────────────────────────────────────────────────────────────
-
 function loadPptxAb(filename) {
   const path = join(FIXTURES_DIR, filename);
   if (!existsSync(path)) {
@@ -78,8 +74,6 @@ export async function loadFeatures() {
   }
   return featuresCache;
 }
-
-// ── XML helpers ─────────────────────────────────────────────────────────────
 
 export function countSlideIds(xml) {
   const patterns = ['<p:sldId ', '<p:sldId\t', '<p:sldId\n', '<p:sldId/>'];

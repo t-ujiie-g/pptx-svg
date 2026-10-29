@@ -1,11 +1,3 @@
-// FFI declarations for pptx-svg Wasm module
-// These are host function imports provided by the JavaScript host layer.
-//
-// Architecture:
-//   The JavaScript host handles ZIP parsing and DEFLATE decompression
-//   (using browser's native DecompressionStream API), then exposes
-//   decompressed PPTX entries to MoonBit via these FFI functions.
-
 ///|
 /// Get the decompressed content of a PPTX ZIP entry as a UTF-8 string.
 /// path: e.g. "ppt/slides/slide1.xml", "ppt/presentation.xml"

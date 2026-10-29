@@ -6,8 +6,6 @@
 //
 // Same package as renderer.mbt — all constants and helpers are shared.
 
-// ── Text helpers ─────────────────────────────────────────────────────────────
-
 ///|
 /// Build a comma-separated font-family string from sym/cs/ea/latin fonts.
 /// Returns empty string if no fonts are specified.
@@ -141,8 +139,6 @@ fn is_kinsoku_start_prohibited(c : Char) -> Bool {
   c == 'ョ' ||
   c == 'ヮ'
 }
-
-// ── Text wrapping ────────────────────────────────────────────────────────────
 
 ///| A visual line fragment: (run_index, text_fragment)
 ///  Used to split paragraph runs into wrapped lines.
@@ -352,8 +348,6 @@ fn wrap_paragraph(
   lines
 }
 
-// ── Tab helpers ──────────────────────────────────────────────────────────
-
 ///|
 /// Check if a string contains a tab character.
 fn contains_tab(s : String) -> Bool {
@@ -431,8 +425,6 @@ fn render_run_with_tabs(
     )
   }
 }
-
-// ── Text rendering ────────────────────────────────────────────────────────────
 
 ///|
 fn para_max_font_emu(para : @ooxml.TextParagraph) -> Int32 {
@@ -1665,8 +1657,6 @@ fn render_text(
   }
   run_fill_defs_section + img_bullets_svg + out + "</text>"
 }
-
-// ── Text height estimation ──────────────────────────────────────────────────
 
 ///|
 fn estimate_text_height(

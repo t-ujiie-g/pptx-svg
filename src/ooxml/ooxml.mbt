@@ -5,8 +5,6 @@
 //   1 inch = 914400 EMU,  1 pt = 12700 EMU,  1 cm = 360000 EMU
 // Standard slide: 9144000 x 6858000 EMU (10in x 7.5in)
 
-// ── Shared constants ─────────────────────────────────────────────────────────
-
 ///|
 /// 1 pt = 12700 EMU.
 pub let emu_per_pt : Int32 = 12700
@@ -34,8 +32,6 @@ pub let char_spc_dpi : Int32 = 96
 ///|
 /// Hundredths-of-a-point per inch (for char spacing conversion).
 pub let hundredth_pt_per_inch : Int32 = 7200
-
-// ── Color ─────────────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct Color {
@@ -218,8 +214,6 @@ fn hex_nibble(n : Int32) -> String {
   }
 }
 
-// ── Gradient fill ────────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct GradientStop {
   pos : Int32 // 0-100000 (1/1000%)
@@ -258,8 +252,6 @@ pub fn GradientFill::none() -> GradientFill {
 pub fn GradientFill::is_none(self : GradientFill) -> Bool {
   self.stops.is_empty()
 }
-
-// ── Blip (image) fill ───────────────────────────────────────────────────
 
 ///|
 pub(all) struct BlipFill {
@@ -321,8 +313,6 @@ pub fn BlipFill::has_crop(self : BlipFill) -> Bool {
   self.src_l > 0 || self.src_t > 0 || self.src_r > 0 || self.src_b > 0
 }
 
-// ── Pattern fill ────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct PatternFill {
   prst : String // preset pattern name; "" = none
@@ -339,8 +329,6 @@ pub fn PatternFill::none() -> PatternFill {
 pub fn PatternFill::is_none(self : PatternFill) -> Bool {
   self.prst.is_empty()
 }
-
-// ── Theme data ───────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct ThemeData {
@@ -432,8 +420,6 @@ pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
   resolve_slot(resolved, theme)
 }
 
-// ── RGB ↔ HSL conversion ────────────────────────────────────────────────────
-
 ///|
 fn min3(a : Int32, b : Int32, c : Int32) -> Int32 {
   let m = if a < b { a } else { b }
@@ -454,8 +440,6 @@ fn max3(a : Int32, b : Int32, c : Int32) -> Int32 {
   }
 }
 
-// ── Integer square root (for gamma approximation) ───────────────────────────
-
 ///|
 /// Integer square root via Newton's method.
 fn int_sqrt(n : Int32) -> Int32 {
@@ -471,7 +455,6 @@ fn int_sqrt(n : Int32) -> Int32 {
   x
 }
 
-// ── HSL color space constants (integer-scaled) ──────────────────────────────
 // Hue: 0-3600 (tenths of a degree), Saturation/Lightness: 0-1000 (tenths of %)
 
 ///|
@@ -572,8 +555,6 @@ fn hsl_to_rgb(h : Int32, s : Int32, l : Int32) -> Color {
   }
   { r: clamp(r), g: clamp(g), b: clamp(b), alpha: 255, }
 }
-
-// ── Color modifiers ─────────────────────────────────────────────────────────
 
 ///|
 /// Apply OOXML color modifier children (lumMod, lumOff, shade, tint, etc.)
@@ -732,8 +713,6 @@ pub fn apply_color_modifiers(
   { r, g, b, alpha: alpha_val, }
 }
 
-// ── Master / Layout types ────────────────────────────────────────────────────
-
 ///|
 pub(all) struct LevelTextDefaults {
   font_size : Int32 // hundredths-of-pt (sz); 0 = unset
@@ -810,8 +789,6 @@ pub fn MasterTextStyles::empty() -> MasterTextStyles {
   }
 }
 
-// ── Color map (scheme color remapping) ───────────────────────────────────────
-
 ///|
 pub(all) struct ColorMap {
   bg1 : String
@@ -867,8 +844,6 @@ pub(all) struct SlideLayoutData {
   shapes : Array[Shape]
   clr_map_ovr : ColorMap? // None = inherit master's color map
 }
-
-// ── Text model ────────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct TextRun {
@@ -937,8 +912,6 @@ pub(all) struct TextParagraph {
   epr_ea_font : String
 }
 
-// ── Text body properties ────────────────────────────────────────────────────
-
 ///|
 /// Default text outline width: 12700 EMU = 1 pt (OOXML default for a:ln on a:rPr).
 pub let default_outline_w : Int32 = 12700
@@ -1005,8 +978,6 @@ pub fn BodyProps::default() -> BodyProps {
     warp_av2: -1,
   }
 }
-
-// ── Table model ──────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct TableCell {
@@ -1093,8 +1064,6 @@ pub(all) struct TableData {
   band_col : Bool
 }
 
-// ── Table style model ────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct TableStyleCell {
   fill : Color
@@ -1173,8 +1142,6 @@ pub fn TableStyleDef::none() -> TableStyleDef {
   }
 }
 
-// ── Shape geometry ────────────────────────────────────────────────────────────
-
 ///|
 pub(all) enum ShapeGeom {
   Rect
@@ -1238,8 +1205,6 @@ pub fn ShapeGeom::to_prst(self : ShapeGeom) -> String {
     ShapeGeom::Custom(_) => "custGeom"
   }
 }
-
-// ── Effects ──────────────────────────────────────────────────────────────────
 
 ///|
 /// Outer shadow (a:outerShdw).
@@ -1476,8 +1441,6 @@ pub fn EffectList::is_none(self : EffectList) -> Bool {
   self.fill_overlay.is_none()
 }
 
-// ── 3D ───────────────────────────────────────────────────────────────────────
-
 ///|
 /// Bevel definition (a:bevelT / a:bevelB).
 pub(all) struct Bevel {
@@ -1548,8 +1511,6 @@ pub fn Scene3d::none() -> Scene3d {
 pub fn Scene3d::is_none(self : Scene3d) -> Bool {
   self.camera_prst.is_empty() && self.light_rig.is_empty()
 }
-
-// ── Shape ─────────────────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct ShapeTransform {
@@ -1731,8 +1692,6 @@ pub fn Shape::default_with_blip(
   { ..Shape::default_with(kind, transform), blip_fill, }
 }
 
-// ── Slide data ────────────────────────────────────────────────────────────────
-
 ///|
 pub(all) struct SlideSize {
   cx : Int32
@@ -1758,8 +1717,6 @@ pub(all) struct SlideData {
   hidden : Bool // <p:sld show="0"> — hidden slide
   bg_inherited : Bool // background came from the layout/master (or default white); not written as <p:bg>
 }
-
-// ── Relationship type ─────────────────────────────────────────────────────────
 
 ///|
 pub(all) struct Relationship {

@@ -6,8 +6,6 @@
 //
 // Same package as ooxml.mbt — all types and helpers are shared.
 
-// ── OMML math text extraction ────────────────────────────────────────────────
-
 ///|
 /// Recursively extract plain text from OMML math elements (m:t nodes).
 fn extract_math_text(node : @xml.XmlNode) -> String {
@@ -32,8 +30,6 @@ fn extract_math_text(node : @xml.XmlNode) -> String {
   }
 }
 
-// ── Spacing parsing ──────────────────────────────────────────────────────────
-
 ///|
 /// Parse spacing value from <a:spcBef>/<a:spcAft>/<a:lnSpc> children.
 ///  Returns EMU. Supports <a:spcPts val="N"> (N in hundredths of a point).
@@ -56,8 +52,6 @@ fn parse_spacing(parent : @xml.XmlNode) -> Int32 {
       }
   }
 }
-
-// ── Body properties parsing ──────────────────────────────────────────────────
 
 ///|
 /// Parse <a:bodyPr> element into BodyProps.
@@ -192,8 +186,6 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
   }
 }
 
-// ── Font theme resolution ────────────────────────────────────────────────────
-
 ///|
 /// Resolve font theme references for Latin fonts.
 fn resolve_font_theme(typeface : String, theme : ThemeData) -> String {
@@ -221,8 +213,6 @@ fn resolve_ea_font_theme(typeface : String, theme : ThemeData) -> String {
     typeface
   }
 }
-
-// ── Paragraph properties parsing ─────────────────────────────────────────────
 
 ///|
 /// Parse paragraph-level properties from <a:pPr>.
@@ -360,8 +350,6 @@ fn parse_para_props(
   )
 }
 
-// ── Default run properties ───────────────────────────────────────────────────
-
 ///|
 /// Parse <a:defRPr> defaults from a <a:pPr> node.
 /// Returns (bold, bold_explicit, italic, font_size, color, font_face, ea_font).
@@ -399,8 +387,6 @@ fn parse_def_rpr(
     }
   }
 }
-
-// ── Run properties parsing ───────────────────────────────────────────────────
 
 ///|
 /// Create a TextRun with default properties (no explicit formatting).
@@ -634,8 +620,6 @@ fn parse_run_effect_lst(
     }
   }
 }
-
-// ── Text body parsing ────────────────────────────────────────────────────────
 
 ///|
 fn parse_text_body(

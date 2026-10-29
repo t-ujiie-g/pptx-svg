@@ -6,8 +6,6 @@
 /// graphicData uri for a SmartArt (DrawingML diagram) graphicFrame.
 let diagram_graphic_uri : String = "http://schemas.openxmlformats.org/drawingml/2006/diagram"
 
-// ── Attribute helpers ─────────────────────────────────────────────────────────
-
 ///|
 fn attr_int(node : @xml.XmlNode, name : String) -> Int32 {
   match @xml.get_attr(node, name) {
@@ -31,8 +29,6 @@ fn child_attr(
       }
   }
 }
-
-// ── Color parsing ─────────────────────────────────────────────────────────────
 
 ///|
 /// Parse a color from direct children (a:srgbClr or a:schemeClr), without a:solidFill wrapper.
@@ -73,8 +69,6 @@ fn parse_solid_fill(nodes : Array[@xml.XmlNode], theme : ThemeData) -> Color {
       parse_color_from_children(@xml.get_children(fill_node), theme)
   }
 }
-
-// ── Gradient fill parsing ────────────────────────────────────────────────────
 
 ///|
 /// Parse <a:gradFill> from child nodes. Returns GradientFill::none() if absent.
@@ -155,8 +149,6 @@ fn parse_gradient_fill(
   }
 }
 
-// ── Transform parsing ─────────────────────────────────────────────────────────
-
 ///|
 /// Parse transform from an xfrm element node (either a:xfrm or p:xfrm).
 fn parse_xfrm_node(xfrm : @xml.XmlNode) -> ShapeTransform {
@@ -185,8 +177,6 @@ fn parse_xfrm(sppr_children : Array[@xml.XmlNode]) -> ShapeTransform {
     Some(xfrm) => parse_xfrm_node(xfrm)
   }
 }
-
-// ── Stroke parsing ────────────────────────────────────────────────────────────
 
 ///|
 fn parse_stroke(
@@ -338,8 +328,6 @@ fn parse_stroke(
   }
 }
 
-// ── Effect list parsing ──────────────────────────────────────────────────────
-
 ///|
 /// Parse a:effectLst from shape property children.
 
@@ -477,8 +465,6 @@ fn parse_effect_lst(
   }
 }
 
-// ── 3D parsing ──────────────────────────────────────────────────────────────
-
 ///|
 fn parse_scene_3d(sppr_ch : Array[@xml.XmlNode]) -> Scene3d {
   match @xml.find_child(sppr_ch, "a:scene3d") {
@@ -580,8 +566,6 @@ fn parse_sp_3d(sppr_ch : Array[@xml.XmlNode]) -> Shape3d {
   }
 }
 
-// ── Blip color helpers ───────────────────────────────────────────────────────
-
 ///|
 /// Parse a single color from children (a:srgbClr only, no theme needed).
 fn parse_first_color(children : Array[@xml.XmlNode]) -> Color {
@@ -615,8 +599,6 @@ fn parse_color_list(children : Array[@xml.XmlNode]) -> Array[Color] {
   }
   colors
 }
-
-// ── Blip fill parser ──────────────────────────────────────────────────────────
 
 ///|
 /// Parse blipFill node internals → BlipFill (shared by a:blipFill and p:blipFill).
@@ -757,8 +739,6 @@ fn parse_blip_fill(nodes : Array[@xml.XmlNode]) -> BlipFill {
   }
 }
 
-// ── Pattern fill parser ──────────────────────────────────────────────────────
-
 ///|
 /// Parse a:pattFill from spPr children → PatternFill.
 fn parse_pattern_fill(
@@ -789,8 +769,6 @@ fn parse_pattern_fill(
   }
 }
 
-// ── Shape link helpers ────────────────────────────────────────────────────────
-
 ///|
 /// Parse hyperlinks from p:cNvPr element (a:hlinkClick, a:hlinkHover).
 /// Returns (click_rid, hover_rid).
@@ -814,8 +792,6 @@ fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
   }
   (click_rid, hover_rid)
 }
-
-// ── Theme style reference (p:style → fmtScheme) ────────────────────────────
 
 ///|
 /// Parse `<a:fillRef>` or `<a:lnRef>` inside `<p:style>`: returns (idx, schemeColorName).
@@ -903,8 +879,6 @@ fn resolve_ln_ref(
   parse_stroke(parsed, theme)
 }
 
-// ── Shape parsers ─────────────────────────────────────────────────────────────
-
 ///|
 fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(sp)
@@ -968,7 +942,6 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     None => false
   }
   let sp_stroke = parse_stroke(sppr_ch, theme)
-  // ── Theme style reference fallback (<p:style>/<a:fillRef>/<a:lnRef>) ──
   let mut fill = fill
   let mut grad_fill = grad_fill
   let mut blip_fill = blip_fill
@@ -1869,8 +1842,6 @@ fn empty_shape() -> Shape {
   Shape::default_with(ShapeKind::Other, ShapeTransform::default())
 }
 
-// ── Relationship parsing ──────────────────────────────────────────────────────
-
 ///|
 /// Parse a .rels XML file into a map of relationship ID → target path.
 pub fn parse_rels(xml_str : String) -> Array[Relationship] {
@@ -1927,8 +1898,6 @@ pub fn find_rel(rels : Array[Relationship], id : String) -> Relationship? {
   None
 }
 
-// ── Slide size ────────────────────────────────────────────────────────────────
-
 ///|
 /// Extract slide size from ppt/presentation.xml.
 pub fn parse_slide_size(prs_xml : String) -> SlideSize {
@@ -1952,8 +1921,6 @@ pub fn parse_slide_size(prs_xml : String) -> SlideSize {
     }
   }
 }
-
-// ── Main slide parser ─────────────────────────────────────────────────────────
 
 ///|
 /// Parse a slide XML string into a SlideData.
@@ -2074,8 +2041,6 @@ pub fn parse_slide(
     }
   }
 }
-
-// ── Background parsing (shared) ──────────────────────────────────────────────
 
 ///|
 /// Parse background color from p:cSld children. Returns Color::none() if no bg.
@@ -2279,8 +2244,6 @@ pub fn apply_diagram_text_color(shapes : Array[Shape], color : Color) -> Unit {
     }
   }
 }
-
-// ── Table style parsing ─────────────────────────────────────────────────────
 
 ///|
 fn parse_table_style_cell(

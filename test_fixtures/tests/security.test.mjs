@@ -32,8 +32,6 @@ function readFixtureAb(name) {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-// ── ZIP construction helpers (for M1 bomb test) ─────────────────────────────
-
 /** CRC-32 over a Uint8Array (matches lib/utils.ts crc32). */
 function crc32(data) {
   let crc = 0xFFFFFFFF;
@@ -107,8 +105,6 @@ function buildSingleEntryZip({ name, content, declaredUncompressedSize }) {
   out.set(eocd, pos);
   return out.buffer;
 }
-
-// ── Tests ───────────────────────────────────────────────────────────────────
 
 test('M1: extractZip rejects entries with declared size over the cap', async () => {
   resetAssertions();

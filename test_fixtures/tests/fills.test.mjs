@@ -13,7 +13,6 @@ test("fills & strokes (slides 23-33)", async () => {
   const { textFiles } = await loadFeatures();
 
 
-  // ── Slide 23: Linear gradient fills ──
   {
     section('test_features.pptx — Slide 23: linear gradient fills');
     const slide23 = textFiles.get('ppt/slides/slide23.xml');
@@ -36,7 +35,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide23 has Linear 0deg text', slide23.includes('Linear 0deg'));
   }
 
-  // ── Slide 24: Radial/path gradient fills ──
   {
     section('test_features.pptx — Slide 24: radial/path gradient fills');
     const slide24 = textFiles.get('ppt/slides/slide24.xml');
@@ -59,7 +57,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide24 has Ellipse grad text', slide24.includes('Ellipse grad'));
   }
 
-  // ── Slide 25: Gradient background ──
   {
     section('test_features.pptx — Slide 25: gradient background');
     const slide25 = textFiles.get('ppt/slides/slide25.xml');
@@ -77,7 +74,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide25 has Gradient Background text', slide25.includes('Gradient Background'));
   }
 
-  // ── Slide 26: Alpha/transparency ──
   {
     section('test_features.pptx — Slide 26: alpha/transparency');
     const slide26 = textFiles.get('ppt/slides/slide26.xml');
@@ -92,7 +88,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide26 has Alpha 50% text', slide26.includes('Alpha 50%'));
   }
 
-  // ── Slide 27: Image fill on AutoShape ──
   {
     section('test_features.pptx — Slide 27: image fill (blipFill)');
     const slide27 = textFiles.get('ppt/slides/slide27.xml');
@@ -104,7 +99,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide27 has a:stretch', hasTag(slide27, 'a:stretch'));
   }
 
-  // ── Slide 28: Pattern fill ──
   {
     section('test_features.pptx — Slide 28: pattern fill');
     const slide28 = textFiles.get('ppt/slides/slide28.xml');
@@ -120,7 +114,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide28 has CCCCCC (gray bg)', slide28.includes('CCCCCC'));
   }
 
-  // ── Slide 29: Gradient tileFlip ──────────────────────────────────────────
   {
     section('test_features.pptx — Slide 29: gradient tileFlip');
     const slide29 = textFiles.get('ppt/slides/slide29.xml');
@@ -131,7 +124,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide29 has tileFlip="xy"', slide29.includes('tileFlip="xy"'));
   }
 
-  // ── Slide 30: Additional pattern fills ───────────────────────────────────
   {
     section('test_features.pptx — Slide 30: additional pattern fills');
     const slide30 = textFiles.get('ppt/slides/slide30.xml');
@@ -145,7 +137,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide30 has prst="trellis"', slide30.includes('prst="trellis"'));
   }
 
-  // ── Slide 31: Image fill tile ────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 31: image fill tile');
     const slide31 = textFiles.get('ppt/slides/slide31.xml');
@@ -158,7 +149,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide31 has algn="tl"', slide31.includes('algn="tl"'));
   }
 
-  // ── Slide 32: Stroke dash styles ────────────────────────────────────────
   {
     section('test_features.pptx — Slide 32: stroke dash styles');
     const slide32 = textFiles.get('ppt/slides/slide32.xml');
@@ -172,7 +162,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide32 has a:ds (custom dash segment)', hasTag(slide32, 'a:ds'));
   }
 
-  // ── Slide 33: Arrows, line join, line cap ───────────────────────────────
   {
     section('test_features.pptx — Slide 33: arrows/join/cap');
     const slide33 = textFiles.get('ppt/slides/slide33.xml');

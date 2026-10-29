@@ -5,8 +5,6 @@
 ///|
 using @test {assert_eq}
 
-// ── Color constructors ──────────────────────────────────────────────────────
-
 ///|
 test "Color::white" {
   let c = @ooxml.Color::white()
@@ -30,8 +28,6 @@ test "Color::none" {
   let c = @ooxml.Color::none()
   assert_true(c.is_none())
 }
-
-// ── parse_hex_color ─────────────────────────────────────────────────────────
 
 ///|
 test "parse_hex_color 6-char" {
@@ -59,8 +55,6 @@ test "parse_hex_color short string" {
   assert_eq(c.g, 0)
   assert_eq(c.b, 0)
 }
-
-// ── Color::to_hex / to_hex_rgb / to_css ─────────────────────────────────────
 
 ///|
 test "Color::to_hex roundtrip" {
@@ -100,16 +94,12 @@ test "Color::to_css none" {
   assert_eq(@ooxml.Color::none().to_css(), "none")
 }
 
-// ── alpha_to_css_str ────────────────────────────────────────────────────────
-
 ///|
 test "alpha_to_css_str" {
   assert_eq(@ooxml.alpha_to_css_str(255), "1")
   assert_eq(@ooxml.alpha_to_css_str(0), "0")
   assert_eq(@ooxml.alpha_to_css_str(128), "0.50")
 }
-
-// ── resolve_scheme_color ────────────────────────────────────────────────────
 
 ///|
 test "resolve_scheme_color basic" {
@@ -164,8 +154,6 @@ test "apply_color_map preserves physical slot identity" {
   let tx1 = @ooxml.resolve_scheme_color("tx1", remapped)
   assert_eq(tx1.r, 238)
 }
-
-// ── apply_color_modifiers ───────────────────────────────────────────────────
 
 ///|
 test "apply_color_modifiers empty" {
@@ -225,8 +213,6 @@ test "apply_color_modifiers hueOff is in correct degrees" {
   assert_true(result.b < 10)
 }
 
-// ── parse_geom / to_prst ────────────────────────────────────────────────────
-
 ///|
 test "parse_geom basic shapes" {
   assert_eq(@ooxml.parse_geom("rect", []).to_prst(), "rect")
@@ -267,8 +253,6 @@ test "parse_connector_geom" {
   )
 }
 
-// ── parse_rels ──────────────────────────────────────────────────────────────
-
 ///|
 test "parse_rels basic" {
   let xml = "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout\" Target=\"../slideLayouts/slideLayout1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"../media/image1.png\"/></Relationships>"
@@ -281,8 +265,6 @@ test "parse_rels basic" {
   assert_eq(@ooxml.find_rel_target(rels, "rId2"), "../media/image1.png")
   assert_eq(@ooxml.find_rel_target(rels, "rId99"), "")
 }
-
-// ── parse_slide_size ────────────────────────────────────────────────────────
 
 ///|
 test "parse_slide_size standard" {
@@ -298,8 +280,6 @@ test "parse_slide_size widescreen" {
   let size = @ooxml.parse_slide_size(xml)
   assert_eq(size.cx, 12192000)
 }
-
-// ── EffectList / Shadow / Glow ──────────────────────────────────────────────
 
 ///|
 test "EffectList::none" {
@@ -910,8 +890,6 @@ test "EffectList with fill_overlay is not none" {
   assert_eq(e.fill_overlay.blend, "screen")
 }
 
-// ── GradientFill / BlipFill / PatternFill ───────────────────────────────────
-
 ///|
 test "GradientFill::none" {
   assert_true(@ooxml.GradientFill::none().is_none())
@@ -928,8 +906,6 @@ test "PatternFill::none" {
   assert_true(@ooxml.PatternFill::none().is_none())
 }
 
-// ── Shape3d / Scene3d / Bevel ───────────────────────────────────────────────
-
 ///|
 test "Shape3d::none" {
   assert_true(@ooxml.Shape3d::none().is_none())
@@ -944,8 +920,6 @@ test "Scene3d::none" {
 test "Bevel::none" {
   assert_true(@ooxml.Bevel::none().is_none())
 }
-
-// ── ChartEx parsing ─────────────────────────────────────────────────────────
 
 ///|
 test "parse_chartex_xml waterfall" {
@@ -1235,8 +1209,6 @@ test "parse_chartex_xml histogram no strDim" {
     },
   )
 }
-
-// ── SmartArt diagram (dsp:) cached-drawing parsing ──────────────────────────
 
 ///|
 /// A SmartArt cached drawing (ppt/drawings/drawingN.xml) uses the `dsp:`

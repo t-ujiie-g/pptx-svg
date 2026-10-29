@@ -1,6 +1,3 @@
-/**
- * Utility functions for pptx-svg.
- */
 
 /** Encode a Uint8Array as a base64 string. */
 export function bytesToBase64(bytes: Uint8Array | undefined): string {

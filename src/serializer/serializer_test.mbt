@@ -1,8 +1,6 @@
 ///|
 using @test {assert_eq}
 
-// ── serialize_slide minimal ──────────────────────────────────────────────────
-
 ///|
 test "serialize_slide empty slide" {
   let slide : @ooxml.SlideData = {
@@ -462,7 +460,6 @@ test "serialize_slide no effectLst when none" {
   assert_true(!xml.contains("<a:effectLst>"))
 }
 
-// ── restore round-trip idempotency (Undo/Redo) ───────────────────────────────
 // The Undo/Redo history captures a slide's OOXML via get_slide_ooxml and restores
 // it through restore_slide_ooxml (parse_slide → g_slides). This must be stable:
 // serialize → parse_slide → serialize should be a fixed point, so no data is lost
@@ -571,8 +568,6 @@ test "serialize round-trips underline style and uFill color" {
   assert_eq(out, @serializer.serialize_slide(slide2))
 }
 
-// ── parse_shapes_xml round-trip (copy/paste) ─────────────────────────────────
-
 ///|
 test "parse_shapes_xml round-trips a serialized shape" {
   let shape : @ooxml.Shape = {
@@ -604,8 +599,6 @@ test "parse_shapes_xml round-trips a serialized shape" {
   }
   assert_true(is_rect)
 }
-
-// ── Table editing ────────────────────────────────────────────────────────────
 
 ///|
 test "TableCell::empty has parser defaults" {

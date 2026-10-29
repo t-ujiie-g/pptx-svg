@@ -12,7 +12,6 @@ test("tables (slides 41-42)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 41: Table cell merge + borders + margins + anchor ──
   {
     console.log('\n── test_features.pptx — Slide 41: table cell merge/borders/margins/anchor ──');
     const slide41 = textFiles.get('ppt/slides/slide41.xml');
@@ -34,7 +33,6 @@ test("tables (slides 41-42)", async () => {
     assert('slide41 has green border 00AA00', slide41.includes('00AA00'));
   }
 
-  // ── Slide 42: Diagonal borders + tblPr flags + tblStyleId ──
   {
     console.log('\n── test_features.pptx — Slide 42: diagonal borders + tblPr flags ──');
     const slide42 = textFiles.get('ppt/slides/slide42.xml');

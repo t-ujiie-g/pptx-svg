@@ -1,8 +1,6 @@
 ///|
 using @test {assert_eq}
 
-// ── render_slide_svg basic ───────────────────────────────────────────────────
-
 ///|
 fn make_empty_slide() -> @ooxml.SlideData {
   {
@@ -242,8 +240,6 @@ test "render_group with small chExt renders children" {
   assert_true(!svg.contains("width=\"0\""))
   assert_true(!svg.contains("height=\"0\""))
 }
-
-// ── Round-trip: render → parse → compare ────────────────────────────────────
 
 ///|
 test "roundtrip empty slide" {
@@ -1150,8 +1146,6 @@ test "shape flipH/flipV mirrors shape rect and text (issue #55)" {
   assert_true(fhr_svg.contains("scale(-1,1)"))
 }
 
-// ── ChartEx rendering tests ──────────────────────────────────────────────────
-
 ///|
 fn make_chart_shape(chart : @ooxml.ChartData) -> @ooxml.Shape {
   @ooxml.Shape::default_with(@ooxml.ShapeKind::ChartShape(chart), {
@@ -1442,8 +1436,6 @@ test "roundtrip multiple shapes" {
   assert_eq(parsed.shapes[1].transform.x, 300000)
 }
 
-// ── sanitize_url (security: H1/H3) ──────────────────────────────────────────
-
 ///|
 test "sanitize_url accepts safe schemes" {
   assert_eq(
@@ -1504,8 +1496,6 @@ test "sanitize_url strips leading whitespace and control bytes" {
   assert_eq(@renderer.sanitize_url(" javascript:alert(1)"), "")
   assert_eq(@renderer.sanitize_url(""), "")
 }
-
-// ── End-to-end attribute escape (security: H2) ──────────────────────────────
 
 ///|
 /// Helper: find first occurrence of `pat` in `s`, or -1 if not found.
@@ -1665,8 +1655,6 @@ test "rendered SVG drops javascript: hyperlink target" {
   assert_eq(find_substring(svg, "javascript:"), -1)
   assert_eq(find_substring(svg, "<a href="), -1)
 }
-
-// ── Geometry-specific regression tests ──────────────────────────────────────
 
 ///|
 /// roundRect must use OOXML default adj 16667 and apply it to min(w,h) — not w/20.
@@ -1909,8 +1897,6 @@ test "leftRightArrowCallout renders as preset path" {
   }
   assert_true(count > 4)
 }
-
-// ── Bullet color inheritance (OOXML) ────────────────────────────────────────
 
 ///|
 /// When a paragraph has no <a:buClr>, the bullet must inherit the first run's
@@ -2247,7 +2233,6 @@ test "render_slide_svg empty custGeom hides the shape (no fallback rect)" {
   assert_eq(find_substring(svg, "<path "), -1)
 }
 
-// ── build_text_layout geometry ───────────────────────────────────────────────
 // The renderer-package FFI stub returns measure_text = 0.0, so per-char widths
 // collapse to 0; these tests assert the structural geometry (line/run/char counts
 // and char offsets), which is independent of measurement. Real x/w geometry is
@@ -2451,8 +2436,6 @@ test "hit_test_layout on empty layout returns origin" {
   assert_eq(c, 0)
   assert_eq(po, 0)
 }
-
-// ── Text decoration fidelity (underline color round-trip) ────────────────────
 
 ///|
 /// An underline renders the decoration line; its style/color survive a

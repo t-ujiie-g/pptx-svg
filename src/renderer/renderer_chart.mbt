@@ -17,8 +17,6 @@
 //
 // Same package as renderer.mbt — all constants and helpers are shared.
 
-// ── Chart layout constants ──────────────────────────────────────────────────
-
 ///|
 let chart_title_h : Int32 = 24 // title area height in px
 
@@ -85,8 +83,6 @@ let chart_pie_start_angle : Int32 = -9000 // -90° in hundredths (start from top
 ///|
 let chart_label_offset_y : Int32 = 12 // vertical offset for bottom axis labels
 
-// ── Chart style constants ─────────────────────────────────────────────────
-
 ///|
 let chart_bg_color : String = "white"
 
@@ -115,8 +111,6 @@ let chart_colors_fallback : Array[String] = [
 
 ///|
 let chart_data_label_font_size : Int32 = 9
-
-// ── Theme color palette ──────────────────────────────────────────────────────
 
 ///|
 /// Build chart color palette from theme accent colors (accent1..accent6 + darker variants).
@@ -157,8 +151,6 @@ fn build_chart_colors(theme : @ooxml.ThemeData) -> Array[String] {
   }
   colors
 }
-
-// ── Main chart renderer ─────────────────────────────────────────────────────
 
 ///|
 /// Detect if a chart needs no axes (pie, donut, treemap, sunburst, funnel).
@@ -318,8 +310,6 @@ fn render_chart(
   svg + "</g>"
 }
 
-// ── Chart group rendering ───────────────────────────────────────────────────
-
 ///|
 fn render_chart_group(
   group : @ooxml.ChartGroup,
@@ -367,8 +357,6 @@ fn render_chart_group(
       render_funnel_chart(group, px_, py, pw, ph, colors)
   }
 }
-
-// ── Bar / Column chart ──────────────────────────────────────────────────────
 
 ///|
 fn render_bar_chart(
@@ -536,8 +524,6 @@ fn render_bar_chart(
   svg
 }
 
-// ── Line chart ──────────────────────────────────────────────────────────────
-
 ///|
 fn render_line_chart(
   group : @ooxml.ChartGroup,
@@ -618,8 +604,6 @@ fn render_line_chart(
   svg = svg + render_err_bars(group, px_, py, pw, ph, max_val, nc, colors)
   svg
 }
-
-// ── Radar chart ─────────────────────────────────────────────────────────────
 
 ///|
 /// Render a radar (spider) chart: N axes radiating from the center, one per
@@ -774,8 +758,6 @@ fn render_radar_chart(
   }
   svg
 }
-
-// ── Pie chart ───────────────────────────────────────────────────────────────
 
 ///|
 fn render_pie_chart(
@@ -967,8 +949,6 @@ fn render_pie_slices(
   svg
 }
 
-// ── Scatter chart ───────────────────────────────────────────────────────────
-
 ///|
 fn render_scatter_chart(
   group : @ooxml.ChartGroup,
@@ -1006,8 +986,6 @@ fn render_scatter_chart(
   }
   svg
 }
-
-// ── Area chart ──────────────────────────────────────────────────────────────
 
 ///|
 fn render_area_chart(
@@ -1071,8 +1049,6 @@ fn render_area_chart(
   svg
 }
 
-// ── Bubble chart ─────────────────────────────────────────────────────────
-
 ///|
 fn render_bubble_chart(
   group : @ooxml.ChartGroup,
@@ -1121,8 +1097,6 @@ fn render_bubble_chart(
   }
   svg
 }
-
-// ── Stock chart ──────────────────────────────────────────────────────────
 
 ///|
 /// Render stock chart (high-low-close).
@@ -1224,8 +1198,6 @@ fn render_stock_chart(
   svg
 }
 
-// ── Surface chart (2D heatmap approximation) ────────────────────────────────
-
 ///|
 /// Render surface chart as a 2D heatmap grid.
 /// Each series represents one row; data points are columns.
@@ -1304,8 +1276,6 @@ fn render_surface_chart(
   }
   svg
 }
-
-// ── Axes rendering ──────────────────────────────────────────────────────────
 
 ///|
 fn render_axes(
@@ -1510,8 +1480,6 @@ fn render_axes(
   svg
 }
 
-// ── Legend rendering ─────────────────────────────────────────────────────────
-
 ///|
 fn render_legend(
   groups : Array[@ooxml.ChartGroup],
@@ -1582,8 +1550,6 @@ fn render_legend_entry(
   svg_escape(label) +
   "</text>"
 }
-
-// ── Helper functions ────────────────────────────────────────────────────────
 
 ///|
 /// Get series color — from spPr fill or stroke (line charts) if set, otherwise from theme palette.
@@ -2189,8 +2155,6 @@ fn format_chart_val(val : Int32, num_fmt : String) -> String {
   }
 }
 
-// ── Data label rendering ─────────────────────────────────────────────────────
-
 ///|
 /// Build data label text for a single data point.
 fn build_label_text(
@@ -2516,8 +2480,6 @@ fn render_pie_data_labels(
   svg
 }
 
-// ── Trendline rendering ─────────────────────────────────────────────────────
-
 ///|
 /// Render trendlines for a chart group (category-based: bar/line/area).
 /// Currently supports linear trendlines (least-squares fit).
@@ -2622,8 +2584,6 @@ fn render_trendlines(
   svg
 }
 
-// ── Error bar rendering ──────────────────────────────────────────────────────
-
 ///|
 /// Render error bars for a chart group (category-based: bar/line).
 fn render_err_bars(
@@ -2722,8 +2682,6 @@ fn render_err_bars(
   svg
 }
 
-// ── Trigonometry (integer, hundredths of degrees) ───────────────────────────
-
 // cos(0°..90°) × 1000, lookup table for accurate integer trig
 
 ///|
@@ -2762,8 +2720,6 @@ fn cos1000(angle_hundredths : Int32) -> Int32 {
 fn sin1000(angle_hundredths : Int32) -> Int32 {
   cos1000(angle_hundredths - 9000) // sin(x) = cos(x - 90°)
 }
-
-// ── ChartEx (cx: namespace) renderers ───────────────────────────────────────
 
 ///|
 /// Check if an index is in the subtotals array.

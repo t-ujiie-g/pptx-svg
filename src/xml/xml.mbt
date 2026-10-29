@@ -8,8 +8,6 @@
 //
 // Char→String conversion uses ffi_char_code_to_str (→ String.fromCharCode).
 
-// ── Data types ────────────────────────────────────────────────────────────────
-
 ///|
 pub struct XmlAttr {
   name : String
@@ -21,8 +19,6 @@ pub enum XmlNode {
   Element(String, Array[XmlAttr], Array[XmlNode])
   Text(String)
 }
-
-// ── Char → String without fromCharCodeArray ───────────────────────────────────
 
 ///|
 fn char_to_str(c : Char) -> String {
@@ -45,8 +41,6 @@ pub fn char_step(c : Char) -> Int32 {
     1
   }
 }
-
-// ── Parser state ──────────────────────────────────────────────────────────────
 
 ///|
 priv struct Parser {
@@ -112,8 +106,6 @@ fn Parser::skip_whitespace(self : Parser) -> Unit {
   }
 }
 
-// ── String helpers (no StringBuilder) ────────────────────────────────────────
-//
 // `StringBuilder::to_string()` is forbidden (calls `wasm:js-string
 // "fromCharCodeArray"` which is unpolyfillable in Tier-2/3 browsers).
 // Naive `result = result + char` in a loop is O(N²). We instead push
@@ -185,8 +177,6 @@ fn Parser::read_until_str(self : Parser, stop : String) -> String {
   concat_balanced(parts)
 }
 
-// ── Entity decoding ───────────────────────────────────────────────────────────
-
 ///|
 fn decode_entities(s : String) -> String {
   let len = s.length()
@@ -253,8 +243,6 @@ fn decode_entities(s : String) -> String {
   }
   concat_balanced(parts)
 }
-
-// ── Name and attribute parsing ────────────────────────────────────────────────
 
 ///|
 fn Parser::parse_name(self : Parser) -> String {
@@ -323,10 +311,6 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
   }
   attrs
 }
-
-// ── Text helpers ──────────────────────────────────────────────────────────────
-
-// ── Core parsing ──────────────────────────────────────────────────────────────
 
 ///|
 /// Maximum element nesting depth. Guards against malicious OOXML with
@@ -503,8 +487,6 @@ fn skip_to_close(p : Parser) -> Unit {
     }
   }
 }
-
-// ── Public API ────────────────────────────────────────────────────────────────
 
 ///|
 /// Parse an XML string into a list of top-level XmlNode values.
@@ -718,8 +700,6 @@ pub fn int_to_str(n : Int32) -> String {
     int_to_str(n / 10) + digit_str(n % 10)
   }
 }
-
-// ── String helpers ──────────────────────────────────────────────────────────
 
 ///|
 /// Extract a substring from index `from` to the end.

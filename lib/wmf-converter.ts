@@ -10,8 +10,6 @@
  * Falls back gracefully — returns empty string if parsing fails.
  */
 
-// ── WMF Record Types (from MS-WMF specification) ────────────────────────────
-
 const META_EOF                  = 0x0000;
 const META_SETBKCOLOR           = 0x0201;
 const META_SETBKMODE            = 0x0102;
@@ -46,8 +44,6 @@ const META_ESCAPE               = 0x0626;
 
 // Placeable WMF magic
 const PLACEABLE_KEY = 0x9AC6CDD7;
-
-// ── GDI State (reused types from emf-converter) ─────────────────────────────
 
 interface WmfPen {
   style: number;  // 0=solid, 1=dash, 5=null
@@ -107,8 +103,6 @@ function cloneState(s: WmfState): WmfState {
   };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 /** Read a WMF COLORREF (4 bytes: R, G, B, reserved) */
 function colorFromRGB(dv: DataView, offset: number): string {
   const r = dv.getUint8(offset);
@@ -125,8 +119,6 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-
-// ── Main converter ──────────────────────────────────────────────────────────
 
 /**
  * Convert WMF binary data to an SVG string.
@@ -146,7 +138,6 @@ function parseWmf(data: Uint8Array): string {
 
   let offset = 0;
 
-  // ── Detect Placeable WMF ──
   let bboxL = 0, bboxT = 0, bboxR = 0, bboxB = 0;
   let unitsPerInch = 96;
   let isPlaceable = false;
@@ -165,7 +156,6 @@ function parseWmf(data: Uint8Array): string {
     offset = 22;
   }
 
-  // ── Standard WMF header (METAHEADER, 18 bytes) ──
   if (offset + 18 > data.length) return '';
   const mtType = dv.getUint16(offset, true);          // 1=memory, 2=disk
   const mtHeaderSize = dv.getUint16(offset + 2, true); // Size in words (should be 9)
@@ -177,7 +167,6 @@ function parseWmf(data: Uint8Array): string {
   const headerBytes = mtHeaderSize * 2;
   offset += headerBytes;
 
-  // ── GDI state ──
   const objects = new Map<number, WmfObject>();
   // Object table: next available slot
   let nextObjIdx = 0;
@@ -204,7 +193,6 @@ function parseWmf(data: Uint8Array): string {
 
   const svgParts: string[] = [];
 
-  // ── Record loop ──
   while (offset + 6 <= data.length) {
     const recSizeWords = dv.getUint32(offset, true);
     const recFunc = dv.getUint16(offset + 4, true);

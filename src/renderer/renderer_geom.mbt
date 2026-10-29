@@ -5,8 +5,6 @@
 //
 // Same package as renderer.mbt — all constants and helpers are shared.
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 ///|
 /// OOXML angles are in 60000ths of a degree.
 let ooxml_angle_to_rad : Double = 3.14159265358979323846 / 10800000.0
@@ -14,8 +12,6 @@ let ooxml_angle_to_rad : Double = 3.14159265358979323846 / 10800000.0
 ///|
 /// 180° in OOXML angle units.
 let half_circle_angle : Double = 10800000.0
-
-// ── Guide variable storage ───────────────────────────────────────────────────
 
 ///|
 /// Simple variable store using parallel arrays. Linear lookup is fine
@@ -136,8 +132,6 @@ fn GuideEnv::init_builtins(self : GuideEnv, w : Double, h : Double) -> Unit {
   self.set("7cd8", 18900000.0) // 315°
 }
 
-// ── Formula evaluator ────────────────────────────────────────────────────────
-
 ///|
 /// Parse a double from a string. Simple integer parsing since guide values are integers.
 fn parse_double(s : String) -> Double {
@@ -165,8 +159,6 @@ fn parse_double(s : String) -> Double {
     result
   }
 }
-
-// ── Typed guide representation ───────────────────────────────────────────────
 
 ///|
 /// A formula operand: an integer literal or a guide name.
@@ -340,8 +332,6 @@ fn eval_guides(env : GuideEnv, guides : Array[Guide]) -> Unit {
     env.set(g.name, g.fmla.eval(env))
   }
 }
-
-// ── Path rendering ───────────────────────────────────────────────────────────
 
 ///|
 /// A path command (ECMA-376 §20.1.9.16). Coordinates are in the path's own
@@ -599,8 +589,6 @@ fn ellipse_point(wr : Double, hr : Double, ang : Double) -> (Double, Double) {
   }
 }
 
-// ── Multiple path support ────────────────────────────────────────────────────
-
 ///|
 /// Shade overlays for PathFill modes: (colour, opacity) drawn over the fill.
 fn shade_overlay(mode : PathFill) -> (String, String)? {
@@ -697,8 +685,6 @@ fn render_styled_paths(
   filled + lines
 }
 
-// ── Parsed preset cache ──────────────────────────────────────────────────────
-
 ///|
 /// A preset definition with its guide list and paths parsed once.
 priv struct ParsedGeom {
@@ -741,8 +727,6 @@ fn preset_geom(prst : String) -> ParsedGeom? {
   preset_geom_cache[prst] = parsed
   parsed
 }
-
-// ── Main entry point ─────────────────────────────────────────────────────────
 
 ///|
 /// Evaluate a preset geometry and return the SVG element string.

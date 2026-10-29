@@ -64,8 +64,6 @@ test('EMF converter', async () => {
   finishAssertions();
 });
 
-// ── Fixture builders ─────────────────────────────────────────────────────────
-
 function buildTestEmfWithPath() {
   // Records: Header(108) + CreateBrushIndirect(16) + SelectObject(12) +
   //   BeginPath(8) + MoveToEx(16) + PolyLineTo16(28+8=36 -> 3pts=40) +

@@ -1,8 +1,6 @@
 ///|
 using @test {assert_eq}
 
-// ── int_to_str ──────────────────────────────────────────────────────────────
-
 ///|
 test "int_to_str zero" {
   assert_eq(@xml.int_to_str(0), "0")
@@ -22,8 +20,6 @@ test "int_to_str negative" {
   assert_eq(@xml.int_to_str(-999), "-999")
 }
 
-// ── parse_int ───────────────────────────────────────────────────────────────
-
 ///|
 test "parse_int basic" {
   assert_eq(@xml.parse_int("0"), 0)
@@ -36,8 +32,6 @@ test "parse_int basic" {
 test "parse_int stops at non-digit" {
   assert_eq(@xml.parse_int("100pt"), 100)
 }
-
-// ── parse_hex_int ───────────────────────────────────────────────────────────
 
 ///|
 test "parse_hex_int basic" {
@@ -54,8 +48,6 @@ test "parse_hex_int 6-digit color" {
   assert_eq(@xml.parse_hex_int("FFFFFF"), 0xFFFFFF)
   assert_eq(@xml.parse_hex_int("000000"), 0)
 }
-
-// ── str_starts_with / str_ends_with ─────────────────────────────────────────
 
 ///|
 test "str_starts_with" {
@@ -106,8 +98,6 @@ test "str_replace_all phClr use case" {
   )
 }
 
-// ── is_astral / char_step ───────────────────────────────────────────────────
-
 ///|
 test "is_astral" {
   assert_false(@xml.is_astral('A'))
@@ -119,8 +109,6 @@ test "char_step BMP" {
   assert_eq(@xml.char_step('A'), 1)
   assert_eq(@xml.char_step(' '), 1)
 }
-
-// ── parse_xml (requires FFI stub via JS target) ─────────────────────────────
 
 ///|
 test "parse_xml empty" {
@@ -176,8 +164,6 @@ test "parse_xml mixed content" {
   }
 }
 
-// ── get_children / get_tag / get_attr on Text nodes ─────────────────────────
-
 ///|
 test "accessors on Text node" {
   // Text nodes are created by parse_xml, not constructed directly
@@ -188,8 +174,6 @@ test "accessors on Text node" {
   assert_eq(@xml.get_children(text_node).length(), 0)
   assert_true(@xml.get_attr(text_node, "x") is None)
 }
-
-// ── find_child / find_children ──────────────────────────────────────────────
 
 ///|
 test "find_child" {
@@ -210,8 +194,6 @@ test "find_children" {
   assert_eq(items.length(), 2)
 }
 
-// ── find_path ───────────────────────────────────────────────────────────────
-
 ///|
 test "find_path" {
   let nodes = @xml.parse_xml("<a><b><c val=\"found\"/></b></a>")
@@ -222,8 +204,6 @@ test "find_path" {
   assert_true(@xml.find_path(nodes, ["a", "missing"]) is None)
   assert_true(@xml.find_path(nodes, []) is None)
 }
-
-// ── str_suffix / str_substring ──────────────────────────────────────────────
 
 ///|
 test "str_suffix" {
@@ -238,8 +218,6 @@ test "str_substring" {
   assert_eq(@xml.str_substring("hello world", 6, 11), "world")
   assert_eq(@xml.str_substring("abc", 1, 2), "b")
 }
-
-// ── xml_escape / xml_unescape ───────────────────────────────────────────────
 
 ///|
 test "xml_escape" {
@@ -264,8 +242,6 @@ test "xml_escape_unescape roundtrip" {
   assert_eq(@xml.xml_unescape(@xml.xml_escape(original)), original)
 }
 
-// ── split_by_space ──────────────────────────────────────────────────────────
-
 ///|
 test "split_by_space" {
   let tokens = @xml.split_by_space("hello world")
@@ -285,8 +261,6 @@ test "split_by_space single" {
 test "split_by_space empty" {
   assert_eq(@xml.split_by_space("").length(), 0)
 }
-
-// ── serialize_node ──────────────────────────────────────────────────────────
 
 ///|
 test "serialize_node self-closing" {
@@ -315,8 +289,6 @@ test "serialize_node roundtrip" {
   assert_eq(@xml.serialize_node(nodes[0]), xml)
 }
 
-// ── parse_xml OOXML fragment ────────────────────────────────────────────────
-
 ///|
 test "parse_xml OOXML slide size" {
   let xml = "<p:sldSz cx=\"9144000\" cy=\"6858000\" type=\"screen4x3\"/>"
@@ -334,8 +306,6 @@ test "parse_xml OOXML text body" {
     None => assert_true(false)
   }
 }
-
-// ── concat_balanced (security: M5 — O(N²) → O(N log N)) ─────────────────────
 
 ///|
 test "concat_balanced empty" {
@@ -381,8 +351,6 @@ test "concat_balanced large input matches naive" {
   assert_eq(@xml.str_substring(result, 0, 5), "xxxxx")
   assert_eq(@xml.str_substring(result, 9995, 10000), "xxxxx")
 }
-
-// ── parse_xml depth limit (security: M4) ────────────────────────────────────
 
 ///|
 test "parse_xml shallow nesting works" {

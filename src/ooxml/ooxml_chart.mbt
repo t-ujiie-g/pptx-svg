@@ -9,15 +9,11 @@
 //
 // Same package as ooxml.mbt — all types and helpers are shared.
 
-// ── Chart defaults (ECMA-376) ───────────────────────────────────────────────
-
 ///|
 let default_bar_gap_width : Int32 = 150 // ECMA-376 default gap width percentage
 
 ///|
 let default_donut_hole_size : Int32 = 50 // ECMA-376 default donut hole size percentage
-
-// ── Chart data labels ─────────────────────────────────────────────────────
 
 ///|
 /// Data label configuration (c:dLbls).
@@ -54,8 +50,6 @@ pub(all) struct ChartDataPoint {
   sp_pr : ChartSpPr // point-level formatting
 }
 
-// ── Trendline ───────────────────────────────────────────────────────────────
-
 ///|
 /// Trendline type (c:trendlineType).
 pub(all) struct ChartTrendline {
@@ -80,8 +74,6 @@ pub fn ChartTrendline::none() -> ChartTrendline {
     name: "",
   }
 }
-
-// ── Error bars ──────────────────────────────────────────────────────────────
 
 ///|
 /// Error bar configuration (c:errBars).
@@ -109,8 +101,6 @@ pub fn ChartErrBars::is_none(self : ChartErrBars) -> Bool {
   self.err_val_type.is_empty()
 }
 
-// ── 3D view ─────────────────────────────────────────────────────────────────
-
 ///|
 /// 3D view settings (c:view3D) — preserved for round-trip, not rendered.
 pub(all) struct ChartView3D {
@@ -125,8 +115,6 @@ pub(all) struct ChartView3D {
 pub fn ChartView3D::none() -> ChartView3D {
   { rot_x: 15, rot_y: 20, depth_percent: 100, r_ang_ax: true, perspective: 30, }
 }
-
-// ── Chart data types ────────────────────────────────────────────────────────
 
 ///|
 /// Chart type — determines rendering strategy.
@@ -360,8 +348,6 @@ pub fn ChartData::empty() -> ChartData {
     view_3d: ChartView3D::none(),
   }
 }
-
-// ── Chart XML parser ────────────────────────────────────────────────────────
 
 ///|
 /// Parse chart XML (c:chartSpace) into ChartData.
@@ -713,8 +699,6 @@ fn parse_ax_ids(ch : Array[@xml.XmlNode]) -> Array[Int32] {
   ids
 }
 
-// ── Data labels parsing ──────────────────────────────────────────────────────
-
 ///|
 /// Parse c:dLbls element.
 fn parse_chart_data_labels(ch : Array[@xml.XmlNode]) -> ChartDataLabels {
@@ -744,8 +728,6 @@ fn parse_chart_data_labels(ch : Array[@xml.XmlNode]) -> ChartDataLabels {
   }
 }
 
-// ── Data point parsing ──────────────────────────────────────────────────────
-
 ///|
 /// Parse c:dPt elements from series children.
 fn parse_data_points(
@@ -762,8 +744,6 @@ fn parse_data_points(
   }
   pts
 }
-
-// ── Trendline parsing ────────────────────────────────────────────────────────
 
 ///|
 /// Parse c:trendline elements from series children.
@@ -809,8 +789,6 @@ fn parse_trendlines(
   result
 }
 
-// ── Error bar parsing ────────────────────────────────────────────────────────
-
 ///|
 /// Parse c:errBars element from series children.
 fn parse_err_bars(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartErrBars {
@@ -840,8 +818,6 @@ fn parse_err_bars(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartErrBars {
     }
   }
 }
-
-// ── Series parsing ──────────────────────────────────────────────────────────
 
 ///|
 /// Parse all c:ser elements (category-based charts).
@@ -1039,8 +1015,6 @@ fn parse_pt_list(ch : Array[@xml.XmlNode]) -> Array[ChartPoint] {
   pts
 }
 
-// ── Chart shape properties ──────────────────────────────────────────────────
-
 ///|
 /// Parse c:spPr from series/chart element children.
 fn parse_chart_sp_pr(ch : Array[@xml.XmlNode], theme : ThemeData) -> ChartSpPr {
@@ -1071,8 +1045,6 @@ fn parse_chart_sp_pr_node(sppr : @xml.XmlNode, theme : ThemeData) -> ChartSpPr {
   }
   { fill, grad_fill, patt_fill, stroke, stroke_w, no_fill, }
 }
-
-// ── Axis parsing ────────────────────────────────────────────────────────────
 
 ///|
 fn parse_chart_axis(
@@ -1165,8 +1137,6 @@ fn parse_chart_axis(
   }
 }
 
-// ── Legend parsing ───────────────────────────────────────────────────────────
-
 ///|
 fn parse_chart_legend(ch : Array[@xml.XmlNode]) -> ChartLegend {
   let pos = child_attr_val(ch, "c:legendPos")
@@ -1206,8 +1176,6 @@ fn parse_view_3d(ch : Array[@xml.XmlNode]) -> ChartView3D {
     },
   }
 }
-
-// ── ChartEx (cx: namespace) parsing ─────────────────────────────────────────
 
 ///|
 /// Parse cx:chartSpace XML (Office 2016+ charts: waterfall, treemap, etc.)

@@ -1029,7 +1029,6 @@ console.log('Test 36: Edit immediately after loadPptx (no prior render)');
   console.log('  OK: edit without pre-render persists to OOXML and export');
 }
 
-// ── Undo / Redo (E6.1) ───────────────────────────────────────────────────────
 // Shared helper: a freshly loaded renderer on minimal.pptx.
 async function freshRenderer(opts = { logLevel: 'silent' }) {
   const renderer = new PptxRenderer(opts);
@@ -1175,7 +1174,6 @@ console.log('Test 43: maxHistory cap + export after undo');
   console.log('  OK: maxHistory cap and export-after-undo');
 }
 
-// ── Inline text editing (E6.2) ───────────────────────────────────────────────
 // Build a shape with two runs: "Hello " (normal) + "World" (bold), in one paragraph.
 async function shapeWithTwoRuns() {
   const r = await freshRenderer();
@@ -1291,7 +1289,6 @@ console.log('Test 49: replaceTextRange undo');
   console.log('  OK: replaceTextRange undo');
 }
 
-// ── Z-order (E6.3) ───────────────────────────────────────────────────────────
 // Serialized shape order == z-order (later = front). Find each shape by its fill
 // color's position in the slide OOXML.
 function fillPos(ooxml, hex) {
@@ -1365,7 +1362,6 @@ console.log('Test 53: z-order undo');
   console.log('  OK: z-order undo');
 }
 
-// ── Multi-shape transform (E6.4) ─────────────────────────────────────────────
 function shapeX(r, idx) {
   const m = r.renderShapeSvg(0, idx).match(/data-ooxml-x="(-?\d+)"/);
   return m ? parseInt(m[1]) : NaN;
@@ -1402,7 +1398,6 @@ console.log('Test 54: updateShapesTransform (atomic + undo)');
   console.log('  OK: updateShapesTransform atomic batch + single undo');
 }
 
-// ── Copy / paste — cross-slide (E6.5) ────────────────────────────────────────
 const MINI_PNG = new Uint8Array([
   0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
   0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
@@ -1492,7 +1487,6 @@ console.log('Test 58: copy/paste boundary errors');
   console.log('  OK: boundary errors');
 }
 
-// ── Table editing (E6.6) ─────────────────────────────────────────────────────
 // test_features.pptx slide 41 (0-indexed) has a plain 3×3 table at shape index 0.
 const FEATURES_PATH = join(__dirname, 'test_features.pptx');
 const TABLE_SLIDE = 41, TABLE_SHAPE = 0;
@@ -1577,7 +1571,6 @@ if (!existsSync(FEATURES_PATH)) {
   }
 }
 
-// ── Header/footer field placeholders (date / footer / slide number) ──────────
 // test_features.pptx slide 97 (index 96) carries dt/ftr/sldNum placeholders with
 // <a:fld> fields and a STALE cached slide number ("1"), mirroring sample.pptx s20.
 {

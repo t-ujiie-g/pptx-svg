@@ -5,8 +5,6 @@
 //
 // Same package as renderer.mbt — all constants and helpers are shared.
 
-// ── Default adjustment values ────────────────────────────────────────────────
-
 ///|
 /// Return default adjustment value for a warp preset (OOXML 60000th-degree for
 /// angles, 0-100000 for percentages).  idx=1 for av1, idx=2 for av2.
@@ -96,8 +94,6 @@ fn warp_default_av(prst : String, idx : Int32) -> Int32 {
   0
 }
 
-// ── Text flattening ──────────────────────────────────────────────────────────
-
 ///|
 /// Flatten all paragraph/run text into a single string for warp rendering.
 /// Returns (text, font_size_px, font_family, fill_color, bold, italic).
@@ -159,8 +155,6 @@ fn flatten_warp_text(
   (text, fs, ff, first_color, first_bold, first_italic)
 }
 
-// ── Warp category ────────────────────────────────────────────────────────────
-
 ///|
 /// Returns true if the warp preset needs SVG <textPath> (curved path).
 /// Returns false for transform-only warps (slant, fade, cascade).
@@ -180,8 +174,6 @@ fn is_path_warp(prst : String) -> Bool {
   true
 }
 
-// ── SVG path generation ──────────────────────────────────────────────────────
-
 ///|
 /// Generate SVG path d-string for a warp preset.
 /// w, h are shape dimensions in pixels (as Double).
@@ -195,7 +187,6 @@ fn generate_warp_path(
 ) -> String {
   let cx = w / 2.0
   let cy = h / 2.0
-  // ── Arch warps ──
   if prst == "textArchUp" {
     // Semicircular arc, text follows top half
     let rx = cx
@@ -270,7 +261,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Circle ──
   if prst == "textCircle" || prst == "textCirclePour" {
     let rx = cx
     let ry = cy
@@ -296,7 +286,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Ring warps ──
   if prst == "textRingInside" {
     let rx = cx
     let ry = cy
@@ -329,7 +318,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Button warps ──
   if prst == "textButton" || prst == "textButtonPour" {
     // Button = arch across top
     let rx = cx
@@ -347,7 +335,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Wave warps ──
   if prst == "textWave1" {
     let amp = h * av1 / 100000.0
     return "M 0," +
@@ -442,7 +429,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Curve warps ──
   if prst == "textCurveUp" {
     let adj = h * av1 / 100000.0
     return "M 0," +
@@ -469,7 +455,6 @@ fn generate_warp_path(
       "," +
       dts(cy - adj)
   }
-  // ── Can warps ──
   if prst == "textCanUp" {
     let adj = h * av1 / 100000.0
     return "M 0," +
@@ -496,7 +481,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Chevron warps ──
   if prst == "textChevron" {
     let adj_y = h * av1 / 100000.0
     return "M 0," +
@@ -521,7 +505,6 @@ fn generate_warp_path(
       "," +
       dts(h - adj_y)
   }
-  // ── Triangle warps ──
   if prst == "textTriangle" {
     let adj_y = h * av1 / 100000.0
     return "M 0," +
@@ -546,7 +529,6 @@ fn generate_warp_path(
       "," +
       dts(h - adj_y)
   }
-  // ── Inflate/Deflate warps ──
   if prst == "textDeflate" {
     let dip = h * av1 / 100000.0
     return "M 0," +
@@ -720,7 +702,6 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Stop ──
   if prst == "textStop" {
     // Octagonal path approximated as straight segments
     let adj = w * av1 / 100000.0
@@ -739,11 +720,8 @@ fn generate_warp_path(
       "," +
       dts(cy)
   }
-  // ── Fallback: horizontal line through center ──
   "M 0," + dts(cy) + " L " + dts(w) + "," + dts(cy)
 }
-
-// ── Transform generation for linear warps ────────────────────────────────────
 
 ///|
 /// Generate SVG transform string for linear (non-path) warps.
@@ -824,8 +802,6 @@ fn generate_warp_transform(
   ""
 }
 
-// ── Main warp text renderer ──────────────────────────────────────────────────
-
 ///|
 /// Render warped text as SVG. Called when body_props.warp_prst is a non-trivial
 /// preset (not empty, not textNoShape, not textPlain).
@@ -875,7 +851,6 @@ fn render_warp_text(
   let italic_attr = if italic { " font-style=\"italic\"" } else { "" }
   let font_family = ff + ", sans-serif"
   if is_path_warp(prst) {
-    // ── Path-based warp ──
     let path_id = "warp-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
     let d = generate_warp_path(prst, w, h, av1_d, av2_d)
     // Determine text-anchor and startOffset based on warp type
@@ -930,7 +905,6 @@ fn render_warp_text(
     svg_escape(text) +
     "</textPath></text>"
   } else {
-    // ── Transform-based warp ──
     let xform = generate_warp_transform(prst, w, h, av1_d)
     if xform.is_empty() {
       // Unknown transform warp — fallback to normal rendering

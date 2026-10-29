@@ -8,8 +8,6 @@
  * Falls back gracefully — returns empty string if parsing fails.
  */
 
-// ── EMF Record Types (from MS-EMF specification) ────────────────────────────
-
 const EMR_HEADER = 0x01;
 const EMR_POLYGON = 0x03;
 const EMR_POLYLINE = 0x04;
@@ -55,8 +53,6 @@ const WHITE_BRUSH = 0;
 const NULL_BRUSH = 5;
 // Stock pen indices
 const NULL_PEN = 8;
-
-// ── GDI State ───────────────────────────────────────────────────────────────
 
 interface GdiPen {
   kind: 'pen';
@@ -125,8 +121,6 @@ function cloneState(s: GdiState): GdiState {
   };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 function colorFromBGR(dv: DataView, offset: number): string {
   const r = dv.getUint8(offset);
   const g = dv.getUint8(offset + 1);
@@ -142,8 +136,6 @@ function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-
-// ── Main converter ──────────────────────────────────────────────────────────
 
 /**
  * Convert EMF binary data to an SVG string.
@@ -578,8 +570,6 @@ function parseEmf(data: Uint8Array): string {
     `</svg>`
   );
 }
-
-// ── Point readers ───────────────────────────────────────────────────────────
 
 /**
  * Hard cap on points per EMF record.

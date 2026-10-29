@@ -12,7 +12,6 @@ test("shapes & geometry (slides 34-40)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-  // ── Slide 34: Group shapes ──────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 34: group shapes');
     const slide34 = textFiles.get('ppt/slides/slide34.xml');
@@ -30,7 +29,6 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide34 has prst="roundRect"', slide34.includes('prst="roundRect"'));
   }
 
-  // ── Slide 35: Connectors ────────────────────────────────────────────────
   {
     section('test_features.pptx — Slide 35: connectors');
     const slide35 = textFiles.get('ppt/slides/slide35.xml');
@@ -45,7 +43,6 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide35 has curvedConnector3', slide35.includes('curvedConnector3'));
   }
 
-  // ── Slide 36: preset geometry shapes ──
   {
     console.log('\n── test_features.pptx — Slide 36: preset geometry shapes ──');
     const slide36 = textFiles.get('ppt/slides/slide36.xml');
@@ -63,7 +60,6 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide36 has a:avLst with adj', slide36.includes('name="adj1"') || slide36.includes('name="adj"'));
   }
 
-  // ── Slide 37: Custom geometry ──
   {
     console.log('\n── test_features.pptx — Slide 37: custom geometry ──');
     const slide37 = textFiles.get('ppt/slides/slide37.xml');
@@ -82,7 +78,6 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide37 has 98FB98 (pale green)', slide37.includes('98FB98'));
   }
 
-  // ── Slide 38: Gear shapes ──
   {
     console.log('\n── test_features.pptx — Slide 38: gear shapes ──');
     const slide38 = textFiles.get('ppt/slides/slide38.xml');
@@ -94,7 +89,6 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide38 has adj fmla', slide38.includes('val 50000'));
   }
 
-  // ── Slide 39: Text rectangles ──
   {
     console.log('\n── test_features.pptx — Slide 39: text rectangles ──');
     const slide39 = textFiles.get('ppt/slides/slide39.xml');
@@ -106,7 +100,6 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide39 has FFD700 (gold)', slide39.includes('FFD700'));
   }
 
-  // ── Slide 40: Connection points ──
   {
     console.log('\n── test_features.pptx — Slide 40: connection points ──');
     const slide40 = textFiles.get('ppt/slides/slide40.xml');

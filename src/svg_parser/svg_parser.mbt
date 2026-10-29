@@ -5,10 +5,6 @@
 //
 // NOTE: No StringBuilder — all strings built via `+` (wasm:js-string "concat").
 
-// ── Integer parsing ──────────────────────────────────────────────────────────
-
-// ── Color parsing ────────────────────────────────────────────────────────────
-
 ///|
 fn parse_hex_color(s : String) -> @ooxml.Color {
   if s == "none" {
@@ -29,8 +25,6 @@ fn color_or_none(node : @xml.XmlNode, name : String) -> @ooxml.Color {
     parse_hex_color(v)
   }
 }
-
-// ── Attribute helpers ────────────────────────────────────────────────────────
 
 ///|
 fn get_data_attr(node : @xml.XmlNode, name : String) -> String {
@@ -55,8 +49,6 @@ fn get_da(node : @xml.XmlNode, name : String) -> String {
 fn get_dai(node : @xml.XmlNode, name : String) -> Int32 {
   get_data_int(node, "data-ooxml-" + name)
 }
-
-// ── Effect parsing from SVG data attributes ─────────────────────────────────
 
 ///|
 /// Parse effects from data-ooxml-* attributes on a shape element.
@@ -291,8 +283,6 @@ fn parse_sp_3d_from_da(node : @xml.XmlNode) -> @ooxml.Shape3d {
   }
 }
 
-// ── Gradient parsing from SVG data attributes ───────────────────────────────
-
 ///|
 /// Parse gradient stops from "pos,RRGGBB;pos,RRGGBB;..." string.
 fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
@@ -428,8 +418,6 @@ fn parse_patt_fill_attrs(
     },
   }
 }
-
-// ── Text parsing from SVG ────────────────────────────────────────────────────
 
 ///|
 fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] {
@@ -574,8 +562,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
   }
   paras
 }
-
-// ── Shape parsing from SVG <g> ───────────────────────────────────────────────
 
 ///|
 fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
@@ -883,8 +869,6 @@ fn parse_adj_string(s : String) -> Array[Int32] {
   }
   result
 }
-
-// ── Public API ────────────────────────────────────────────────────────────────
 
 ///|
 /// Parse an SVG string (with data-ooxml-* attributes) back into SlideData.
