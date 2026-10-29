@@ -1506,6 +1506,31 @@ fn roman_convert(n : Int32, lower : Bool) -> String {
 }
 
 ///|
+/// `data-ooxml-nv-*` for the shape's p:cNvPr id, name, descr and title (when set).
+fn nv_attrs(shape : @ooxml.Shape) -> String {
+  (if shape.nv_id >= 0 { dai("nv-id", shape.nv_id) } else { "" }) +
+  (if shape.nv_name.is_empty() { "" } else { da("nv-name", shape.nv_name) }) +
+  (if shape.nv_descr.is_empty() { "" } else { da("nv-descr", shape.nv_descr) }) +
+  (if shape.nv_title.is_empty() { "" } else { da("nv-title", shape.nv_title) })
+}
+
+///|
+/// The shape's alt text (descr, else title) as an SVG `<title>`: its accessible name
+/// and tooltip. "" when it has none.
+fn alt_text_title(shape : @ooxml.Shape) -> String {
+  let text = if shape.nv_descr.is_empty() {
+    shape.nv_title
+  } else {
+    shape.nv_descr
+  }
+  if text.is_empty() {
+    ""
+  } else {
+    "<title>" + @xml.xml_escape(text) + "</title>"
+  }
+}
+
+///|
 pub fn render_shape(
   shape : @ooxml.Shape,
   rels : Array[@ooxml.Relationship],
@@ -1546,6 +1571,7 @@ pub fn render_shape(
   let xform = transform_attr(t, scale)
 
   let g_attrs = da("shape-type", shape_type_str(shape.kind)) +
+    nv_attrs(shape) +
     da("geom", geom_str(shape.kind)) +
     dai("x", t.x) +
     dai("y", t.y) +
@@ -2078,6 +2104,7 @@ pub fn render_shape(
       eff_attr +
       shape_id_attr +
       ">" +
+      alt_text_title(shape) +
       inner +
       "</g>"
     if has_refl {

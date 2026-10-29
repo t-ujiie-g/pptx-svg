@@ -300,3 +300,37 @@ _, bg_rid = slide105.part.get_or_add_image_part(io.BytesIO(_bg_png))
 set_slide_bg(slide105,
              f'<a:blipFill dpi="0" rotWithShape="1"><a:blip r:embed="{bg_rid}"/>'
              '<a:srcRect/><a:stretch><a:fillRect/></a:stretch></a:blipFill>')
+
+# ── Slide 106: shape ids, names and alt text survive editing ──────────────────
+# A shape with descr/title, a picture with descr, and an appear animation that
+# targets the shape by its p:cNvPr id (p:spTgt spid). Editing the slide must keep
+# the ids (or the animation loses its target), names and alt text.
+
+
+slide106 = prs.slides.add_slide(blank)
+alt_box = slide106.shapes.add_shape(1, Inches(1), Inches(1), Inches(3), Inches(1.5))
+alt_box.name = "Revenue Box"
+alt_box.text_frame.text = "Revenue"
+cnv = alt_box._element.find(f".//{{{ns_p}}}cNvPr")
+cnv.set("descr", "Quarterly revenue, up 12% & rising")
+cnv.set("title", "Revenue")
+
+alt_pic = slide106.shapes.add_picture(io.BytesIO(_bg_png), Inches(5), Inches(1), Inches(2), Inches(2))
+alt_pic.name = "Logo"
+alt_pic._element.find(f".//{{{ns_p}}}cNvPr").set("descr", "Company logo")
+
+_spid = alt_box.shape_id
+slide106._element.append(etree.fromstring(
+    f'<p:timing xmlns:p="{ns_p}"><p:tnLst><p:par>'
+    '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>'
+    '<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq">'
+    '<p:childTnLst><p:par><p:cTn id="3" fill="hold"><p:stCondLst><p:cond delay="indefinite"/>'
+    '</p:stCondLst><p:childTnLst><p:par><p:cTn id="4" fill="hold"><p:stCondLst>'
+    '<p:cond delay="0"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="5" presetID="1" '
+    'presetClass="entr" presetSubtype="0" fill="hold" nodeType="clickEffect"><p:stCondLst>'
+    '<p:cond delay="0"/></p:stCondLst><p:childTnLst><p:set><p:cBhvr><p:cTn id="6" dur="1" '
+    'fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn><p:tgtEl>'
+    f'<p:spTgt spid="{_spid}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility'
+    '</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="visible"/></p:to></p:set>'
+    '</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn>'
+    '</p:par></p:childTnLst></p:cTn></p:seq></p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>'))

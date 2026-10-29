@@ -2,6 +2,7 @@
 package "pptx-svg/ooxml"
 
 import {
+  "moonbitlang/core/ref",
   "pptx-svg/xml",
 }
 
@@ -37,6 +38,8 @@ pub fn find_rel(Array[Relationship], String) -> Relationship?
 pub fn find_rel_target(Array[Relationship], String) -> String
 
 pub let hundredth_pt_per_inch : Int32
+
+pub fn max_nv_id(Array[Shape]) -> Int32
 
 pub let max_outline_levels : Int32
 
@@ -83,6 +86,8 @@ pub fn resolve_scheme_color(String, ThemeData) -> Color
 pub let rot_to_centideg : Int32
 
 pub let round_rect_default_adj : Int32
+
+pub fn with_fresh_nv_ids(Shape, @ref.Ref[Int32]) -> Shape
 
 // Errors
 
@@ -550,6 +555,10 @@ pub(all) struct Shape {
   sp_3d : Shape3d
   lst_style : TextStyleGroup
   font_ref_color : Color
+  nv_id : Int32
+  nv_name : String
+  nv_descr : String
+  nv_title : String
 }
 pub fn Shape::default_with(ShapeKind, ShapeTransform) -> Self
 pub fn Shape::default_with_blip(ShapeKind, ShapeTransform, BlipFill) -> Self

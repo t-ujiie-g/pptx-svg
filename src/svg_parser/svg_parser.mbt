@@ -771,6 +771,17 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     sp_3d: parse_sp_3d_from_da(g_node),
     lst_style: @ooxml.TextStyleGroup::empty(),
     font_ref_color: @ooxml.Color::none(),
+    nv_id: {
+      let id = get_da(g_node, "nv-id")
+      if id.is_empty() {
+        -1
+      } else {
+        @xml.parse_int(id)
+      }
+    },
+    nv_name: get_da(g_node, "nv-name"),
+    nv_descr: get_da(g_node, "nv-descr"),
+    nv_title: get_da(g_node, "nv-title"),
   }
 }
 

@@ -985,6 +985,10 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     sp_3d: parse_sp_3d(sppr_ch),
     lst_style: txt_lst_style,
     font_ref_color,
+    nv_id: -1,
+    nv_name: "",
+    nv_descr: "",
+    nv_title: "",
   }
 }
 
@@ -2003,6 +2007,29 @@ pub fn parse_bg_fills_from_csld(
 }
 
 ///|
+/// `shape` with the id, name, descr and title of its element's p:cNvPr.
+fn with_nv_props(shape : Shape, elem : @xml.XmlNode) -> Shape {
+  for nv in @xml.get_children(elem) {
+    if @xml.find_child(@xml.get_children(nv), "p:cNvPr") is Some(c) {
+      let attr = fn(name) { @xml.get_attr(c, name).unwrap_or("") }
+      let id = attr("id")
+      return {
+        ..shape,
+        nv_id: if id.is_empty() {
+          -1
+        } else {
+          @xml.parse_int(id)
+        },
+        nv_name: attr("name"),
+        nv_descr: attr("descr"),
+        nv_title: attr("title"),
+      }
+    }
+  }
+  shape
+}
+
+///|
 /// Parse shapes from a list of child nodes (shared by spTree and grpSp).
 fn parse_shapes_from_children(
   children : Array[@xml.XmlNode],
@@ -2013,15 +2040,15 @@ fn parse_shapes_from_children(
     match child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "p:sp" {
-          shapes.push(parse_sp(child, theme))
+          shapes.push(with_nv_props(parse_sp(child, theme), child))
         } else if tag == "p:pic" {
-          shapes.push(parse_pic(child, theme))
+          shapes.push(with_nv_props(parse_pic(child, theme), child))
         } else if tag == "p:graphicFrame" {
-          shapes.push(parse_graphic_frame(child, theme))
+          shapes.push(with_nv_props(parse_graphic_frame(child, theme), child))
         } else if tag == "p:grpSp" {
-          shapes.push(parse_grp_sp(child, theme))
+          shapes.push(with_nv_props(parse_grp_sp(child, theme), child))
         } else if tag == "p:cxnSp" {
-          shapes.push(parse_cxn_sp(child, theme))
+          shapes.push(with_nv_props(parse_cxn_sp(child, theme), child))
         } else if tag == "mc:AlternateContent" {
           let ac_ch = @xml.get_children(child)
           let mut choice_xml = ""

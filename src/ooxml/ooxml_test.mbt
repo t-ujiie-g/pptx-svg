@@ -1240,3 +1240,27 @@ test "diagram text color resolution + apply" {
   assert_eq(r1.g, 255)
   assert_eq(r1.b, 0)
 }
+
+///|
+test "p:cNvPr id, name, descr and title are parsed; fresh ids reach group children" {
+  let xml = "<p:grpSp><p:nvGrpSpPr><p:cNvPr id=\"4\" name=\"Group\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>" +
+    "<p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"10\" cy=\"10\"/><a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"10\" cy=\"10\"/></a:xfrm></p:grpSpPr><p:sp><p:nvSpPr><p:cNvPr id=\"9\" name=\"Box\" descr=\"alt\" title=\"T\"/>" +
+    "<p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp></p:grpSp>"
+  let shapes = @ooxml.parse_shapes_xml(xml, @ooxml.ThemeData::default())
+  assert_eq(shapes[0].nv_id, 4)
+  assert_eq(@ooxml.max_nv_id(shapes), 9)
+  guard shapes[0].kind is @ooxml.ShapeKind::GroupShape(grp) else {
+    fail("not a group")
+  }
+  let child = grp.children[0]
+  assert_eq(
+    (child.nv_id, child.nv_name, child.nv_descr, child.nv_title),
+    (9, "Box", "alt", "T"),
+  )
+  let fresh = @ooxml.with_fresh_nv_ids(shapes[0], { val: 9, })
+  assert_eq(fresh.nv_id, 10)
+  guard fresh.kind is @ooxml.ShapeKind::GroupShape(fgrp) else {
+    fail("not a group")
+  }
+  assert_eq(fgrp.children[0].nv_id, 11)
+}

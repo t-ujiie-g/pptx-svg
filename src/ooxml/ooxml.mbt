@@ -1594,6 +1594,10 @@ pub(all) struct Shape {
   sp_3d : Shape3d // a:sp3d
   lst_style : TextStyleGroup // a:lstStyle from p:txBody (used for placeholder inheritance)
   font_ref_color : Color // resolved color from <p:style>/<a:fontRef>; used as last-resort text color fallback
+  nv_id : Int32 // p:cNvPr id (-1 = none; the serializer keeps ids unique per slide)
+  nv_name : String // p:cNvPr name
+  nv_descr : String // p:cNvPr descr: the alt text
+  nv_title : String // p:cNvPr title
 }
 
 ///|
@@ -1642,11 +1646,48 @@ pub fn Shape::default_with(
     sp_3d: Shape3d::none(),
     lst_style: TextStyleGroup::empty(),
     font_ref_color: Color::none(),
+    nv_id: -1,
+    nv_name: "",
+    nv_descr: "",
+    nv_title: "",
   }
 }
 
 ///|
-/// Create a default Shape with a specific BlipFill (for Picture shapes with crop/alpha).
+/// The largest p:cNvPr id among `shapes` and their group children (0 if none).
+pub fn max_nv_id(shapes : Array[Shape]) -> Int32 {
+  let mut m = 0
+  for shape in shapes {
+    if shape.nv_id > m {
+      m = shape.nv_id
+    }
+    if shape.kind is GroupShape(grp) {
+      let c = max_nv_id(grp.children)
+      if c > m {
+        m = c
+      }
+    }
+  }
+  m
+}
+
+///|
+/// `shape` with new p:cNvPr ids drawn from `next` (pre-incremented), group children
+/// included; for shapes added to a slide whose largest id is `next`.
+pub fn with_fresh_nv_ids(shape : Shape, next : Ref[Int32]) -> Shape {
+  next.val = next.val + 1
+  let nv_id = next.val
+  match shape.kind {
+    GroupShape(grp) if shape.ole_xml.is_empty() => {
+      let children = grp.children.map(fn(c) { with_fresh_nv_ids(c, next) })
+      { ..shape, nv_id, kind: GroupShape({ ..grp, children, }), }
+    }
+    _ => { ..shape, nv_id, }
+  }
+}
+
+///|
+/// A default Shape with a specific BlipFill (for pictures with crop/alpha).
 pub fn Shape::default_with_blip(
   kind : ShapeKind,
   transform : ShapeTransform,
