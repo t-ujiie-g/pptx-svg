@@ -8,8 +8,8 @@
 
 ### Fixed
 
+- **Adding or deleting table rows/columns broke merged cells.** The span attributes were left untouched, so an insertion inside a merged range left a hole, and deleting the row/column a merged cell was anchored on dropped the cell and its text while its covered cells stayed merged into nothing. Merged ranges now widen, shrink and move their anchor (with its content) to follow the edit; covered cells get PowerPoint's `hMerge`/`vMerge` flags.
 - **Editing a slide reset every shape's id and name on export.** The serializer wrote `<p:cNvPr id="0" name=""/>` for every shape, so an edited slide lost its shape names and alt text, its animations (`p:spTgt spid`) pointed at ids that no longer existed, and connector endpoints (`stCxn`/`endCxn`) came loose. Picture hyperlinks were dropped the same way. Ids, names, descr/title and hyperlinks are now kept; added, duplicated and pasted shapes get fresh ids, and duplicate ids are renumbered on export (the first use keeps its id).
-
 - **Editing a slide that contains a chart dropped the chart on export.** Charts (`c:chart` and Office 2016+ `cx:chart`) serialized to nothing, so after any edit to the slide — moving the chart, or changing any other shape — the exported slide, Undo/Redo and `updateSlideFromSvg` lost the chart's `p:graphicFrame`. The frame is now preserved and written back, and a chart re-renders after an SVG round-trip. Chart shapes in the SVG now carry `data-ooxml-ole` (`docs/svg-specification.md`).
 - **Moving or resizing a chart, SmartArt or OLE object was not exported.** Their preserved `p:graphicFrame` was written back verbatim; its `p:xfrm` now follows the shape's current position and size.
 

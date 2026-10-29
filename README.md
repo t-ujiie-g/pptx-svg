@@ -236,7 +236,7 @@ Supports pasting onto a different slide/presentation. See [docs/editing-guide.md
 | `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | `string` | Insert / delete a table row. |
 | `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | `string` | Insert / delete a table column. |
 
-All undoable. Merged cells are not span-adjusted (v1). See [docs/editing-guide.md](docs/editing-guide.md#table-editing).
+All undoable; merged cells grow, shrink and move with row/column edits. See [docs/editing-guide.md](docs/editing-guide.md#table-editing).
 
 **Notes & Comments:**
 

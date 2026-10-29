@@ -720,6 +720,10 @@ pub(all) struct TableData {
   band_row : Bool
   band_col : Bool
 }
+pub fn TableData::delete_column(Self, Int32) -> Unit
+pub fn TableData::delete_row(Self, Int32) -> Unit
+pub fn TableData::insert_column(Self, Int32, Int32) -> Unit
+pub fn TableData::insert_row(Self, Int32, Int32) -> Unit
 
 pub(all) struct TableRow {
   height : Int32

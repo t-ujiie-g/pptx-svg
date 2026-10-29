@@ -221,6 +221,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/ooxml/ooxml_text.mbt` | Text body parsing (paragraphs, runs, bodyPr) |
 | `src/ooxml/ooxml_parse.mbt` | Shape/Slide/Fill parsing + rels + slide size + SmartArt cached-drawing parsing (`parse_diagram_drawing`/`parse_diagram_text_color`/`apply_diagram_text_color`) |
 | `src/ooxml/ooxml_chart.mbt` | ChartML parser (c:chartSpace → ChartData) |
+| `src/ooxml/ooxml_table_edit.mbt` | Merge-aware row/column insert/delete on `TableData` (merged ranges read from the anchors' spans, then spans/flags rewritten as PowerPoint writes them) |
 | `src/renderer/renderer.mbt` | Constants + helpers + Shape rendering + public API |
 | `src/renderer/renderer_table.mbt` | Table SVG rendering (cell borders, merging, conditional formatting) |
 | `src/renderer/renderer_text.mbt` | Text rendering (bullets, wrapping, tabs, height) + shared helpers (`solve_text_autofit`, `run_fs_px`, `run_ff`, `wrap_paragraph`, `measure_line_width`) |

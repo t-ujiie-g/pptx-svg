@@ -1,6 +1,3 @@
-// Merged cells (gridSpan/rowSpan/hMerge/vMerge) are not span-adjusted by row/column
-// edits, so changing the structure of a table with merged cells can corrupt it.
-
 ///|
 /// Width of a new column with no neighbour to copy (1 inch, EMU).
 let default_table_col_width_emu : Int32 = 914400
@@ -63,18 +60,14 @@ pub fn update_table_cell_text(
 }
 
 ///|
-/// Insert an empty row after `after_row` (-1 = top). Returns "OK:<new_row_idx>" or "ERROR:...".
+/// Insert an empty row after `after_row` (-1 = top), widening merged cells it falls
+/// inside. Returns "OK:<new_row_idx>" or "ERROR:...".
 pub fn add_table_row(
   slide_idx : Int32,
   shape_idx : Int32,
   after_row : Int32,
 ) -> String {
   with_table(slide_idx, shape_idx, fn(t) {
-    let ncols = t.col_widths.length()
-    let cells : Array[@ooxml.TableCell] = []
-    for _ in 0..<ncols {
-      cells.push(@ooxml.TableCell::empty())
-    }
     let height = if !t.rows.is_empty() {
       let ref_idx = if after_row >= 0 && after_row < t.rows.length() {
         after_row
@@ -85,16 +78,16 @@ pub fn add_table_row(
     } else {
       0
     }
-    let new_row : @ooxml.TableRow = { height, cells, }
     let insert_at = clamp_insert_index(after_row, t.rows.length())
-    array_insert_at(t.rows, insert_at, new_row)
+    t.insert_row(insert_at, height)
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(insert_at)
   })
 }
 
 ///|
-/// Delete a row. At least one row must remain. Returns "OK" or "ERROR:<message>".
+/// Delete a row (one must remain); merged cells through it shrink, and one anchored
+/// on it moves down. Returns "OK" or "ERROR:<message>".
 pub fn delete_table_row(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -107,15 +100,15 @@ pub fn delete_table_row(
     if row < 0 || row >= t.rows.length() {
       return "ERROR:row index out of range"
     }
-    array_remove_at(t.rows, row)
+    t.delete_row(row)
     g_modified.val[slide_idx] = true
     "OK"
   })
 }
 
 ///|
-/// Insert an empty column after `after_col` (-1 = left); `width_emu <= 0` copies a
-/// neighbour's width. Returns "OK:<new_col_idx>" or "ERROR:<message>".
+/// Insert an empty column after `after_col` (-1 = left), widening merged cells it falls
+/// inside; `width_emu <= 0` copies a neighbour's width. Returns "OK:<new_col_idx>".
 pub fn add_table_column(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -137,24 +130,15 @@ pub fn add_table_column(
     } else {
       default_table_col_width_emu
     }
-    array_insert_at(t.col_widths, insert_at, width)
-    for row in t.rows {
-      let cells = row.cells
-      // Clamp per row: malformed tables can have short rows.
-      let at = if insert_at > cells.length() {
-        cells.length()
-      } else {
-        insert_at
-      }
-      array_insert_at(cells, at, @ooxml.TableCell::empty())
-    }
+    t.insert_column(insert_at, width)
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(insert_at)
   })
 }
 
 ///|
-/// Delete a column. At least one column must remain. Returns "OK" or "ERROR:...".
+/// Delete a column (one must remain); merged cells through it shrink, and one anchored
+/// in it moves right. Returns "OK" or "ERROR:...".
 pub fn delete_table_column(
   slide_idx : Int32,
   shape_idx : Int32,
@@ -167,13 +151,7 @@ pub fn delete_table_column(
     if col < 0 || col >= t.col_widths.length() {
       return "ERROR:column index out of range"
     }
-    array_remove_at(t.col_widths, col)
-    for row in t.rows {
-      let cells = row.cells
-      if col < cells.length() {
-        array_remove_at(cells, col)
-      }
-    }
+    t.delete_column(col)
     g_modified.val[slide_idx] = true
     "OK"
   })

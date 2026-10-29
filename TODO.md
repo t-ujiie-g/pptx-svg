@@ -248,7 +248,7 @@ EMF コンバータと同様の手法で WMF (16-bit GDI) をパースし SVG �
 
 ### E3: テーブル操作
 
-- [x] **行/列の追加・削除** — E6.6 で実装（結合セルの span 調整は未対応）
+- [x] **行/列の追加・削除** — E6.6 で実装。結合セルは範囲内の挿入で拡大、削除で縮小し、起点の行/列を消すと内容ごと次へ移る
 - [ ] **セルの結合・分割**
 - [x] **セルテキスト編集 API** — E6.6 で実装
 
@@ -280,7 +280,7 @@ PowerPoint / Google スライド級の直接操作編集に必要な基盤プリ
 - [x] **E6.3 z-order（重なり順）操作** (P3) — 本セッションで完了。`bringToFront`/`sendToBack`/`bringForward`/`sendBackward`。z-order = shape 配列順（末尾＝最前面）。含有配列（slide.shapes / group.children）内で並べ替え、`OK:<new_composite_idx>` を返す。E6.1 履歴に統合（undo 可能）。汎用 `reorderShape` は4メソッドで要件充足のため見送り。
 - [x] **E6.4 複数シェイプの一括 transform** (P4) — 本セッションで完了。`updateShapesTransform(slideIdx, items:[{shapeIdx,x,y,cx,cy,rot}])`。全 shapeIdx を検証してから適用（原子的・部分適用なし）・1 undo 単位。失敗時は履歴に残さない guarded checkpoint（`commitCheckpoint`）を追加。
 - [x] **E6.5 シェイプのコピー&ペースト（スライド跨ぎ）** (P5) — 本セッションで完了。`getShapeSpec`（シェイプの OOXML + 参照画像を base64 内包した移植可能 JSON）/ `insertShapeSpec`（別スライドへ貼付、メディア再追加 + rId 再リンク、オフセット対応、undo 可能）。MoonBit: `serialize_shape` pub 化 + `parse_shapes_xml` + `get_shape_ooxml`/`add_shape_from_ooxml`。TS: `base64ToBytes`。**v1 制約**: chart は非対応（chart パートと埋め込みブックをペースト先へ複製しないため `ERROR:charts are not copyable`）、OLE/SmartArt は画像メディアのみ再リンク。
-- [x] **E6.6 テーブルセル編集** (P6, 既存 E3 と整合) — 本セッションで完了。`updateTableCellText`（セルの first-run 書式を継承）+ `addTableRow`/`deleteTableRow`/`addTableColumn`/`deleteTableColumn`（最低1行/1列保持）。`TableCell::empty()` 追加。すべて undo 可能。**v1 制約**: 結合セル（gridSpan/rowSpan/hMerge/vMerge）は span 調整しないため、結合を含む表の行列操作は構造が崩れる可能性あり。`mergeCells`/`splitCells` は見送り（将来タスク）。
+- [x] **E6.6 テーブルセル編集** (P6, 既存 E3 と整合) — 本セッションで完了。`updateTableCellText`（セルの first-run 書式を継承）+ `addTableRow`/`deleteTableRow`/`addTableColumn`/`deleteTableColumn`（最低1行/1列保持）。`TableCell::empty()` 追加。すべて undo 可能。結合セルは行列操作に追従（`TableData::insert_row` 等、`ooxml_table_edit.mbt`）。`mergeCells`/`splitCells` は見送り（将来タスク）。
   - **→ これで E6（直接操作編集 P1〜P6）完了。** consumer リクエスト `pptx-svg-editing-api-request.md` の全項目に対応。
 
 > **スコープ外（consumer 側で対応 / 既に可能）**: ドラッグ移動・リサイズ/回転ハンドル UI（`updateShapeTransform` が rot 対応済み）、スナップ/スマートガイド（`getAllShapes` の幾何から算出）、キーボードショートカット・右クリックメニュー・スライドサムネイル一覧（`renderSlideSvg` で描画）。
@@ -371,7 +371,7 @@ PowerPoint / Google スライド級の直接操作編集に必要な基盤プリ
 | **E2** | シェイプ追加/削除/複製 / グラデーション編集 / ストローク編集 | — | — | **完了** |
 | **E2** | (既知問題) line 追加時ストローク未設定 / シェイプテキスト追加 | — | — | **完了** |
 | **E2.5** | テキスト編集: 段落/ラン追加削除 / 書式変更 (太字/サイズ/色/配置) | — | — | **完了** |
-| **E3** | テーブル行列操作 / セル編集 | — | — | **一部完了** (結合・分割と結合セルの span 調整は未) |
+| **E3** | テーブル行列操作 / セル編集 | — | — | **一部完了** (セルの結合・分割 API は未) |
 | **E4** | チャートデータ編集 / シリアライズ | — | — | **一部完了** (graphicFrame の保持・書き戻しのみ、データ編集は未) |
 | **E5** | 画像追加/差替/削除 | — | — | **完了** |
 | **E6** | 直接操作編集 (Undo/Redo, インライン文字, z-order, 一括transform, コピペ, セル編集) | — | — | **完了** (E6.1〜E6.6) |

@@ -895,30 +895,30 @@ export class PptxRenderer {
   }
 
   /**
-   * Insert an empty row after `afterRow` (-1 = top). Returns `"OK:<newRowIdx>"` or `"ERROR:..."`.
-   * Merged cells are not span-adjusted.
+   * Insert an empty row after `afterRow` (-1 = top); merged cells it falls inside grow.
+   * Returns `"OK:<newRowIdx>"` or `"ERROR:..."`.
    */
   addTableRow(slideIdx: number, shapeIdx: number, afterRow = -1): string {
     this.checkpoint();
     return this.exports.add_table_row(slideIdx, shapeIdx, afterRow);
   }
 
-  /** Delete a table row (at least one must remain). Returns `"OK"` or `"ERROR:..."`. */
+  /** Delete a table row (one must remain); a merged cell anchored on it moves down. Returns `"OK"` or `"ERROR:..."`. */
   deleteTableRow(slideIdx: number, shapeIdx: number, row: number): string {
     this.checkpoint();
     return this.exports.delete_table_row(slideIdx, shapeIdx, row);
   }
 
   /**
-   * Insert an empty column after `afterCol` (-1 = left); `widthEmu = 0` copies a neighbour's
-   * width. Returns `"OK:<newColIdx>"` or `"ERROR:..."`. Merged cells are not span-adjusted.
+   * Insert an empty column after `afterCol` (-1 = left), growing merged cells it falls inside;
+   * `widthEmu = 0` copies a neighbour's width. Returns `"OK:<newColIdx>"` or `"ERROR:..."`.
    */
   addTableColumn(slideIdx: number, shapeIdx: number, afterCol = -1, widthEmu = 0): string {
     this.checkpoint();
     return this.exports.add_table_column(slideIdx, shapeIdx, afterCol, widthEmu);
   }
 
-  /** Delete a table column (at least one must remain). Returns `"OK"` or `"ERROR:..."`. */
+  /** Delete a table column (one must remain); a merged cell anchored in it moves right. Returns `"OK"` or `"ERROR:..."`. */
   deleteTableColumn(slideIdx: number, shapeIdx: number, col: number): string {
     this.checkpoint();
     return this.exports.delete_table_column(slideIdx, shapeIdx, col);
