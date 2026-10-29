@@ -372,5 +372,46 @@ test("regressions (slides 96-98)", async () => {
     assert('slide77 moved OLE exports its new offset', xfrmOf(ole).includes('<a:off x="1828800" y="914400"/>'), xfrmOf(ole));
   }
 
+  // ── Slide 106: shape ids, names and alt text survive editing ─────────────
+  {
+    console.log('\n── test_features.pptx — Slide 106: shape ids / names / alt text ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const idx = 105;
+    const cnvPrs = (xml) => [...xml.matchAll(/<p:cNvPr ([^>]*?)\/?>/g)].map((m) => m[1]);
+    const ids = (xml) => cnvPrs(xml).map((a) => a.match(/id="(\d+)"/)[1]);
+    const spid = r.getSlideOoxml(idx).match(/spid="(\d+)"/)[1];
+
+    const svg = r.renderSlideSvg(idx);
+    assert('slide106 SVG carries the alt text as <title>',
+      svg.includes('<title>Quarterly revenue, up 12% &amp; rising</title>') && svg.includes('<title>Company logo</title>'));
+    assert('slide106 SVG carries the shape name', svg.includes('data-ooxml-nv-name="Revenue Box"'));
+
+    r.updateShapeFill(idx, 0, 255, 0, 0);
+    const edited = r.getSlideOoxml(idx);
+    const attrs = cnvPrs(edited).join(' | ');
+    assert('slide106 export keeps the animation', edited.includes(`spid="${spid}"`));
+    assert('slide106 export keeps the animated shape\'s id', ids(edited).includes(spid), attrs);
+    assert('slide106 export keeps names and alt text',
+      attrs.includes('name="Revenue Box" descr="Quarterly revenue, up 12% &amp; rising" title="Revenue"') &&
+      attrs.includes('name="Logo" descr="Company logo"'), attrs);
+
+    // A duplicate gets a fresh id; the original keeps the one the animation targets.
+    r.duplicateShape(idx, 0, 91440, 91440);
+    const dup = r.getSlideOoxml(idx);
+    assert('slide106 ids stay unique after duplicating', new Set(ids(dup)).size === ids(dup).length, ids(dup).join(','));
+    assert('slide106 original keeps its id after duplicating', cnvPrs(dup)[1].includes(`id="${spid}"`), cnvPrs(dup)[1]);
+
+    // SVG round-trip keeps them too.
+    r.updateSlideFromSvg(idx, r.renderSlideSvg(idx));
+    assert('slide106 SVG round-trip keeps ids, names and alt text',
+      cnvPrs(r.getSlideOoxml(idx)).join(' | ').includes(`id="${spid}" name="Revenue Box" descr=`));
+  }
+
   finishAssertions();
 });

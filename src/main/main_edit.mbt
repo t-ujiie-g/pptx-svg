@@ -160,6 +160,16 @@ fn make_default_paragraph(
 }
 
 ///|
+/// `shape` with p:cNvPr ids above every id already on `slide`, for a shape being added.
+fn with_new_nv_ids(
+  slide : @ooxml.SlideData,
+  shape : @ooxml.Shape,
+) -> @ooxml.Shape {
+  let max_id = @ooxml.max_nv_id(slide.shapes)
+  @ooxml.with_fresh_nv_ids(shape, { val: if max_id > 1 { max_id } else { 1 }, })
+}
+
+///|
 /// Remove an element at `idx` from an array in-place.
 fn[T] array_remove_at(arr : Array[T], idx : Int32) -> Unit {
   let new_arr : Array[T] = []
@@ -447,7 +457,7 @@ pub fn add_shape(
     stroke,
     stroke_w,
   }
-  slide.shapes.push(shape)
+  slide.shapes.push(with_new_nv_ids(slide, shape))
   let new_idx = slide.shapes.length() - 1
   g_modified.val[slide_idx] = true
   "OK:" + int_to_str(new_idx)
@@ -506,7 +516,7 @@ pub fn add_picture_shape(
     clr_to: @ooxml.Color::none(),
   }
   let shape = @ooxml.Shape::default_with_blip(kind, transform, blip_fill)
-  slide.shapes.push(shape)
+  slide.shapes.push(with_new_nv_ids(slide, shape))
   let new_idx = slide.shapes.length() - 1
   g_modified.val[slide_idx] = true
   "OK:" + int_to_str(new_idx)
@@ -585,7 +595,7 @@ pub fn duplicate_shape(
         flip_v: src.transform.flip_v,
       },
     }
-    arr.push(dup)
+    arr.push(with_new_nv_ids(g_slides.val[slide_idx], dup))
     let new_idx = if shape_idx < group_index_base {
       g_slides.val[slide_idx].shapes.length() - 1
     } else {
@@ -1077,7 +1087,7 @@ pub fn add_shape_from_ooxml(
     },
   }
   let slide = g_slides.val[slide_idx]
-  slide.shapes.push(pasted)
+  slide.shapes.push(with_new_nv_ids(slide, pasted))
   g_modified.val[slide_idx] = true
   "OK:" + int_to_str(slide.shapes.length() - 1)
 }

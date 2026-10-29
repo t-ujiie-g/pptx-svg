@@ -56,6 +56,12 @@ Each shape is rendered as a `<g>` element with these attributes.
 | `data-ooxml-shape-idx` | int | Shape index in slide | 0-based |
 | `data-ooxml-ph-type` | string | Placeholder type | `"ctrTitle"`, `"body"`, `"sldNum"`, `"ftr"`, `"dt"`, etc. |
 | `data-ooxml-ph-idx` | int | Placeholder index | integer |
+| `data-ooxml-nv-id` | int | `p:cNvPr` id (animations and connectors refer to it) | absent if none |
+| `data-ooxml-nv-name` | string | `p:cNvPr` name (Selection Pane) | absent if empty |
+| `data-ooxml-nv-descr` | string | `p:cNvPr` descr — the alt text | absent if empty |
+| `data-ooxml-nv-title` | string | `p:cNvPr` title | absent if empty |
+
+A shape with alt text also gets a `<title>` as the first child of its `<g>` (descr, else title): its accessible name and tooltip.
 
 ### Transform (Position & Size)
 

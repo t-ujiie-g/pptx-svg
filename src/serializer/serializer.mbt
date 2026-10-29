@@ -1,28 +1,67 @@
 ///|
-/// Serialize p:cNvPr with optional hyperlinks.
-fn serialize_cnvpr(
-  id : String,
-  link_rid : String,
-  hover_rid : String,
-) -> String {
-  if link_rid.is_empty() && hover_rid.is_empty() {
-    "<p:cNvPr id=\"" + id + "\" name=\"\"/>"
-  } else {
-    let mut inner = ""
-    if !link_rid.is_empty() {
-      inner = inner +
-        "<a:hlinkClick xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" +
-        link_rid +
-        "\"/>"
-    }
-    if !hover_rid.is_empty() {
-      inner = inner +
-        "<a:hlinkHover xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" +
-        hover_rid +
-        "\"/>"
-    }
-    "<p:cNvPr id=\"" + id + "\" name=\"\">" + inner + "</p:cNvPr>"
+/// The shape's p:cNvPr: id (0 if it has none), name, descr, title and hyperlinks.
+fn serialize_cnvpr(shape : @ooxml.Shape) -> String {
+  let id = if shape.nv_id >= 0 { shape.nv_id } else { 0 }
+  let mut out = "<p:cNvPr id=\"" +
+    int_to_str(id) +
+    "\" name=\"" +
+    xml_escape(shape.nv_name) +
+    "\""
+  if !shape.nv_descr.is_empty() {
+    out = out + " descr=\"" + xml_escape(shape.nv_descr) + "\""
   }
+  if !shape.nv_title.is_empty() {
+    out = out + " title=\"" + xml_escape(shape.nv_title) + "\""
+  }
+  let mut inner = ""
+  if !shape.sh_link_rid.is_empty() {
+    inner = inner +
+      "<a:hlinkClick xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" +
+      shape.sh_link_rid +
+      "\"/>"
+  }
+  if !shape.sh_link_hover_rid.is_empty() {
+    inner = inner +
+      "<a:hlinkHover xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" r:id=\"" +
+      shape.sh_link_hover_rid +
+      "\"/>"
+  }
+  if inner.is_empty() {
+    out + "/>"
+  } else {
+    out + ">" + inner + "</p:cNvPr>"
+  }
+}
+
+///|
+/// `shapes` with unique p:cNvPr ids: the first use of an id keeps it (animations and
+/// connectors refer to it); a repeated or missing id takes the next free one.
+fn with_unique_nv_ids(
+  shapes : Array[@ooxml.Shape],
+  used : Array[Int32],
+  next : Ref[Int32],
+) -> Array[@ooxml.Shape] {
+  shapes.map(fn(shape) {
+    // A preserved frame (chart, SmartArt, OLE) is written with its own id.
+    let keep = !shape.ole_xml.is_empty() ||
+      (shape.nv_id > 0 && !used.contains(shape.nv_id))
+    let nv_id = if keep {
+      shape.nv_id
+    } else {
+      next.val = next.val + 1
+      next.val
+    }
+    used.push(nv_id)
+    let kind = match shape.kind {
+      @ooxml.ShapeKind::GroupShape(grp) if shape.ole_xml.is_empty() =>
+        @ooxml.ShapeKind::GroupShape({
+          ..grp,
+          children: with_unique_nv_ids(grp.children, used, next),
+        })
+      k => k
+    }
+    { ..shape, nv_id, kind, }
+  })
 }
 
 ///|
@@ -893,7 +932,7 @@ fn serialize_path_segment(
 fn serialize_autoshape(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
   let mut out = "<p:sp>"
   out = out + "<p:nvSpPr>"
-  out = out + serialize_cnvpr("0", shape.sh_link_rid, shape.sh_link_hover_rid)
+  out = out + serialize_cnvpr(shape)
   out = out + "<p:cNvSpPr/>"
   if !shape.ph_type.is_empty() {
     let mut ph = "<p:nvPr><p:ph type=\"" + shape.ph_type + "\""
@@ -1229,7 +1268,7 @@ fn serialize_stroke(shape : @ooxml.Shape) -> String {
 fn serialize_picture(shape : @ooxml.Shape, rid : String) -> String {
   let mut out = "<p:pic>"
   out = out + "<p:nvPicPr>"
-  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + serialize_cnvpr(shape)
   out = out + "<p:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></p:cNvPicPr>"
   out = out + "<p:nvPr/>"
   out = out + "</p:nvPicPr>"
@@ -1333,7 +1372,7 @@ fn serialize_table_text_body(
 fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
   let mut out = "<p:graphicFrame>"
   out = out + "<p:nvGraphicFramePr>"
-  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + serialize_cnvpr(shape)
   out = out +
     "<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp=\"1\"/></p:cNvGraphicFramePr>"
   out = out + "<p:nvPr/>"
@@ -1386,7 +1425,7 @@ fn serialize_table(shape : @ooxml.Shape, table : @ooxml.TableData) -> String {
 fn serialize_group(shape : @ooxml.Shape, grp : @ooxml.GroupShapeData) -> String {
   let mut out = "<p:grpSp>"
   out = out + "<p:nvGrpSpPr>"
-  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + serialize_cnvpr(shape)
   out = out + "<p:cNvGrpSpPr/>"
   out = out + "<p:nvPr/>"
   out = out + "</p:nvGrpSpPr>"
@@ -1484,7 +1523,7 @@ fn graphic_frame_with_transform(
 fn serialize_connector(shape : @ooxml.Shape, geom : @ooxml.ShapeGeom) -> String {
   let mut out = "<p:cxnSp>"
   out = out + "<p:nvCxnSpPr>"
-  out = out + "<p:cNvPr id=\"0\" name=\"\"/>"
+  out = out + serialize_cnvpr(shape)
   out = out + "<p:cNvCxnSpPr>"
   if shape.st_cxn_id >= 0 {
     out = out +
@@ -1577,7 +1616,15 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out + "<a:chExt cx=\"0\" cy=\"0\"/>"
   out = out + "</a:xfrm>"
   out = out + "</p:grpSpPr>"
-  for shape in slide.shapes {
+  let max_id = @ooxml.max_nv_id(slide.shapes)
+  let shapes = with_unique_nv_ids(slide.shapes, [1], {
+    val: if max_id > 1 {
+      max_id
+    } else {
+      1
+    },
+  })
+  for shape in shapes {
     out = out + serialize_shape(shape)
   }
   out = out + "</p:spTree>"

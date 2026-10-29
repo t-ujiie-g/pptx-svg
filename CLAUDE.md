@@ -142,7 +142,10 @@ Shape { kind: ShapeKind, transform: ShapeTransform,
   sh_link_rid: String, sh_link_hover_rid: String,
   mc_choice_xml: String, ole_xml: String,
   effects: EffectList, scene_3d: Scene3d, sp_3d: Shape3d,
-  lst_style: TextStyleGroup, font_ref_color: Color }
+  lst_style: TextStyleGroup, font_ref_color: Color,
+  nv_id: Int, nv_name, nv_descr, nv_title: String }
+  // nv_*: p:cNvPr. nv_id -1 = none; edits assign fresh ids (with_fresh_nv_ids) and the
+  //   serializer keeps them unique per slide (first use wins: animations target spid).
   // lst_style: a:lstStyle from p:txBody, used as a placeholder-inheritance source.
   // font_ref_color: resolved color from <p:style>/<a:fontRef>; applied to text runs
   //   that still lack an explicit color after all other inheritance (last-resort fallback).

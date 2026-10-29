@@ -679,3 +679,40 @@ test "chart graphicFrame round-trips with its current transform" {
   assert_true(xml.contains("<c:chart r:id=\"rId2\"/>"))
   assert_true(xml.contains("<p:cNvPr id=\"4\" name=\"Chart 3\"/>"))
 }
+
+///|
+test "serialize_slide keeps p:cNvPr ids unique, first use wins" {
+  let base = @ooxml.Shape::default_with(
+    @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+    { x: 0, y: 0, cx: 100, cy: 100, rot: 0, flip_h: false, flip_v: false, },
+  )
+  let slide : @ooxml.SlideData = {
+    slide_size: @ooxml.SlideSize::default(),
+    background: @ooxml.Color::none(),
+    bg_grad: @ooxml.GradientFill::none(),
+    bg_blip_fill: @ooxml.BlipFill::none(),
+    bg_patt_fill: @ooxml.PatternFill::none(),
+    shapes: [
+      {
+        ..base,
+        nv_id: 5,
+        nv_name: "A \"quoted\" & named",
+        nv_descr: "alt <text>",
+      },
+      { ..base, nv_id: 5, nv_name: "copy", },
+      { ..base, nv_id: -1, },
+    ],
+    transition_xml: "",
+    timing_xml: "",
+    hidden: false,
+    bg_inherited: false,
+  }
+  let xml = @serializer.serialize_slide(slide)
+  assert_true(
+    xml.contains(
+      "<p:cNvPr id=\"5\" name=\"A &quot;quoted&quot; &amp; named\" descr=\"alt &lt;text&gt;\"/>",
+    ),
+  )
+  assert_true(xml.contains("<p:cNvPr id=\"6\" name=\"copy\"/>"))
+  assert_true(xml.contains("<p:cNvPr id=\"7\" name=\"\"/>"))
+}

@@ -2442,3 +2442,42 @@ test "underline style + color round-trip" {
   assert_eq(pr.underline_color.g, 0)
   assert_eq(pr.underline_color.b, 0)
 }
+
+///|
+/// The alt text is the shape's `<title>` and round-trips with its id and name.
+test "alt text renders as <title> and round-trips" {
+  let shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 1000000,
+        cy: 1000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    fill: @ooxml.Color::white(),
+    nv_id: 7,
+    nv_name: "Box",
+    nv_descr: "A & B",
+  }
+  let svg = @renderer.render_slide_svg(
+    { ..make_empty_slide(), shapes: [shape], },
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  assert_true(svg.contains("<title>A &amp; B</title>"))
+  let back = @svg_parser.parse_svg_to_slide(svg).shapes[0]
+  assert_eq(
+    (back.nv_id, back.nv_name, back.nv_descr, back.nv_title),
+    (7, "Box", "A & B", ""),
+  )
+}

@@ -286,6 +286,7 @@ const scale = getSlideScale(svgElement);           // EMU per SVG pixel
 - **Tables**: Cell merge (grid span, row span), borders (including diagonal), margins, anchoring, table styles, conditional formatting (banded rows/cols, first/last row/col)
 - **Charts**: Bar (clustered/stacked/percentStacked), Line, Pie, Doughnut, Scatter, Area, Radar, Bubble, Stock, Surface, OfPie (13 classic types) + Waterfall, Treemap, Sunburst, Histogram, Box & Whisker, Funnel (6 Office 2016+ cx:chart types), data labels, data points, trendlines, error bars, composite charts
 - **Group shapes**: Recursive nesting with coordinate transforms
+- **Accessibility**: Shape alt text (`descr`/`title`) as SVG `<title>`; shape ids and names kept on export
 - **Theme**: 12 theme colors, font scheme, all color modifiers (tint, shade, saturation, luminance, etc.)
 - **Master/Layout inheritance**: Placeholder inheritance, `p:clrMapOvr`
 - **Background**: Solid, gradient, image, pattern backgrounds
