@@ -195,7 +195,7 @@ EMF コンバータと同様の手法で WMF (16-bit GDI) をパースし SVG �
 ### F1: アクセシビリティ・メタデータ
 
 - [x] **代替テキスト（p:cNvPr descr/title）** — SVG の `<title>`（アクセシブルネーム兼ツールチップ）として出力し、`data-ooxml-nv-*` で round-trip。あわせて p:cNvPr の id/name を保持（編集スライドのエクスポートで全シェイプが `id="0" name=""` になり、アニメーションの spid やコネクタ接続先が切れていた）。追加・複製・貼り付けでは新しい id を採番し、書き出し時にも重複を解消
-- [ ] **非表示シェイプ（p:cNvPr hidden="1"）** — 選択ウィンドウで非表示にしたシェイプも現在は描画される
+- [x] **非表示シェイプ（p:cNvPr hidden="1"）** — `<g display="none">` として SVG に残し（描画しない）、`data-ooxml-nv-hidden` で round-trip、エクスポートで `hidden="1"` を保持
 - [ ] **セクション（p:sectionLst）** — プレゼンテーションのセクション情報をパース。API で取得可能にする
 
 ### F2: テーマ・スタイル

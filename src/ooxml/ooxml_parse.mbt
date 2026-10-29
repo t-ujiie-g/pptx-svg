@@ -989,6 +989,7 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     nv_name: "",
     nv_descr: "",
     nv_title: "",
+    nv_hidden: false,
   }
 }
 
@@ -2007,7 +2008,7 @@ pub fn parse_bg_fills_from_csld(
 }
 
 ///|
-/// `shape` with the id, name, descr and title of its element's p:cNvPr.
+/// `shape` with the id, name, descr, title and hidden flag of its element's p:cNvPr.
 fn with_nv_props(shape : Shape, elem : @xml.XmlNode) -> Shape {
   for nv in @xml.get_children(elem) {
     if @xml.find_child(@xml.get_children(nv), "p:cNvPr") is Some(c) {
@@ -2023,6 +2024,7 @@ fn with_nv_props(shape : Shape, elem : @xml.XmlNode) -> Shape {
         nv_name: attr("name"),
         nv_descr: attr("descr"),
         nv_title: attr("title"),
+        nv_hidden: attr("hidden") == "1" || attr("hidden") == "true",
       }
     }
   }

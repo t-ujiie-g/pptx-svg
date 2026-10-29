@@ -1506,12 +1506,13 @@ fn roman_convert(n : Int32, lower : Bool) -> String {
 }
 
 ///|
-/// `data-ooxml-nv-*` for the shape's p:cNvPr id, name, descr and title (when set).
+/// `data-ooxml-nv-*` for the shape's p:cNvPr id, name, descr, title and hidden flag (when set).
 fn nv_attrs(shape : @ooxml.Shape) -> String {
   (if shape.nv_id >= 0 { dai("nv-id", shape.nv_id) } else { "" }) +
   (if shape.nv_name.is_empty() { "" } else { da("nv-name", shape.nv_name) }) +
   (if shape.nv_descr.is_empty() { "" } else { da("nv-descr", shape.nv_descr) }) +
-  (if shape.nv_title.is_empty() { "" } else { da("nv-title", shape.nv_title) })
+  (if shape.nv_title.is_empty() { "" } else { da("nv-title", shape.nv_title) }) +
+  (if shape.nv_hidden { da("nv-hidden", "1") } else { "" })
 }
 
 ///|
@@ -2092,7 +2093,8 @@ pub fn render_shape(
     } else {
       ""
     }
-    let has_refl = !shape.effects.is_none() &&
+    let has_refl = !shape.nv_hidden &&
+      !shape.effects.is_none() &&
       !shape.effects.reflection.is_none()
     let shape_id_attr = if has_refl {
       " id=\"" + refl_shape_id(slide_num, shape_idx) + "\""
@@ -2103,6 +2105,8 @@ pub fn render_shape(
       g_attrs +
       eff_attr +
       shape_id_attr +
+      // A hidden shape stays in the SVG (for round-trip and export) but isn't drawn.
+      (if shape.nv_hidden { " display=\"none\"" } else { "" }) +
       ">" +
       alt_text_title(shape) +
       inner +

@@ -716,3 +716,21 @@ test "serialize_slide keeps p:cNvPr ids unique, first use wins" {
   assert_true(xml.contains("<p:cNvPr id=\"6\" name=\"copy\"/>"))
   assert_true(xml.contains("<p:cNvPr id=\"7\" name=\"\"/>"))
 }
+
+///|
+test "serialize_shape writes p:cNvPr hidden" {
+  let shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      { x: 0, y: 0, cx: 100, cy: 100, rot: 0, flip_h: false, flip_v: false, },
+    ),
+    nv_id: 3,
+    nv_name: "H",
+    nv_hidden: true,
+  }
+  assert_true(
+    @serializer.serialize_shape(shape).contains(
+      "<p:cNvPr id=\"3\" name=\"H\" hidden=\"1\"/>",
+    ),
+  )
+}

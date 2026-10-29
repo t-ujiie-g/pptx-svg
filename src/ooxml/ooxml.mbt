@@ -1598,6 +1598,7 @@ pub(all) struct Shape {
   nv_name : String // p:cNvPr name
   nv_descr : String // p:cNvPr descr: the alt text
   nv_title : String // p:cNvPr title
+  nv_hidden : Bool // p:cNvPr hidden: kept in the document but not drawn
 }
 
 ///|
@@ -1650,6 +1651,7 @@ pub fn Shape::default_with(
     nv_name: "",
     nv_descr: "",
     nv_title: "",
+    nv_hidden: false,
   }
 }
 
