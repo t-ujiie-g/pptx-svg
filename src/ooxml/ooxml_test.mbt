@@ -1264,3 +1264,130 @@ test "p:cNvPr id, name, descr and title are parsed; fresh ids reach group childr
   }
   assert_eq(fgrp.children[0].nv_id, 11)
 }
+
+///|
+/// A table from (grid_span, row_span, h_merge, v_merge) per cell; the anchor at
+/// (r, c) in `marked` is filled red so a moved anchor can be traced.
+fn merge_table(
+  spec : Array[Array[(Int32, Int32, Bool, Bool)]],
+  marked : (Int32, Int32),
+) -> @ooxml.TableData {
+  let rows = spec.mapi(fn(r, row) {
+    let cells = row.mapi(fn(c, s) {
+      let (gs, rs, h, v) = s
+      {
+        ..@ooxml.TableCell::empty(),
+        grid_span: gs,
+        row_span: rs,
+        h_merge: h,
+        v_merge: v,
+        fill: if (r, c) == marked {
+          @ooxml.parse_hex_color("FF0000")
+        } else {
+          @ooxml.Color::none()
+        },
+      }
+    })
+    ({ height: 100, cells, } : @ooxml.TableRow)
+  })
+  {
+    col_widths: Array::make(spec[0].length(), 100),
+    rows,
+    style_id: "",
+    first_row: false,
+    last_row: false,
+    first_col: false,
+    last_col: false,
+    band_row: false,
+    band_col: false,
+  }
+}
+
+///|
+/// Each row as "anchor/covered" codes: "{cols}x{rows}" for an anchor, H / V / HV for a
+/// covered cell, "." otherwise.
+fn merge_layout(t : @ooxml.TableData) -> Array[String] {
+  t.rows.map(fn(row) {
+    row.cells
+    .map(fn(c) {
+      if c.h_merge && c.v_merge {
+        "HV"
+      } else if c.h_merge {
+        "H"
+      } else if c.v_merge {
+        "V"
+      } else if c.grid_span > 1 || c.row_span > 1 {
+        @xml.int_to_str(c.grid_span) + "x" + @xml.int_to_str(c.row_span)
+      } else {
+        "."
+      }
+    })
+    .join(" ")
+  })
+}
+
+///|
+/// Slide 41's table: A spans two columns (its neighbour has no hMerge, as python-pptx
+/// writes it), D spans two rows.
+fn slide41_table() -> @ooxml.TableData {
+  merge_table(
+    [
+      [(2, 1, false, false), (1, 1, false, false), (1, 1, false, false)],
+      [(1, 2, false, false), (1, 1, false, false), (1, 1, false, false)],
+      [(1, 1, false, true), (1, 1, false, false), (1, 1, false, false)],
+    ],
+    (1, 0),
+  )
+}
+
+///|
+test "table insert_row inside a vertical merge widens it" {
+  let t = slide41_table()
+  t.insert_row(2, 100)
+  assert_eq(merge_layout(t), ["2x1 H .", "1x3 . .", "V . .", "V . ."])
+}
+
+///|
+test "table delete_row on a merge's anchor row moves the anchor down" {
+  let t = slide41_table()
+  t.delete_row(1)
+  assert_eq(merge_layout(t), ["2x1 H .", ". . ."])
+  assert_eq(t.rows[1].cells[0].fill.r, 255)
+}
+
+///|
+test "table insert_column inside a horizontal merge widens it" {
+  let t = slide41_table()
+  t.insert_column(1, 100)
+  assert_eq(merge_layout(t), ["3x1 H H .", "1x2 . . .", "V . . ."])
+  assert_eq(t.col_widths.length(), 4)
+}
+
+///|
+test "table delete_column on a merge's anchor column moves the anchor right" {
+  let t = merge_table(
+    [
+      [(2, 2, false, false), (1, 2, true, false), (1, 1, false, false)],
+      [(2, 1, false, true), (1, 1, true, true), (1, 1, false, false)],
+      [(1, 1, false, false), (1, 1, false, false), (1, 1, false, false)],
+    ],
+    (0, 0),
+  )
+  t.delete_column(0)
+  assert_eq(merge_layout(t), ["1x2 .", "V .", ". ."])
+  assert_eq(t.rows[0].cells[0].fill.r, 255)
+}
+
+///|
+test "table insert_column inside a 2x2 merge widens every row of it" {
+  let t = merge_table(
+    [
+      [(2, 2, false, false), (1, 2, true, false), (1, 1, false, false)],
+      [(2, 1, false, true), (1, 1, true, true), (1, 1, false, false)],
+    ],
+    (0, 0),
+  )
+  t.insert_column(1, 100)
+  assert_eq(merge_layout(t), ["3x2 H H .", "V HV HV ."])
+  assert_eq(t.rows[1].cells[0].grid_span, 3)
+}

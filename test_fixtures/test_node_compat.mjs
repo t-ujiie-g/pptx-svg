@@ -1584,6 +1584,36 @@ if (!existsSync(FEATURES_PATH)) {
   console.log('  OK: header/footer field placeholders');
 }
 
+// --- Test 64: row/column edits keep merged cells consistent ---
+// test_features.pptx slide 41 (index 40): "Merged 2 cols" spans two columns of row 0
+// and "Merged 2 rows" two rows of column 0.
+if (existsSync(FEATURES_PATH)) {
+  console.log('Test 64: table edits with merged cells');
+  const MSLIDE = 40;
+  const tcAttrs = (xml) => [...xml.matchAll(/<a:tr[^>]*>(.*?)<\/a:tr>/gs)]
+    .map((m) => [...m[1].matchAll(/<a:tc(\s[^>]*)?>/g)].map((t) => (t[1] ?? '').trim()));
+  const r = await freshFeatures();
+  const msvg = r.renderSlideSvg(MSLIDE);
+  const midx = Number(msvg.match(/data-ooxml-shape-type="table"[^>]*data-ooxml-shape-idx="(\d+)"/)[1]);
+
+  // A row inserted inside the vertical merge widens it.
+  assert(r.addTableRow(MSLIDE, midx, 1) === 'OK:2', 'addTableRow inside the merge');
+  let rows = tcAttrs(r.getSlideOoxml(MSLIDE));
+  assert(rows.length === 4 && rows.every((cells) => cells.length === 3), `every row keeps 3 cells: ${JSON.stringify(rows)}`);
+  assert(rows[1][0].includes('rowSpan="3"'), `anchor spans 3 rows: ${rows[1][0]}`);
+  assert(rows[2][0].includes('vMerge="1"') && rows[3][0].includes('vMerge="1"'), 'inserted and old rows are covered');
+  assert(!r.renderSlideSvg(MSLIDE).startsWith('ERROR'), 'table still renders');
+
+  // Deleting the horizontal merge's anchor column moves its content right.
+  assert(r.deleteTableColumn(MSLIDE, midx, 0) === 'OK', 'deleteTableColumn on the anchor column');
+  const xml = r.getSlideOoxml(MSLIDE);
+  rows = tcAttrs(xml);
+  assert(rows.every((cells) => cells.length === 2), `every row keeps 2 cells: ${JSON.stringify(rows)}`);
+  assert(xml.includes('Merged 2 cols'), 'the merged cell\'s text moves to the next column');
+  assert(!xml.includes('gridSpan="2"') && !xml.includes('hMerge'), 'no horizontal merge is left');
+  console.log('  OK: merged cells stay consistent');
+}
+
 // --- Summary ---
 console.log('');
 console.log(`Results: ${passed} passed, ${failed} failed`);

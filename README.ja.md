@@ -236,7 +236,7 @@ z-order はシェイプ配列順（末尾＝最前面）。4つとも undo 可�
 | `addTableRow(slideIdx, shapeIdx, afterRow?)` / `deleteTableRow(slideIdx, shapeIdx, row)` | `string` | 行の追加 / 削除。 |
 | `addTableColumn(slideIdx, shapeIdx, afterCol?, widthEmu?)` / `deleteTableColumn(slideIdx, shapeIdx, col)` | `string` | 列の追加 / 削除。 |
 
-すべて undo 可能。結合セルは span 調整しない（v1）。詳細は [docs/editing-guide.md](docs/editing-guide.md#table-editing)。
+すべて undo 可能。結合セルは行・列の追加・削除に合わせて伸縮・移動する。詳細は [docs/editing-guide.md](docs/editing-guide.md#table-editing)。
 
 **ノート・コメント:**
 

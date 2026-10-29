@@ -413,7 +413,7 @@ renderer.deleteTableColumn(0, tableShapeIdx, 2);
 renderer.renderSlideSvg(0); // re-render afterwards
 ```
 
-These target a shape whose `data-ooxml-shape-type` is `table`; calling them on a non-table shape returns `ERROR`. **v1 limitation:** merged cells (`gridSpan`/`rowSpan`/`hMerge`/`vMerge`) are **not** span-adjusted when rows/columns change — editing the structure of a table with merged cells may corrupt it.
+These target a shape whose `data-ooxml-shape-type` is `table`; calling them on a non-table shape returns `ERROR`. Merged cells follow row/column edits: an insertion inside a merged range widens it, a deletion through one shrinks it, and deleting the row/column a merged cell is anchored on moves the anchor (with its content) to the next row/column. Merging and splitting cells is not available yet.
 
 ## Copy & Paste (cross-slide)
 
