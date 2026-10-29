@@ -1,13 +1,4 @@
-// OOXML Chart parsing — ChartML (ECMA-376 Part 1 Chapter 21)
-//
-// Parses c:chartSpace XML from ppt/charts/*.xml into ChartData.
-// Supports: bar/column, line, pie, donut, scatter, area, radar, bubble, stock charts.
-// Series data is read from numCache/strCache (not from external xlsx).
-//
-// Lazy resolution: parse_graphic_frame stores chart r:id in chart_xml field;
-// main.mbt resolves the actual chart XML file via rels + ffi_get_file.
-//
-// Same package as ooxml.mbt — all types and helpers are shared.
+// Series data comes from the chart part's numCache/strCache, not the embedded workbook.
 
 ///|
 let default_bar_gap_width : Int32 = 150 // ECMA-376 default gap width percentage
@@ -130,7 +121,6 @@ pub(all) enum ChartKind {
   StockChart // c:stockChart
   SurfaceChart // c:surfaceChart / c:surface3DChart — 2D heatmap approximation
   OfPieChart // c:ofPieChart — pie/bar of pie, rendered as standard pie
-  // Office 2016+ ChartEx (cx: namespace)
   WaterfallChart // cx:series layoutId="waterfall"
   TreemapChart // cx:series layoutId="treemap"
   SunburstChart // cx:series layoutId="sunburst"
@@ -207,20 +197,14 @@ pub(all) struct ChartSeries {
   order : Int32 // c:order/@val
   title : String // series name (from c:tx strCache)
   sp_pr : ChartSpPr // series formatting
-  // Category-based (bar/line/area/pie)
   cat : AxisDataSource // c:cat
   val : AxisDataSource // c:val
-  // Scatter/bubble
   x_val : AxisDataSource // c:xVal
   y_val : AxisDataSource // c:yVal
   bubble_size : AxisDataSource // c:bubbleSize (bubble chart only)
-  // Line/scatter
   smooth : Bool // c:smooth
-  // Pie
   explosion : Int32 // c:explosion (0 = none)
-  // Per-point formatting
   data_points : Array[ChartDataPoint] // c:dPt list
-  // Trendlines + error bars
   trendlines : Array[ChartTrendline] // c:trendline list
   err_bars : ChartErrBars // c:errBars
   // Series-level data labels (override group dLbls)
@@ -358,30 +342,24 @@ pub fn parse_chart_xml(chart_xml : String, theme : ThemeData) -> ChartData {
     Some(n) => n
   }
   let cs_ch = @xml.get_children(cs)
-  // c:style
   let style = match @xml.find_child(cs_ch, "c:style") {
     None => 0
     Some(s) => attr_int(s, "val")
   }
-  // c:chart
   let chart_node = match @xml.find_child(cs_ch, "c:chart") {
     None => return { ..ChartData::empty(), style, chart_xml, }
     Some(n) => n
   }
   let chart_ch = @xml.get_children(chart_node)
-  // Chart title
   let title = parse_chart_title_text(chart_ch)
-  // Plot area
   let (groups, axes) = match @xml.find_child(chart_ch, "c:plotArea") {
     None => ([], [])
     Some(pa) => parse_plot_area(@xml.get_children(pa), theme)
   }
-  // Legend
   let legend = match @xml.find_child(chart_ch, "c:legend") {
     None => ChartLegend::none()
     Some(lg) => parse_chart_legend(@xml.get_children(lg))
   }
-  // 3D view (preserved for round-trip)
   let view_3d = match @xml.find_child(chart_ch, "c:view3D") {
     None => ChartView3D::none()
     Some(v) => parse_view_3d(@xml.get_children(v))
@@ -402,7 +380,6 @@ fn parse_chart_title_text(chart_ch : Array[@xml.XmlNode]) -> String {
     Some(n) => n
   }
   let tx_ch = @xml.get_children(tx)
-  // c:rich → a:p → a:r → a:t
   match @xml.find_child(tx_ch, "c:rich") {
     None => ""
     Some(rich) => extract_all_text(@xml.get_children(rich))
@@ -923,7 +900,6 @@ fn parse_series_title(ch : Array[@xml.XmlNode]) -> String {
     Some(n) => n
   }
   let tx_ch = @xml.get_children(tx)
-  // Try c:strRef/c:strCache first
   if @xml.find_child(tx_ch, "c:strRef") is Some(sr) {
     let sr_ch = @xml.get_children(sr)
     if @xml.find_child(sr_ch, "c:strCache") is Some(cache) {
@@ -935,7 +911,6 @@ fn parse_series_title(ch : Array[@xml.XmlNode]) -> String {
       }
     }
   }
-  // Try c:v directly
   match @xml.find_child(tx_ch, "c:v") {
     Some(v) => @xml.get_text_content(v)
     None => ""
@@ -945,7 +920,6 @@ fn parse_series_title(ch : Array[@xml.XmlNode]) -> String {
 ///|
 /// Parse axis data source (c:cat, c:val, c:xVal, c:yVal children).
 fn parse_axis_data_source(ch : Array[@xml.XmlNode]) -> AxisDataSource {
-  // Try c:numRef
   if @xml.find_child(ch, "c:numRef") is Some(nr) {
     let nr_ch = @xml.get_children(nr)
     let formula = match @xml.find_child(nr_ch, "c:f") {
@@ -958,11 +932,9 @@ fn parse_axis_data_source(ch : Array[@xml.XmlNode]) -> AxisDataSource {
     }
     return NumSource(formula, cache)
   }
-  // Try c:numLit
   if @xml.find_child(ch, "c:numLit") is Some(nl) {
     return NumSource("", parse_num_data(@xml.get_children(nl)))
   }
-  // Try c:strRef
   if @xml.find_child(ch, "c:strRef") is Some(sr) {
     let sr_ch = @xml.get_children(sr)
     let formula = match @xml.find_child(sr_ch, "c:f") {
@@ -975,7 +947,6 @@ fn parse_axis_data_source(ch : Array[@xml.XmlNode]) -> AxisDataSource {
     }
     return StrSource(formula, cache)
   }
-  // Try c:strLit
   if @xml.find_child(ch, "c:strLit") is Some(sl) {
     return StrSource("", parse_str_data(@xml.get_children(sl)))
   }
@@ -1054,7 +1025,6 @@ fn parse_chart_axis(
 ) -> ChartAxis {
   let ax_pos_raw = child_attr_val(ch, "c:axPos")
   let tick_raw = child_attr_val(ch, "c:tickLblPos")
-  // Scaling
   let (orientation, min_val, max_val) = match @xml.find_child(ch, "c:scaling") {
     None => ("minMax", "", "")
     Some(sc) => {
@@ -1071,7 +1041,6 @@ fn parse_chart_axis(
       )
     }
   }
-  // Number format
   let num_fmt = match @xml.find_child(ch, "c:numFmt") {
     None => "General"
     Some(nf) =>
@@ -1080,10 +1049,8 @@ fn parse_chart_axis(
         Some(v) => v
       }
   }
-  // Value axis specifics
   let cb_raw = if is_val { child_attr_val(ch, "c:crossBetween") } else { "" }
   let mu = if is_val { child_attr_val(ch, "c:majorUnit") } else { "" }
-  // Axis title
   let title = match @xml.find_child(ch, "c:title") {
     None => ""
     Some(title_node) => {
@@ -1145,8 +1112,7 @@ fn parse_chart_legend(ch : Array[@xml.XmlNode]) -> ChartLegend {
 }
 
 ///|
-/// Parse c:view3D element — 3D rotation/perspective for round-trip preservation.
-/// Uses child_attr_val to distinguish missing elements (default) from val="0".
+/// Parse c:view3D. child_attr_val tells a missing element (default) from val="0".
 fn parse_view_3d(ch : Array[@xml.XmlNode]) -> ChartView3D {
   let rx_s = child_attr_val(ch, "c:rotX")
   let ry_s = child_attr_val(ch, "c:rotY")
@@ -1186,22 +1152,17 @@ pub fn parse_chartex_xml(chart_xml : String, theme : ThemeData) -> ChartData {
     Some(n) => n
   }
   let cs_ch = @xml.get_children(root)
-  // 1. Parse cx:chartData — build data lookup by id
   let data_map = parse_cx_chart_data(cs_ch)
-  // 2. Parse cx:chart
   let chart_node = match @xml.find_child(cs_ch, "cx:chart") {
     None => return { ..ChartData::empty(), chart_xml, }
     Some(n) => n
   }
   let chart_ch = @xml.get_children(chart_node)
-  // Title
   let title = parse_cx_title(chart_ch)
-  // Plot area
   let (groups, axes) = match @xml.find_child(chart_ch, "cx:plotArea") {
     None => ([], [])
     Some(pa) => parse_cx_plot_area(@xml.get_children(pa), data_map, theme)
   }
-  // Legend
   let legend = match @xml.find_child(chart_ch, "cx:legend") {
     None => ChartLegend::none()
     Some(lg) => {
@@ -1278,12 +1239,10 @@ fn parse_cx_chart_data(cs_ch : Array[@xml.XmlNode]) -> Array[CxDataBlock] {
 /// Parse cx:strDim → StrSource with first cx:lvl.
 fn parse_cx_str_dim(node : @xml.XmlNode) -> AxisDataSource {
   let ch = @xml.get_children(node)
-  // Get formula if present
   let formula = match @xml.find_child(ch, "cx:f") {
     None => ""
     Some(f) => @xml.get_text_content(f)
   }
-  // Parse first cx:lvl
   match @xml.find_child(ch, "cx:lvl") {
     None => AxisDataSource::StrSource(formula, StrData::empty())
     Some(lvl) => {
@@ -1344,7 +1303,6 @@ fn parse_cx_title(chart_ch : Array[@xml.XmlNode]) -> String {
   match @xml.find_child(tx_ch, "cx:rich") {
     Some(rich) => extract_all_text(@xml.get_children(rich))
     None =>
-      // Fallback: cx:txData/cx:v
       match @xml.find_child(tx_ch, "cx:txData") {
         None => ""
         Some(txd) =>
@@ -1365,7 +1323,6 @@ fn parse_cx_plot_area(
 ) -> (Array[ChartGroup], Array[ChartAxis]) {
   let groups : Array[ChartGroup] = []
   let axes : Array[ChartAxis] = []
-  // cx:plotAreaRegion contains cx:series
   if @xml.find_child(pa_ch, "cx:plotAreaRegion") is Some(par) {
     let par_ch = @xml.get_children(par)
     let ser_nodes = @xml.find_children(par_ch, "cx:series")
@@ -1373,7 +1330,6 @@ fn parse_cx_plot_area(
       groups.push(parse_cx_series(ser_nodes[i], data_map, i, theme))
     }
   }
-  // cx:axis elements
   let ax_nodes = @xml.find_children(pa_ch, "cx:axis")
   for i in 0..<ax_nodes.length() {
     axes.push(parse_cx_axis(ax_nodes[i]))
@@ -1425,13 +1381,11 @@ fn parse_cx_series(
   }
   let chart_kind = cx_layout_to_kind(layout_id)
   let ch = @xml.get_children(node)
-  // Data reference
   let data_id = match @xml.find_child(ch, "cx:dataId") {
     None => attr_int(node, "dataId")
     Some(did) => attr_int(did, "val")
   }
   let data_block = find_cx_data(data_map, data_id)
-  // Series title
   let title = match @xml.find_child(ch, "cx:tx") {
     None => ""
     Some(tx) => {
@@ -1446,9 +1400,7 @@ fn parse_cx_series(
       }
     }
   }
-  // Per-point formatting (cx:dataPt)
   let data_points = parse_cx_data_points(ch, theme)
-  // Shape properties
   let sp_pr = match @xml.find_child(ch, "cx:spPr") {
     None =>
       match @xml.find_child(ch, "a:spPr") {
@@ -1457,7 +1409,6 @@ fn parse_cx_series(
       }
     Some(sppr) => parse_chart_sp_pr_node(sppr, theme)
   }
-  // Layout properties (subtotals for waterfall, binning for histogram)
   let subtotals = parse_cx_subtotals(ch)
   let series : ChartSeries = {
     idx,
@@ -1527,7 +1478,6 @@ fn parse_cx_axis(node : @xml.XmlNode) -> ChartAxis {
     Some("1") => true
     _ => false
   }
-  // Determine if value or category axis
   let is_val = match @xml.find_child(ch, "cx:valScaling") {
     Some(_) => true
     None => false

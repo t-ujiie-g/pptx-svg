@@ -1,11 +1,3 @@
-// OOXML Text body parsing — paragraphs, runs, bodyPr
-//
-// Parses <a:bodyPr>, <a:p>, <a:r>, <a:rPr>, <a:pPr> elements into
-// TextParagraph/TextRun/BodyProps structs. Handles bullets (char/auto/image),
-// spacing, indentation, tabs, RTL, run-level effects, and font resolution.
-//
-// Same package as ooxml.mbt — all types and helpers are shared.
-
 ///|
 /// Recursively extract plain text from OMML math elements (m:t nodes).
 fn extract_math_text(node : @xml.XmlNode) -> String {
@@ -13,14 +5,12 @@ fn extract_math_text(node : @xml.XmlNode) -> String {
     @xml.XmlNode::Text(s) => s
     @xml.XmlNode::Element(tag, _, children) =>
       if tag == "m:t" {
-        // m:t contains the actual math text
         let mut t = ""
         for child in children {
           t = t + extract_math_text(child)
         }
         t
       } else {
-        // Recurse into children
         let mut result = ""
         for child in children {
           result = result + extract_math_text(child)
@@ -31,8 +21,7 @@ fn extract_math_text(node : @xml.XmlNode) -> String {
 }
 
 ///|
-/// Parse spacing value from <a:spcBef>/<a:spcAft>/<a:lnSpc> children.
-///  Returns EMU. Supports <a:spcPts val="N"> (N in hundredths of a point).
+/// A spcBef/spcAft/lnSpc value in EMU (a:spcPts is in hundredths of a point).
 fn parse_spacing(parent : @xml.XmlNode) -> Int32 {
   let ch = @xml.get_children(parent)
   match @xml.find_child(ch, "a:spcPts") {
@@ -84,7 +73,6 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
         Some(_) => true
         None => false
       }
-      // Parse <a:normAutofit fontScale="..." lnSpcReduction="..."/>
       let (font_scale, ln_spc_reduction) = match
         @xml.find_child(bpr_ch, "a:normAutofit") {
         Some(naf) => {
@@ -117,7 +105,6 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
         Some(v) => @xml.parse_int(v)
         None => 0
       }
-      // Parse <a:prstTxWarp prst="..."> with optional <a:avLst>
       let (warp_prst, warp_av1, warp_av2) = match
         @xml.find_child(bpr_ch, "a:prstTxWarp") {
         None => ("", -1, -1)
@@ -132,7 +119,6 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
             Some(avl) => {
               let gds = @xml.find_children(@xml.get_children(avl), "a:gd")
               let v1 = if !gds.is_empty() {
-                // a:gd name="adj" fmla="val N" — extract N
                 let fmla = match @xml.get_attr(gds[0], "fmla") {
                   Some(f) => f
                   None => ""
@@ -284,7 +270,6 @@ fn parse_para_props(
     Some(_) => true
     None => false
   }
-  // Bullet formatting
   let bu_font = match @xml.find_child(ppr_ch, "a:buFont") {
     None => ""
     Some(bf) =>
@@ -316,7 +301,6 @@ fn parse_para_props(
       parse_color_from_children(bc_ch, theme)
     }
   }
-  // Image bullet: <a:buBlip><a:blip r:embed="rIdN"/></a:buBlip>
   let bu_img_rid = match @xml.find_child(ppr_ch, "a:buBlip") {
     None => ""
     Some(bub) => {
@@ -331,7 +315,6 @@ fn parse_para_props(
       }
     }
   }
-  // Tab stops: <a:tabLst><a:tab pos="N" algn="l"/></a:tabLst>
   let tab_stops : Array[TabStop] = []
   if @xml.find_child(ppr_ch, "a:tabLst") is Some(tl) {
     let tabs = @xml.find_children(@xml.get_children(tl), "a:tab")
@@ -351,10 +334,8 @@ fn parse_para_props(
 }
 
 ///|
-/// Parse <a:defRPr> defaults from a <a:pPr> node.
-/// Returns (bold, bold_explicit, italic, font_size, color, font_face, ea_font).
-/// bold_explicit is true when defRPr has an explicit `b` attribute (either "0" or "1"),
-/// which should prevent inheriting bold from lower-priority style sources.
+/// a:defRPr defaults of an a:pPr: (bold, bold_explicit, italic, size, color, font, ea_font).
+/// bold_explicit = an explicit `b`, which blocks bold from lower-priority styles.
 fn parse_def_rpr(
   ppr : @xml.XmlNode,
   theme : ThemeData,
@@ -430,10 +411,8 @@ fn default_text_run(
 }
 
 ///|
-/// Split a string on embedded LF (`\n`) characters. PowerPoint renders a raw
-/// newline inside `<a:t>` as a forced line break (same as `<a:br/>`), even
-/// though this is outside the strict OOXML text-run schema — some
-/// generators (e.g. python-pptx multi-line `text =` assignment) emit it.
+/// Split on raw `\n`: PowerPoint renders it inside `<a:t>` as a line break (python-pptx
+/// writes it), though the schema doesn't allow it.
 fn split_by_newline(s : String) -> Array[String] {
   let parts : Array[String] = []
   let len = s.length()
@@ -491,8 +470,7 @@ fn parse_run_props(
   let rpr_ch = @xml.get_children(rpr)
   let clr_raw = parse_solid_fill(rpr_ch, theme)
   let color = if clr_raw.is_none() { def_color } else { clr_raw }
-  // Underline color: a:uFill (CT_TextUnderlineFill) or a:uLn (CT_TextUnderlineLine).
-  // Color::none() means the underline follows the run's text color.
+  // Underline color from a:uFill or a:uLn; Color::none() follows the text color.
   let underline_color = match @xml.find_child(rpr_ch, "a:uFill") {
     Some(uf) => parse_solid_fill(@xml.get_children(uf), theme)
     None =>
@@ -517,7 +495,6 @@ fn parse_run_props(
     Some(v) => v
     None => ""
   }
-  // Hyperlink: <a:hlinkClick r:id="rIdN"/>
   let hlink_rid = match @xml.find_child(rpr_ch, "a:hlinkClick") {
     None => ""
     Some(hl) =>
@@ -534,22 +511,17 @@ fn parse_run_props(
         None => ""
       }
   }
-  // Text outline: a:ln on a:rPr
-  // Only apply outline when a:ln has an explicit solid fill color.
-  // An empty <a:ln/> or <a:ln> without <a:solidFill> means no visible outline.
+  // A text outline needs an explicit a:ln/a:solidFill; an empty a:ln draws nothing.
   let (outline_color, outline_w) = match @xml.find_child(rpr_ch, "a:ln") {
     None => (Color::none(), 0)
     Some(ln) => {
       let ow = attr_int(ln, "w")
       let ln_ch = @xml.get_children(ln)
       let oc = parse_solid_fill(ln_ch, theme)
-      // Only set outline if solidFill was explicitly specified
       (oc, ow)
     }
   }
-  // Text gradient fill: a:gradFill on a:rPr
   let text_grad_fill = parse_gradient_fill(rpr_ch, theme)
-  // Text pattern fill: a:pattFill on a:rPr
   let text_patt_fill = parse_pattern_fill(rpr_ch, theme)
   {
     text: "",
@@ -585,12 +557,10 @@ fn parse_run_effect_lst(
   rpr_ch : Array[@xml.XmlNode],
   theme : ThemeData,
 ) -> EffectList {
-  // a:effectLst can appear as a child of a:rPr
   match @xml.find_child(rpr_ch, "a:effectLst") {
     None => EffectList::none()
     Some(eff) => {
       let eff_ch = @xml.get_children(eff)
-      // Reuse the shape-level effect parsing (only need outerShdw for text typically)
       let os = match @xml.find_child(eff_ch, "a:outerShdw") {
         None => OuterShadow::none()
         Some(osn) => parse_outer_shadow(osn, theme)
@@ -629,7 +599,6 @@ fn parse_text_body(
   let paras : Array[TextParagraph] = []
   let ch = @xml.get_children(txbody)
   let body_props = parse_body_props(ch)
-  // Parse a:lstStyle for shape-specific level defaults
   let lst_style = match @xml.find_child(ch, "a:lstStyle") {
     None => TextStyleGroup::empty()
     Some(ls) => parse_text_style_group(ls, theme)
@@ -688,7 +657,6 @@ fn parse_text_body(
       None => (false, false, false, 0, Color::none(), "", "")
       Some(ppr) => parse_def_rpr(ppr, theme)
     }
-    // Apply lstStyle level defaults as fallback
     let lvl_idx = if level >= 0 && level < max_outline_levels {
       level
     } else {
@@ -716,10 +684,7 @@ fn parse_text_body(
     } else {
       def_ea_font
     }
-    // endParaRPr is NOT applied as a fallback to def_* here — it's stored
-    // on the paragraph (epr_* fields) and applied as last-resort fallback in
-    // main_inherit.mbt, AFTER layout/master placeholder inheritance.
-    // Iterate over all children to handle a:r (runs), a:fld (fields), and a:br (breaks)
+    // endParaRPr goes to epr_*, applied in main_inherit.mbt after placeholder inheritance.
     let runs : Array[TextRun] = []
     for child in p_ch {
       let child_tag = @xml.get_tag(child)
@@ -759,7 +724,6 @@ fn parse_text_body(
           }
         }
       } else if child_tag == "m:oMath" || child_tag == "m:oMathPara" {
-        // OMML math equation — preserve raw XML, extract plain text from m:t elements
         let math_raw = @xml.serialize_node(child)
         let math_text = extract_math_text(child)
         let display = if math_text.is_empty() { "[math]" } else { math_text }
@@ -770,7 +734,6 @@ fn parse_text_body(
         run = { ..run, math_xml: math_raw, }
         runs.push(run)
       } else if child_tag == "a:br" {
-        // Line break — insert a newline run
         runs.push(
           default_text_run(
             "\n", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
@@ -779,10 +742,6 @@ fn parse_text_body(
         )
       }
     }
-    // Capture endParaRPr values for this paragraph as last-resort fallbacks.
-    // These are applied AFTER layout/master inheritance so that, for free
-    // textboxes with no placeholder chain, runs still pick up endParaRPr
-    // color/font (e.g. PowerPoint's "remembered state" behavior).
     let (epr_font_size, epr_color, epr_font_face, epr_ea_font) = match
       @xml.find_child(p_ch, "a:endParaRPr") {
       Some(epr) => {
@@ -825,7 +784,6 @@ fn parse_text_body(
       epr_ea_font,
     })
   }
-  // Apply lstStyle fallbacks to paragraphs missing explicit values
   let npara = paras.length()
   for pai in 0..<npara {
     let para = paras[pai]
@@ -837,12 +795,10 @@ fn parse_text_body(
     let lst_def = lst_style.levels[lvl_idx]
     let mut changed = false
     let mut new_para = para
-    // Alignment fallback
     if para.align.is_empty() && !lst_def.align.is_empty() {
       new_para = { ..new_para, align: lst_def.align, }
       changed = true
     }
-    // Bullet fallback: inherit buChar from lstStyle if paragraph has no explicit bullet
     if para.bullet.is_empty() &&
       para.bullet_auto.is_empty() &&
       !para.bullet_none &&
@@ -850,7 +806,6 @@ fn parse_text_body(
       !lst_def.bullet.is_empty() {
       new_para = { ..new_para, bullet: lst_def.bullet, }
       changed = true
-      // Also inherit bullet_font/size/color from lstStyle if not set on paragraph
       if new_para.bullet_font.is_empty() && !lst_def.bullet_font.is_empty() {
         new_para = { ..new_para, bullet_font: lst_def.bullet_font, }
       }
@@ -861,7 +816,6 @@ fn parse_text_body(
         new_para = { ..new_para, bullet_color: lst_def.bullet_color, }
       }
     } else if !para.bullet.is_empty() || !para.bullet_auto.is_empty() {
-      // Paragraph has explicit bullet, but may still need font/size/color from lstStyle
       if para.bullet_font.is_empty() && !lst_def.bullet_font.is_empty() {
         new_para = { ..new_para, bullet_font: lst_def.bullet_font, }
         changed = true
@@ -875,7 +829,6 @@ fn parse_text_body(
         changed = true
       }
     }
-    // buNone fallback
     if !para.bullet_none &&
       lst_def.bullet_none &&
       para.bullet.is_empty() &&
@@ -884,12 +837,10 @@ fn parse_text_body(
       new_para = { ..new_para, bullet_none: true, }
       changed = true
     }
-    // Line spacing fallback
     if para.line_spacing == 0 && lst_def.line_spacing != 0 {
       new_para = { ..new_para, line_spacing: lst_def.line_spacing, }
       changed = true
     }
-    // Space before/after fallback
     if para.spc_before == 0 && lst_def.spc_before != 0 {
       new_para = { ..new_para, spc_before: lst_def.spc_before, }
       changed = true

@@ -1,7 +1,3 @@
-// OOXML Shape / Slide / Fill parsing
-//
-// Same package as ooxml.mbt — all types and helpers are shared.
-
 ///|
 /// graphicData uri for a SmartArt (DrawingML diagram) graphicFrame.
 let diagram_graphic_uri : String = "http://schemas.openxmlformats.org/drawingml/2006/diagram"
@@ -31,8 +27,7 @@ fn child_attr(
 }
 
 ///|
-/// Parse a color from direct children (a:srgbClr or a:schemeClr), without a:solidFill wrapper.
-///  Used for e.g. a:buClr which contains color child directly.
+/// A color from direct a:srgbClr/a:schemeClr children, with no a:solidFill wrapper (a:buClr).
 fn parse_color_from_children(
   children : Array[@xml.XmlNode],
   theme : ThemeData,
@@ -84,7 +79,6 @@ fn parse_gradient_fill(
         None => true
       }
       let gf_ch = @xml.get_children(gf_node)
-      // Parse gradient stops
       let stops : Array[GradientStop] = []
       if @xml.find_child(gf_ch, "a:gsLst") is Some(gs_lst) {
         let gs_nodes = @xml.find_children(@xml.get_children(gs_lst), "a:gs")
@@ -100,7 +94,6 @@ fn parse_gradient_fill(
       if stops.is_empty() {
         return GradientFill::none()
       }
-      // Parse linear gradient: <a:lin ang="N" scaled="0|1"/>
       let mut angle = 0
       let mut path_type = ""
       let mut fill_to_l = -1
@@ -110,14 +103,12 @@ fn parse_gradient_fill(
       match @xml.find_child(gf_ch, "a:lin") {
         Some(lin) => angle = attr_int(lin, "ang")
         None =>
-          // Parse path gradient: <a:path path="circle|rect|shape">
           if @xml.find_child(gf_ch, "a:path") is Some(path_node) {
             angle = -1
             path_type = match @xml.get_attr(path_node, "path") {
               Some(v) => v
               None => "circle"
             }
-            // Parse <a:fillToRect l="N" t="N" r="N" b="N"/>
             match
               @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
               Some(ftr) => {
@@ -221,7 +212,6 @@ fn parse_stroke(
           clr
         }
       }
-      // Preset dash or custom dash
       let mut dash = match @xml.find_child(ln_ch, "a:prstDash") {
         None => ""
         Some(d) =>
@@ -232,8 +222,7 @@ fn parse_stroke(
       }
       if dash.is_empty() {
         if @xml.find_child(ln_ch, "a:custDash") is Some(cd) {
-          // a:custDash contains a:ds children with d (dash) and sp (space) percentages
-          // Format: "custDash:d1,sp1;d2,sp2;..." (percentages of line width * 100)
+          // custDash becomes "custDash:d1,sp1;..." (a:ds d/sp, in 1/1000 % of the line width).
           let ds_nodes = @xml.find_children(@xml.get_children(cd), "a:ds")
           let nds = ds_nodes.length()
           let mut cd_str = cust_dash_prefix
@@ -253,7 +242,6 @@ fn parse_stroke(
           }
         }
       }
-      // Line join
       let mut join = ""
       let mut miter_limit = 0
       if @xml.find_child(ln_ch, "a:round") is Some(_) {
@@ -270,7 +258,6 @@ fn parse_stroke(
           miter_limit = attr_int(m, "lim")
         }
       }
-      // Arrow head
       let mut head_type = ""
       let mut head_w = ""
       let mut head_len = ""
@@ -288,7 +275,6 @@ fn parse_stroke(
           None => ""
         }
       }
-      // Arrow tail
       let mut tail_type = ""
       let mut tail_w = ""
       let mut tail_len = ""
@@ -619,16 +605,13 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
       None => ""
     }
     let blip_ch = @xml.get_children(blip)
-    // Parse a:alphaModFix
     if @xml.find_child(blip_ch, "a:alphaModFix") is Some(amf) {
       alpha = attr_int(amf, "amt")
     }
-    // Parse a:lum (brightness/contrast)
     if @xml.find_child(blip_ch, "a:lum") is Some(lum) {
       bright = attr_int(lum, "bright")
       contrast = attr_int(lum, "contrast")
     }
-    // Parse a:duotone — contains 2 color children
     if @xml.find_child(blip_ch, "a:duotone") is Some(dt) {
       let dt_ch = @xml.get_children(dt)
       let colors = parse_color_list(dt_ch)
@@ -637,7 +620,6 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
         duotone_2 = colors[1]
       }
     }
-    // Parse a:clrChange — from/to color
     if @xml.find_child(blip_ch, "a:clrChange") is Some(cc) {
       let cc_ch = @xml.get_children(cc)
       if @xml.find_child(cc_ch, "a:clrFrom") is Some(from_node) {
@@ -647,12 +629,10 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
         clr_to = parse_first_color(@xml.get_children(to_node))
       }
     }
-    // Parse asvg:svgBlip from a:extLst
     if @xml.find_child(blip_ch, "a:extLst") is Some(ext_lst) {
       let exts = @xml.get_children(ext_lst)
       for ext in exts {
         let ext_ch = @xml.get_children(ext)
-        // Look for asvg:svgBlip or any svgBlip tag
         for ext_node in ext_ch {
           match ext_node {
             @xml.XmlNode::Element(tag, _, _) =>
@@ -685,7 +665,6 @@ fn parse_blip_fill_node(bf_node : @xml.XmlNode) -> BlipFill {
     src_r = attr_int(sr, "r")
     src_b = attr_int(sr, "b")
   }
-  // Parse a:tile element
   let mut tile_tx = 0
   let mut tile_ty = 0
   let mut tile_sx = 0
@@ -770,8 +749,7 @@ fn parse_pattern_fill(
 }
 
 ///|
-/// Parse hyperlinks from p:cNvPr element (a:hlinkClick, a:hlinkHover).
-/// Returns (click_rid, hover_rid).
+/// The (click, hover) hyperlink rIds of a p:cNvPr.
 fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
   let mut click_rid = ""
   let mut hover_rid = ""
@@ -794,8 +772,8 @@ fn parse_cnvpr_links(nv_ch : Array[@xml.XmlNode]) -> (String, String) {
 }
 
 ///|
-/// Parse `<a:fillRef>` or `<a:lnRef>` inside `<p:style>`: returns (idx, schemeColorName).
-/// idx 0 means "no reference". schemeColorName is "" if not a scheme color.
+/// (idx, schemeClr name) of a p:style fillRef/lnRef; idx 0 = no reference, "" = not a
+/// scheme color.
 fn parse_style_ref(
   style_ch : Array[@xml.XmlNode],
   tag : String,
@@ -819,10 +797,8 @@ fn parse_style_ref(
 }
 
 ///|
-/// Resolve `<a:fillRef idx="N"><a:schemeClr val="X"/></a:fillRef>` against the
-/// theme's `a:fmtScheme/a:fillStyleLst`.  Returns the resolved
-/// (solid, gradient, blip, pattern) fill — exactly one will be non-none (or
-/// all none if `idx` is out of range or the style list is empty).
+/// The fill of a fillRef from the theme's fillStyleLst as (solid, gradient, blip, pattern),
+/// at most one set; all none when idx is out of range.
 fn resolve_fill_ref(
   idx : Int32,
   scheme_color_name : String,
@@ -847,10 +823,7 @@ fn resolve_fill_ref(
 }
 
 ///|
-/// Resolve `<a:fontRef>` inside `<p:style>` to a Color.
-/// PowerPoint applies this color to text runs that have no explicit color via
-/// any other inheritance step. Returns Color::none() if absent or no color
-/// child is present.
+/// The p:style fontRef color (Color::none() if absent), the last-resort run color.
 fn parse_font_ref_color(
   style_ch : Array[@xml.XmlNode],
   theme : ThemeData,
@@ -862,9 +835,7 @@ fn parse_font_ref_color(
 }
 
 ///|
-/// Resolve `<a:lnRef idx="N"><a:schemeClr val="X"/></a:lnRef>` against the
-/// theme's `a:fmtScheme/a:lnStyleLst`.  Returns StrokeProps::default() if not
-/// applicable.
+/// The stroke of an lnRef from the theme's lnStyleLst (StrokeProps::default() if none).
 fn resolve_ln_ref(
   idx : Int32,
   scheme_color_name : String,
@@ -882,14 +853,12 @@ fn resolve_ln_ref(
 ///|
 fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(sp)
-  // Extract placeholder info from p:nvSpPr/p:nvPr/p:ph
   let mut ph_type = ""
   let mut ph_idx = -1
   let mut sh_link_rid = ""
   let mut sh_link_hover_rid = ""
   if @xml.find_child(ch, "p:nvSpPr") is Some(nvsp) {
     let nvsp_ch = @xml.get_children(nvsp)
-    // Parse shape hyperlinks from p:cNvPr
     let (lr, hr) = parse_cnvpr_links(nvsp_ch)
     sh_link_rid = lr
     sh_link_hover_rid = hr
@@ -913,7 +882,6 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   let sppr_ch = @xml.get_children(sppr)
   let transform = parse_xfrm(sppr_ch)
-  // Geometry
   let geom = match @xml.find_child(sppr_ch, "a:prstGeom") {
     Some(g) =>
       match @xml.get_attr(g, "prst") {
@@ -926,7 +894,6 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
         None => ShapeGeom::Rect
       }
   }
-  // Fill
   let (fill, explicit_no_fill) = match @xml.find_child(sppr_ch, "a:noFill") {
     Some(_) => (Color::none(), true)
     None => {
@@ -973,7 +940,6 @@ fn parse_sp(sp : @xml.XmlNode, theme : ThemeData) -> Shape {
     }
     font_ref_color = parse_font_ref_color(style_ch, theme)
   }
-  // Text
   let (paras, body_props, txt_lst_style) = match
     @xml.find_child(ch, "p:txBody") {
     None => ([], BodyProps::default(), TextStyleGroup::empty())
@@ -1032,12 +998,10 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
   let sppr_ch = @xml.get_children(sppr)
   let transform = parse_xfrm(sppr_ch)
   let sp = parse_stroke(sppr_ch, theme)
-  // Parse p:blipFill (same structure as a:blipFill) for rid, crop, alpha
   let bf = match @xml.find_child(ch, "p:blipFill") {
     None => BlipFill::none()
     Some(bf_node) => parse_blip_fill_node(bf_node)
   }
-  // Parse shape hyperlinks from p:nvPicPr/p:cNvPr + detect media (video/audio)
   let mut sh_link_rid = ""
   let mut sh_link_hover_rid = ""
   let mut has_media = false
@@ -1046,7 +1010,6 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     let links = parse_cnvpr_links(nvpic_ch)
     sh_link_rid = links.0
     sh_link_hover_rid = links.1
-    // Check p:nvPr for a:videoFile or a:audioFile
     if @xml.find_child(nvpic_ch, "p:nvPr") is Some(nvpr) {
       let nvpr_ch = @xml.get_children(nvpr)
       if @xml.find_child(nvpr_ch, "a:videoFile") is Some(_) {
@@ -1064,7 +1027,6 @@ fn parse_pic(pic : @xml.XmlNode, theme : ThemeData) -> Shape {
     transform,
     bf,
   )
-  // Apply stroke properties
   s = {
     ..s,
     stroke: sp.color,
@@ -1096,7 +1058,6 @@ fn parse_tc_border(
     Some(ln_node) => {
       let w = attr_int(ln_node, "w")
       let ln_ch = @xml.get_children(ln_node)
-      // Check for <a:noFill>
       match @xml.find_child(ln_ch, "a:noFill") {
         Some(_) => (-1, Color::none())
         None => {
@@ -1111,7 +1072,6 @@ fn parse_tc_border(
 ///|
 fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let ch = @xml.get_children(tc)
-  // Parse cell merge attributes
   let grid_span = {
     let v = attr_int(tc, "gridSpan")
     if v > 0 {
@@ -1136,12 +1096,10 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     Some("1") => true
     _ => false
   }
-  // Parse cell text from <a:txBody>
   let (paragraphs, _, _) = match @xml.find_child(ch, "a:txBody") {
     None => ([], BodyProps::default(), TextStyleGroup::empty())
     Some(txb) => parse_text_body(txb, theme)
   }
-  // Parse cell properties from <a:tcPr>
   let mut fill = Color::none()
   let mut grad_fill = GradientFill::none()
   let mut mar_l = -1
@@ -1163,14 +1121,12 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
   let mut bdr_bl_tr_color = Color::none()
   if @xml.find_child(ch, "a:tcPr") is Some(tcpr) {
     let tcpr_ch = @xml.get_children(tcpr)
-    // Fill
     let gf = parse_gradient_fill(tcpr_ch, theme)
     if !gf.is_none() {
       grad_fill = gf
     } else {
       fill = parse_solid_fill(tcpr_ch, theme)
     }
-    // Margins
     let ml = attr_int(tcpr, "marL")
     let mr = attr_int(tcpr, "marR")
     let mt = attr_int(tcpr, "marT")
@@ -1187,12 +1143,10 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     if mb > 0 {
       mar_b = mb
     }
-    // Anchor
     anchor = match @xml.get_attr(tcpr, "anchor") {
       Some(v) => v
       None => ""
     }
-    // Borders (a:lnL, a:lnR, a:lnT, a:lnB)
     let (lw, lc) = parse_tc_border(tcpr_ch, "a:lnL", theme)
     bdr_l_w = lw
     bdr_l_color = lc
@@ -1205,7 +1159,6 @@ fn parse_table_cell(tc : @xml.XmlNode, theme : ThemeData) -> TableCell {
     let (bw, bc) = parse_tc_border(tcpr_ch, "a:lnB", theme)
     bdr_b_w = bw
     bdr_b_color = bc
-    // Diagonal borders
     let (tlbr_w, tlbr_c) = parse_tc_border(tcpr_ch, "a:lnTlToBr", theme)
     bdr_tl_br_w = tlbr_w
     bdr_tl_br_color = tlbr_c
@@ -1259,7 +1212,6 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(gf)
   // Transform from <p:xfrm> (direct child of graphicFrame, not inside spPr)
   let transform = parse_xfrm_any(ch)
-  // Navigate: <a:graphic> → <a:graphicData>
   let gdata = match @xml.find_child(ch, "a:graphic") {
     None => None
     Some(graphic) =>
@@ -1270,11 +1222,8 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
     Some(n) => n
   }
   let gdata_ch = @xml.get_children(gdata_node)
-  // Check for SmartArt diagram (graphicData uri = .../diagram).
-  // The frame only references the data part; the actual laid-out shapes live in a
-  // cached drawing (ppt/drawings/drawingN.xml). Return a GroupShape placeholder
-  // with empty children and the raw graphicFrame preserved in ole_xml; main.mbt
-  // resolves the cached drawing later (needs FFI + rels access).
+  // SmartArt: the laid-out shapes live in a cached drawing that main.mbt resolves later;
+  // keep the frame in ole_xml and return an empty group.
   let gdata_uri = match @xml.get_attr(gdata_node, "uri") {
     Some(v) => v
     None => ""
@@ -1292,10 +1241,8 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       ole_xml: @xml.serialize_node(gf),
     }
   }
-  // Check for chart (c:chart) — external file via relationship
-  // Return a placeholder ChartShape with empty data; main.mbt resolves the chart XML.
-  // The raw graphicFrame is kept in ole_xml: the serializer writes it back, since
-  // the chart part itself is never regenerated.
+  // Charts: main.mbt loads the chart part later. The frame is kept in ole_xml and
+  // written back by the serializer, since the chart part is never regenerated.
   if @xml.find_child(gdata_ch, "c:chart") is Some(cn) {
     let rid = match @xml.get_attr(cn, "r:id") {
       Some(v) => v
@@ -1310,7 +1257,6 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       }
     }
   }
-  // Check for ChartEx (cx:chart) — Office 2016+ chart types
   if @xml.find_child(gdata_ch, "cx:chart") is Some(cn) {
     let rid = match @xml.get_attr(cn, "r:id") {
       Some(v) => v
@@ -1328,9 +1274,7 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
       }
     }
   }
-  // Check for OLE object (p:oleObj)
   if @xml.find_child(gdata_ch, "p:oleObj") is Some(ole_obj) {
-    // Extract fallback image r:id from p:pic inside oleObj
     let mut img_rid = ""
     if @xml.find_child(@xml.get_children(ole_obj), "p:pic") is Some(pic) {
       let pic_ch = @xml.get_children(pic)
@@ -1344,29 +1288,24 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         }
       }
     }
-    // Serialize entire graphicFrame as ole_xml for round-trip
     let ole_raw = @xml.serialize_node(gf)
     if !img_rid.is_empty() {
-      // Render as Picture with the fallback image
       return {
         ..Shape::default_with(ShapeKind::Picture(img_rid), transform),
         ole_xml: ole_raw,
       }
     } else {
-      // No fallback image available; preserve OLE data as empty shape
       return {
         ..Shape::default_with(ShapeKind::Other, transform),
         ole_xml: ole_raw,
       }
     }
   }
-  // Check for table (a:tbl)
   let tbl = @xml.find_child(gdata_ch, "a:tbl")
   match tbl {
     None => empty_shape()
     Some(tbl_node) => {
       let tbl_ch = @xml.get_children(tbl_node)
-      // Parse table properties from <a:tblPr>
       let mut style_id = ""
       let mut first_row = false
       let mut last_row = false
@@ -1386,7 +1325,6 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         band_row = attr_int(tbl_pr, "bandRow") == 1
         band_col = attr_int(tbl_pr, "bandCol") == 1
       }
-      // Parse column widths from <a:tblGrid>/<a:gridCol w="...">
       let col_widths : Array[Int32] = []
       if @xml.find_child(tbl_ch, "a:tblGrid") is Some(grid) {
         let gcols = @xml.find_children(@xml.get_children(grid), "a:gridCol")
@@ -1394,7 +1332,6 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
           col_widths.push(attr_int(gcol, "w"))
         }
       }
-      // Parse rows from <a:tr>
       let tr_nodes = @xml.find_children(tbl_ch, "a:tr")
       let rows : Array[TableRow] = []
       for tr in tr_nodes {
@@ -1462,7 +1399,6 @@ fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int32] {
         Some(v) => v
         None => ""
       }
-      // Extract value from "val NNNNN"
       if fmla.length() > 4 {
         let val_str = @xml.str_suffix(fmla, 4)
         avs.push(@xml.parse_int(val_str))
@@ -1477,7 +1413,6 @@ fn parse_avlst(geom_node : @xml.XmlNode) -> Array[Int32] {
 fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
   let ch = @xml.get_children(node)
   let mut gdlst = ""
-  // Parse a:avLst → guide formulas with "val" operator
   if @xml.find_child(ch, "a:avLst") is Some(avlst_node) {
     let gds = @xml.find_children(@xml.get_children(avlst_node), "a:gd")
     for i in 0..<gds.length() {
@@ -1495,7 +1430,6 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       gdlst = gdlst + name + "=" + fmla
     }
   }
-  // Parse a:gdLst → guide formulas
   if @xml.find_child(ch, "a:gdLst") is Some(gdlst_node) {
     let gds = @xml.find_children(@xml.get_children(gdlst_node), "a:gd")
     for i in 0..<gds.length() {
@@ -1513,7 +1447,6 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       gdlst = gdlst + name + "=" + fmla
     }
   }
-  // Parse a:pathLst → compact path format
   let mut paths = ""
   let mut path_w = 0
   let mut path_h = 0
@@ -1560,7 +1493,6 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       }
     }
   }
-  // Parse a:rect → text rectangle guide variable references
   let mut rect_l = ""
   let mut rect_t = ""
   let mut rect_r = ""
@@ -1583,7 +1515,6 @@ fn parse_custom_geom(node : @xml.XmlNode) -> ShapeGeom {
       None => ""
     }
   }
-  // Parse a:cxnLst → connection points: "x,y,ang;x2,y2,ang2;..."
   let mut cxn_lst = ""
   if @xml.find_child(ch, "a:cxnLst") is Some(cxn_node) {
     let cxns = @xml.find_children(@xml.get_children(cxn_node), "a:cxn")
@@ -1754,7 +1685,6 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
       parse_connector_geom(prst, avs)
     }
   }
-  // Parse connection references from p:nvCxnSpPr/p:cNvCxnSpPr
   let mut st_id = -1
   let mut st_idx = -1
   let mut end_id = -1
@@ -1808,13 +1738,11 @@ fn parse_cxn_sp(cxn : @xml.XmlNode, theme : ThemeData) -> Shape {
 ///|
 fn parse_grp_sp(grp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch = @xml.get_children(grp)
-  // Group shape properties
   let grp_sp_pr = match @xml.find_child(ch, "p:grpSpPr") {
     None => return empty_shape()
     Some(n) => n
   }
   let pr_ch = @xml.get_children(grp_sp_pr)
-  // Parse group xfrm: has a:off, a:ext, a:chOff, a:chExt
   let xfrm = match @xml.find_child(pr_ch, "a:xfrm") {
     None => return empty_shape()
     Some(n) => n
@@ -1825,7 +1753,6 @@ fn parse_grp_sp(grp : @xml.XmlNode, theme : ThemeData) -> Shape {
   let ch_off_y = @xml.parse_int(child_attr(xfrm_ch, "a:chOff", "y"))
   let ch_ext_cx = @xml.parse_int(child_attr(xfrm_ch, "a:chExt", "cx"))
   let ch_ext_cy = @xml.parse_int(child_attr(xfrm_ch, "a:chExt", "cy"))
-  // Parse child shapes recursively
   let children = parse_shapes_from_children(ch, theme)
   let grp_data : GroupShapeData = {
     ch_off_x,
@@ -1847,7 +1774,6 @@ fn empty_shape() -> Shape {
 pub fn parse_rels(xml_str : String) -> Array[Relationship] {
   let nodes = @xml.parse_xml(xml_str)
   let rels : Array[Relationship] = []
-  // Find <Relationships> root
   if @xml.find_child(nodes, "Relationships") is Some(root) {
     let ch = @xml.get_children(root)
     let rel_nodes = @xml.find_children(ch, "Relationship")
@@ -1931,9 +1857,7 @@ pub fn parse_slide(
 ) -> SlideData {
   let nodes = @xml.parse_xml(slide_xml)
   let shapes : Array[Shape] = []
-  // Find p:sld element for attributes and children
   let sld_node = @xml.find_child(nodes, "p:sld")
-  // Parse hidden attribute: <p:sld show="0">
   let hidden = match sld_node {
     Some(sld) =>
       match @xml.get_attr(sld, "show") {
@@ -1942,7 +1866,6 @@ pub fn parse_slide(
       }
     None => false
   }
-  // Extract p:transition and p:timing as raw XML for round-trip
   let sld_children = match sld_node {
     Some(sld) => @xml.get_children(sld)
     None => []
@@ -1955,7 +1878,6 @@ pub fn parse_slide(
     Some(n) => @xml.serialize_node(n)
     None => ""
   }
-  // Navigate p:sld → p:cSld
   let csld = @xml.find_child(sld_children, "p:cSld")
   match csld {
     None =>
@@ -1973,8 +1895,7 @@ pub fn parse_slide(
       }
     Some(csld_node) => {
       let csld_ch = @xml.get_children(csld_node)
-      // Parse background: p:bg → p:bgPr → solidFill / gradFill
-      // Color::none() = no explicit bg (inherit from layout/master)
+      // Color::none() = no own background (inherited from layout/master).
       let (bg, bg_grad, bg_bf, bg_pf) = match @xml.find_child(csld_ch, "p:bg") {
         None =>
           (
@@ -2004,7 +1925,6 @@ pub fn parse_slide(
           }
         }
       }
-      // Navigate to p:spTree
       match @xml.find_child(csld_ch, "p:spTree") {
         None =>
           {
@@ -2143,20 +2063,15 @@ fn parse_shapes_from_tree(
 }
 
 ///|
-/// Parse one or more top-level shape fragments (`<p:sp>` / `<p:pic>` /
-/// `<p:grpSp>` / `<p:cxnSp>` / `<p:graphicFrame>` / `mc:AlternateContent`) from an
-/// XML string. Public for cross-slide copy/paste: a shape spec produced by
-/// `serialize_shape` is parsed back into `Shape` values here.
+/// Parse top-level shape fragments (`p:sp`, `p:pic`, `p:graphicFrame`, …), e.g. a pasted
+/// `serialize_shape` result.
 pub fn parse_shapes_xml(xml : String, theme : ThemeData) -> Array[Shape] {
   parse_shapes_from_children(@xml.parse_xml(xml), theme)
 }
 
 ///|
-/// Parse a SmartArt cached drawing (`ppt/drawings/drawingN.xml`) into shapes.
-/// The drawing uses the `dsp:` namespace (`dsp:drawing`/`dsp:spTree`/`dsp:sp`),
-/// whose elements map 1:1 onto their `p:` equivalents (the inner geometry/fill/
-/// text still uses the `a:` namespace). We remap the prefix and reuse the
-/// standard shape-tree parser.
+/// Parse a SmartArt cached drawing. Its `dsp:` elements map 1:1 onto `p:`, so the prefix
+/// is remapped and the normal shape-tree parser reused.
 pub fn parse_diagram_drawing(xml : String, theme : ThemeData) -> Array[Shape] {
   if xml.is_empty() {
     return []
@@ -2171,17 +2086,13 @@ pub fn parse_diagram_drawing(xml : String, theme : ThemeData) -> Array[Shape] {
         Some(tree) => parse_shapes_from_tree(tree, theme)
       }
   }
-  // SmartArt nodes center their text vertically by default. A full PowerPoint
-  // cached drawing writes the anchor explicitly, but minimal drawings (some
-  // converters / older files) emit an empty <a:bodyPr/> which would otherwise
-  // top-align. Default any unset anchor on text-bearing diagram shapes to center.
+  // SmartArt text centers vertically by default; minimal drawings leave the anchor unset.
   apply_diagram_text_anchor(shapes)
   shapes
 }
 
 ///|
-/// Default the vertical text anchor to center for text-bearing diagram shapes
-/// whose anchor is unset (see `parse_diagram_drawing`). Recurses into groups.
+/// Center the unset text anchor of text-bearing diagram shapes, recursing into groups.
 fn apply_diagram_text_anchor(shapes : Array[Shape]) -> Unit {
   for i in 0..<shapes.length() {
     match shapes[i].kind {
@@ -2198,12 +2109,8 @@ fn apply_diagram_text_anchor(shapes : Array[Shape]) -> Unit {
 }
 
 ///|
-/// Resolve the SmartArt text color from a diagram colors part
-/// (`ppt/diagrams/colorsN.xml`). SmartArt cached drawings usually omit explicit
-/// run colors; PowerPoint derives them from the color style's text color list
-/// (`dgm:txLinClrLst` / `dgm:txClrLst` / `dgm:txEffectClrLst`). We take the first
-/// color from whichever list is present and resolve it against the theme. Returns
-/// `Color::none()` when no text color list is found.
+/// The SmartArt text color: the first color of the colors part's text list (txLinClrLst /
+/// txClrLst / txEffectClrLst), as PowerPoint derives it; Color::none() if there is none.
 pub fn parse_diagram_text_color(xml : String, theme : ThemeData) -> Color {
   if xml.is_empty() {
     return Color::none()
@@ -2221,9 +2128,7 @@ pub fn parse_diagram_text_color(xml : String, theme : ThemeData) -> Color {
 }
 
 ///|
-/// Apply a fallback text color to every run in `shapes` (recursing into groups)
-/// that has no explicit color. Used to bake SmartArt color-style text colors into
-/// the cached drawing's runs, which usually omit them.
+/// Color every uncolored run in `shapes`, recursing into groups.
 pub fn apply_diagram_text_color(shapes : Array[Shape], color : Color) -> Unit {
   if color.is_none() {
     return
@@ -2264,7 +2169,6 @@ fn parse_table_style_cell(
   let mut bdr_r_color = Color::none()
   let mut bdr_t_color = Color::none()
   let mut bdr_b_color = Color::none()
-  // Parse a:tcPr (cell properties within style)
   if @xml.find_child(ch, "a:tcPr") is Some(tcpr) {
     let tcpr_ch = @xml.get_children(tcpr)
     let gf = parse_gradient_fill(tcpr_ch, theme)
@@ -2286,13 +2190,10 @@ fn parse_table_style_cell(
     bdr_b_w = bw
     bdr_b_color = bc
   }
-  // Parse a:tcTxBody → a:lstStyle / a:defRPr for font style
   if @xml.find_child(ch, "a:tcTxBody") is Some(txb) {
     let txb_ch = @xml.get_children(txb)
-    // Look for a:lstStyle → a:defPPr → a:defRPr or direct a:p → a:pPr → a:defRPr
     if @xml.find_child(txb_ch, "a:lstStyle") is Some(lst) {
       let lst_ch = @xml.get_children(lst)
-      // Check lvl1pPr
       if @xml.find_child(lst_ch, "a:lvl1pPr") is Some(ppr) {
         if @xml.find_child(@xml.get_children(ppr), "a:defRPr") is Some(rpr) {
           bold = attr_int(rpr, "b") == 1
@@ -2326,7 +2227,6 @@ pub fn parse_table_styles(
 ) -> Array[TableStyleDef] {
   let styles : Array[TableStyleDef] = []
   let nodes = @xml.parse_xml(xml_str)
-  // root = <a:tblStyleLst>
   let lst_node = match @xml.find_child(nodes, "a:tblStyleLst") {
     Some(n) => n
     None => return styles // no table styles

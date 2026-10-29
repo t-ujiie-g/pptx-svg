@@ -1,12 +1,5 @@
-// Simple XML parser for OOXML/PPTX documents.
-//
-// NOTE: This module intentionally avoids StringBuilder entirely.
-// StringBuilder::to_string() calls wasm:js-string "fromCharCodeArray" which
-// cannot be polyfilled in JS for Tier-2/3 fallback browsers.
-// Instead, all strings are built via the `+` concat operator
-// (→ wasm:js-string "concat") which IS polyfillable.
-//
-// Char→String conversion uses ffi_char_code_to_str (→ String.fromCharCode).
+// No StringBuilder here: its to_string needs the unpolyfillable fromCharCodeArray
+// (see CLAUDE.md). Strings are built with `+`, chars via ffi_char_code_to_str.
 
 ///|
 pub struct XmlAttr {
@@ -106,16 +99,12 @@ fn Parser::skip_whitespace(self : Parser) -> Unit {
   }
 }
 
-// `StringBuilder::to_string()` is forbidden (calls `wasm:js-string
-// "fromCharCodeArray"` which is unpolyfillable in Tier-2/3 browsers).
-// Naive `result = result + char` in a loop is O(N²). We instead push
-// fragments into an Array and merge with `concat_balanced`, giving O(N log N)
-// total work via balanced pairwise `+` (which compiles to `concat`).
+// Appending char by char is O(N²): collect fragments and merge them with
+// concat_balanced (O(N log N)).
 
 ///|
-/// Combine an array of strings using balanced bottom-up merge.
-/// O(N log N) instead of O(N²) for sequential `result = result + part`.
-/// Mutates `parts` in place; the result is left at index 0.
+/// Concatenate `parts` by balanced pairwise merging (O(N log N)). Mutates `parts`;
+/// the result ends up at index 0.
 pub fn concat_balanced(parts : Array[String]) -> String {
   let n = parts.length()
   if n == 0 {
@@ -215,7 +204,6 @@ fn decode_entities(s : String) -> String {
       } else if entity == "apos" {
         parts.push("'")
       } else if str_starts_with(entity, "#x") || str_starts_with(entity, "#X") {
-        // Hex numeric character reference: &#xHHHH;
         let hex = str_suffix(entity, 2)
         let code = parse_hex_int(hex)
         if code > 0 {
@@ -224,7 +212,6 @@ fn decode_entities(s : String) -> String {
           parts.push("&" + entity + ";")
         }
       } else if str_starts_with(entity, "#") {
-        // Decimal numeric character reference: &#DDD;
         let dec = str_suffix(entity, 1)
         let code = parse_int(dec)
         if code > 0 {
@@ -313,16 +300,13 @@ fn Parser::parse_attrs(self : Parser) -> Array[XmlAttr] {
 }
 
 ///|
-/// Maximum element nesting depth. Guards against malicious OOXML with
-/// extreme nesting that would overflow the Wasm call stack.
+/// Maximum element nesting depth, so hostile OOXML can't overflow the Wasm stack.
 let max_xml_depth : Int32 = 1024
 
 ///|
 fn Parser::parse_children(self : Parser, depth : Int32) -> Array[XmlNode] {
   let children : Array[XmlNode] = []
-  // If we've hit the depth cap, skip the entire content of this element
-  // (including any nested children) until the matching closing tag.
-  // This keeps the parser linear-time on adversarial input.
+  // Past the depth cap, skip the whole element lexically (linear on hostile input).
   if depth > max_xml_depth {
     skip_to_close(self)
     return children
@@ -350,7 +334,6 @@ fn Parser::parse_children(self : Parser, depth : Int32) -> Array[XmlNode] {
           } else if nc == '!' {
             self.advance()
             if self.starts_with("--") {
-              // HTML comment: skip to end marker
               self.skip_str("--")
               let _ = self.read_until_str("-->")
               if !self.at_end() {
@@ -366,14 +349,12 @@ fn Parser::parse_children(self : Parser, depth : Int32) -> Array[XmlNode] {
                 children.push(XmlNode::Text(text))
               }
             } else {
-              // DOCTYPE or other declaration: skip to '>'
               let _ = self.read_until_char('>')
               if !self.at_end() {
                 self.advance()
               }
             }
           } else if nc == '?' {
-            // Processing instruction: skip to end marker
             self.advance()
             let _ = self.read_until_str("?>")
             if !self.at_end() {
@@ -405,8 +386,7 @@ fn Parser::parse_children(self : Parser, depth : Int32) -> Array[XmlNode] {
         }
       } else {
         let text = self.read_until_char('<')
-        // Keep all text nodes including whitespace-only ones.
-        // Whitespace is significant inside elements like <a:t xml:space="preserve">.
+        // Keep whitespace-only text: it is significant in `<a:t xml:space="preserve">`.
         if !text.is_empty() {
           children.push(XmlNode::Text(decode_entities(text)))
         }
@@ -417,8 +397,7 @@ fn Parser::parse_children(self : Parser, depth : Int32) -> Array[XmlNode] {
 }
 
 ///|
-/// Skip parser past one element body (used when depth cap is exceeded).
-/// Tracks nested `<...>` / `</...>` pairs without recursing — purely lexical.
+/// Skip one element body without recursing (past the depth cap).
 fn skip_to_close(p : Parser) -> Unit {
   let mut depth = 1
   while !p.at_end() && depth > 0 {
@@ -430,7 +409,6 @@ fn skip_to_close(p : Parser) -> Unit {
       }
       let nc = p.peek_char()
       if nc == '/' {
-        // </tag>
         p.advance()
         let _ = p.read_until_char('>')
         if !p.at_end() {
@@ -464,7 +442,6 @@ fn skip_to_close(p : Parser) -> Unit {
           p.skip_str("?>")
         }
       } else {
-        // Open tag (or self-closing). Read tag + attrs and check terminator.
         let _ = p.parse_name()
         let _ = p.parse_attrs()
         p.skip_whitespace()
@@ -554,10 +531,8 @@ pub fn find_children(nodes : Array[XmlNode], tag : String) -> Array[XmlNode] {
 }
 
 ///|
-/// Find the first descendant Element (depth-first) whose tag equals `local` or
-/// ends with `":" + local`, i.e. matches the local name regardless of namespace
-/// prefix. Useful for elements whose prefix varies between producers (e.g.
-/// `dgm:relIds` vs `ext0:relIds`).
+/// The first descendant (depth-first) with local name `local`, whatever its prefix
+/// (`dgm:relIds` vs `ext0:relIds`).
 pub fn find_descendant(nodes : Array[XmlNode], local_name : String) -> XmlNode? {
   let suffix = ":" + local_name
   for node in nodes {
@@ -726,7 +701,6 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
   let parts : Array[String] = []
   let mut i = 0
   while i < slen {
-    // Try to match pat starting at i
     if i + plen <= slen {
       let mut matched = true
       for k = 0; k < plen; k = k + 1 {

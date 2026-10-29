@@ -1,9 +1,4 @@
-// SVG → SlideData parser for round-trip editing
-//
-// Reads data-ooxml-* attributes embedded by the renderer to reconstruct
-// a SlideData from edited SVG. All values in OOXML native units (EMU, etc.)
-//
-// NOTE: No StringBuilder — all strings built via `+` (wasm:js-string "concat").
+// Rebuilds SlideData from the data-ooxml-* attributes (OOXML units) the renderer writes.
 
 ///|
 fn parse_hex_color(s : String) -> @ooxml.Color {
@@ -320,9 +315,8 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
 }
 
 ///|
-/// Parse a GradientFill from `data-ooxml-<prefix>grad-*` attributes (`prefix`
-/// "" on a shape's <g>, "bg-" on the <svg> root for the slide background, "t"
-/// on a text run's <tspan>).
+/// A GradientFill from `data-ooxml-<prefix>grad-*`: prefix "" on a shape's <g>, "bg-" on
+/// the <svg> root, "t" on a run's <tspan>.
 fn parse_grad_fill_attrs(
   node : @xml.XmlNode,
   prefix : String,
@@ -355,8 +349,7 @@ fn parse_grad_fill_attrs(
 }
 
 ///|
-/// Parse a BlipFill from `data-ooxml-<prefix>blip-*` attributes. An image is
-/// present when it has a raster (`rid`) or an SVG-only (`svg-rid`) reference.
+/// A BlipFill from `data-ooxml-<prefix>blip-*`; present with a raster or SVG-only rId.
 fn parse_blip_fill_attrs(
   node : @xml.XmlNode,
   prefix : String,
@@ -427,7 +420,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
     match child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "tspan" {
-          // This is a paragraph-level tspan
           let align = get_da(child, "para-align")
           let level = get_dai(child, "para-lvl")
           let runs : Array[@ooxml.TextRun] = []
@@ -436,7 +428,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
             match tspan_child {
               @xml.XmlNode::Element(rtag, _, _) =>
                 if rtag == "tspan" {
-                  // Run-level tspan
                   let run_node = tspan_child
                   let text = @xml.get_text_content(run_node)
                   let bold_s = get_da(run_node, "bold")
@@ -448,7 +439,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   } else {
                     parse_hex_color(color_hex)
                   }
-                  // Check italic from font-style attribute
                   let italic_s = get_data_attr(run_node, "font-style")
                   let italic = italic_s == "italic"
                   let font_face = get_da(run_node, "run-font")
@@ -492,7 +482,6 @@ fn parse_text_from_svg(text_node : @xml.XmlNode) -> Array[@ooxml.TextParagraph] 
                   })
                 }
               @xml.XmlNode::Text(text) =>
-                // Direct text content (no run tspan wrapper)
                 if !text.is_empty() {
                   runs.push({
                     text,
@@ -594,13 +583,10 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let flip_v = get_da(g_node, "flip-v") == "1"
   let transform : @ooxml.ShapeTransform = { x, y, cx, cy, rot, flip_h, flip_v, }
 
-  // Determine shape kind
   let kind : @ooxml.ShapeKind = if shape_type == "picture" {
-    // For pictures, we don't have the relationship ID in SVG
-    // Use an empty string — the original rels will be preserved
+    // The SVG has no picture rId; the original rels are kept.
     @ooxml.ShapeKind::Picture("")
   } else if shape_type == "chart" {
-    // Chart shapes preserved via chart_xml round-trip
     @ooxml.ShapeKind::ChartShape(@ooxml.ChartData::empty())
   } else if shape_type == "table" {
     // Table shapes carry no inline data in SVG for now — use empty table
@@ -617,7 +603,6 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     }
     @ooxml.ShapeKind::TableShape(table_data)
   } else if shape_type == "group" {
-    // Parse group children from inner <g> containing child shape <g> elements
     let grp_children = parse_group_children_from_g(g_node)
     let grp_data : @ooxml.GroupShapeData = {
       ch_off_x: get_dai(g_node, "grp-ch-off-x"),
@@ -629,7 +614,6 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     @ooxml.ShapeKind::GroupShape(grp_data)
   } else {
     let geom = if geom_str == "custGeom" {
-      // Custom geometry round-trip
       let cust_gdlst = get_da(g_node, "cust-gdlst")
       let cust_paths = get_da(g_node, "cust-paths")
       let cust_pw = @xml.parse_int(get_da(g_node, "cust-pw"))
@@ -659,7 +643,6 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     @ooxml.ShapeKind::AutoShape(geom)
   }
 
-  // Parse text from <text> children
   let children = @xml.get_children(g_node)
   let mut paragraphs : Array[@ooxml.TextParagraph] = []
   for child in children {
@@ -672,16 +655,14 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     }
   }
 
-  // Parse body props from data attributes
   let bp_anchor = get_da(g_node, "anchor")
   let bp_l_ins = get_dai(g_node, "l-ins")
   let bp_t_ins = get_dai(g_node, "t-ins")
   let bp_r_ins = get_dai(g_node, "r-ins")
   let bp_b_ins = get_dai(g_node, "b-ins")
   let bp_auto_fit = get_da(g_node, "auto-fit") == "1"
-  // normAutofit: get_dai returns 0 for missing attrs; 0 maps to -1 (inactive).
-  // This is safe because font_scale=0 (0%) never occurs in practice, and
-  // ln_spc_reduction=0 is functionally identical to -1 (no reduction).
+  // A missing attribute reads as 0, mapped to -1 (inactive): fontScale 0 never occurs and
+  // lnSpcReduction 0 means no reduction anyway.
   let bp_font_scale = get_dai(g_node, "font-scale")
   let bp_ln_spc_reduction = get_dai(g_node, "ln-spc-reduction")
   let bp_wrap = get_da(g_node, "wrap")
@@ -802,12 +783,10 @@ fn parse_group_children_from_g(group_g : @xml.XmlNode) -> Array[@ooxml.Shape] {
     match g_child {
       @xml.XmlNode::Element(tag, _, _) =>
         if tag == "g" {
-          // Look inside: could be the transform <g> or a child shape <g>
           let st = get_da(g_child, "shape-type")
           if !st.is_empty() {
             children.push(parse_shape_from_g(g_child))
           } else {
-            // This might be the inner transform <g> wrapping children
             let inner_ch = @xml.get_children(g_child)
             for inner_child in inner_ch {
               match inner_child {
@@ -874,7 +853,6 @@ fn parse_adj_string(s : String) -> Array[Int32] {
 /// Parse an SVG string (with data-ooxml-* attributes) back into SlideData.
 pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
   let nodes = @xml.parse_xml(svg_string)
-  // Find the <svg> root
   let svg_node = match @xml.find_child(nodes, "svg") {
     Some(n) => n
     None =>
@@ -891,7 +869,6 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
         bg_inherited: false,
       }
   }
-  // Read slide metadata from SVG root
   let slide_cx = get_dai(svg_node, "slide-cx")
   let slide_cy = get_dai(svg_node, "slide-cy")
   let bg_hex = get_da(svg_node, "bg")
@@ -912,7 +889,6 @@ pub fn parse_svg_to_slide(svg_string : String) -> @ooxml.SlideData {
     parse_hex_color(bg_hex)
   }
 
-  // Parse shapes from <g data-ooxml-shape-type="..."> elements
   let shapes : Array[@ooxml.Shape] = []
   let svg_children = @xml.get_children(svg_node)
   for svg_child in svg_children {
