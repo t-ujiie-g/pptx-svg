@@ -1,8 +1,4 @@
-/**
- * Unit tests for editing-helpers.ts (unit conversion functions).
- *
- * Run: node test_fixtures/test_editing_helpers.mjs
- */
+/** Unit tests for lib/editing-helpers.ts: `node test_fixtures/test_editing_helpers.mjs`. */
 
 import {
   EMU_PER_PT, EMU_PER_PX_96DPI,

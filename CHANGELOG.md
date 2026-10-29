@@ -7,6 +7,10 @@
 - **Editing a slide that contains a chart dropped the chart on export.** Charts (`c:chart` and Office 2016+ `cx:chart`) serialized to nothing, so after any edit to the slide — moving the chart, or changing any other shape — the exported slide, Undo/Redo and `updateSlideFromSvg` lost the chart's `p:graphicFrame`. The frame is now preserved and written back, and a chart re-renders after an SVG round-trip. Chart shapes in the SVG now carry `data-ooxml-ole` (`docs/svg-specification.md`).
 - **Moving or resizing a chart, SmartArt or OLE object was not exported.** Their preserved `p:graphicFrame` was written back verbatim; its `p:xfrm` now follows the shape's current position and size.
 
+### Changed
+
+- Source comments trimmed to the constraints the code can't show (CLAUDE.md "Comment hygiene", after the `yxl` AGENTS.md guide): file-header essays, section banners, step narration and roadmap codes removed, and the TypeScript API's JSDoc shortened. No code or output changes.
+
 ## 0.6.7
 
 Slide background fix release. Image backgrounds inherited from a layout or

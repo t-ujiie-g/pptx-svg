@@ -37,9 +37,7 @@ test("regressions (slides 96-98)", async () => {
       slide96.includes('<a:r><a:t>Reference rect (prstGeom)</a:t></a:r>'),
     );
 
-    // Empty custGeom: the issue #39 reproduction. The shape must be present
-    // in OOXML (so the renderer exercises the suppression path) but have an
-    // empty path with no draw commands.
+    // Empty custGeom (#39): present in the OOXML, with a path that has no commands.
     assert('slide96 has EmptyCustGeom shape', slide96.includes('EmptyCustGeom'));
     assert('slide96 EmptyCustGeom has solidFill 00B4D8', slide96.includes('00B4D8'));
     assert(

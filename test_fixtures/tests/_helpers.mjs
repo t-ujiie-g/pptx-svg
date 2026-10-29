@@ -1,14 +1,6 @@
 /**
- * Shared helpers for node:test category files under test_fixtures/tests/.
- *
- * Each *.test.mjs file imports these helpers, calls `resetAssertions()` at the
- * start of its single top-level `test(...)` block, records assertions via
- * `expect(label, cond)`, and at the end calls `finishAssertions()` which
- * throws an Error summarizing any failures (so node:test marks the test fail).
- *
- * ZIP extraction is delegated to the library's own lib/zip.ts (compiled to
- * dist/zip.js). That removes the duplicated minimal-ZIP parser the old
- * monolithic test_node.mjs carried.
+ * Helpers for the test_fixtures/tests/*.test.mjs files: each wraps its assertions in
+ * resetAssertions() … finishAssertions(), which throws if any `expect` failed.
  */
 
 import { readFileSync, existsSync } from 'node:fs';

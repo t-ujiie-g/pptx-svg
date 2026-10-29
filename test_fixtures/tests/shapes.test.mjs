@@ -113,6 +113,5 @@ test("shapes & geometry (slides 34-40)", async () => {
     assert('slide40 has a:rect', hasTag(slide40, 'a:rect'));
   }
 
-
   finishAssertions();
 });

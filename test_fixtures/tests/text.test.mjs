@@ -238,8 +238,6 @@ test("text features (slides 9-22, 70-72, 88)", async () => {
     assert('slide72 has Wave Text', slide72.includes('Wave Text'));
   }
 
-
-
   {
     section('test_features.pptx — Slide 88: justified text');
     const slide88 = textFiles.get('ppt/slides/slide89.xml') || '';

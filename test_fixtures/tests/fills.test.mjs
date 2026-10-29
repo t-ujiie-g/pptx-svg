@@ -12,7 +12,6 @@ test("fills & strokes (slides 23-33)", async () => {
   }
   const { textFiles } = await loadFeatures();
 
-
   {
     section('test_features.pptx — Slide 23: linear gradient fills');
     const slide23 = textFiles.get('ppt/slides/slide23.xml');
@@ -178,7 +177,6 @@ test("fills & strokes (slides 23-33)", async () => {
     assert('slide33 has cmpd="dbl"', slide33.includes('cmpd="dbl"'));
     assert('slide33 has a:noFill', hasTag(slide33, 'a:noFill'));
   }
-
 
   finishAssertions();
 });

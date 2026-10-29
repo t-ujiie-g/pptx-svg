@@ -325,12 +325,15 @@ When asked to "refactor" (リファクタリング), review against these six cr
 
 ### Comment hygiene
 
-A comment must make sense to a reader who has never opened `TODO.md` and was not there when the code landed.
+**The default is no comment.** Write one only where a reader cannot recover the intent from the code, and keep it to one or two lines (three at most; four is too long — this binds `///` docs and JSDoc too). A comment must make sense to someone who never opened `TODO.md` and wasn't there when the code landed.
 
-- **No roadmap / phase codes in code comments.** `E6.1`, `E2.5`, `P3`, `Phase 2`, `see TODO R1` mean nothing to an outside reader and go stale as soon as `TODO.md` is reorganized. Name the *thing* instead — "History support", "cross-slide copy/paste", "run-box layout". Stable, findable references are fine and should stay: ECMA-376 § numbers, GitHub issue `#N`, browser-version constraints. `TODO.md` and `CHANGELOG.md` keep the codes; the code does not.
-- **Delete comments the code already says.** A comment restating the next line, narrating what was changed, or arguing the change to a reviewer is noise once merged. That history lives in git and `CHANGELOG.md`.
-- **Keep comments that carry a constraint the code cannot show.** Spec rules, sentinel meanings (`-1 = unset`), units (EMU, 1/60000 deg, hundredths-of-pt), the browser/compiler limitations in this file, and deliberate deviations ("browsers ignore `text-decoration-color` on SVG `<text>`") all stay. `///` doc comments on Wasm exports and public helpers stay mandatory.
-- **Keep comments short and non-repeating.** When several fields share one mechanism, explain it once above the group instead of repeating it per field. Trailing per-field comments in `ooxml.mbt` structs are the established convention here and stay — they carry units and sentinels — but they must be one short line, never a section marker or a paragraph wedged between fields.
-- **Section markers** (`// ── Title ────…`) label a block of related declarations; keep the title descriptive and the rule padded to the same column as its neighbours.
+- **Delete what the code already says.** A paraphrase of the next line, block or function name carries nothing — step labels in a long function (`// Render legend`, `// Parse rels`) included. If the code is unreadable, fix the code (a name, a helper), not the comment.
+- **Delete documentation that wandered into the source.** File-header essays (architecture tours, "same package as …", supported-element lists) and section banners (`// ── Title ──`) go: `///|` already separates blocks and the file name names the subject. Architecture lives in this file, the SVG format in `docs/svg-specification.md`, the data model in "Data model" above.
+- **Delete narration of the past.** "Previously …", "the old behavior …", "after the fix …" belong in git and `CHANGELOG.md`. If a bug explains a non-obvious line, keep the reason in one clause and cite the issue (`#39`).
+- **No roadmap / phase codes** (`E6.1`, `P3`, `Phase 2`, `see TODO R1`) — name the thing instead. ECMA-376 §, `#N` and browser-version constraints are stable and fine.
+- **Keep the constraint the code can't show**: a spec rule, a unit (EMU, 1/60000°, hundredths of a point), a sentinel (`-1 = unset`), a browser/compiler limitation from this file, a deliberate deviation, a binary record layout. One or two lines, at the line it governs.
+- **`///` on Wasm exports and public helpers, and JSDoc on the TS public API, stay mandatory** — they are API docs — but short: what it does, the units/sentinels of its arguments, the return format (`"OK:<idx>"` / `"ERROR:..."`). Drop `@param` lines that only restate the parameter name.
+- **Struct fields:** the trailing one-line `//` per field in `ooxml.mbt` (units, sentinels) is the convention; never a standalone comment between fields that labels a group.
+- **Tests:** the test name says what it asserts. Keep only the surprising *why* — why this expected value, which defect the case pins down.
 
 After refactoring, run `npm test` and confirm rendering output is unchanged (the renderer/Node suites guard this).

@@ -1,9 +1,4 @@
-/**
- * Node.js compatibility test — verifies that pptx-svg works on Node.js 22+.
- *
- * Run: node test_fixtures/test_node_compat.mjs
- * Requires: Node.js 22+ (WasmGC support)
- */
+/** Node.js 22+ (WasmGC) integration tests: `node test_fixtures/test_node_compat.mjs`. */
 
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -695,8 +690,8 @@ console.log('Test 28: Add text to invalid shape');
   console.log('  OK: Error handling for invalid indices');
 }
 
-// --- Test 29: Text editing E2.5 — paragraph and run CRUD ---
-console.log('Test 29: Text editing E2.5 — paragraph and run CRUD');
+// --- Test 29: Text editing — paragraph and run CRUD ---
+console.log('Test 29: Text editing — paragraph and run CRUD');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -740,8 +735,8 @@ console.log('Test 29: Text editing E2.5 — paragraph and run CRUD');
   console.log('  OK: Paragraph and run CRUD');
 }
 
-// --- Test 30: Text editing E2.5 — style, font size, color ---
-console.log('Test 30: Text editing E2.5 — style, font size, color');
+// --- Test 30: Text editing — style, font size, color ---
+console.log('Test 30: Text editing — style, font size, color');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -781,8 +776,8 @@ console.log('Test 30: Text editing E2.5 — style, font size, color');
   console.log('  OK: Style, font size, color updates');
 }
 
-// --- Test 31: Text editing E2.5 — font family, alignment, decoration ---
-console.log('Test 31: Text editing E2.5 — font family, alignment, decoration');
+// --- Test 31: Text editing — font family, alignment, decoration ---
+console.log('Test 31: Text editing — font family, alignment, decoration');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -832,8 +827,8 @@ console.log('Test 31: Text editing E2.5 — font family, alignment, decoration')
   console.log('  OK: Font family, alignment, decoration updates');
 }
 
-// --- Test 32: Text editing E2.5 — round-trip export ---
-console.log('Test 32: Text editing E2.5 — round-trip export');
+// --- Test 32: Text editing — round-trip export ---
+console.log('Test 32: Text editing — round-trip export');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
   const wasmBuf = readFileSync(join(__dirname, '..', 'dist', 'main.wasm'));
@@ -1001,11 +996,7 @@ console.log('Test 35: Image API — deleteImage');
   console.log('  OK: deleteImage');
 }
 
-// --- Test 36: Edit immediately after loadPptx (no prior renderSlideSvg) ---
-// Regression: editing APIs read the g_slides cache, which is populated lazily on
-// the first render. Before the ensure_slide_parsed guard, an edit issued before any
-// renderSlideSvg() silently no-op'd ("ERROR:shape index out of range") and never
-// reached the export. minimal.pptx slide 0 shape 0 is a title with inline text.
+// An edit before any renderSlideSvg() must still reach the export (ensure_slide_parsed).
 console.log('Test 36: Edit immediately after loadPptx (no prior render)');
 {
   const renderer = new PptxRenderer({ logLevel: 'silent' });
@@ -1275,7 +1266,7 @@ console.log('Test 48: replaceTextRange paragraph merge + newline split');
   console.log('  OK: paragraph merge + newline split');
 }
 
-// --- Test 49: replaceTextRange is undoable (E6.1 integration) ---
+// --- Test 49: replaceTextRange is undoable ---
 console.log('Test 49: replaceTextRange undo');
 {
   const { r, sIdx } = await shapeWithTwoRuns();

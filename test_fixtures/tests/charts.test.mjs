@@ -273,7 +273,6 @@ test("charts (slides 52-69, 73, 89-94)", async () => {
     }
   }
 
-
   {
     section('test_features.pptx — Slide 73: Stacked / Percent-stacked bar charts');
     // Should have chart references
