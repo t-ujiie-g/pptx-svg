@@ -238,7 +238,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `src/svg_parser/svg_parser.mbt` | SVG (with `data-ooxml-*`) → SlideData |
 | `src/serializer/serializer.mbt` | SlideData → OOXML slide XML |
 | `src/main/main.mbt` | Wasm exports (read-only APIs), slide cache (`g_slides`), global state; post-parse resolution of charts (`resolve_chart_shapes`) and SmartArt diagrams (`resolve_diagram_shapes`) |
-| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes); history (`restore_slide_ooxml`); z-order; multi-transform; copy/paste. Shared helpers: `with_shape`/`with_run`, `make_default_run`/`paragraph`, `array_remove_at`/`array_insert_at` |
+| `src/main/main_edit.mbt` | Shape/text/image editing API exports (CRUD, fill, stroke, text formatting, picture shapes); history (`restore_slide_ooxml`); z-order; multi-transform; copy/paste. Shared helpers: `with_shape`/`with_run`, `make_default_run`/`paragraph`, `with_new_nv_ids` |
 | `src/main/main_text_edit.mbt` | Inline text editing exports: `get_text_layout`, `hit_test_text`, `replace_text_range` + `split_para_runs` |
 | `src/main/main_table_edit.mbt` | Table editing exports: `update_table_cell_text`, `add_table_row`/`column`, `delete_table_row`/`column` + `with_table` |
 | `src/main/main_inherit.mbt` | Placeholder inheritance + text style defaults (transforms, text styles, auto-content) |

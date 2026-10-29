@@ -1656,9 +1656,10 @@ pub fn Shape::default_with(
 }
 
 ///|
-/// The largest p:cNvPr id among `shapes` and their group children (0 if none).
+/// The largest p:cNvPr id among `shapes` and their group children, at least 1 (the
+/// spTree's own id).
 pub fn max_nv_id(shapes : Array[Shape]) -> Int32 {
-  let mut m = 0
+  let mut m = 1
   for shape in shapes {
     if shape.nv_id > m {
       m = shape.nv_id

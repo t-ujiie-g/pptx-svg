@@ -1,17 +1,8 @@
-"""Slide 96: regression fixtures.
+"""Slides 96+: regression fixtures — small reproductions of fixed bugs, one per slide
+(or group of slides), each described by the comment above its builder."""
+import base64
+import io
 
-Slides for behaviors that don't fit neatly into a category module — typically
-small reproductions for bugs that have been fixed, kept so regressions can be
-detected automatically.
-
-Currently covered:
-  - empty custGeom (issue #39): a custGeom with no path commands must NOT
-    render as a colored rectangle.
-  - p:style/a:fontRef text color: a shape whose <p:style> includes
-    <a:fontRef> should apply that color to text runs that have no explicit
-    color, matching PowerPoint's behavior (accent-styled rectangles get white
-    text via fontRef -> lt1).
-"""
 from pptx.util import Inches
 from lxml import etree
 
@@ -266,8 +257,6 @@ slide102.shapes._spTree.append(etree.fromstring(cust_sp_xml))
 # ── Slides 103-105: slide-own gradient / pattern / image backgrounds ──────────
 # Each slide carries its own non-solid <p:bg>; it must render and survive the
 # SVG round-trip (data-ooxml-bg-grad-* / -bg-patt-* / -bg-blip-*) on export.
-import base64
-import io
 
 ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 

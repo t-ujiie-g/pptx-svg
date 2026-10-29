@@ -1,13 +1,10 @@
 import { test } from 'node:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   assert, hasTag,
-  loadFeatures, pptxExists, resetAssertions, finishAssertions,
-  FIXTURES_DIR, DIST_DIR,
+  loadFeatures, openFeatures, pptxExists, resetAssertions, finishAssertions,
 } from './_helpers.mjs';
 
-test("regressions (slides 96-98)", async () => {
+test("regressions (slides 96-107 and patched-fixture cases)", async () => {
   resetAssertions();
   if (!pptxExists('test_features.pptx')) {
     console.log('  SKIPPED: test_features.pptx not found');
@@ -93,13 +90,7 @@ test("regressions (slides 96-98)", async () => {
     }
     // Rendering: the renderer must emit a negative-scale mirror for the flips
     // (the actual issue #55 bug — flips were dropped, only rotate() was kept).
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const svg99 = r.renderSlideSvg(98); // 0-based → slide 99
     assert('slide99 SVG mirrors flipH (scale(-1,1))', svg99.includes('scale(-1,1)'));
     assert('slide99 SVG mirrors flipV (scale(1,-1))', svg99.includes('scale(1,-1)'));
@@ -107,13 +98,7 @@ test("regressions (slides 96-98)", async () => {
 
   {
     console.log('\n── test_features.pptx — Slide 100: preset geometry (issue #62) ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const svg = r.renderSlideSvg(99);
 
     // Shape order on the slide: 12 presets, then 4 wedgeRectCallout variants.
@@ -183,13 +168,7 @@ test("regressions (slides 96-98)", async () => {
 
   {
     console.log('\n── test_features.pptx — Slide 101: generated preset geometry ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const svg = r.renderSlideSvg(100);
     const shapeSvg = (idx) => {
       const start = svg.indexOf(`data-ooxml-shape-idx="${idx}"`);
@@ -215,13 +194,7 @@ test("regressions (slides 96-98)", async () => {
 
   {
     console.log('\n── test_features.pptx — Slide 102: custGeom per-path styles ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const svg = r.renderSlideSvg(101);
     const paths = [...svg.matchAll(/<path d="([^"]+)"([^>]*)\/>/g)].map((m) => ({ d: m[1], attrs: m[2] }));
     const fillOnly = paths.filter((p) => /fill="rgb\(91,155,213\)" stroke="none"/.test(p.attrs));
@@ -251,11 +224,6 @@ test("regressions (slides 96-98)", async () => {
 
   {
     console.log('\n── test_features.pptx — layout blipFill background inheritance ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const { buildZip } = await import(join(DIST_DIR, 'zip.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
     // Slide 1 has no <p:bg> and uses slideLayout7; give that layout an image
     // background whose rId exists only in the layout's .rels.
     const layoutPath = 'ppt/slideLayouts/slideLayout7.xml';
@@ -267,10 +235,7 @@ test("regressions (slides 96-98)", async () => {
       '<Relationship Id="rIdLayoutBg" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ' +
       'Target="../media/image1.png"/></Relationships>');
     assert('slide1 has no own background', !textFiles.get('ppt/slides/slide1.xml').includes('<p:bg>'));
-    const patched = await buildZip(pptxAb, new Map([[layoutPath, layoutXml], [layoutRelsPath, layoutRels]]));
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(patched);
+    const r = await openFeatures(new Map([[layoutPath, layoutXml], [layoutRelsPath, layoutRels]]));
     const hasBgImage = (svg) => /<image x="0" y="0"[^>]*href="data:image\/png;base64,/.test(svg);
     assert('inherited layout image background is rendered', hasBgImage(r.renderSlideSvg(0)));
     // An edited slide renders from the SlideData cache; the background rels must survive.
@@ -291,13 +256,7 @@ test("regressions (slides 96-98)", async () => {
 
   {
     console.log('\n── test_features.pptx — Slides 103-105: background SVG round-trip ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const bgOf = (xml) => (xml.match(/<p:bg>.*?<\/p:bg>/s) || [''])[0];
     const cases = [
       { idx: 102, name: 'gradient', attr: 'data-ooxml-bg-grad-stops="0,1F4E79;100000,9DC3E6"',
@@ -323,13 +282,7 @@ test("regressions (slides 96-98)", async () => {
 
   {
     console.log('\n── test_features.pptx — chart / OLE graphicFrame survives editing ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const frameOf = (xml) => (xml.match(/<p:graphicFrame>.*?<\/p:graphicFrame>/s) || [''])[0];
     const xfrmOf = (frame) => (frame.match(/<p:xfrm[^>]*>.*?<\/p:xfrm>/s) || [''])[0];
     const chartBars = (svg) => (svg.match(/data-ooxml-shape-type="chart"[\s\S]*?<\/g><\/g>/) || [''])[0]
@@ -375,13 +328,7 @@ test("regressions (slides 96-98)", async () => {
   // ── Slide 106: shape ids, names and alt text survive editing ─────────────
   {
     console.log('\n── test_features.pptx — Slide 106: shape ids / names / alt text ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const idx = 105;
     const cnvPrs = (xml) => [...xml.matchAll(/<p:cNvPr ([^>]*?)\/?>/g)].map((m) => m[1]);
     const ids = (xml) => cnvPrs(xml).map((a) => a.match(/id="(\d+)"/)[1]);
@@ -416,13 +363,7 @@ test("regressions (slides 96-98)", async () => {
   // ── Slide 107: a hidden shape is kept but not drawn ──────────────────────
   {
     console.log('\n── test_features.pptx — Slide 107: hidden shape ──');
-    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
-    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
-    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
-    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-    const r = new PptxRenderer({ logLevel: 'silent' });
-    await r.init(wasmBuf);
-    await r.loadPptx(pptxAb);
+    const r = await openFeatures();
     const idx = 106;
     const gOf = (svg, name) => (svg.match(new RegExp(`<g [^>]*data-ooxml-nv-name="${name}"[^>]*>`)) || [''])[0];
     const svg = r.renderSlideSvg(idx);

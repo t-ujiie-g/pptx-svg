@@ -165,26 +165,7 @@ fn with_new_nv_ids(
   slide : @ooxml.SlideData,
   shape : @ooxml.Shape,
 ) -> @ooxml.Shape {
-  let max_id = @ooxml.max_nv_id(slide.shapes)
-  @ooxml.with_fresh_nv_ids(shape, { val: if max_id > 1 { max_id } else { 1 }, })
-}
-
-///|
-/// Remove an element at `idx` from an array in-place.
-fn[T] array_remove_at(arr : Array[T], idx : Int32) -> Unit {
-  let new_arr : Array[T] = []
-  let len = arr.length()
-  for i in 0..<len {
-    if i != idx {
-      new_arr.push(arr[i])
-    }
-  }
-  while !arr.is_empty() {
-    let _ = arr.pop()
-  }
-  for item in new_arr {
-    arr.push(item)
-  }
+  @ooxml.with_fresh_nv_ids(shape, { val: @ooxml.max_nv_id(slide.shapes), })
 }
 
 ///|
@@ -392,7 +373,7 @@ pub fn update_shape_fill(
 /// Delete a shape from a slide. Returns "OK" or "ERROR:<message>".
 pub fn delete_shape(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
-    array_remove_at(arr, local_idx)
+    arr.remove(local_idx) |> ignore
     g_modified.val[slide_idx] = true
     "OK"
   })
@@ -705,7 +686,7 @@ pub fn delete_paragraph(
     if para_idx < 0 || para_idx >= shape.paragraphs.length() {
       return "ERROR:paragraph index out of range"
     }
-    array_remove_at(shape.paragraphs, para_idx)
+    shape.paragraphs.remove(para_idx) |> ignore
     g_modified.val[slide_idx] = true
     "OK"
   })
@@ -742,7 +723,7 @@ pub fn delete_run(
   run_idx : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, _run) {
-    array_remove_at(para.runs, run_idx)
+    para.runs.remove(run_idx) |> ignore
     g_modified.val[slide_idx] = true
     "OK"
   })
@@ -958,18 +939,6 @@ pub fn restore_slide_ooxml(slide_idx : Int32, xml : String) -> String {
 // z-order is array order (last = front-most), within the shape's containing array.
 
 ///|
-/// Insert `item` at `idx`, shifting later elements right (in-place).
-fn[T] array_insert_at(arr : Array[T], idx : Int32, item : T) -> Unit {
-  arr.push(item)
-  let mut i = arr.length() - 1
-  while i > idx {
-    arr[i] = arr[i - 1]
-    i = i - 1
-  }
-  arr[idx] = item
-}
-
-///|
 /// Composite index for a sibling at `local_idx` within the same container as `shape_idx`.
 fn sibling_composite_idx(shape_idx : Int32, local_idx : Int32) -> Int32 {
   let base = if shape_idx < group_index_base {
@@ -985,7 +954,7 @@ fn sibling_composite_idx(shape_idx : Int32, local_idx : Int32) -> Int32 {
 pub fn bring_to_front(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let sh = arr[local_idx]
-    array_remove_at(arr, local_idx)
+    arr.remove(local_idx) |> ignore
     arr.push(sh)
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(sibling_composite_idx(shape_idx, arr.length() - 1))
@@ -997,8 +966,8 @@ pub fn bring_to_front(slide_idx : Int32, shape_idx : Int32) -> String {
 pub fn send_to_back(slide_idx : Int32, shape_idx : Int32) -> String {
   with_shape(slide_idx, shape_idx, fn(arr, local_idx) {
     let sh = arr[local_idx]
-    array_remove_at(arr, local_idx)
-    array_insert_at(arr, 0, sh)
+    arr.remove(local_idx) |> ignore
+    arr.insert(0, sh)
     g_modified.val[slide_idx] = true
     "OK:" + int_to_str(sibling_composite_idx(shape_idx, 0))
   })
