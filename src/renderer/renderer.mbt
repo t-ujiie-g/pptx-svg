@@ -16,10 +16,10 @@ let default_t_inset : Int32 = 45720 // 0.05 in (top / bottom)
 let level_indent_emu : Int32 = 342900 // indent per bullet level
 
 ///|
-let svg_target_width : Int32 = 960 // output SVG width in px
+pub let svg_target_width : Int32 = 960 // output SVG width in px
 
 ///|
-let default_emu_per_px : Int32 = 9525 // EMU per pixel at 96 DPI
+pub let default_emu_per_px : Int32 = 9525 // EMU per pixel at 96 DPI
 
 ///|
 let line_height_numer : Int32 = 12 // default line-height = font-size * 12/10

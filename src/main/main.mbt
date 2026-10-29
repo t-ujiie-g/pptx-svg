@@ -1119,10 +1119,9 @@ pub fn get_modified_entries() -> String {
 /// Compute the EMU-to-pixel scale factor for the current presentation.
 fn get_scale() -> Int32 {
   let sw = g_slide_size.val.cx
-  let w = 960
   if sw > 0 {
-    sw / w
+    sw / @renderer.svg_target_width
   } else {
-    9525
+    @renderer.default_emu_per_px
   }
 }

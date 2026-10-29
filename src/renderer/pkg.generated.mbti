@@ -8,6 +8,8 @@ import {
 // Values
 pub fn build_text_layout(Array[@ooxml.TextParagraph], @ooxml.ShapeTransform, Int32, @ooxml.ThemeData, @ooxml.BodyProps) -> TextLayout
 
+pub let default_emu_per_px : Int32
+
 pub fn hit_test_layout(TextLayout, Int32, Int32) -> (Int32, Int32, Int32, Int32)
 
 pub fn render_shape(@ooxml.Shape, Array[@ooxml.Relationship], Int32, Int32, Int32, @ooxml.ThemeData, Array[@ooxml.TableStyleDef]) -> String
@@ -17,6 +19,8 @@ pub fn render_shape_defs(@ooxml.Shape, Int32, Int32, Int32) -> String
 pub fn render_slide_svg(@ooxml.SlideData, Array[@ooxml.Relationship], Int32, @ooxml.ThemeData, Array[@ooxml.Shape], Array[@ooxml.TableStyleDef], Array[Array[@ooxml.Relationship]], Array[@ooxml.Relationship]) -> String
 
 pub fn sanitize_url(String) -> String
+
+pub let svg_target_width : Int32
 
 pub fn text_layout_to_json(TextLayout) -> String
 
