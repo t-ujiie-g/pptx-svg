@@ -1321,6 +1321,8 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
   }
   // Check for chart (c:chart) — external file via relationship
   // Return a placeholder ChartShape with empty data; main.mbt resolves the chart XML.
+  // The raw graphicFrame is kept in ole_xml: the serializer writes it back, since
+  // the chart part itself is never regenerated.
   if @xml.find_child(gdata_ch, "c:chart") is Some(cn) {
     let rid = match @xml.get_attr(cn, "r:id") {
       Some(v) => v
@@ -1329,7 +1331,10 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
     if !rid.is_empty() {
       // Store rid in chart_xml field temporarily; main.mbt will resolve it.
       let chart_data : ChartData = { ..ChartData::empty(), chart_xml: rid, }
-      return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
+      return {
+        ..Shape::default_with(ShapeKind::ChartShape(chart_data), transform),
+        ole_xml: @xml.serialize_node(gf),
+      }
     }
   }
   // Check for ChartEx (cx:chart) — Office 2016+ chart types
@@ -1344,7 +1349,10 @@ fn parse_graphic_frame(gf : @xml.XmlNode, theme : ThemeData) -> Shape {
         ..ChartData::empty(),
         chart_xml: "cx:" + rid,
       }
-      return Shape::default_with(ShapeKind::ChartShape(chart_data), transform)
+      return {
+        ..Shape::default_with(ShapeKind::ChartShape(chart_data), transform),
+        ole_xml: @xml.serialize_node(gf),
+      }
     }
   }
   // Check for OLE object (p:oleObj)

@@ -157,7 +157,7 @@ Each shape is rendered as a `<g>` element with these attributes.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `data-ooxml-ole` | string (XML-escaped) | Raw `p:graphicFrame` XML for OLE round-trip. The shape renders the fallback image from `p:oleObj/p:pic`. |
+| `data-ooxml-ole` | string (XML-escaped) | Raw `p:graphicFrame` XML of a chart, ChartEx, SmartArt or OLE object, written back on export (its `p:xfrm` replaced by the shape's current position and size). An OLE object renders the fallback image from `p:oleObj/p:pic`; a chart is re-read from its chart part after `updateSlideFromSvg`. |
 
 ### Math Equations (OMML)
 

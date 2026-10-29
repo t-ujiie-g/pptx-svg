@@ -637,7 +637,17 @@ fn serialize_transform_with_extra(
   t : @ooxml.ShapeTransform,
   extra : String,
 ) -> String {
-  let mut xfrm = "<a:xfrm"
+  serialize_xfrm_element("a:xfrm", t, extra)
+}
+
+///|
+/// Serialize a transform as `<tag>` (`a:xfrm`, or `p:xfrm` on a graphicFrame).
+fn serialize_xfrm_element(
+  tag : String,
+  t : @ooxml.ShapeTransform,
+  extra : String,
+) -> String {
+  let mut xfrm = "<" + tag
   if t.rot != 0 {
     xfrm = xfrm + " rot=\"" + int_to_str(t.rot) + "\""
   }
@@ -660,7 +670,7 @@ fn serialize_transform_with_extra(
     "\" cy=\"" +
     int_to_str(t.cy) +
     "\"/>"
-  xfrm + extra + "</a:xfrm>"
+  xfrm + extra + "</" + tag + ">"
 }
 
 ///|
@@ -1492,7 +1502,8 @@ fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
     @ooxml.ShapeKind::Picture(rid) => serialize_picture(shape, rid)
     @ooxml.ShapeKind::TableShape(table) => serialize_table(shape, table)
     @ooxml.ShapeKind::GroupShape(grp) => serialize_group(shape, grp)
-    @ooxml.ShapeKind::ChartShape(_) => "" // Charts preserved via chart_xml round-trip
+    // Charts, SmartArt and OLE objects are written from their preserved
+    // graphicFrame (ole_xml) by serialize_shape.
     _ => ""
   }
 }
@@ -1500,11 +1511,10 @@ fn serialize_shape_inner(shape : @ooxml.Shape) -> String {
 ///|
 /// Serialize a single shape to its OOXML fragment (`<p:sp>` / `<p:pic>` /
 /// `<p:grpSp>` / …). Public so the editing layer can extract a shape spec for
-/// cross-slide copy/paste. Charts return "" (preserved via chart_xml).
+/// cross-slide copy/paste.
 pub fn serialize_shape(shape : @ooxml.Shape) -> String {
-  // OLE objects: output the preserved graphicFrame XML directly
   if !shape.ole_xml.is_empty() {
-    return shape.ole_xml
+    return graphic_frame_with_transform(shape.ole_xml, shape.transform)
   }
   let inner = serialize_shape_inner(shape)
   if shape.mc_choice_xml.is_empty() {
@@ -1516,6 +1526,34 @@ pub fn serialize_shape(shape : @ooxml.Shape) -> String {
     inner +
     "</mc:Fallback></mc:AlternateContent>"
   }
+}
+
+///|
+/// A preserved `<p:graphicFrame>` (chart / SmartArt / OLE) with its `p:xfrm`
+/// replaced by the shape's current transform, so moves and resizes are exported.
+fn graphic_frame_with_transform(
+  frame_xml : String,
+  t : @ooxml.ShapeTransform,
+) -> String {
+  for node in @xml.parse_xml(frame_xml) {
+    if node is @xml.XmlNode::Element(tag, attrs, children) {
+      let mut out = "<" + tag
+      for kv in attrs {
+        out = out + " " + kv.name + "=\"" + xml_escape(kv.value) + "\""
+      }
+      out = out + ">"
+      for child in children {
+        out = out +
+          (if @xml.get_tag(child) == "p:xfrm" {
+            serialize_xfrm_element("p:xfrm", t, "")
+          } else {
+            @xml.serialize_node(child)
+          })
+      }
+      return out + "</" + tag + ">"
+    }
+  }
+  frame_xml
 }
 
 ///|

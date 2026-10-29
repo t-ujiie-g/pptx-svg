@@ -332,5 +332,57 @@ test("regressions (slides 96-98)", async () => {
     }
   }
 
+  // ── Editing a slide with a chart / ChartEx / OLE frame keeps the frame ───
+  {
+    console.log('\n── test_features.pptx — chart / OLE graphicFrame survives editing ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const frameOf = (xml) => (xml.match(/<p:graphicFrame>.*?<\/p:graphicFrame>/s) || [''])[0];
+    const xfrmOf = (frame) => (frame.match(/<p:xfrm[^>]*>.*?<\/p:xfrm>/s) || [''])[0];
+    const chartBars = (svg) => (svg.match(/data-ooxml-shape-type="chart"[\s\S]*?<\/g><\/g>/) || [''])[0]
+      .split('<rect').length - 1;
+
+    // Slide 52: a classic chart (shape 0) next to a text box.
+    const idx = 51;
+    const barsBefore = chartBars(r.renderSlideSvg(idx));
+    assert('slide52 chart renders bars', barsBefore > 2, `${barsBefore}`);
+    // Editing only the other shape must not drop the chart.
+    r.updateShapeTransform(idx, 1, 914400, 5029200, 3657600, 457200, 0);
+    assert('slide52 export keeps the chart after editing another shape',
+      frameOf(r.getSlideOoxml(idx)).includes('<c:chart '));
+    // Moving the chart itself is written into its p:xfrm.
+    r.updateShapeTransform(idx, 0, 457200, 228600, 4572000, 2743200, 0);
+    const moved = xfrmOf(frameOf(r.getSlideOoxml(idx)));
+    assert('slide52 moved chart exports its new offset', moved.includes('<a:off x="457200" y="228600"/>'), moved);
+    assert('slide52 moved chart exports its new size', moved.includes('<a:ext cx="4572000" cy="2743200"/>'), moved);
+    // Undo/Redo re-parses the serialized slide: the chart must come back with its data.
+    r.undo();
+    r.redo();
+    assert('slide52 chart renders after undo/redo', chartBars(r.renderSlideSvg(idx)) === barsBefore);
+    // SVG round-trip: the frame travels as data-ooxml-ole and the chart is re-resolved.
+    r.updateSlideFromSvg(idx, r.renderSlideSvg(idx));
+    assert('slide52 SVG round-trip export keeps the chart', frameOf(r.getSlideOoxml(idx)).includes('<c:chart '));
+    assert('slide52 chart renders after SVG round-trip', chartBars(r.renderSlideSvg(idx)) === barsBefore);
+    // Charts stay non-copyable: their chart part cannot be carried by a paste.
+    assert('chart copy is refused', r.getShapeSpec(idx, 0).startsWith('ERROR'));
+
+    // Slide 90: an Office 2016+ chart (cx:chart).
+    r.renderSlideSvg(89);
+    r.updateShapeTransform(89, 0, 914400, 914400, 4572000, 2743200, 0);
+    assert('slide90 export keeps the ChartEx frame', r.getSlideOoxml(89).includes('<cx:chart '));
+
+    // Slide 77: an OLE object — its move is exported too (the frame used to be written verbatim).
+    r.renderSlideSvg(76);
+    r.updateShapeTransform(76, 0, 1828800, 914400, 2743200, 1828800, 0);
+    const ole = frameOf(r.getSlideOoxml(76));
+    assert('slide77 export keeps the OLE object', ole.includes('<p:oleObj'));
+    assert('slide77 moved OLE exports its new offset', xfrmOf(ole).includes('<a:off x="1828800" y="914400"/>'), xfrmOf(ole));
+  }
+
   finishAssertions();
 });

@@ -1163,6 +1163,24 @@ pub fn update_slide_from_svg(slide_idx : Int32, svg_string : String) -> String {
     return "ERROR:slide index out of range"
   }
   let slide_data = @svg_parser.parse_svg_to_slide(svg_string)
+  // The SVG carries no chart data: re-read each chart from its preserved
+  // graphicFrame (data-ooxml-ole) so it renders again after the round-trip.
+  let ctx = slide_context(slide_idx)
+  let shapes = slide_data.shapes
+  for i in 0..<shapes.length() {
+    let s = shapes[i]
+    if s.kind is @ooxml.ShapeKind::ChartShape(_) && !s.ole_xml.is_empty() {
+      if @ooxml.parse_shapes_xml(s.ole_xml, ctx.base_theme) is [frame, ..] &&
+        frame.kind is @ooxml.ShapeKind::ChartShape(_) {
+        shapes[i] = { ..s, kind: frame.kind, }
+      }
+    }
+  }
+  resolve_chart_shapes(
+    shapes,
+    ctx.rels,
+    layout_effective_theme(ctx.base_theme, ctx.master_opt, ctx.layout_opt),
+  )
   g_slides.val[slide_idx] = slide_data
   g_modified.val[slide_idx] = true
   "OK"
