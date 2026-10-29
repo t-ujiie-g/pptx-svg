@@ -60,6 +60,7 @@ Each shape is rendered as a `<g>` element with these attributes.
 | `data-ooxml-nv-name` | string | `p:cNvPr` name (Selection Pane) | absent if empty |
 | `data-ooxml-nv-descr` | string | `p:cNvPr` descr — the alt text | absent if empty |
 | `data-ooxml-nv-title` | string | `p:cNvPr` title | absent if empty |
+| `data-ooxml-nv-hidden` | string | `"1"` for a hidden shape (`p:cNvPr hidden`), whose `<g>` also gets `display="none"` | absent otherwise |
 
 A shape with alt text also gets a `<title>` as the first child of its `<g>` (descr, else title): its accessible name and tooltip.
 

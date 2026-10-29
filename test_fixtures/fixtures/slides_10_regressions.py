@@ -334,3 +334,13 @@ slide106._element.append(etree.fromstring(
     '</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="visible"/></p:to></p:set>'
     '</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn>'
     '</p:par></p:childTnLst></p:cTn></p:seq></p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>'))
+
+# ── Slide 107: a hidden shape (p:cNvPr hidden="1") is kept but not drawn ──────
+slide107 = prs.slides.add_slide(blank)
+shown = slide107.shapes.add_shape(1, Inches(1), Inches(1), Inches(3), Inches(1.5))
+shown.name = "Shown"
+shown.text_frame.text = "Visible"
+hidden = slide107.shapes.add_shape(1, Inches(5), Inches(1), Inches(3), Inches(1.5))
+hidden.name = "Hidden"
+hidden.text_frame.text = "Hidden text"
+hidden._element.find(f".//{{{ns_p}}}cNvPr").set("hidden", "1")

@@ -559,6 +559,7 @@ pub(all) struct Shape {
   nv_name : String
   nv_descr : String
   nv_title : String
+  nv_hidden : Bool
 }
 pub fn Shape::default_with(ShapeKind, ShapeTransform) -> Self
 pub fn Shape::default_with_blip(ShapeKind, ShapeTransform, BlipFill) -> Self

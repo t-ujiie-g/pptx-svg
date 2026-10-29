@@ -782,6 +782,7 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
     nv_name: get_da(g_node, "nv-name"),
     nv_descr: get_da(g_node, "nv-descr"),
     nv_title: get_da(g_node, "nv-title"),
+    nv_hidden: get_da(g_node, "nv-hidden") == "1",
   }
 }
 

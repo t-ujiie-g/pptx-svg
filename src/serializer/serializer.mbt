@@ -1,5 +1,5 @@
 ///|
-/// The shape's p:cNvPr: id (0 if it has none), name, descr, title and hyperlinks.
+/// The shape's p:cNvPr: id (0 if it has none), name, descr, title, hidden and hyperlinks.
 fn serialize_cnvpr(shape : @ooxml.Shape) -> String {
   let id = if shape.nv_id >= 0 { shape.nv_id } else { 0 }
   let mut out = "<p:cNvPr id=\"" +
@@ -12,6 +12,9 @@ fn serialize_cnvpr(shape : @ooxml.Shape) -> String {
   }
   if !shape.nv_title.is_empty() {
     out = out + " title=\"" + xml_escape(shape.nv_title) + "\""
+  }
+  if shape.nv_hidden {
+    out = out + " hidden=\"1\""
   }
   let mut inner = ""
   if !shape.sh_link_rid.is_empty() {

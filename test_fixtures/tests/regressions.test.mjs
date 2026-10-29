@@ -413,5 +413,26 @@ test("regressions (slides 96-98)", async () => {
       cnvPrs(r.getSlideOoxml(idx)).join(' | ').includes(`id="${spid}" name="Revenue Box" descr=`));
   }
 
+  // ── Slide 107: a hidden shape is kept but not drawn ──────────────────────
+  {
+    console.log('\n── test_features.pptx — Slide 107: hidden shape ──');
+    const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+    const wasmBuf = readFileSync(join(DIST_DIR, 'main.wasm'));
+    const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+    const pptxAb = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const r = new PptxRenderer({ logLevel: 'silent' });
+    await r.init(wasmBuf);
+    await r.loadPptx(pptxAb);
+    const idx = 106;
+    const gOf = (svg, name) => (svg.match(new RegExp(`<g [^>]*data-ooxml-nv-name="${name}"[^>]*>`)) || [''])[0];
+    const svg = r.renderSlideSvg(idx);
+    assert('slide107 hidden shape is not drawn', gOf(svg, 'Hidden').includes('display="none"'), gOf(svg, 'Hidden'));
+    assert('slide107 visible shape is drawn', gOf(svg, 'Shown') !== '' && !gOf(svg, 'Shown').includes('display='));
+    r.updateShapeFill(idx, 0, 255, 0, 0);
+    assert('slide107 export keeps hidden="1"', /<p:cNvPr id="\d+" name="Hidden" hidden="1"\/>/.test(r.getSlideOoxml(idx)));
+    r.updateSlideFromSvg(idx, r.renderSlideSvg(idx));
+    assert('slide107 SVG round-trip keeps hidden="1"', /name="Hidden" hidden="1"/.test(r.getSlideOoxml(idx)));
+  }
+
   finishAssertions();
 });

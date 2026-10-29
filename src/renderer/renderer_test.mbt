@@ -2481,3 +2481,36 @@ test "alt text renders as <title> and round-trips" {
     (7, "Box", "A & B", ""),
   )
 }
+
+///|
+/// A hidden shape stays in the SVG with display="none" and round-trips its flag.
+test "hidden shape is kept but not drawn" {
+  let shape = {
+    ..@ooxml.Shape::default_with(
+      @ooxml.ShapeKind::AutoShape(@ooxml.ShapeGeom::Rect),
+      {
+        x: 0,
+        y: 0,
+        cx: 1000000,
+        cy: 1000000,
+        rot: 0,
+        flip_h: false,
+        flip_v: false,
+      },
+    ),
+    fill: @ooxml.Color::white(),
+    nv_hidden: true,
+  }
+  let svg = @renderer.render_slide_svg(
+    { ..make_empty_slide(), shapes: [shape], },
+    [],
+    1,
+    @ooxml.ThemeData::default(),
+    [],
+    [],
+    [],
+    [],
+  )
+  assert_true(svg.contains("display=\"none\""))
+  assert_true(@svg_parser.parse_svg_to_slide(svg).shapes[0].nv_hidden)
+}
