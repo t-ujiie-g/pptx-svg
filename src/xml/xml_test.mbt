@@ -347,7 +347,7 @@ test "concat_balanced large input matches naive" {
   }
   let result = @xml.concat_balanced(parts)
   assert_eq(result.length(), 10000)
-  // Spot-check via slicing through str_substring (also O(N log N) post-fix).
+  // Spot-check through str_substring.
   assert_eq(@xml.str_substring(result, 0, 5), "xxxxx")
   assert_eq(@xml.str_substring(result, 9995, 10000), "xxxxx")
 }
@@ -378,8 +378,7 @@ test "parse_xml shallow nesting works" {
 
 ///|
 test "parse_xml deep nesting does not stack-overflow" {
-  // Far above max_xml_depth = 1024. Without the depth cap this would
-  // recurse 5000 times and blow the Wasm call stack.
+  // Far above max_xml_depth: without the cap this would overflow the Wasm stack.
   let mut xml = ""
   let mut close = ""
   for _ in 0..<5000 {
@@ -387,8 +386,7 @@ test "parse_xml deep nesting does not stack-overflow" {
     close = "</a>" + close
   }
   let full = xml + "X" + close
-  // Just verify it returns without panicking. Depth past the cap is
-  // skipped lexically (skip_to_close); the outer structure remains.
+  // Past the cap the nesting is skipped lexically; the outer structure remains.
   let nodes = @xml.parse_xml(full)
   assert_true(nodes.length() >= 1)
 }

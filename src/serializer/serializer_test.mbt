@@ -16,15 +16,12 @@ test "serialize_slide empty slide" {
     bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
-  // Should start with XML declaration
   assert_true(@xml.str_starts_with(xml, "<?xml version"))
-  // Should contain p:sld root element
   assert_true(
     @xml.str_starts_with(
       xml, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><p:sld",
     ),
   )
-  // Should contain shape tree
   let nodes = @xml.parse_xml(xml)
   assert_eq(nodes.length(), 1)
   assert_eq(@xml.get_tag(nodes[0]), "p:sld")
@@ -72,8 +69,7 @@ test "serialize_slide inherited background writes no p:bg" {
 
 ///|
 test "serialize_slide svg-only blip background omits r:embed" {
-  // Regression: SVG-only blips (no r:embed, only asvg:svgBlip) were being
-  // serialized as <a:blip r:embed=""> which PowerPoint rejects.
+  // An SVG-only blip must not get r:embed="", which PowerPoint rejects.
   let svg_only : @ooxml.BlipFill = {
     ..@ooxml.BlipFill::none(),
     svg_rid: "rId9",
@@ -207,7 +203,6 @@ test "serialize_slide shape with blur effect" {
     bg_inherited: false,
   }
   let xml = @serializer.serialize_slide(slide)
-  // Should contain a:effectLst with a:blur
   assert_true(xml.contains("<a:effectLst>"))
   assert_true(xml.contains("<a:blur"))
   assert_true(xml.contains("rad=\"76200\""))
@@ -460,10 +455,8 @@ test "serialize_slide no effectLst when none" {
   assert_true(!xml.contains("<a:effectLst>"))
 }
 
-// The Undo/Redo history captures a slide's OOXML via get_slide_ooxml and restores
-// it through restore_slide_ooxml (parse_slide → g_slides). This must be stable:
-// serialize → parse_slide → serialize should be a fixed point, so no data is lost
-// across an undo/redo cycle.
+// Undo/Redo stores serialized slides: serialize → parse_slide → serialize must be a
+// fixed point.
 
 ///|
 test "restore round-trip: serialize is idempotent after parse_slide" {
