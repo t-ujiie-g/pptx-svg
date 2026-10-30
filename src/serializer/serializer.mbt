@@ -1619,13 +1619,8 @@ pub fn serialize_slide(slide : @ooxml.SlideData) -> String {
   out = out + "<a:chExt cx=\"0\" cy=\"0\"/>"
   out = out + "</a:xfrm>"
   out = out + "</p:grpSpPr>"
-  let max_id = @ooxml.max_nv_id(slide.shapes)
   let shapes = with_unique_nv_ids(slide.shapes, [1], {
-    val: if max_id > 1 {
-      max_id
-    } else {
-      1
-    },
+    val: @ooxml.max_nv_id(slide.shapes),
   })
   for shape in shapes {
     out = out + serialize_shape(shape)

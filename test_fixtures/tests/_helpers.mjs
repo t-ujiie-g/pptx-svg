@@ -60,6 +60,21 @@ export async function loadPptxEntries(filename) {
 }
 
 let featuresCache;
+/** A renderer with test_features.pptx loaded, its entries first patched by `mods` (path → XML). */
+export async function openFeatures(mods) {
+  const { PptxRenderer } = await import(join(DIST_DIR, 'index.js'));
+  const buf = readFileSync(join(FIXTURES_DIR, 'test_features.pptx'));
+  let ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  if (mods) {
+    const { buildZip } = await import(join(DIST_DIR, 'zip.js'));
+    ab = await buildZip(ab, mods);
+  }
+  const r = new PptxRenderer({ logLevel: 'silent' });
+  await r.init(readFileSync(join(DIST_DIR, 'main.wasm')));
+  await r.loadPptx(ab);
+  return r;
+}
+
 export async function loadFeatures() {
   if (!featuresCache) {
     featuresCache = await loadPptxEntries('test_features.pptx');
