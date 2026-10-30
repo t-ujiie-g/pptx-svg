@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.6.8
+
+Editing round-trip release. Editing a slide no longer drops its charts, resets
+its shapes' ids and names (which broke animations and connectors), or loses
+alt text; moving a chart, SmartArt or OLE object is exported; table row/column
+edits keep merged cells consistent; and hidden shapes are no longer drawn.
+Shapes gain alt text as an SVG `<title>` and `data-ooxml-nv-*` attributes, and
+chart shapes carry `data-ooxml-ole` (`docs/svg-specification.md`). The public
+TypeScript API is unchanged; the Wasm is ~413 KB (~149 KB gzipped).
 
 ### Added
 
