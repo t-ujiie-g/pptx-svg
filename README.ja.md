@@ -17,7 +17,7 @@ PPTX と SVG の双方向変換ライブラリ。外部依存なし、ブラウ�
 
 - **PPTX → SVG**: PowerPoint スライドを高品質な SVG に変換
 - **SVG → PPTX**: SVG を編集して有効な .pptx ファイルにエクスポート（ロスレス往復）
-- **ブラウザ & Node.js**: サーバー不要でクライアント側実行、または Node.js 22+ でサーバー側実行
+- **ブラウザ & Node.js**: サーバー不要でクライアント側実行（WebAssembly GC 対応ブラウザ: Chrome/Edge 119+、Firefox 120+、Safari 18.2+）、または Node.js 22+ でサーバー側実行
 - **外部依存なし**: Wasm バイナリ約 400KB（gzip 後 約 145KB）、npm 依存パッケージなし
 - **フレームワーク非依存**: React、Vue、Svelte、バニラ JS、Express など何でも利用可能
 
