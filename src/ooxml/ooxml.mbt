@@ -110,8 +110,8 @@ fn hex_digit(c : Char) -> Int32 {
 
 ///|
 fn parse_hex2(s : String, offset : Int32) -> Int32 {
-  hex_digit(s.get_char(offset).unwrap()) * 16 +
-  hex_digit(s.get_char(offset + 1).unwrap())
+  hex_digit(@xml.char_at(s, offset)) * 16 +
+  hex_digit(@xml.char_at(s, offset + 1))
 }
 
 ///|

@@ -57,12 +57,12 @@ fn GuideEnv::resolve(self : GuideEnv, token : String) -> Double {
 /// True if `s` is an optionally negative decimal integer literal.
 fn is_int_literal(s : String) -> Bool {
   let n = s.length()
-  let start = if n > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
+  let start = if n > 0 && @xml.char_at(s, 0) == '-' { 1 } else { 0 }
   if start >= n {
     return false
   }
   for i in start..<n {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     if c < '0' || c > '9' {
       return false
     }
@@ -126,13 +126,13 @@ fn parse_double(s : String) -> Double {
   }
   let mut neg = false
   let mut i = 0
-  if s.get_char(0).unwrap() == '-' {
+  if @xml.char_at(s, 0) == '-' {
     neg = true
     i = 1
   }
   let mut result = 0.0
   while i < n {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     if c >= '0' && c <= '9' {
       result = result * 10.0 + (c.to_int() - 48).to_double()
     }
@@ -887,7 +887,7 @@ fn split_on(s : String, sep : Char) -> Array[String] {
   let len = s.length()
   let mut start = 0
   for i in 0..<=len {
-    if i == len || s.get_char(i).unwrap() == sep {
+    if i == len || @xml.char_at(s, i) == sep {
       if i > start {
         parts.push(@xml.str_substring(s, start, i))
       }
@@ -902,7 +902,7 @@ fn split_on(s : String, sep : Char) -> Array[String] {
 fn split_entry(s : String) -> (String, String)? {
   let len = s.length()
   for i in 0..<len {
-    if s.get_char(i).unwrap() == '=' {
+    if @xml.char_at(s, i) == '=' {
       return Some(
         (@xml.str_substring(s, 0, i), @xml.str_substring(s, i + 1, len)),
       )

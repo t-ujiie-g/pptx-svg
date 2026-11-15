@@ -91,7 +91,7 @@ fn count_occurrences(text : String, pattern : String) -> Int32 {
 fn match_at(text : String, pattern : String, pos : Int32) -> Bool {
   let plen = pattern.length()
   for j in 0..<plen {
-    if text.get_char(pos + j).unwrap() != pattern.get_char(j).unwrap() {
+    if @xml.char_at(text, pos + j) != @xml.char_at(pattern, j) {
       return false
     }
   }
@@ -161,7 +161,7 @@ fn resolve_rel_path(base_dir : String, target : String) -> String {
   let mut tgt = target
   while @xml.str_starts_with(tgt, "../") {
     let dlen = dir.length()
-    let d2 = if dlen > 0 && dir.get_char(dlen - 1).unwrap() == '/' {
+    let d2 = if dlen > 0 && @xml.char_at(dir, dlen - 1) == '/' {
       substring(dir, 0, dlen - 1)
     } else {
       dir
@@ -340,7 +340,7 @@ fn last_index_of(s : String, c : Char) -> Int32 {
   let len = s.length()
   let mut i = len - 1
   while i >= 0 {
-    if s.get_char(i).unwrap() == c {
+    if @xml.char_at(s, i) == c {
       return i
     }
     i = i - 1

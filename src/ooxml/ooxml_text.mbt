@@ -412,7 +412,7 @@ fn split_by_newline(s : String) -> Array[String] {
   let len = s.length()
   let mut start = 0
   for i in 0..<len {
-    if s.get_char(i).unwrap() == '\n' {
+    if @xml.char_at(s, i) == '\n' {
       parts.push(@xml.str_substring(s, start, i))
       start = i + 1
     }

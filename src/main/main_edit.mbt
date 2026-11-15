@@ -196,7 +196,7 @@ fn split_string(s : String, sep : Char) -> Array[String] {
   let len = s.length()
   let mut start = 0
   for i in 0..<len {
-    if s.get_char(i).unwrap() == sep {
+    if @xml.char_at(s, i) == sep {
       result.push(substring(s, start, i))
       start = i + 1
     }

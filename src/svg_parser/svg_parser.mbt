@@ -289,13 +289,13 @@ fn parse_grad_stops(s : String) -> Array[@ooxml.GradientStop] {
   let mut start = 0
   for i in 0..<=len {
     let at_end = i == len
-    let is_semi = if at_end { false } else { s.get_char(i).unwrap() == ';' }
+    let is_semi = if at_end { false } else { @xml.char_at(s, i) == ';' }
     if is_semi || at_end {
       if i > start {
         let mut ci = start
         let mut comma = -1
         while ci < i {
-          if s.get_char(ci).unwrap() == ',' {
+          if @xml.char_at(s, ci) == ',' {
             comma = ci
           }
           ci = ci + 1
@@ -851,7 +851,7 @@ fn parse_adj_string(s : String) -> Array[Int32] {
   let mut start = 0
   let len = s.length()
   for i in 0..<len {
-    if s.get_char(i).unwrap() == ',' {
+    if @xml.char_at(s, i) == ',' {
       if i > start {
         result.push(@xml.parse_int(@xml.str_substring(s, start, i)))
       }

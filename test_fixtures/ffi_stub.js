@@ -5,7 +5,7 @@
 // Usage: NODE_OPTIONS="--require ./test_fixtures/ffi_stub.js" moon test --target js
 
 globalThis.pptx_ffi = {
-  char_code_to_str: (code) => String.fromCharCode(code),
+  char_code_to_str: (code) => String.fromCodePoint(code),
   get_file: () => "",
   get_entry_list: () => "",
   get_file_base64: () => "",

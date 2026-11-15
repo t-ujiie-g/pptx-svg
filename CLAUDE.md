@@ -70,7 +70,7 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 **No integer string interpolation.** `"\{n}"` for integer `n` calls `fromCharCodeArray` internally, which requires `{ builtins: ['js-string'] }` browser support (Chrome 117+). The codebase uses `@xml.int_to_str(n)` (defined in `xml.mbt`, aliased locally as `fn int_to_str(n) -> String { @xml.int_to_str(n) }`) which only uses `concat` + string literals and works in all wasm-gc browsers (Chrome 111+).
 
-**String API:** Use `s.get_char(i).unwrap()` (not deprecated `unsafe_char_at`). Avoid `s[i:j]` in non-error functions — it raises `CreatingViewError`.
+**String API:** Read a character with `@xml.char_at(s, i)` (`char_at` inside `xml`), never `s.get_char(i).unwrap()`: indices are UTF-16 code units, and on the second half of a surrogate pair (any emoji) `get_char` is `None`, so a scanner stepping by 1 panics with `unreachable` (#88). `char_at` yields U+FFFD there, which matches no ASCII delimiter. Loops that copy characters still step by `char_step(c)`. Avoid `s[i:j]` in non-error functions — it raises `CreatingViewError`.
 
 **No external packages.** `bobzhang/zip` and `ruifeng/XMLParser` are incompatible with the current compiler (Feb 2026). Do not add external deps; implement needed parsers inline.
 

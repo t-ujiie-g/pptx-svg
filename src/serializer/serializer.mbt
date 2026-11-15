@@ -729,13 +729,13 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
     let len = data.gdlst.length()
     let mut start = 0
     for i in 0..<=len {
-      if i == len || data.gdlst.get_char(i).unwrap() == ';' {
+      if i == len || @xml.char_at(data.gdlst, i) == ';' {
         if i > start {
           let entry = @xml.str_substring(data.gdlst, start, i)
           let elen = entry.length()
           let mut eq = 0
           while eq < elen {
-            if entry.get_char(eq).unwrap() == '=' {
+            if @xml.char_at(entry, eq) == '=' {
               break
             }
             eq = eq + 1
@@ -775,7 +775,7 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
   let plen = data.paths.length()
   let mut pstart = 0
   for pi in 0..<=plen {
-    if pi == plen || data.paths.get_char(pi).unwrap() == '|' {
+    if pi == plen || @xml.char_at(data.paths, pi) == '|' {
       if pi > pstart {
         let seg = @xml.str_substring(data.paths, pstart, pi)
         out = out + serialize_path_segment(seg, data.path_w, data.path_h)
@@ -789,7 +789,7 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
     let clen = data.cxn_lst.length()
     let mut cstart = 0
     for ci in 0..<=clen {
-      if ci == clen || data.cxn_lst.get_char(ci).unwrap() == ';' {
+      if ci == clen || @xml.char_at(data.cxn_lst, ci) == ';' {
         if ci > cstart {
           let entry = @xml.str_substring(data.cxn_lst, cstart, ci)
           let mut c1 = 0
@@ -798,7 +798,7 @@ fn serialize_custom_geom(data : @ooxml.CustomGeomData) -> String {
           let mut ei = 0
           let mut comma_count = 0
           while ei < elen {
-            if entry.get_char(ei).unwrap() == ',' {
+            if @xml.char_at(entry, ei) == ',' {
               if comma_count == 0 {
                 c1 = ei
               } else {
@@ -1214,13 +1214,13 @@ fn serialize_stroke(shape : @ooxml.Shape) -> String {
     let mut pos = 0
     while pos < data_len {
       let mut d_end = pos
-      while d_end < data_len && data.get_char(d_end).unwrap() != ',' {
+      while d_end < data_len && @xml.char_at(data, d_end) != ',' {
         d_end = d_end + 1
       }
       let d_val = @xml.parse_int(@xml.str_substring(data, pos, d_end))
       let sp_start = d_end + 1
       let mut sp_end = sp_start
-      while sp_end < data_len && data.get_char(sp_end).unwrap() != ';' {
+      while sp_end < data_len && @xml.char_at(data, sp_end) != ';' {
         sp_end = sp_end + 1
       }
       let sp_val = @xml.parse_int(@xml.str_substring(data, sp_start, sp_end))

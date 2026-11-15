@@ -375,5 +375,29 @@ test("regressions (slides 96-107 and patched-fixture cases)", async () => {
     assert('slide107 SVG round-trip keeps hidden="1"', /name="Hidden" hidden="1"/.test(r.getSlideOoxml(idx)));
   }
 
+  // ── Issue #88: an astral character in presentation.xml ───────────────────
+  {
+    console.log('\n── test_features.pptx — astral characters in presentation.xml (issue #88) ──');
+    const prs = textFiles.get('ppt/presentation.xml');
+    const slideCount = (prs.match(/<p:sldId /g) || []).length;
+    // Slide counting stepped one UTF-16 unit at a time and panicked on the low surrogate.
+    const sections = '<p:extLst><p:ext uri="{521415D9-36F7-43E2-AB2F-B90AF26B5E84}">' +
+      '<p14:sectionLst xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">' +
+      '<p14:section name="TypeScript 💙 ESLint" id="{6F0F2A43-6C47-4C1A-9E0C-1A2B3C4D5E6F}"><p14:sldIdLst/></p14:section>' +
+      '</p14:sectionLst></p:ext></p:extLst>';
+    const patched = prs.replace('</p:presentation>', `<!-- 😀 -->${sections}</p:presentation>`);
+    assert('issue88 fixture patch applied', patched !== prs);
+    let count = -1, error = '';
+    try {
+      const r = await openFeatures(new Map([['ppt/presentation.xml', patched]]));
+      count = r.getSlideCount();
+      r.renderSlideSvg(0);
+    } catch (e) {
+      error = String(e);
+    }
+    assert('issue88 deck with an emoji section name loads', error === '', error);
+    assert('issue88 slide count is unchanged', count === slideCount, `${count} vs ${slideCount}`);
+  }
+
   finishAssertions();
 });
