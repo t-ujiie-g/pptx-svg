@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- **`loadPptx` threw `RuntimeError: unreachable` for an emoji (or any character outside the BMP) in `ppt/presentation.xml`**, e.g. a section named `TypeScript 💙 ESLint` (#88). Slide counting stepped through the XML one UTF-16 code unit at a time and unwrapped `get_char` on the second half of a surrogate pair. Every character read in the MoonBit sources now goes through `@xml.char_at`, which cannot panic, so the same failure is gone from the other byte-wise scanners too (`str_ends_with` on a path or target ending near an emoji, number-format and hex parsing, newline/space splitting, etc.). Output for decks without such characters is byte-identical.
+- The MoonBit unit-test FFI stub now builds characters with `String.fromCodePoint`, like the library, instead of `String.fromCharCode` (which mangled emoji in tests only).
+
 ### Refactoring
 
 - **MoonBit sources brought up to the moon 0.1.20261104 idiom** (no behavior change — SVG and round-trip OOXML output are byte-identical to 0.6.8 across all fixture and real-world decks; test counts unchanged).

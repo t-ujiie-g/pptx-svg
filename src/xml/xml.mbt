@@ -19,6 +19,13 @@ fn char_to_str(c : Char) -> String {
 }
 
 ///|
+/// The character at UTF-16 index `i`; U+FFFD on the second half of a surrogate
+///  pair or out of range, so a scanner stepping by code unit cannot panic (#88).
+pub fn char_at(s : String, i : Int32) -> Char {
+  s.get_char(i).unwrap_or('\u{FFFD}')
+}
+
+///|
 /// True if the character is in an astral plane (code > 0xFFFF, e.g. emoji).
 pub fn is_astral(c : Char) -> Bool {
   c.to_int() > 0xFFFF
@@ -77,7 +84,7 @@ fn Parser::starts_with(self : Parser, s : String) -> Bool {
     return false
   }
   for i in 0..<slen {
-    if self.src.get_char(self.pos + i).unwrap() != s.get_char(i).unwrap() {
+    if char_at(self.src, self.pos + i) != char_at(s, i) {
       return false
     }
   }
@@ -131,7 +138,7 @@ fn collect_chars(s : String, start : Int32, end_exclusive : Int32) -> String {
   let parts : Array[String] = []
   let mut i = start
   while i < lim {
-    let c = s.get_char(i).unwrap()
+    let c = char_at(s, i)
     parts.push(char_to_str(c))
     i = i + char_step(c)
   }
@@ -173,7 +180,7 @@ fn decode_entities(s : String) -> String {
   let mut has_amp = false
   let mut k = 0
   while k < len {
-    let kc = s.get_char(k).unwrap()
+    let kc = char_at(s, k)
     if kc == '&' {
       has_amp = true
       break
@@ -186,10 +193,10 @@ fn decode_entities(s : String) -> String {
   let parts : Array[String] = []
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = char_at(s, i)
     if c == '&' {
       let mut j = i + 1
-      while j < len && s.get_char(j).unwrap() != ';' {
+      while j < len && char_at(s, j) != ';' {
         j = j + 1
       }
       let entity = collect_chars(s, i + 1, j)
@@ -597,13 +604,13 @@ pub fn parse_int(s : String) -> Int32 {
   }
   let mut i = 0
   let mut neg = false
-  if s.get_char(0).unwrap() == '-' {
+  if char_at(s, 0) == '-' {
     neg = true
     i = 1
   }
   let mut result = 0
   while i < len {
-    let d = s.get_char(i).unwrap().to_int() - 48
+    let d = char_at(s, i).to_int() - 48
     if d < 0 || d > 9 {
       break
     }
@@ -626,7 +633,7 @@ pub fn parse_hex_int(s : String) -> Int32 {
   }
   let mut result = 0
   for i in 0..<len {
-    let c = s.get_char(i).unwrap().to_int()
+    let c = char_at(s, i).to_int()
     let d = if c >= 48 && c <= 57 {
       c - 48 // '0'-'9'
     } else if c >= 65 && c <= 70 {
@@ -680,7 +687,7 @@ pub fn str_suffix(s : String, from : Int32) -> String {
   let parts : Array[String] = []
   let mut i = from
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = char_at(s, i)
     parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
     i = i + char_step(c)
   }
@@ -701,7 +708,7 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
     if i + plen <= slen {
       let mut matched = true
       for k in 0..<plen {
-        if s.get_char(i + k).unwrap() != pat.get_char(k).unwrap() {
+        if char_at(s, i + k) != char_at(pat, k) {
           matched = false
           break
         }
@@ -710,12 +717,12 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
         parts.push(repl)
         i = i + plen
       } else {
-        let c = s.get_char(i).unwrap()
+        let c = char_at(s, i)
         parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
         i = i + char_step(c)
       }
     } else {
-      let c = s.get_char(i).unwrap()
+      let c = char_at(s, i)
       parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
       i = i + char_step(c)
     }
@@ -732,7 +739,7 @@ pub fn str_starts_with(s : String, pat : String) -> Bool {
     return false
   }
   for j in 0..<plen {
-    if s.get_char(j).unwrap() != pat.get_char(j).unwrap() {
+    if char_at(s, j) != char_at(pat, j) {
       return false
     }
   }
@@ -749,7 +756,7 @@ pub fn str_ends_with(s : String, pat : String) -> Bool {
   }
   let start = slen - plen
   for j in 0..<plen {
-    if s.get_char(start + j).unwrap() != pat.get_char(j).unwrap() {
+    if char_at(s, start + j) != char_at(pat, j) {
       return false
     }
   }
@@ -762,7 +769,7 @@ pub fn str_substring(s : String, from : Int32, to : Int32) -> String {
   let parts : Array[String] = []
   let mut i = from
   while i < to {
-    let c = s.get_char(i).unwrap()
+    let c = char_at(s, i)
     parts.push(@ffi.ffi_char_code_to_str(c.to_int()))
     i = i + char_step(c)
   }
@@ -782,7 +789,7 @@ pub fn xml_escape(s : String) -> String {
   let mut needs = false
   let mut k = 0
   while k < len {
-    let kc = s.get_char(k).unwrap()
+    let kc = char_at(s, k)
     if kc == '<' || kc == '>' || kc == '&' || kc == '"' || kc == '\'' {
       needs = true
       break
@@ -795,7 +802,7 @@ pub fn xml_escape(s : String) -> String {
   let parts : Array[String] = []
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = char_at(s, i)
     if c == '<' {
       parts.push("&lt;")
     } else if c == '>' {
@@ -822,7 +829,7 @@ pub fn split_by_space(s : String) -> Array[String] {
   let mut start = 0
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = char_at(s, i)
     let step = char_step(c)
     if c == ' ' {
       if i > start {

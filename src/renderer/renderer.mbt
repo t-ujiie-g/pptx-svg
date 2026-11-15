@@ -302,7 +302,7 @@ fn stroke_dasharray(dash : String, sw : Int32) -> String {
       while pos < data_len {
         let mut num_end = pos
         while num_end < data_len {
-          let c = data.get_char(num_end).unwrap()
+          let c = @xml.char_at(data, num_end)
           if c == ',' || c == ';' {
             break
           }
@@ -470,7 +470,7 @@ fn ascii_lower(s : String) -> String {
   let mut out = ""
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     let code = c.to_int()
     let mapped = if code >= 65 && code <= 90 { code + 32 } else { code }
     out = out + @ffi.ffi_char_code_to_str(mapped)
@@ -490,7 +490,7 @@ pub fn sanitize_url(url : String) -> String {
   let len = url.length()
   let mut start = 0
   while start < len {
-    let c = url.get_char(start).unwrap()
+    let c = @xml.char_at(url, start)
     let code = c.to_int()
     if code > 0x20 {
       break
@@ -504,7 +504,7 @@ pub fn sanitize_url(url : String) -> String {
   let tlen = trimmed.length()
   let mut colon = -1
   for j in 0..<tlen {
-    let c = trimmed.get_char(j).unwrap()
+    let c = @xml.char_at(trimmed, j)
     if c == ':' {
       colon = j
       break
@@ -685,9 +685,9 @@ fn transform_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
 ///|
 fn resolve_image_path(target : String) -> String {
   if target.length() > 3 &&
-    target.get_char(0).unwrap() == '.' &&
-    target.get_char(1).unwrap() == '.' &&
-    target.get_char(2).unwrap() == '/' {
+    @xml.char_at(target, 0) == '.' &&
+    @xml.char_at(target, 1) == '.' &&
+    @xml.char_at(target, 2) == '/' {
     "ppt/" + @xml.str_suffix(target, 3)
   } else {
     target
@@ -699,7 +699,7 @@ fn mime_from_ext(path : String) -> String {
   let len = path.length()
   let mut dot = len - 1
   while dot >= 0 {
-    if path.get_char(dot).unwrap() == '.' {
+    if @xml.char_at(path, dot) == '.' {
       break
     }
     dot = dot - 1

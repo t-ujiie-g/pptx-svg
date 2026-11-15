@@ -40,7 +40,7 @@ fn to_upper_ascii(s : String) -> String {
   let mut result = ""
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     let code = c.to_int()
     if code >= ascii_lower_a && code <= ascii_lower_z {
       result = result + @ffi.ffi_char_code_to_str(code - ascii_case_shift)
@@ -143,7 +143,7 @@ fn count_spaces(text : String) -> Int32 {
   let len = text.length()
   let mut count = 0
   for i in 0..<len {
-    if text.get_char(i).unwrap() == ' ' {
+    if @xml.char_at(text, i) == ' ' {
       count = count + 1
     }
   }
@@ -275,7 +275,7 @@ fn wrap_paragraph(
     let text_len = text.length()
     let mut seg_start = 0
     while seg_start < text_len {
-      let c = text.get_char(seg_start).unwrap()
+      let c = @xml.char_at(text, seg_start)
       let mut seg_end = seg_start
       if is_cjk(c) || @xml.is_astral(c) {
         // CJK or astral-plane character (emoji): treat as single segment
@@ -283,7 +283,7 @@ fn wrap_paragraph(
       } else {
         seg_end = seg_start
         while seg_end < text_len {
-          let sc = text.get_char(seg_end).unwrap()
+          let sc = @xml.char_at(text, seg_end)
           if is_cjk(sc) || @xml.is_astral(sc) {
             break
           }
@@ -299,7 +299,7 @@ fn wrap_paragraph(
       let total_w = cur_width + candidate_w
       if !cur_line.is_empty() && total_w > max_w && max_w > 0.0 {
         // Kinsoku: line-start-prohibited chars stay on current line
-        let first_char = seg_text.get_char(0).unwrap()
+        let first_char = @xml.char_at(seg_text, 0)
         if is_kinsoku_start_prohibited(first_char) {
           cur_line.push((ri, seg_text))
           run_accum = candidate
@@ -333,7 +333,7 @@ fn contains_tab(s : String) -> Bool {
   let len = s.length()
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     if c == '\t' {
       return true
     }
@@ -350,7 +350,7 @@ fn split_by_tab(s : String) -> Array[String] {
   let mut start = 0
   let mut i = 0
   while i < len {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     let step = @xml.char_step(c)
     if c == '\t' {
       parts.push(@xml.str_substring(s, start, i))

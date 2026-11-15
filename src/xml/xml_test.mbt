@@ -59,6 +59,26 @@ test "str_starts_with" {
 }
 
 ///|
+test "char_at yields U+FFFD on the second half of a surrogate pair" {
+  let s = "a😀b"
+  assert_eq(@xml.char_at(s, 1), '😀')
+  assert_eq(@xml.char_at(s, 2), '\u{FFFD}')
+  assert_eq(@xml.char_at(s, 3), 'b')
+  assert_eq(@xml.char_at(s, 9), '\u{FFFD}')
+}
+
+///|
+test "scanners do not panic next to an astral character (#88)" {
+  // Each case starts a comparison on the low surrogate of the emoji.
+  assert_false(@xml.str_ends_with("😀abcde", "/theme"))
+  assert_true(@xml.str_ends_with("x😀", "😀"))
+  assert_false(@xml.str_ends_with("x😀", "a"))
+  assert_eq(@xml.parse_int("12😀"), 12)
+  assert_eq(@xml.xml_unescape("💙&amp;💙"), "💙&💙")
+  assert_eq(@xml.str_replace_all("😀a😀", "a", "b"), "😀b😀")
+}
+
+///|
 test "str_ends_with" {
   assert_true(@xml.str_ends_with("hello world", "world"))
   assert_true(@xml.str_ends_with("hello", "hello"))

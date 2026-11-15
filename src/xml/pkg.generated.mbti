@@ -2,6 +2,8 @@
 package "pptx-svg/xml"
 
 // Values
+pub fn char_at(String, Int32) -> Char
+
 pub fn char_step(Char) -> Int32
 
 pub fn concat_balanced(Array[String]) -> String

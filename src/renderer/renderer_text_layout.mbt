@@ -287,7 +287,7 @@ pub fn build_text_layout(
         let mut ci = 0
         let mut prev_w = 0.0
         while ci < tlen {
-          let step = @xml.char_step(text.get_char(ci).unwrap())
+          let step = @xml.char_step(@xml.char_at(text, ci))
           let prefix = @xml.str_substring(text, 0, ci + step)
           let cum_w = @ffi.ffi_measure_text(prefix, ff, fs_px)
           let ch_w = cum_w - prev_w

@@ -1839,10 +1839,10 @@ fn parse_chart_num(s : String) -> Int32 {
     return 0
   }
   let len = s.length()
-  let start = if len > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
+  let start = if len > 0 && @xml.char_at(s, 0) == '-' { 1 } else { 0 }
   let mut e_pos = -1
   for si in start..<len {
-    let c = s.get_char(si).unwrap()
+    let c = @xml.char_at(s, si)
     if c == 'E' || c == 'e' {
       e_pos = si
       break
@@ -1856,7 +1856,7 @@ fn parse_chart_num(s : String) -> Int32 {
     let mut found_dot = false
     let mut sig_digits = 0
     for si in start..<e_pos {
-      let c = s.get_char(si).unwrap()
+      let c = @xml.char_at(s, si)
       if c == '.' {
         found_dot = true
       } else if c >= '0' && c <= '9' && sig_digits < 8 {
@@ -1871,7 +1871,7 @@ fn parse_chart_num(s : String) -> Int32 {
     let mut exp_neg = false
     let mut si = e_pos + 1
     if si < len {
-      let ec = s.get_char(si).unwrap()
+      let ec = @xml.char_at(s, si)
       if ec == '-' {
         exp_neg = true
         si = si + 1
@@ -1880,7 +1880,7 @@ fn parse_chart_num(s : String) -> Int32 {
       }
     }
     while si < len {
-      let c = s.get_char(si).unwrap()
+      let c = @xml.char_at(s, si)
       if c >= '0' && c <= '9' {
         exp = exp * 10 + (c.to_int() - 48)
       }
@@ -1908,14 +1908,14 @@ fn parse_chart_num(s : String) -> Int32 {
   // Find decimal point position
   let mut dot_pos = len
   for i in start..<len {
-    if s.get_char(i).unwrap() == '.' {
+    if @xml.char_at(s, i) == '.' {
       dot_pos = i
       break
     }
   }
   let mut int_part = 0
   for i in start..<dot_pos {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     if c >= '0' && c <= '9' {
       int_part = int_part * 10 + (c.to_int() - 48)
     }
@@ -1924,7 +1924,7 @@ fn parse_chart_num(s : String) -> Int32 {
   let mut dec_digits = 0
   let mut i = dot_pos + 1
   while i < len && dec_digits < 4 {
-    let c = s.get_char(i).unwrap()
+    let c = @xml.char_at(s, i)
     if c >= '0' && c <= '9' {
       dec_part = dec_part * 10 + (c.to_int() - 48)
       dec_digits = dec_digits + 1
@@ -1981,7 +1981,7 @@ fn mul_div(a : Int32, b : Int32, c : Int32) -> Int32 {
 fn format_chart_val(val : Int32, num_fmt : String) -> String {
   let is_pct = !num_fmt.is_empty() &&
     ({
-      let last = num_fmt.get_char(num_fmt.length() - 1).unwrap()
+      let last = @xml.char_at(num_fmt, num_fmt.length() - 1)
       last == '%'
     })
   if is_pct {
