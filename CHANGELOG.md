@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.6.9
+
+Compatibility release. A deck with an emoji (or any character outside the BMP)
+in `ppt/presentation.xml` — such as a section name — no longer fails to load
+(#88), and the Wasm now loads in browsers with WebAssembly GC but without
+js-string builtins, notably Safari 18.2–26.1 (#91). MoonBit sources are brought
+up to the current compiler idiom. The public TypeScript API and the SVG output
+are unchanged; the Wasm is ~414 KB (~149 KB gzipped).
 
 ### Fixed
 
