@@ -1828,7 +1828,7 @@ test "leftRightArrowCallout renders as preset path" {
   assert_true(find_substring(svg, "<path") >= 0)
   // A rectangle has 4 `L` commands, leftRightArrowCallout 17 (count `L` before a digit or `-`).
   let mut count = 0
-  for idx = 0; idx < svg.length() - 1; idx = idx + 1 {
+  for idx in 0..<(svg.length() - 1) {
     if svg.get_char(idx).unwrap() == 'L' {
       let next = svg.get_char(idx + 1).unwrap()
       let nc = next.to_int()

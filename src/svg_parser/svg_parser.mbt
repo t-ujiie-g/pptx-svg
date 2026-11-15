@@ -583,64 +583,67 @@ fn parse_shape_from_g(g_node : @xml.XmlNode) -> @ooxml.Shape {
   let flip_v = get_da(g_node, "flip-v") == "1"
   let transform : @ooxml.ShapeTransform = { x, y, cx, cy, rot, flip_h, flip_v, }
 
-  let kind : @ooxml.ShapeKind = if shape_type == "picture" {
-    // The SVG has no picture rId; the original rels are kept.
-    @ooxml.ShapeKind::Picture("")
-  } else if shape_type == "chart" {
-    @ooxml.ShapeKind::ChartShape(@ooxml.ChartData::empty())
-  } else if shape_type == "table" {
-    // Table shapes carry no inline data in SVG for now — use empty table
-    let table_data : @ooxml.TableData = {
-      col_widths: [],
-      rows: [],
-      style_id: "",
-      first_row: false,
-      last_row: false,
-      first_col: false,
-      last_col: false,
-      band_row: false,
-      band_col: false,
-    }
-    @ooxml.ShapeKind::TableShape(table_data)
-  } else if shape_type == "group" {
-    let grp_children = parse_group_children_from_g(g_node)
-    let grp_data : @ooxml.GroupShapeData = {
-      ch_off_x: get_dai(g_node, "grp-ch-off-x"),
-      ch_off_y: get_dai(g_node, "grp-ch-off-y"),
-      ch_ext_cx: get_dai(g_node, "grp-ch-ext-cx"),
-      ch_ext_cy: get_dai(g_node, "grp-ch-ext-cy"),
-      children: grp_children,
-    }
-    @ooxml.ShapeKind::GroupShape(grp_data)
-  } else {
-    let geom = if geom_str == "custGeom" {
-      let cust_gdlst = get_da(g_node, "cust-gdlst")
-      let cust_paths = get_da(g_node, "cust-paths")
-      let cust_pw = @xml.parse_int(get_da(g_node, "cust-pw"))
-      let cust_ph = @xml.parse_int(get_da(g_node, "cust-ph"))
-      @ooxml.ShapeGeom::Custom({
-        gdlst: cust_gdlst,
-        paths: cust_paths,
-        path_w: cust_pw,
-        path_h: cust_ph,
-        rect_l: get_da(g_node, "cust-rl"),
-        rect_t: get_da(g_node, "cust-rt"),
-        rect_r: get_da(g_node, "cust-rr"),
-        rect_b: get_da(g_node, "cust-rb"),
-        cxn_lst: get_da(g_node, "cust-cxn"),
-      })
-    } else {
-      let adj_str = get_da(g_node, "cxn-adj")
-      if is_connector_prst(geom_str) {
-        parse_connector_geom_from_svg(geom_str, adj_str)
-      } else if !adj_str.is_empty() {
-        let avs = parse_adj_string(adj_str)
-        @ooxml.parse_geom(geom_str, avs)
-      } else {
-        @ooxml.parse_geom(geom_str, [])
+  let kind : @ooxml.ShapeKind = match shape_type {
+    "picture" =>
+      // The SVG has no picture rId; the original rels are kept.
+      @ooxml.ShapeKind::Picture("")
+    "chart" => @ooxml.ShapeKind::ChartShape(@ooxml.ChartData::empty())
+    "table" => {
+      // Table shapes carry no inline data in SVG for now — use empty table
+      let table_data : @ooxml.TableData = {
+        col_widths: [],
+        rows: [],
+        style_id: "",
+        first_row: false,
+        last_row: false,
+        first_col: false,
+        last_col: false,
+        band_row: false,
+        band_col: false,
       }
+      @ooxml.ShapeKind::TableShape(table_data)
     }
-    @ooxml.ShapeKind::AutoShape(geom)
+    "group" => {
+      let grp_children = parse_group_children_from_g(g_node)
+      let grp_data : @ooxml.GroupShapeData = {
+        ch_off_x: get_dai(g_node, "grp-ch-off-x"),
+        ch_off_y: get_dai(g_node, "grp-ch-off-y"),
+        ch_ext_cx: get_dai(g_node, "grp-ch-ext-cx"),
+        ch_ext_cy: get_dai(g_node, "grp-ch-ext-cy"),
+        children: grp_children,
+      }
+      @ooxml.ShapeKind::GroupShape(grp_data)
+    }
+    _ => {
+      let geom = if geom_str == "custGeom" {
+        let cust_gdlst = get_da(g_node, "cust-gdlst")
+        let cust_paths = get_da(g_node, "cust-paths")
+        let cust_pw = @xml.parse_int(get_da(g_node, "cust-pw"))
+        let cust_ph = @xml.parse_int(get_da(g_node, "cust-ph"))
+        @ooxml.ShapeGeom::Custom({
+          gdlst: cust_gdlst,
+          paths: cust_paths,
+          path_w: cust_pw,
+          path_h: cust_ph,
+          rect_l: get_da(g_node, "cust-rl"),
+          rect_t: get_da(g_node, "cust-rt"),
+          rect_r: get_da(g_node, "cust-rr"),
+          rect_b: get_da(g_node, "cust-rb"),
+          cxn_lst: get_da(g_node, "cust-cxn"),
+        })
+      } else {
+        let adj_str = get_da(g_node, "cxn-adj")
+        if is_connector_prst(geom_str) {
+          parse_connector_geom_from_svg(geom_str, adj_str)
+        } else if !adj_str.is_empty() {
+          let avs = parse_adj_string(adj_str)
+          @ooxml.parse_geom(geom_str, avs)
+        } else {
+          @ooxml.parse_geom(geom_str, [])
+        }
+      }
+      @ooxml.ShapeKind::AutoShape(geom)
+    }
   }
 
   let children = @xml.get_children(g_node)

@@ -160,8 +160,7 @@ fn math_hbox(boxes : Array[MathBox]) -> MathBox {
   }
   let mut max_bl : Double = 0.0
   let mut max_desc : Double = 0.0
-  let mut i = 0
-  while i < n {
+  for i in 0..<n {
     let b = boxes[i]
     if b.baseline > max_bl {
       max_bl = b.baseline
@@ -170,20 +169,17 @@ fn math_hbox(boxes : Array[MathBox]) -> MathBox {
     if desc > max_desc {
       max_desc = desc
     }
-    i = i + 1
   }
   let total_h = max_bl + max_desc
   let mut svg = ""
   let mut x : Double = 0.0
-  i = 0
-  while i < n {
+  for i in 0..<n {
     let b = boxes[i]
     let dy = max_bl - b.baseline
     if !b.svg.is_empty() {
       svg = svg + math_g(x, dy, b.svg)
     }
     x = x + b.w
-    i = i + 1
   }
   { svg, w: x, h: total_h, baseline: max_bl, }
 }
@@ -694,24 +690,16 @@ fn layout_math_acc(
     None => "\u{0302}"
   }
   // Combining accents (U+0300…) render poorly alone in SVG <text>: use spacing forms.
-  let display_acc = if acc_chr == "\u{0302}" || acc_chr == "\u{005E}" {
-    "\u{02C6}" // modifier letter circumflex accent
-  } else if acc_chr == "\u{0303}" || acc_chr == "\u{007E}" {
-    "\u{02DC}" // small tilde
-  } else if acc_chr == "\u{0304}" || acc_chr == "\u{00AF}" {
-    "\u{00AF}" // macron
-  } else if acc_chr == "\u{0307}" {
-    "\u{02D9}" // dot above
-  } else if acc_chr == "\u{0308}" {
-    "\u{00A8}" // diaeresis
-  } else if acc_chr == "\u{030C}" {
-    "\u{02C7}" // caron
-  } else if acc_chr == "\u{0301}" {
-    "\u{00B4}" // acute accent
-  } else if acc_chr == "\u{0300}" {
-    "\u{0060}" // grave accent
-  } else {
-    acc_chr
+  let display_acc = match acc_chr {
+    "\u{0302}" | "\u{005E}" => "\u{02C6}" // modifier letter circumflex accent
+    "\u{0303}" | "\u{007E}" => "\u{02DC}" // small tilde
+    "\u{0304}" | "\u{00AF}" => "\u{00AF}" // macron
+    "\u{0307}" => "\u{02D9}" // dot above
+    "\u{0308}" => "\u{00A8}" // diaeresis
+    "\u{030C}" => "\u{02C7}" // caron
+    "\u{0301}" => "\u{00B4}" // acute accent
+    "\u{0300}" => "\u{0060}" // grave accent
+    _ => acc_chr
   }
   let use_line = display_acc == "\u{00AF}" // macron → draw as line
   if use_line {
@@ -875,8 +863,7 @@ fn layout_math_matrix(
   }
   let cell_boxes : Array[Array[MathBox]] = []
   let mut max_cols = 0
-  let mut ri = 0
-  while ri < nrows {
+  for ri in 0..<nrows {
     let cells = math_children(rows[ri], "m:e")
     let row : Array[MathBox] = []
     let nc = cells.length()
@@ -887,7 +874,6 @@ fn layout_math_matrix(
       row.push(layout_math_children(cell, fs, ff, color))
     }
     cell_boxes.push(row)
-    ri = ri + 1
   }
   if max_cols == 0 {
     return math_empty_box
@@ -895,8 +881,7 @@ fn layout_math_matrix(
   let col_widths : Array[Double] = Array::make(max_cols, 0.0)
   let row_heights : Array[Double] = Array::make(nrows, 0.0)
   let row_baselines : Array[Double] = Array::make(nrows, 0.0)
-  ri = 0
-  while ri < nrows {
+  for ri in 0..<nrows {
     let row = cell_boxes[ri]
     let nc = row.length()
     let mut ci = 0
@@ -913,29 +898,25 @@ fn layout_math_matrix(
       }
       ci = ci + 1
     }
-    ri = ri + 1
   }
   let gap = fs * math_matrix_gap_ratio
   let mut total_w : Double = 0.0
-  for ci = 0; ci < max_cols; ci = ci + 1 {
+  for ci in 0..<max_cols {
     total_w = total_w + col_widths[ci]
     if ci < max_cols - 1 {
       total_w = total_w + gap
     }
   }
   let mut total_h : Double = 0.0
-  ri = 0
-  while ri < nrows {
+  for ri in 0..<nrows {
     total_h = total_h + row_heights[ri]
     if ri < nrows - 1 {
       total_h = total_h + gap
     }
-    ri = ri + 1
   }
   let mut svg = ""
   let mut cur_y : Double = 0.0
-  ri = 0
-  while ri < nrows {
+  for ri in 0..<nrows {
     let row = cell_boxes[ri]
     let nc = row.length()
     let mut cur_x : Double = 0.0
@@ -950,7 +931,6 @@ fn layout_math_matrix(
       cur_x = cur_x + col_widths[ci2] + gap
     }
     cur_y = cur_y + row_heights[ri] + gap
-    ri = ri + 1
   }
   let baseline = total_h / 2.0 + fs * 0.3 // center baseline
   { svg, w: total_w, h: total_h, baseline, }
@@ -1127,12 +1107,11 @@ fn render_math_text(
   let math_x = shape_x +
     px(l_ins, scale).to_double() +
     (avail_w - math_box.w) / 2.0
-  let math_y = if body_props.anchor == "ctr" {
-    shape_y + px(t_ins, scale).to_double() + (avail_h - math_box.h) / 2.0
-  } else if body_props.anchor == "b" {
-    shape_y + shape_h - px(b_ins, scale).to_double() - math_box.h
-  } else {
-    shape_y + px(t_ins, scale).to_double()
+  let math_y = match body_props.anchor {
+    "ctr" =>
+      shape_y + px(t_ins, scale).to_double() + (avail_h - math_box.h) / 2.0
+    "b" => shape_y + shape_h - px(b_ins, scale).to_double() - math_box.h
+    _ => shape_y + px(t_ins, scale).to_double()
   }
   let visual_svg = "<g" +
     da("math-xml", all_math_xml) +

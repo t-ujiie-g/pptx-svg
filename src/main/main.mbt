@@ -557,7 +557,7 @@ pub fn initialize_pptx() -> String {
   let layout_paths : Array[String] = []
   let layout_to_master : Array[(String, String)] = []
   let master_paths : Array[String] = []
-  for si = 0; si < count; si = si + 1 {
+  for si in 0..<count {
     let slide_num = si + 1
     let slide_rels_path = "ppt/slides/_rels/slide" +
       int_to_str(slide_num) +
@@ -694,7 +694,7 @@ pub fn initialize_pptx() -> String {
   let modified : Array[Bool] = []
   let parsed : Array[Bool] = []
   let bg_rels : Array[Array[@ooxml.Relationship]] = []
-  for i = 0; i < count; i = i + 1 {
+  for _ in 0..<count {
     slides.push({
       slide_size: g_slide_size.val,
       background: @ooxml.Color::none(),

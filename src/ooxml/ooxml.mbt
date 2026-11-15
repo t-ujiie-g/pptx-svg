@@ -382,32 +382,20 @@ pub fn ThemeData::default() -> ThemeData {
 /// (dk1/lt1/dk2/lt2) resolve directly (ECMA-376 §20.1.6.2).
 pub fn resolve_scheme_color(name : String, theme : ThemeData) -> Color {
   let cmap = theme.clr_map
-  let resolved = if name == "bg1" {
-    cmap.bg1
-  } else if name == "tx1" {
-    cmap.tx1
-  } else if name == "bg2" {
-    cmap.bg2
-  } else if name == "tx2" {
-    cmap.tx2
-  } else if name == "accent1" {
-    cmap.accent1
-  } else if name == "accent2" {
-    cmap.accent2
-  } else if name == "accent3" {
-    cmap.accent3
-  } else if name == "accent4" {
-    cmap.accent4
-  } else if name == "accent5" {
-    cmap.accent5
-  } else if name == "accent6" {
-    cmap.accent6
-  } else if name == "hlink" {
-    cmap.hlink
-  } else if name == "folHlink" {
-    cmap.fol_hlink
-  } else {
-    name
+  let resolved = match name {
+    "bg1" => cmap.bg1
+    "tx1" => cmap.tx1
+    "bg2" => cmap.bg2
+    "tx2" => cmap.tx2
+    "accent1" => cmap.accent1
+    "accent2" => cmap.accent2
+    "accent3" => cmap.accent3
+    "accent4" => cmap.accent4
+    "accent5" => cmap.accent5
+    "accent6" => cmap.accent6
+    "hlink" => cmap.hlink
+    "folHlink" => cmap.fol_hlink
+    _ => name
   }
   resolve_slot(resolved, theme)
 }
@@ -568,89 +556,98 @@ pub fn apply_color_modifiers(
     match modifier_nodes[i] {
       @xml.XmlNode::Element(tag, _, _) => {
         let val = attr_int(modifier_nodes[i], "val")
-        if tag == "a:shade" {
-          // shade: multiply each RGB component by val/pct_100
-          r = r * val / pct_100
-          g = g * val / pct_100
-          b = b * val / pct_100
-        } else if tag == "a:tint" {
-          // tint: val% of the color mixed with (100 - val)% white (ECMA-376).
-          r = rgb_max - (rgb_max - r) * val / pct_100
-          g = rgb_max - (rgb_max - g) * val / pct_100
-          b = rgb_max - (rgb_max - b) * val / pct_100
-        } else if tag == "a:lumMod" {
-          lum_mod = val
-        } else if tag == "a:lumOff" {
-          lum_off = val
-        } else if tag == "a:satMod" {
-          let (h, s, l) = rgb_to_hsl(r, g, b)
-          let new_s = s * val / pct_100
-          let ns = if new_s > hsl_scale { hsl_scale } else { new_s }
-          let c2 = hsl_to_rgb(h, ns, l)
-          r = c2.r
-          g = c2.g
-          b = c2.b
-        } else if tag == "a:alpha" {
-          // alpha: val is in 1/1000th percent (0-100000)
-          alpha_val = val * 255 / pct_100
-        } else if tag == "a:alphaModFix" {
-          alpha_val = alpha_val * val / pct_100
-        } else if tag == "a:comp" {
-          let (h, s, l) = rgb_to_hsl(r, g, b)
-          let new_h = (h + 1800) % 3600
-          let c2 = hsl_to_rgb(new_h, s, l)
-          r = c2.r
-          g = c2.g
-          b = c2.b
-        } else if tag == "a:inv" {
-          r = rgb_max - r
-          g = rgb_max - g
-          b = rgb_max - b
-        } else if tag == "a:gamma" {
-          // gamma: sRGB → linear, approximating (v/255)^2.2 · 255 as v²/255.
-          r = r * r / rgb_max
-          g = g * g / rgb_max
-          b = b * b / rgb_max
-        } else if tag == "a:invGamma" {
-          // invGamma: linear → sRGB, approximating (v/255)^(1/2.2) · 255 as √(255v).
-          r = int_sqrt(r * rgb_max)
-          g = int_sqrt(g * rgb_max)
-          b = int_sqrt(b * rgb_max)
-        } else if tag == "a:hueMod" {
-          // Hue modulation: val is percentage (100000 = no change)
-          let (h, s, l) = rgb_to_hsl(r, g, b)
-          let new_h = h * val / pct_100 % 3600
-          let c2 = hsl_to_rgb(new_h, s, l)
-          r = c2.r
-          g = c2.g
-          b = c2.b
-        } else if tag == "a:hueOff" {
-          // hueOff is in 1/60000°, h in tenths of a degree: divide by 6000.
-          let (h, s, l) = rgb_to_hsl(r, g, b)
-          let offset = val / 6000
-          let mut new_h = h + offset
-          if new_h < 0 {
-            new_h = new_h + 3600
+        match tag {
+          "a:shade" => {
+            // shade: multiply each RGB component by val/pct_100
+            r = r * val / pct_100
+            g = g * val / pct_100
+            b = b * val / pct_100
           }
-          new_h = new_h % 3600
-          let c2 = hsl_to_rgb(new_h, s, l)
-          r = c2.r
-          g = c2.g
-          b = c2.b
-        } else if tag == "a:satOff" {
-          // Saturation offset: val is percentage (0-100000)
-          let (h, s, l) = rgb_to_hsl(r, g, b)
-          let mut new_s = s + val * hsl_scale / pct_100
-          if new_s < 0 {
-            new_s = 0
+          "a:tint" => {
+            // tint: val% of the color mixed with (100 - val)% white (ECMA-376).
+            r = rgb_max - (rgb_max - r) * val / pct_100
+            g = rgb_max - (rgb_max - g) * val / pct_100
+            b = rgb_max - (rgb_max - b) * val / pct_100
           }
-          if new_s > hsl_scale {
-            new_s = hsl_scale
+          "a:lumMod" => lum_mod = val
+          "a:lumOff" => lum_off = val
+          "a:satMod" => {
+            let (h, s, l) = rgb_to_hsl(r, g, b)
+            let new_s = s * val / pct_100
+            let ns = if new_s > hsl_scale { hsl_scale } else { new_s }
+            let c2 = hsl_to_rgb(h, ns, l)
+            r = c2.r
+            g = c2.g
+            b = c2.b
           }
-          let c2 = hsl_to_rgb(h, new_s, l)
-          r = c2.r
-          g = c2.g
-          b = c2.b
+          "a:alpha" =>
+            // alpha: val is in 1/1000th percent (0-100000)
+            alpha_val = val * 255 / pct_100
+          "a:alphaModFix" => alpha_val = alpha_val * val / pct_100
+          "a:comp" => {
+            let (h, s, l) = rgb_to_hsl(r, g, b)
+            let new_h = (h + 1800) % 3600
+            let c2 = hsl_to_rgb(new_h, s, l)
+            r = c2.r
+            g = c2.g
+            b = c2.b
+          }
+          "a:inv" => {
+            r = rgb_max - r
+            g = rgb_max - g
+            b = rgb_max - b
+          }
+          "a:gamma" => {
+            // gamma: sRGB → linear, approximating (v/255)^2.2 · 255 as v²/255.
+            r = r * r / rgb_max
+            g = g * g / rgb_max
+            b = b * b / rgb_max
+          }
+          "a:invGamma" => {
+            // invGamma: linear → sRGB, approximating (v/255)^(1/2.2) · 255 as √(255v).
+            r = int_sqrt(r * rgb_max)
+            g = int_sqrt(g * rgb_max)
+            b = int_sqrt(b * rgb_max)
+          }
+          "a:hueMod" => {
+            // Hue modulation: val is percentage (100000 = no change)
+            let (h, s, l) = rgb_to_hsl(r, g, b)
+            let new_h = h * val / pct_100 % 3600
+            let c2 = hsl_to_rgb(new_h, s, l)
+            r = c2.r
+            g = c2.g
+            b = c2.b
+          }
+          "a:hueOff" => {
+            // hueOff is in 1/60000°, h in tenths of a degree: divide by 6000.
+            let (h, s, l) = rgb_to_hsl(r, g, b)
+            let offset = val / 6000
+            let mut new_h = h + offset
+            if new_h < 0 {
+              new_h = new_h + 3600
+            }
+            new_h = new_h % 3600
+            let c2 = hsl_to_rgb(new_h, s, l)
+            r = c2.r
+            g = c2.g
+            b = c2.b
+          }
+          "a:satOff" => {
+            // Saturation offset: val is percentage (0-100000)
+            let (h, s, l) = rgb_to_hsl(r, g, b)
+            let mut new_s = s + val * hsl_scale / pct_100
+            if new_s < 0 {
+              new_s = 0
+            }
+            if new_s > hsl_scale {
+              new_s = hsl_scale
+            }
+            let c2 = hsl_to_rgb(h, new_s, l)
+            r = c2.r
+            g = c2.g
+            b = c2.b
+          }
+          _ => ()
         }
       }
       _ => ()
@@ -1139,17 +1136,19 @@ pub(all) struct CustomGeomData {
 
 ///|
 pub fn parse_geom(prst : String, avlst : Array[Int32]) -> ShapeGeom {
-  if prst == "rect" {
-    ShapeGeom::Rect
-  } else if prst == "ellipse" || prst == "oval" {
-    ShapeGeom::Ellipse
-  } else if prst == "roundRect" {
-    let adj = if !avlst.is_empty() { avlst[0] } else { round_rect_default_adj }
-    ShapeGeom::RoundRect(adj)
-  } else if prst == "line" || prst == "straightConnector1" {
-    ShapeGeom::Line
-  } else {
-    ShapeGeom::Other(prst, avlst)
+  match prst {
+    "rect" => ShapeGeom::Rect
+    "ellipse" | "oval" => ShapeGeom::Ellipse
+    "roundRect" => {
+      let adj = if !avlst.is_empty() {
+        avlst[0]
+      } else {
+        round_rect_default_adj
+      }
+      ShapeGeom::RoundRect(adj)
+    }
+    "line" | "straightConnector1" => ShapeGeom::Line
+    _ => ShapeGeom::Other(prst, avlst)
   }
 }
 
@@ -1300,15 +1299,10 @@ pub fn PresetShadow::is_none(self : PresetShadow) -> Bool {
 /// Blur radius of a preset shadow shdw1-shdw20 (ECMA-376 §20.1.10.52).
 pub fn PresetShadow::blur_rad(self : PresetShadow) -> Int32 {
   // shdw9 (centre) and shdw17-20 (below perspective) blur more than the rest.
-  if self.prst == "shdw9" {
-    76200 // 6pt
-  } else if self.prst == "shdw17" ||
-    self.prst == "shdw18" ||
-    self.prst == "shdw19" ||
-    self.prst == "shdw20" {
-    57150 // 4.5pt
-  } else {
-    38100 // 3pt (default for shdw1-shdw8, shdw10-shdw16)
+  match self.prst {
+    "shdw9" => 76200 // 6pt
+    "shdw17" | "shdw18" | "shdw19" | "shdw20" => 57150 // 4.5pt
+    _ => 38100 // 3pt (default for shdw1-shdw8, shdw10-shdw16)
   }
 }
 

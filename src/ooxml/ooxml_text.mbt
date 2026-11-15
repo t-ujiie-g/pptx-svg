@@ -175,28 +175,22 @@ fn parse_body_props(ch : Array[@xml.XmlNode]) -> BodyProps {
 ///|
 /// Resolve font theme references for Latin fonts.
 fn resolve_font_theme(typeface : String, theme : ThemeData) -> String {
-  if typeface == "+mj-lt" {
-    theme.major_font
-  } else if typeface == "+mn-lt" {
-    theme.minor_font
-  } else if typeface == "+mj-ea" {
-    theme.major_ea_font
-  } else if typeface == "+mn-ea" {
-    theme.minor_ea_font
-  } else {
-    typeface
+  match typeface {
+    "+mj-lt" => theme.major_font
+    "+mn-lt" => theme.minor_font
+    "+mj-ea" => theme.major_ea_font
+    "+mn-ea" => theme.minor_ea_font
+    _ => typeface
   }
 }
 
 ///|
 /// Resolve font theme references for East Asian fonts.
 fn resolve_ea_font_theme(typeface : String, theme : ThemeData) -> String {
-  if typeface == "+mj-ea" {
-    theme.major_ea_font
-  } else if typeface == "+mn-ea" {
-    theme.minor_ea_font
-  } else {
-    typeface
+  match typeface {
+    "+mj-ea" => theme.major_ea_font
+    "+mn-ea" => theme.minor_ea_font
+    _ => typeface
   }
 }
 
@@ -689,57 +683,61 @@ fn parse_text_body(
     for child in p_ch {
       let child_tag = @xml.get_tag(child)
       // a:r (run) and a:fld (field, e.g. slide number) share the same structure
-      if child_tag == "a:r" || child_tag == "a:fld" {
-        let r_ch = @xml.get_children(child)
-        let text = match @xml.find_child(r_ch, "a:t") {
-          None => ""
-          Some(t_node) => @xml.get_text_content(t_node)
-        }
-        if !text.is_empty() {
-          let base_run = match @xml.find_child(r_ch, "a:rPr") {
-            None =>
-              default_text_run(
-                "", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
-                def_font_face, def_ea_font,
-              )
-            Some(rpr) =>
-              parse_run_props(
-                rpr, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
-                def_font_face, def_ea_font, theme,
-              )
+      match child_tag {
+        "a:r" | "a:fld" => {
+          let r_ch = @xml.get_children(child)
+          let text = match @xml.find_child(r_ch, "a:t") {
+            None => ""
+            Some(t_node) => @xml.get_text_content(t_node)
           }
-          if text.contains("\n") {
-            let segs = split_by_newline(text)
-            let ns = segs.length()
-            for si in 0..<ns {
-              if !segs[si].is_empty() {
-                runs.push({ ..base_run, text: segs[si], })
-              }
-              if si < ns - 1 {
-                runs.push({ ..base_run, text: "\n", })
-              }
+          if !text.is_empty() {
+            let base_run = match @xml.find_child(r_ch, "a:rPr") {
+              None =>
+                default_text_run(
+                  "", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+                  def_font_face, def_ea_font,
+                )
+              Some(rpr) =>
+                parse_run_props(
+                  rpr, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+                  def_font_face, def_ea_font, theme,
+                )
             }
-          } else {
-            runs.push({ ..base_run, text, })
+            if text.contains("\n") {
+              let segs = split_by_newline(text)
+              let ns = segs.length()
+              for si in 0..<ns {
+                if !segs[si].is_empty() {
+                  runs.push({ ..base_run, text: segs[si], })
+                }
+                if si < ns - 1 {
+                  runs.push({ ..base_run, text: "\n", })
+                }
+              }
+            } else {
+              runs.push({ ..base_run, text, })
+            }
           }
         }
-      } else if child_tag == "m:oMath" || child_tag == "m:oMathPara" {
-        let math_raw = @xml.serialize_node(child)
-        let math_text = extract_math_text(child)
-        let display = if math_text.is_empty() { "[math]" } else { math_text }
-        let mut run = default_text_run(
-          display, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
-          def_font_face, def_ea_font,
-        )
-        run = { ..run, math_xml: math_raw, }
-        runs.push(run)
-      } else if child_tag == "a:br" {
-        runs.push(
-          default_text_run(
-            "\n", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+        "m:oMath" | "m:oMathPara" => {
+          let math_raw = @xml.serialize_node(child)
+          let math_text = extract_math_text(child)
+          let display = if math_text.is_empty() { "[math]" } else { math_text }
+          let mut run = default_text_run(
+            display, def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
             def_font_face, def_ea_font,
-          ),
-        )
+          )
+          run = { ..run, math_xml: math_raw, }
+          runs.push(run)
+        }
+        "a:br" =>
+          runs.push(
+            default_text_run(
+              "\n", def_bold, def_bold_explicit, def_italic, def_font_size, def_color,
+              def_font_face, def_ea_font,
+            ),
+          )
+        _ => ()
       }
     }
     let (epr_font_size, epr_color, epr_font_face, epr_ea_font) = match

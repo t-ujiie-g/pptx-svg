@@ -411,14 +411,11 @@ pub fn add_shape(
     flip_h: false,
     flip_v: false,
   }
-  let geom = if geom_type == "ellipse" {
-    @ooxml.ShapeGeom::Ellipse
-  } else if geom_type == "roundRect" {
-    @ooxml.ShapeGeom::RoundRect(@ooxml.round_rect_default_adj)
-  } else if geom_type == "line" {
-    @ooxml.ShapeGeom::Line
-  } else {
-    @ooxml.ShapeGeom::Rect
+  let geom = match geom_type {
+    "ellipse" => @ooxml.ShapeGeom::Ellipse
+    "roundRect" => @ooxml.ShapeGeom::RoundRect(@ooxml.round_rect_default_adj)
+    "line" => @ooxml.ShapeGeom::Line
+    _ => @ooxml.ShapeGeom::Rect
   }
   let kind = @ooxml.ShapeKind::AutoShape(geom)
   let fill = if fill_r >= 0 && fill_g >= 0 && fill_b >= 0 {
@@ -873,19 +870,15 @@ pub fn update_text_run_decoration(
   baseline : Int32,
 ) -> String {
   with_run(slide_idx, shape_idx, para_idx, run_idx, fn(_shape, para, run) {
-    let new_underline = if underline == "" {
-      run.underline
-    } else if underline == "none" {
-      ""
-    } else {
-      underline
+    let new_underline = match underline {
+      "" => run.underline
+      "none" => ""
+      _ => underline
     }
-    let new_strike = if strike == "" {
-      run.strike
-    } else if strike == "none" {
-      ""
-    } else {
-      strike
+    let new_strike = match strike {
+      "" => run.strike
+      "none" => ""
+      _ => strike
     }
     para.runs[run_idx] = {
       ..run,

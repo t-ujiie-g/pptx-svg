@@ -1797,17 +1797,19 @@ fn get_value_axis_max(groups : Array[@ooxml.ChartGroup]) -> Int32 {
       let mut max_val = 0
       for gi in 0..<groups.length() {
         let g = groups[gi]
-        if g.grouping == "percentStacked" {
-          max_val = chart_val_scale
-        } else if g.grouping == "stacked" {
-          let (_, gmax) = get_stacked_series_range(g.series)
-          if gmax > max_val {
-            max_val = gmax
+        match g.grouping {
+          "percentStacked" => max_val = chart_val_scale
+          "stacked" => {
+            let (_, gmax) = get_stacked_series_range(g.series)
+            if gmax > max_val {
+              max_val = gmax
+            }
           }
-        } else {
-          let (_, gmax) = get_series_range(g.series)
-          if gmax > max_val {
-            max_val = gmax
+          _ => {
+            let (_, gmax) = get_series_range(g.series)
+            if gmax > max_val {
+              max_val = gmax
+            }
           }
         }
       }
@@ -1839,14 +1841,12 @@ fn parse_chart_num(s : String) -> Int32 {
   let len = s.length()
   let start = if len > 0 && s.get_char(0).unwrap() == '-' { 1 } else { 0 }
   let mut e_pos = -1
-  let mut si = start
-  while si < len {
+  for si in start..<len {
     let c = s.get_char(si).unwrap()
     if c == 'E' || c == 'e' {
       e_pos = si
-      si = len // break
+      break
     }
-    si = si + 1
   }
   if e_pos >= 0 {
     // Scientific notation: parse mantissa and exponent separately
@@ -1855,8 +1855,7 @@ fn parse_chart_num(s : String) -> Int32 {
     let mut mant_dec_digits = 0
     let mut found_dot = false
     let mut sig_digits = 0
-    si = start
-    while si < e_pos {
+    for si in start..<e_pos {
       let c = s.get_char(si).unwrap()
       if c == '.' {
         found_dot = true
@@ -1867,11 +1866,10 @@ fn parse_chart_num(s : String) -> Int32 {
           mant_dec_digits = mant_dec_digits + 1
         }
       }
-      si = si + 1
     }
     let mut exp = 0
     let mut exp_neg = false
-    si = e_pos + 1
+    let mut si = e_pos + 1
     if si < len {
       let ec = s.get_char(si).unwrap()
       if ec == '-' {
@@ -1896,13 +1894,11 @@ fn parse_chart_num(s : String) -> Int32 {
     let shift = exp - mant_dec_digits + 4
     let mut result = mantissa
     if shift >= 0 {
-      let mut p = 0
-      while p < shift {
+      for _ in 0..<shift {
         result = result * 10
-        p = p + 1
       }
     } else {
-      for p = 0; p < -shift; p = p + 1 {
+      for _ in 0..<-shift {
         result = result / 10
       }
     }
@@ -1911,27 +1907,22 @@ fn parse_chart_num(s : String) -> Int32 {
   // Standard decimal parsing
   // Find decimal point position
   let mut dot_pos = len
-  let mut i = start
-  while i < len {
-    let c = s.get_char(i).unwrap()
-    if c == '.' {
+  for i in start..<len {
+    if s.get_char(i).unwrap() == '.' {
       dot_pos = i
-      i = len // break
+      break
     }
-    i = i + 1
   }
   let mut int_part = 0
-  i = start
-  while i < dot_pos {
+  for i in start..<dot_pos {
     let c = s.get_char(i).unwrap()
     if c >= '0' && c <= '9' {
       int_part = int_part * 10 + (c.to_int() - 48)
     }
-    i = i + 1
   }
   let mut dec_part = 0
   let mut dec_digits = 0
-  i = dot_pos + 1
+  let mut i = dot_pos + 1
   while i < len && dec_digits < 4 {
     let c = s.get_char(i).unwrap()
     if c >= '0' && c <= '9' {
@@ -1999,17 +1990,14 @@ fn format_chart_val(val : Int32, num_fmt : String) -> String {
     // Count decimal places in format (e.g. "0%" = 0, "0.0%" = 1, "0.00%" = 2)
     let mut dec_places = 0
     let mut found_dot = false
-    let mut fi = 0
-    while fi < num_fmt.length() {
-      let c = num_fmt.get_char(fi).unwrap()
+    for c in num_fmt {
       if c == '.' {
         found_dot = true
       } else if found_dot && c == '0' {
         dec_places = dec_places + 1
       } else if c == '%' {
-        fi = num_fmt.length() // break
+        break
       }
-      fi = fi + 1
     }
     if dec_places == 0 {
       let int_pct = (pct_scaled + chart_val_scale / 2) / chart_val_scale

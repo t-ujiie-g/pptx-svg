@@ -193,34 +193,31 @@ fn decode_entities(s : String) -> String {
         j = j + 1
       }
       let entity = collect_chars(s, i + 1, j)
-      if entity == "amp" {
-        parts.push("&")
-      } else if entity == "lt" {
-        parts.push("<")
-      } else if entity == "gt" {
-        parts.push(">")
-      } else if entity == "quot" {
-        parts.push("\"")
-      } else if entity == "apos" {
-        parts.push("'")
-      } else if str_starts_with(entity, "#x") || str_starts_with(entity, "#X") {
-        let hex = str_suffix(entity, 2)
-        let code = parse_hex_int(hex)
-        if code > 0 {
-          parts.push(@ffi.ffi_char_code_to_str(code))
-        } else {
-          parts.push("&" + entity + ";")
+      match entity {
+        "amp" => parts.push("&")
+        "lt" => parts.push("<")
+        "gt" => parts.push(">")
+        "quot" => parts.push("\"")
+        "apos" => parts.push("'")
+        _ if str_starts_with(entity, "#x") || str_starts_with(entity, "#X") => {
+          let hex = str_suffix(entity, 2)
+          let code = parse_hex_int(hex)
+          if code > 0 {
+            parts.push(@ffi.ffi_char_code_to_str(code))
+          } else {
+            parts.push("&" + entity + ";")
+          }
         }
-      } else if str_starts_with(entity, "#") {
-        let dec = str_suffix(entity, 1)
-        let code = parse_int(dec)
-        if code > 0 {
-          parts.push(@ffi.ffi_char_code_to_str(code))
-        } else {
-          parts.push("&" + entity + ";")
+        _ if str_starts_with(entity, "#") => {
+          let dec = str_suffix(entity, 1)
+          let code = parse_int(dec)
+          if code > 0 {
+            parts.push(@ffi.ffi_char_code_to_str(code))
+          } else {
+            parts.push("&" + entity + ";")
+          }
         }
-      } else {
-        parts.push("&" + entity + ";")
+        _ => parts.push("&" + entity + ";")
       }
       i = j + 1
     } else {
@@ -583,7 +580,7 @@ pub fn find_path(nodes : Array[XmlNode], path : Array[String]) -> XmlNode? {
         Some(node)
       } else {
         let rest : Array[String] = []
-        for i = 1; i < plen; i = i + 1 {
+        for i in 1..<plen {
           rest.push(path[i])
         }
         find_path(get_children(node), rest)
@@ -703,7 +700,7 @@ pub fn str_replace_all(s : String, pat : String, repl : String) -> String {
   while i < slen {
     if i + plen <= slen {
       let mut matched = true
-      for k = 0; k < plen; k = k + 1 {
+      for k in 0..<plen {
         if s.get_char(i + k).unwrap() != pat.get_char(k).unwrap() {
           matched = false
           break
@@ -734,7 +731,7 @@ pub fn str_starts_with(s : String, pat : String) -> Bool {
   if slen < plen {
     return false
   }
-  for j = 0; j < plen; j = j + 1 {
+  for j in 0..<plen {
     if s.get_char(j).unwrap() != pat.get_char(j).unwrap() {
       return false
     }
@@ -751,7 +748,7 @@ pub fn str_ends_with(s : String, pat : String) -> Bool {
     return false
   }
   let start = slen - plen
-  for j = 0; j < plen; j = j + 1 {
+  for j in 0..<plen {
     if s.get_char(start + j).unwrap() != pat.get_char(j).unwrap() {
       return false
     }

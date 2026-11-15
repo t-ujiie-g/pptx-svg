@@ -244,8 +244,7 @@ fn wrap_paragraph(
   let mut run_ff : String = "" // font face for accumulated text
   let mut run_fs : Double = 0.0 // font size for accumulated text
   let nr = para.runs.length()
-  let mut ri = 0
-  while ri < nr {
+  for ri in 0..<nr {
     let run = para.runs[ri]
     let fs_px = run_fs_px(run, scale, def_sz, font_scale)
     let ff = run_font_face(run, theme)
@@ -263,7 +262,6 @@ fn wrap_paragraph(
       cur_line = []
       cur_width = 0.0
       run_accum = ""
-      ri = ri + 1
       continue
     }
     if ff != run_ff || fs_px != run_fs {
@@ -319,7 +317,6 @@ fn wrap_paragraph(
       run_accum = run_accum + seg_text
       seg_start = seg_end
     }
-    ri = ri + 1
   }
   if !cur_line.is_empty() {
     lines.push(cur_line)
@@ -1087,12 +1084,10 @@ fn render_text(
   }
   let text_h_for_anchor = total_text_h - trailing_space
 
-  let anchor_offset = if body_props.anchor == "ctr" {
-    (avail_h - text_h_for_anchor) / 2
-  } else if body_props.anchor == "b" {
-    avail_h - text_h_for_anchor
-  } else {
-    0
+  let anchor_offset = match body_props.anchor {
+    "ctr" => (avail_h - text_h_for_anchor) / 2
+    "b" => avail_h - text_h_for_anchor
+    _ => 0
   }
   // "ctr" may go negative so overflowing text stays centered (as PowerPoint does), but
   // never above the top edge; "t"/"b" stay inside the padding.
@@ -1234,10 +1229,8 @@ fn render_text(
       let rtl_attr = if para.rtl { " direction=\"rtl\"" } else { "" }
       let cur_level = para.level
       if cur_level < prev_para_level {
-        let mut rl = cur_level + 1
-        while rl < 10 {
+        for rl in (cur_level + 1)..<10 {
           auto_num_counters[rl] = 0
-          rl = rl + 1
         }
       }
       prev_para_level = cur_level
@@ -1344,13 +1337,10 @@ fn render_text(
               cur_col = cur_col + 1
               text_x = base_text_x + (col_w + col_spacing_px) * cur_col
               cur_y = base_y + p_font_sz
-              cur_anchor_x = if effective_align == "ctr" ||
-                effective_align == "c" {
-                text_x + indent + (text_w - indent) / 2
-              } else if effective_align == "r" {
-                text_x + text_w
-              } else {
-                text_x + indent
+              cur_anchor_x = match effective_align {
+                "ctr" | "c" => text_x + indent + (text_w - indent) / 2
+                "r" => text_x + text_w
+                _ => text_x + indent
               }
               cont_anchor_x = cur_anchor_x
               out = out + make_text_header(text_x)
@@ -1490,8 +1480,7 @@ fn render_text(
       } else {
         // No wrapping: emit runs directly, honoring tabs and line breaks.
         let mut tab_idx = 0
-        let mut ri = 0
-        while ri < nr {
+        for ri in 0..<nr {
           let run = para.runs[ri]
           let display_text = if run.cap == "all" {
             to_upper_ascii(run.text)
@@ -1509,7 +1498,6 @@ fn render_text(
               da("para-idx", int_to_str(pi)) +
               da("para-align", para_align) +
               ">"
-            ri = ri + 1
             continue
           }
           let (tab_svg, new_ti) = render_run_with_tabs(
@@ -1528,7 +1516,6 @@ fn render_text(
           )
           out = out + tab_svg
           tab_idx = new_ti
-          ri = ri + 1
         }
       }
       out = out + "</tspan>"

@@ -281,58 +281,48 @@ fn stroke_dasharray(dash : String, sw : Int32) -> String {
   let s2 = int_to_str(sw * 2)
   let s4 = int_to_str(sw * 4)
   let s8 = int_to_str(sw * 8)
-  let pattern = if dash == "dash" {
-    s4 + "," + s2
-  } else if dash == "dot" {
-    s + "," + s2
-  } else if dash == "dashDot" {
-    s4 + "," + s2 + "," + s + "," + s2
-  } else if dash == "lgDash" {
-    s8 + "," + s2
-  } else if dash == "sysDot" {
-    s + "," + s
-  } else if dash == "sysDash" {
-    s2 + "," + s
-  } else if dash == "sysDashDot" {
-    s2 + "," + s + "," + s + "," + s
-  } else if dash == "sysDashDotDot" {
-    s2 + "," + s + "," + s + "," + s + "," + s + "," + s
-  } else if dash == "dashDotDot" {
-    s4 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
-  } else if dash == "lgDashDot" {
-    s8 + "," + s2 + "," + s + "," + s2
-  } else if dash == "lgDashDotDot" {
-    s8 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
-  } else if @xml.str_starts_with(dash, @ooxml.cust_dash_prefix) {
-    // custDash is "custDash:d1,sp1;..." in 1/1000 % of the line width.
-    let data = @xml.str_suffix(dash, @ooxml.cust_dash_prefix_len)
-    let mut result = ""
-    let data_len = data.length()
-    let mut pos = 0
-    while pos < data_len {
-      let mut num_end = pos
-      while num_end < data_len {
-        let c = data.get_char(num_end).unwrap()
-        if c == ',' || c == ';' {
-          break
+  let pattern = match dash {
+    "dash" => s4 + "," + s2
+    "dot" => s + "," + s2
+    "dashDot" => s4 + "," + s2 + "," + s + "," + s2
+    "lgDash" => s8 + "," + s2
+    "sysDot" => s + "," + s
+    "sysDash" => s2 + "," + s
+    "sysDashDot" => s2 + "," + s + "," + s + "," + s
+    "sysDashDotDot" => s2 + "," + s + "," + s + "," + s + "," + s + "," + s
+    "dashDotDot" => s4 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
+    "lgDashDot" => s8 + "," + s2 + "," + s + "," + s2
+    "lgDashDotDot" => s8 + "," + s2 + "," + s + "," + s2 + "," + s + "," + s2
+    _ if @xml.str_starts_with(dash, @ooxml.cust_dash_prefix) => {
+      // custDash is "custDash:d1,sp1;..." in 1/1000 % of the line width.
+      let data = @xml.str_suffix(dash, @ooxml.cust_dash_prefix_len)
+      let mut result = ""
+      let data_len = data.length()
+      let mut pos = 0
+      while pos < data_len {
+        let mut num_end = pos
+        while num_end < data_len {
+          let c = data.get_char(num_end).unwrap()
+          if c == ',' || c == ';' {
+            break
+          }
+          num_end = num_end + 1
         }
-        num_end = num_end + 1
-      }
-      if num_end > pos {
-        let val = @xml.parse_int(@xml.str_substring(data, pos, num_end))
-        // val is in percentage * 100 (e.g. 300000 = 300%). Scale: val * sw / ooxml_pct_denom
-        let px_val = val * sw / ooxml_pct_denom
-        let clamped = if px_val < 1 { 1 } else { px_val }
-        if !result.is_empty() {
-          result = result + ","
+        if num_end > pos {
+          let val = @xml.parse_int(@xml.str_substring(data, pos, num_end))
+          // val is in percentage * 100 (e.g. 300000 = 300%). Scale: val * sw / ooxml_pct_denom
+          let px_val = val * sw / ooxml_pct_denom
+          let clamped = if px_val < 1 { 1 } else { px_val }
+          if !result.is_empty() {
+            result = result + ","
+          }
+          result = result + int_to_str(clamped)
         }
-        result = result + int_to_str(clamped)
+        pos = num_end + 1
       }
-      pos = num_end + 1
+      result
     }
-    result
-  } else {
-    return ""
+    _ => return ""
   }
   a("stroke-dasharray", pattern)
 }
@@ -340,39 +330,35 @@ fn stroke_dasharray(dash : String, sw : Int32) -> String {
 ///|
 /// Convert OOXML line cap to SVG stroke-linecap attribute.
 fn stroke_linecap(cap : String) -> String {
-  if cap == "flat" {
-    a("stroke-linecap", "butt")
-  } else if cap == "rnd" {
-    a("stroke-linecap", "round")
-  } else if cap == "sq" {
-    a("stroke-linecap", "square")
-  } else {
-    ""
+  match cap {
+    "flat" => a("stroke-linecap", "butt")
+    "rnd" => a("stroke-linecap", "round")
+    "sq" => a("stroke-linecap", "square")
+    _ => ""
   }
 }
 
 ///|
 /// Convert OOXML line join to SVG stroke-linejoin + miterlimit attributes.
 fn stroke_linejoin(join : String, miter_limit : Int32) -> String {
-  if join == "round" {
-    a("stroke-linejoin", "round")
-  } else if join == "bevel" {
-    a("stroke-linejoin", "bevel")
-  } else if join == "miter" {
-    let ml = if miter_limit > 0 {
-      // OOXML miter limit is in 1/1000 % (800000 = 8); SVG takes the plain ratio.
-      let ratio = miter_limit / ooxml_pct_denom
-      if ratio > 1 {
-        a("stroke-miterlimit", int_to_str(ratio))
+  match join {
+    "round" => a("stroke-linejoin", "round")
+    "bevel" => a("stroke-linejoin", "bevel")
+    "miter" => {
+      let ml = if miter_limit > 0 {
+        // OOXML miter limit is in 1/1000 % (800000 = 8); SVG takes the plain ratio.
+        let ratio = miter_limit / ooxml_pct_denom
+        if ratio > 1 {
+          a("stroke-miterlimit", int_to_str(ratio))
+        } else {
+          ""
+        }
       } else {
         ""
       }
-    } else {
-      ""
+      a("stroke-linejoin", "miter") + ml
     }
-    a("stroke-linejoin", "miter") + ml
-  } else {
-    ""
+    _ => ""
   }
 }
 
@@ -399,12 +385,10 @@ fn arrow_marker_id(
 ///|
 /// Arrow marker size from sm/med/lg.
 fn arrow_size(sz : String) -> Int32 {
-  if sz == "sm" {
-    3
-  } else if sz == "lg" {
-    7
-  } else {
-    5
+  match sz {
+    "sm" => 3
+    "lg" => 7
+    _ => 5
   }
 }
 
@@ -422,22 +406,22 @@ fn render_arrow_marker(
   let ws = int_to_str(w)
   let hs = int_to_str(h)
   let fill_color = color.to_css()
-  let path = if arrow_type == "triangle" {
-    "<path d=\"M 0 0 L 10 5 L 0 10 z\"" + a("fill", fill_color) + "/>"
-  } else if arrow_type == "stealth" {
-    "<path d=\"M 0 0 L 10 5 L 0 10 L 3 5 z\"" + a("fill", fill_color) + "/>"
-  } else if arrow_type == "diamond" {
-    "<path d=\"M 0 5 L 5 0 L 10 5 L 5 10 z\"" + a("fill", fill_color) + "/>"
-  } else if arrow_type == "oval" {
-    "<ellipse cx=\"5\" cy=\"5\" rx=\"5\" ry=\"5\"" +
-    a("fill", fill_color) +
-    "/>"
-  } else if arrow_type == "arrow" {
-    "<path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\"" +
-    a("stroke", fill_color) +
-    " stroke-width=\"2\"/>"
-  } else {
-    return ""
+  let path = match arrow_type {
+    "triangle" =>
+      "<path d=\"M 0 0 L 10 5 L 0 10 z\"" + a("fill", fill_color) + "/>"
+    "stealth" =>
+      "<path d=\"M 0 0 L 10 5 L 0 10 L 3 5 z\"" + a("fill", fill_color) + "/>"
+    "diamond" =>
+      "<path d=\"M 0 5 L 5 0 L 10 5 L 5 10 z\"" + a("fill", fill_color) + "/>"
+    "oval" =>
+      "<ellipse cx=\"5\" cy=\"5\" rx=\"5\" ry=\"5\"" +
+      a("fill", fill_color) +
+      "/>"
+    "arrow" =>
+      "<path d=\"M 0 0 L 10 5 L 0 10\" fill=\"none\"" +
+      a("stroke", fill_color) +
+      " stroke-width=\"2\"/>"
+    _ => return ""
   }
   "<marker id=\"" +
   id +
@@ -534,30 +518,25 @@ pub fn sanitize_url(url : String) -> String {
     return trimmed
   }
   let scheme = ascii_lower(@xml.str_substring(trimmed, 0, colon))
-  if scheme == "http" ||
-    scheme == "https" ||
-    scheme == "mailto" ||
-    scheme == "tel" ||
-    scheme == "ftp" ||
-    scheme == "ftps" {
-    trimmed
-  } else if scheme == "data" {
-    // Allow only image/* data URIs (constructed internally for embedded images)
-    let rest_start = colon + 1
-    if rest_start + 6 <= tlen {
-      let prefix = ascii_lower(
-        @xml.str_substring(trimmed, rest_start, rest_start + 6),
-      )
-      if prefix == "image/" {
-        trimmed
+  match scheme {
+    "http" | "https" | "mailto" | "tel" | "ftp" | "ftps" => trimmed
+    "data" => {
+      // Allow only image/* data URIs (constructed internally for embedded images)
+      let rest_start = colon + 1
+      if rest_start + 6 <= tlen {
+        let prefix = ascii_lower(
+          @xml.str_substring(trimmed, rest_start, rest_start + 6),
+        )
+        if prefix == "image/" {
+          trimmed
+        } else {
+          ""
+        }
       } else {
         ""
       }
-    } else {
-      ""
     }
-  } else {
-    ""
+    _ => ""
   }
 }
 
@@ -729,25 +708,18 @@ fn mime_from_ext(path : String) -> String {
     return "image/png"
   }
   let ext = @xml.str_suffix(path, dot + 1)
-  if ext == "png" {
-    "image/png"
-  } else if ext == "jpg" || ext == "jpeg" {
-    "image/jpeg"
-  } else if ext == "gif" {
-    "image/gif"
-  } else if ext == "svg" || ext == "svgz" {
-    "image/svg+xml"
-  } else if ext == "bmp" {
-    "image/bmp"
-  } else if ext == "tif" || ext == "tiff" {
-    "image/tiff"
-  } else if ext == "webp" {
-    "image/webp"
-  } else if ext == "emf" || ext == "wmf" {
-    // EMF/WMF are Windows-only vector formats; browsers cannot render them
-    ""
-  } else {
-    "image/png"
+  match ext {
+    "png" => "image/png"
+    "jpg" | "jpeg" => "image/jpeg"
+    "gif" => "image/gif"
+    "svg" | "svgz" => "image/svg+xml"
+    "bmp" => "image/bmp"
+    "tif" | "tiff" => "image/tiff"
+    "webp" => "image/webp"
+    "emf" | "wmf" =>
+      // EMF/WMF are Windows-only vector formats; browsers cannot render them
+      ""
+    _ => "image/png"
   }
 }
 
@@ -1168,87 +1140,102 @@ fn render_bent_path(
 ) -> String {
   let s = " "
   let p = fn(emu : Int32) -> String { int_to_str(px(emu, scale)) }
-  if prst == "bentConnector2" {
-    "M" + p(x1) + s + p(y1) + "L" + p(x2) + s + p(y1) + "L" + p(x2) + s + p(y2)
-  } else if prst == "bentConnector3" {
-    // Z-shape: adj1 controls the horizontal split point
-    let adj1 = adj_val(avs, 0)
-    let mx = bend_offset(x1, x2 - x1, adj1)
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "L" +
-    p(mx) +
-    s +
-    p(y1) +
-    "L" +
-    p(mx) +
-    s +
-    p(y2) +
-    "L" +
-    p(x2) +
-    s +
-    p(y2)
-  } else if prst == "bentConnector4" {
-    // 4-segment: adj1 (horizontal split), adj2 (vertical split)
-    let adj1 = adj_val(avs, 0)
-    let adj2 = adj_val(avs, 1)
-    let mx = bend_offset(x1, x2 - x1, adj1)
-    let my = bend_offset(y1, y2 - y1, adj2)
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "L" +
-    p(mx) +
-    s +
-    p(y1) +
-    "L" +
-    p(mx) +
-    s +
-    p(my) +
-    "L" +
-    p(x2) +
-    s +
-    p(my) +
-    "L" +
-    p(x2) +
-    s +
-    p(y2)
-  } else {
-    // bentConnector5: 5-segment
-    let adj1 = adj_val(avs, 0)
-    let adj2 = adj_val(avs, 1)
-    let adj3 = adj_val(avs, 2)
-    let span_x = x2 - x1
-    let mx1 = bend_offset(x1, span_x, adj1)
-    let my = bend_offset(y1, y2 - y1, adj2)
-    let mx2 = bend_offset(x1, span_x, adj3)
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "L" +
-    p(mx1) +
-    s +
-    p(y1) +
-    "L" +
-    p(mx1) +
-    s +
-    p(my) +
-    "L" +
-    p(mx2) +
-    s +
-    p(my) +
-    "L" +
-    p(mx2) +
-    s +
-    p(y2) +
-    "L" +
-    p(x2) +
-    s +
-    p(y2)
+  match prst {
+    "bentConnector2" =>
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "L" +
+      p(x2) +
+      s +
+      p(y1) +
+      "L" +
+      p(x2) +
+      s +
+      p(y2)
+    "bentConnector3" => {
+      // Z-shape: adj1 controls the horizontal split point
+      let adj1 = adj_val(avs, 0)
+      let mx = bend_offset(x1, x2 - x1, adj1)
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "L" +
+      p(mx) +
+      s +
+      p(y1) +
+      "L" +
+      p(mx) +
+      s +
+      p(y2) +
+      "L" +
+      p(x2) +
+      s +
+      p(y2)
+    }
+    "bentConnector4" => {
+      // 4-segment: adj1 (horizontal split), adj2 (vertical split)
+      let adj1 = adj_val(avs, 0)
+      let adj2 = adj_val(avs, 1)
+      let mx = bend_offset(x1, x2 - x1, adj1)
+      let my = bend_offset(y1, y2 - y1, adj2)
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "L" +
+      p(mx) +
+      s +
+      p(y1) +
+      "L" +
+      p(mx) +
+      s +
+      p(my) +
+      "L" +
+      p(x2) +
+      s +
+      p(my) +
+      "L" +
+      p(x2) +
+      s +
+      p(y2)
+    }
+    _ => {
+      // bentConnector5: 5-segment
+      let adj1 = adj_val(avs, 0)
+      let adj2 = adj_val(avs, 1)
+      let adj3 = adj_val(avs, 2)
+      let span_x = x2 - x1
+      let mx1 = bend_offset(x1, span_x, adj1)
+      let my = bend_offset(y1, y2 - y1, adj2)
+      let mx2 = bend_offset(x1, span_x, adj3)
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "L" +
+      p(mx1) +
+      s +
+      p(y1) +
+      "L" +
+      p(mx1) +
+      s +
+      p(my) +
+      "L" +
+      p(mx2) +
+      s +
+      p(my) +
+      "L" +
+      p(mx2) +
+      s +
+      p(y2) +
+      "L" +
+      p(x2) +
+      s +
+      p(y2)
+    }
   }
 }
 
@@ -1266,128 +1253,133 @@ fn render_curved_path(
 ) -> String {
   let s = " "
   let p = fn(emu : Int32) -> String { int_to_str(px(emu, scale)) }
-  if prst == "curvedConnector2" {
-    // Simple S-curve
-    let mx = (x1 + x2) / 2
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "C" +
-    p(mx) +
-    s +
-    p(y1) +
-    s +
-    p(mx) +
-    s +
-    p(y2) +
-    s +
-    p(x2) +
-    s +
-    p(y2)
-  } else if prst == "curvedConnector3" {
-    // S-curve with adjustable midpoint
-    let adj1 = adj_val(avs, 0)
-    let mx = bend_offset(x1, x2 - x1, adj1)
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "C" +
-    p(mx) +
-    s +
-    p(y1) +
-    s +
-    p(mx) +
-    s +
-    p(y2) +
-    s +
-    p(x2) +
-    s +
-    p(y2)
-  } else if prst == "curvedConnector4" {
-    let adj1 = adj_val(avs, 0)
-    let adj2 = adj_val(avs, 1)
-    let mx = bend_offset(x1, x2 - x1, adj1)
-    let my = bend_offset(y1, y2 - y1, adj2)
-    // Two cubic bezier segments
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "C" +
-    p(mx) +
-    s +
-    p(y1) +
-    s +
-    p(mx) +
-    s +
-    p(my) +
-    s +
-    p(mx) +
-    s +
-    p(my) +
-    "C" +
-    p(mx) +
-    s +
-    p(my) +
-    s +
-    p(x2) +
-    s +
-    p(my) +
-    s +
-    p(x2) +
-    s +
-    p(y2)
-  } else {
-    // curvedConnector5
-    let adj1 = adj_val(avs, 0)
-    let adj2 = adj_val(avs, 1)
-    let adj3 = adj_val(avs, 2)
-    let span_x = x2 - x1
-    let mx1 = bend_offset(x1, span_x, adj1)
-    let my = bend_offset(y1, y2 - y1, adj2)
-    let mx2 = bend_offset(x1, span_x, adj3)
-    "M" +
-    p(x1) +
-    s +
-    p(y1) +
-    "C" +
-    p(mx1) +
-    s +
-    p(y1) +
-    s +
-    p(mx1) +
-    s +
-    p(my) +
-    s +
-    p(mx1) +
-    s +
-    p(my) +
-    "C" +
-    p(mx1) +
-    s +
-    p(my) +
-    s +
-    p(mx2) +
-    s +
-    p(my) +
-    s +
-    p(mx2) +
-    s +
-    p(my) +
-    "C" +
-    p(mx2) +
-    s +
-    p(my) +
-    s +
-    p(x2) +
-    s +
-    p(y2) +
-    s +
-    p(x2) +
-    s +
-    p(y2)
+  match prst {
+    "curvedConnector2" => {
+      // Simple S-curve
+      let mx = (x1 + x2) / 2
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "C" +
+      p(mx) +
+      s +
+      p(y1) +
+      s +
+      p(mx) +
+      s +
+      p(y2) +
+      s +
+      p(x2) +
+      s +
+      p(y2)
+    }
+    "curvedConnector3" => {
+      // S-curve with adjustable midpoint
+      let adj1 = adj_val(avs, 0)
+      let mx = bend_offset(x1, x2 - x1, adj1)
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "C" +
+      p(mx) +
+      s +
+      p(y1) +
+      s +
+      p(mx) +
+      s +
+      p(y2) +
+      s +
+      p(x2) +
+      s +
+      p(y2)
+    }
+    "curvedConnector4" => {
+      let adj1 = adj_val(avs, 0)
+      let adj2 = adj_val(avs, 1)
+      let mx = bend_offset(x1, x2 - x1, adj1)
+      let my = bend_offset(y1, y2 - y1, adj2)
+      // Two cubic bezier segments
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "C" +
+      p(mx) +
+      s +
+      p(y1) +
+      s +
+      p(mx) +
+      s +
+      p(my) +
+      s +
+      p(mx) +
+      s +
+      p(my) +
+      "C" +
+      p(mx) +
+      s +
+      p(my) +
+      s +
+      p(x2) +
+      s +
+      p(my) +
+      s +
+      p(x2) +
+      s +
+      p(y2)
+    }
+    _ => {
+      // curvedConnector5
+      let adj1 = adj_val(avs, 0)
+      let adj2 = adj_val(avs, 1)
+      let adj3 = adj_val(avs, 2)
+      let span_x = x2 - x1
+      let mx1 = bend_offset(x1, span_x, adj1)
+      let my = bend_offset(y1, y2 - y1, adj2)
+      let mx2 = bend_offset(x1, span_x, adj3)
+      "M" +
+      p(x1) +
+      s +
+      p(y1) +
+      "C" +
+      p(mx1) +
+      s +
+      p(y1) +
+      s +
+      p(mx1) +
+      s +
+      p(my) +
+      s +
+      p(mx1) +
+      s +
+      p(my) +
+      "C" +
+      p(mx1) +
+      s +
+      p(my) +
+      s +
+      p(mx2) +
+      s +
+      p(my) +
+      s +
+      p(mx2) +
+      s +
+      p(my) +
+      "C" +
+      p(mx2) +
+      s +
+      p(my) +
+      s +
+      p(x2) +
+      s +
+      p(y2) +
+      s +
+      p(x2) +
+      s +
+      p(y2)
+    }
   }
 }
 
@@ -1414,24 +1406,16 @@ fn geom_str(kind : @ooxml.ShapeKind) -> String {
 ///|
 fn auto_number_text(type_ : String, idx : Int32) -> String {
   let n = idx + 1
-  if type_ == "arabicPeriod" {
-    int_to_str(n) + "."
-  } else if type_ == "arabicParenR" {
-    int_to_str(n) + ")"
-  } else if type_ == "alphaLcPeriod" {
-    alpha_lower(n) + "."
-  } else if type_ == "alphaLcParenR" {
-    alpha_lower(n) + ")"
-  } else if type_ == "alphaUcPeriod" {
-    alpha_upper(n) + "."
-  } else if type_ == "alphaUcParenR" {
-    alpha_upper(n) + ")"
-  } else if type_ == "romanLcPeriod" {
-    roman_lower(n) + "."
-  } else if type_ == "romanUcPeriod" {
-    roman_upper(n) + "."
-  } else {
-    int_to_str(n) + "."
+  match type_ {
+    "arabicPeriod" => int_to_str(n) + "."
+    "arabicParenR" => int_to_str(n) + ")"
+    "alphaLcPeriod" => alpha_lower(n) + "."
+    "alphaLcParenR" => alpha_lower(n) + ")"
+    "alphaUcPeriod" => alpha_upper(n) + "."
+    "alphaUcParenR" => alpha_upper(n) + ")"
+    "romanLcPeriod" => roman_lower(n) + "."
+    "romanUcPeriod" => roman_upper(n) + "."
+    _ => int_to_str(n) + "."
   }
 }
 
