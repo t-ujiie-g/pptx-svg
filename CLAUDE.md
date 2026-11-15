@@ -68,7 +68,7 @@ ooxml → xml (types, PPTX parser, parse_hex_color)
 
 ## Critical MoonBit constraints
 
-**No integer string interpolation.** `"\{n}"` for integer `n` calls `fromCharCodeArray` internally, which requires `{ builtins: ['js-string'] }` browser support (Chrome 117+). The codebase uses `@xml.int_to_str(n)` (defined in `xml.mbt`, aliased locally as `fn int_to_str(n) -> String { @xml.int_to_str(n) }`) which only uses `concat` + string literals and works in all wasm-gc browsers (Chrome 111+).
+**No integer string interpolation.** `"\{n}"` for integer `n` calls `fromCharCodeArray` internally, which only works with native js-string builtins (in the JS fallback it yields `""`). The codebase uses `@xml.int_to_str(n)` (defined in `xml.mbt`, aliased locally as `fn int_to_str(n) -> String { @xml.int_to_str(n) }`) which only uses `concat` + string literals and works in every WasmGC browser.
 
 **String API:** Read a character with `@xml.char_at(s, i)` (`char_at` inside `xml`), never `s.get_char(i).unwrap()`: indices are UTF-16 code units, and on the second half of a surrogate pair (any emoji) `get_char` is `None`, so a scanner stepping by 1 panics with `unreachable` (#88). `char_at` yields U+FFFD there, which matches no ASCII delimiter. Loops that copy characters still step by `char_step(c)`. Avoid `s[i:j]` in non-error functions — it raises `CreatingViewError`.
 
@@ -106,7 +106,7 @@ Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with
 
 **Why JS target?** MoonBit FFI functions (`pptx_ffi.*`) are unresolved in the wasm-gc test runner. The JS target compiles to Node.js and allows injecting stubs via `NODE_OPTIONS='--require ./test_fixtures/ffi_stub.js'`.
 
-**Why not remove FFI from xml?** `Char::to_string()` and `String::make(1, c)` both use `wasm:js-string "fromCharCodeArray"` which breaks Tier-2/3 browser polyfill compatibility. The `ffi_char_code_to_str` FFI (→ `String.fromCharCode`) only uses the polyfillable `concat` path.
+**Why not remove FFI from xml?** `Char::to_string()` and `String::make(1, c)` both use `wasm:js-string "fromCharCodeArray"` which the JS fallback cannot implement. The `ffi_char_code_to_str` FFI (→ `String.fromCharCode`) only uses the polyfillable `concat` path.
 
 **Test-only imports:** Use `import { ... } for "test"` in `moon.pkg` to add dependencies needed only by test files (e.g. svg_parser in renderer tests).
 
@@ -115,17 +115,20 @@ Tests are in `src/*/..._test.mbt` files and run via `moon test --target js` with
 ## Browser compatibility and string constants
 
 `use-js-builtin-string: true` in `src/main/moon.pkg` generates Wasm that imports:
-1. Functions from `wasm:js-string` (length, charCodeAt, equals, concat)
-2. String-constant globals from module `_` (one per string literal in MoonBit)
+1. Functions from `wasm:js-string` (length, charCodeAt, equals, concat, and fromCharCodeArray — see below)
+2. String-constant globals from module `_` (one per string literal in MoonBit), typed non-null `(ref extern)`
 
-`lib/wasm-compat.ts` handles this with a 3-tier fallback:
-- **Tier 1** `{ builtins: ['js-string'] }` — Chrome 117+, Firefox 120+, Safari 17+
-- **Tier 2** `{ importedStringConstants: '_' }` + manual `wasm:js-string` — Chrome 115–116
-- **Tier 3** Manual `WebAssembly.Global(externref)` for `_` + manual `wasm:js-string` — Chrome 111+
+`lib/wasm-compat.ts` supplies `_` as plain strings (a nullable `WebAssembly.Global(externref)` fails the type check) and instantiates in one of two ways:
+- **Builtins** `{ builtins: ['js-string'] }` — recent Chrome/Firefox, Safari 26.2+, Node.js 22+
+- **JS fallback** `wasm:js-string` implemented in JS (`JS_STRING_MODULE`) — any WasmGC engine: Chrome 119+, Firefox 120+, Safari 18.2+. Guarded by `test_fixtures/tests/wasm_compat.test.mjs`, which forces this path and diffs the SVG against the builtins path.
+
+WasmGC itself is the floor: Chrome 111–118 had it only behind a flag, with pre-standard opcodes.
 
 `wasm-compat.ts` parses the Wasm binary at startup to extract `_` module string constants dynamically — no manual list to maintain.
 
-**Critical**: Never use `StringBuilder` in MoonBit. `StringBuilder::to_string()` calls `wasm:js-string "fromCharCodeArray"` which cannot be polyfilled in JS. Build strings with `+` (concat) instead. For Char→String use `@ffi.ffi_char_code_to_str(Char::to_int(c))` (→ `String.fromCharCode`).
+**`fromCharCodeArray` is imported but only reachable on a panic.** The moon stdlib calls it from `Int::to_string` / `StringBuilder::to_string`, which since 0.6.2's toolchain format the abort message of every bounds-checked `Array` op (`push`, `insert`, `remove`, …) right before `unreachable`. Its Wasm GC array argument is opaque to JS, so the fallback stubs it as `() => ''`; trace a new caller with `moon build --target wasm-gc --output-wat`.
+
+**Critical**: Never use `StringBuilder` in MoonBit. `StringBuilder::to_string()` calls `wasm:js-string "fromCharCodeArray"` which cannot be polyfilled in JS, so in the JS fallback it would return `""`. Build strings with `+` (concat) instead. For Char→String use `@ffi.ffi_char_code_to_str(Char::to_int(c))` (→ `String.fromCharCode`).
 
 ## Data model (ooxml.mbt)
 
@@ -267,7 +270,7 @@ ChartAxis { ax_id, cross_ax: Int, ax_pos: String, delete, is_val, major_gridline
 | `test_fixtures/fixtures/_ctx.py` | Shared `prs`/`blank` state + cross-module helpers (`nsmap`, `set_fill_xml`) |
 | `test_fixtures/fixtures/slides_NN_*.py` | Per-category slide builders (text basics, fills, shapes, tables, images, charts, misc, chartex, regressions) |
 | `test_fixtures/fixtures/_postprocess.py` | Post-save ZIP patching (OMML, ChartEx, media, WMF) |
-| `test_fixtures/tests/*.test.mjs` | Node `--test` suite split by feature category (structure, text, fills, shapes, tables, images, charts, misc, chartex, emf, wmf, utils, regressions) |
+| `test_fixtures/tests/*.test.mjs` | Node `--test` suite split by feature category (structure, text, fills, shapes, tables, images, charts, misc, chartex, emf, wmf, utils, regressions, wasm_compat) |
 | `test_fixtures/tests/_helpers.mjs` | Shared test helpers (`expect`, `loadFeatures`, `hasTag`, `findRelTarget`, …) |
 | `test_fixtures/test_node_compat.mjs` | Node.js editing API test suite (shape/text/image CRUD, round-trip export) |
 
