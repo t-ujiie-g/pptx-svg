@@ -214,227 +214,214 @@ fn patt_svg_content(
     fg +
     "\"/>"
 
-  if prst == "pct5" {
-    br + patt_dot(h, h, "1", fg)
-  } else if prst == "pct10" {
-    br + patt_dot(h, h, "1", fg)
-  } else if prst == "pct20" || prst == "pct25" {
-    br + patt_dot(h, h, "2", fg)
-  } else if prst == "pct30" {
-    br + patt_dot(q, q, "1", fg) + patt_dot(q3, q3, "1", fg)
-  } else if prst == "pct40" {
-    br +
-    patt_dot(q, q, "1", fg) +
-    patt_dot(q3, q, "1", fg) +
-    patt_dot(h, q3, "1", fg)
-  } else if prst == "pct50" {
-    br + patt_rect("0", "0", h, h, fg)
-  } else if prst == "pct60" {
-    br + patt_rect("0", "0", h, h, fg) + patt_dot(q3, q3, "1", fg)
-  } else if prst == "pct70" || prst == "pct75" {
-    fr + patt_dot(h, h, "2", bg)
-  } else if prst == "pct80" {
-    fr + patt_dot(h, h, "1", bg)
-  } else if prst == "pct90" {
-    fr + patt_dot(h, q, "1", bg)
+  match prst {
+    "pct5" => br + patt_dot(h, h, "1", fg)
+    "pct10" => br + patt_dot(h, h, "1", fg)
+    "pct20" | "pct25" => br + patt_dot(h, h, "2", fg)
+    "pct30" => br + patt_dot(q, q, "1", fg) + patt_dot(q3, q3, "1", fg)
+    "pct40" =>
+      br +
+      patt_dot(q, q, "1", fg) +
+      patt_dot(q3, q, "1", fg) +
+      patt_dot(h, q3, "1", fg)
+    "pct50" => br + patt_rect("0", "0", h, h, fg)
+    "pct60" => br + patt_rect("0", "0", h, h, fg) + patt_dot(q3, q3, "1", fg)
+    "pct70" | "pct75" => fr + patt_dot(h, h, "2", bg)
+    "pct80" => fr + patt_dot(h, h, "1", bg)
+    "pct90" => fr + patt_dot(h, q, "1", bg)
 
     // lt/dk are half-spaced vs the plain preset (GDI+ 4px vs 8px); dk doubles the width.
-  } else if prst == "ltDnDiag" {
-    br + dn_diag_half("1")
-  } else if prst == "dkDnDiag" {
-    br + dn_diag_half("2")
-  } else if prst == "ltUpDiag" {
-    br + up_diag_half("1")
-  } else if prst == "dkUpDiag" {
-    br + up_diag_half("2")
-  } else if prst == "dnDiag" {
-    br +
-    patt_line("0", "0", s, s, fg, "1") +
-    patt_line(int_to_str(-sz), "0", "0", s, fg, "1") +
-    patt_line(s, "0", int_to_str(sz * 2), s, fg, "1")
-  } else if prst == "upDiag" {
-    br +
-    patt_line(s, "0", "0", s, fg, "1") +
-    patt_line(int_to_str(sz * 2), "0", s, s, fg, "1") +
-    patt_line("0", "0", int_to_str(-sz), s, fg, "1")
-  } else if prst == "wdDnDiag" {
-    br + patt_line("0", "0", s, s, fg, "3")
-  } else if prst == "wdUpDiag" {
-    br + patt_line(s, "0", "0", s, fg, "3")
-  } else if prst == "dashDnDiag" {
-    br + patt_line("0", "0", h, h, fg, "1")
-  } else if prst == "dashUpDiag" {
-    br + patt_line(s, "0", h, h, fg, "1")
+    "ltDnDiag" => br + dn_diag_half("1")
+    "dkDnDiag" => br + dn_diag_half("2")
+    "ltUpDiag" => br + up_diag_half("1")
+    "dkUpDiag" => br + up_diag_half("2")
+    "dnDiag" =>
+      br +
+      patt_line("0", "0", s, s, fg, "1") +
+      patt_line(int_to_str(-sz), "0", "0", s, fg, "1") +
+      patt_line(s, "0", int_to_str(sz * 2), s, fg, "1")
+    "upDiag" =>
+      br +
+      patt_line(s, "0", "0", s, fg, "1") +
+      patt_line(int_to_str(sz * 2), "0", s, s, fg, "1") +
+      patt_line("0", "0", int_to_str(-sz), s, fg, "1")
+    "wdDnDiag" => br + patt_line("0", "0", s, s, fg, "3")
+    "wdUpDiag" => br + patt_line(s, "0", "0", s, fg, "3")
+    "dashDnDiag" => br + patt_line("0", "0", h, h, fg, "1")
+    "dashUpDiag" => br + patt_line(s, "0", h, h, fg, "1")
 
     // lt/dk = half-spaced (2 lines per tile), nar = quarter-spaced (4 lines)
-  } else if prst == "ltHorz" {
-    br + horz_half("1")
-  } else if prst == "dkHorz" {
-    br + horz_half("2")
-  } else if prst == "ltVert" {
-    br + vert_half("1")
-  } else if prst == "dkVert" {
-    br + vert_half("2")
-  } else if prst == "horz" {
-    br + patt_line("0", h, s, h, fg, "1")
-  } else if prst == "vert" {
-    br + patt_line(h, "0", h, s, fg, "1")
-  } else if prst == "narHorz" {
-    br +
-    patt_line("0", e1, s, e1, fg, "1") +
-    patt_line("0", e3, s, e3, fg, "1") +
-    patt_line("0", e5, s, e5, fg, "1") +
-    patt_line("0", e7, s, e7, fg, "1")
-  } else if prst == "narVert" {
-    br +
-    patt_line(e1, "0", e1, s, fg, "1") +
-    patt_line(e3, "0", e3, s, fg, "1") +
-    patt_line(e5, "0", e5, s, fg, "1") +
-    patt_line(e7, "0", e7, s, fg, "1")
-  } else if prst == "dashHorz" {
-    br + patt_line("0", h, h, h, fg, "1")
-  } else if prst == "dashVert" {
-    br + patt_line(h, "0", h, h, fg, "1")
-  } else if prst == "cross" {
-    br + patt_line(h, "0", h, s, fg, "1") + patt_line("0", h, s, h, fg, "1")
-  } else if prst == "dnCross" {
-    br + patt_line("0", "0", s, s, fg, "1") + patt_line(s, "0", "0", s, fg, "1")
-  } else if prst == "smCheck" || prst == "lgCheck" {
-    br + patt_rect("0", "0", h, h, fg) + patt_rect(h, h, h, h, fg)
-  } else if prst == "openDmnd" {
-    br +
-    "<polygon points=\"" +
-    h +
-    ",0 " +
-    s +
-    "," +
-    h +
-    " " +
-    h +
-    "," +
-    s +
-    " 0," +
-    h +
-    "\" fill=\"none\" stroke=\"" +
-    fg +
-    "\" stroke-width=\"1\"/>"
-  } else if prst == "solidDmnd" {
-    br +
-    "<polygon points=\"" +
-    h +
-    ",0 " +
-    s +
-    "," +
-    h +
-    " " +
-    h +
-    "," +
-    s +
-    " 0," +
-    h +
-    "\" fill=\"" +
-    fg +
-    "\"/>"
-  } else if prst == "smGrid" {
-    br + patt_line(h, "0", h, s, fg, "1") + patt_line("0", h, s, h, fg, "1")
-  } else if prst == "lgGrid" {
-    br +
-    patt_line("0", "0", s, "0", fg, "1") +
-    patt_line("0", "0", "0", s, fg, "1")
-  } else if prst == "dotGrid" {
-    br +
-    patt_dot("0", "0", "1", fg) +
-    patt_dot(h, "0", "1", fg) +
-    patt_dot("0", h, "1", fg) +
-    patt_dot(h, h, "1", fg)
-  } else if prst == "dotDmnd" {
-    br +
-    patt_dot(h, "0", "1", fg) +
-    patt_dot("0", h, "1", fg) +
-    patt_dot(s, h, "1", fg) +
-    patt_dot(h, s, "1", fg)
-  } else if prst == "ltDnDiagCross" {
-    br + patt_line("0", "0", s, s, fg, "1") + patt_line(s, "0", "0", s, fg, "1")
-  } else if prst == "dkDnDiagCross" {
-    br + patt_line("0", "0", s, s, fg, "2") + patt_line(s, "0", "0", s, fg, "2")
-  } else if prst == "trellis" {
-    br + patt_line("0", "0", s, s, fg, "2") + patt_line(s, "0", "0", s, fg, "2")
-  } else if prst == "sphere" {
-    br +
-    "<circle cx=\"" +
-    h +
-    "\" cy=\"" +
-    h +
-    "\" r=\"" +
-    q +
-    "\" fill=\"" +
-    fg +
-    "\" opacity=\"0.7\"/>" +
-    patt_dot(q, q, "1", bg)
-  } else if prst == "weave" {
-    br +
-    patt_line("0", "0", h, h, fg, "2") +
-    patt_line(s, "0", h, h, fg, "2") +
-    patt_line("0", s, h, h, fg, "2") +
-    patt_line(s, s, h, h, fg, "2")
-  } else if prst == "plaid" {
-    br +
-    patt_rect("0", "0", h, h, fg) +
-    patt_line("0", q3, s, q3, fg, "1") +
-    patt_line(q3, "0", q3, s, fg, "1")
-  } else if prst == "divot" {
-    br + patt_line(q, q, h, q, fg, "1") + patt_line(h, q3, q3, q3, fg, "1")
-  } else if prst == "zigZag" {
-    br +
-    "<polyline points=\"0," +
-    h +
-    " " +
-    q +
-    ",0 " +
-    h +
-    "," +
-    h +
-    " " +
-    q3 +
-    ",0 " +
-    s +
-    "," +
-    h +
-    "\" fill=\"none\" stroke=\"" +
-    fg +
-    "\" stroke-width=\"1\"/>"
-  } else if prst == "wave" {
-    br +
-    "<path d=\"M0," +
-    h +
-    " Q" +
-    q +
-    ",0 " +
-    h +
-    "," +
-    h +
-    " Q" +
-    q3 +
-    "," +
-    s +
-    " " +
-    s +
-    "," +
-    h +
-    "\" fill=\"none\" stroke=\"" +
-    fg +
-    "\" stroke-width=\"1\"/>"
-  } else if prst == "diagBrick" {
-    br + patt_line("0", "0", s, s, fg, "1") + patt_line("0", h, h, "0", fg, "1")
-  } else if prst == "horzBrick" {
-    br +
-    patt_line("0", h, s, h, fg, "1") +
-    patt_line(h, "0", h, h, fg, "1") +
-    patt_line("0", s, "0", h, fg, "1")
-  } else if prst == "shingle" {
-    br + patt_line("0", s, s, "0", fg, "1") + patt_line("0", h, h, "0", fg, "1")
-  } else {
-    patt_rect("0", "0", s, s, fg)
+    "ltHorz" => br + horz_half("1")
+    "dkHorz" => br + horz_half("2")
+    "ltVert" => br + vert_half("1")
+    "dkVert" => br + vert_half("2")
+    "horz" => br + patt_line("0", h, s, h, fg, "1")
+    "vert" => br + patt_line(h, "0", h, s, fg, "1")
+    "narHorz" =>
+      br +
+      patt_line("0", e1, s, e1, fg, "1") +
+      patt_line("0", e3, s, e3, fg, "1") +
+      patt_line("0", e5, s, e5, fg, "1") +
+      patt_line("0", e7, s, e7, fg, "1")
+    "narVert" =>
+      br +
+      patt_line(e1, "0", e1, s, fg, "1") +
+      patt_line(e3, "0", e3, s, fg, "1") +
+      patt_line(e5, "0", e5, s, fg, "1") +
+      patt_line(e7, "0", e7, s, fg, "1")
+    "dashHorz" => br + patt_line("0", h, h, h, fg, "1")
+    "dashVert" => br + patt_line(h, "0", h, h, fg, "1")
+    "cross" =>
+      br + patt_line(h, "0", h, s, fg, "1") + patt_line("0", h, s, h, fg, "1")
+    "dnCross" =>
+      br +
+      patt_line("0", "0", s, s, fg, "1") +
+      patt_line(s, "0", "0", s, fg, "1")
+    "smCheck" | "lgCheck" =>
+      br + patt_rect("0", "0", h, h, fg) + patt_rect(h, h, h, h, fg)
+    "openDmnd" =>
+      br +
+      "<polygon points=\"" +
+      h +
+      ",0 " +
+      s +
+      "," +
+      h +
+      " " +
+      h +
+      "," +
+      s +
+      " 0," +
+      h +
+      "\" fill=\"none\" stroke=\"" +
+      fg +
+      "\" stroke-width=\"1\"/>"
+    "solidDmnd" =>
+      br +
+      "<polygon points=\"" +
+      h +
+      ",0 " +
+      s +
+      "," +
+      h +
+      " " +
+      h +
+      "," +
+      s +
+      " 0," +
+      h +
+      "\" fill=\"" +
+      fg +
+      "\"/>"
+    "smGrid" =>
+      br + patt_line(h, "0", h, s, fg, "1") + patt_line("0", h, s, h, fg, "1")
+    "lgGrid" =>
+      br +
+      patt_line("0", "0", s, "0", fg, "1") +
+      patt_line("0", "0", "0", s, fg, "1")
+    "dotGrid" =>
+      br +
+      patt_dot("0", "0", "1", fg) +
+      patt_dot(h, "0", "1", fg) +
+      patt_dot("0", h, "1", fg) +
+      patt_dot(h, h, "1", fg)
+    "dotDmnd" =>
+      br +
+      patt_dot(h, "0", "1", fg) +
+      patt_dot("0", h, "1", fg) +
+      patt_dot(s, h, "1", fg) +
+      patt_dot(h, s, "1", fg)
+    "ltDnDiagCross" =>
+      br +
+      patt_line("0", "0", s, s, fg, "1") +
+      patt_line(s, "0", "0", s, fg, "1")
+    "dkDnDiagCross" =>
+      br +
+      patt_line("0", "0", s, s, fg, "2") +
+      patt_line(s, "0", "0", s, fg, "2")
+    "trellis" =>
+      br +
+      patt_line("0", "0", s, s, fg, "2") +
+      patt_line(s, "0", "0", s, fg, "2")
+    "sphere" =>
+      br +
+      "<circle cx=\"" +
+      h +
+      "\" cy=\"" +
+      h +
+      "\" r=\"" +
+      q +
+      "\" fill=\"" +
+      fg +
+      "\" opacity=\"0.7\"/>" +
+      patt_dot(q, q, "1", bg)
+    "weave" =>
+      br +
+      patt_line("0", "0", h, h, fg, "2") +
+      patt_line(s, "0", h, h, fg, "2") +
+      patt_line("0", s, h, h, fg, "2") +
+      patt_line(s, s, h, h, fg, "2")
+    "plaid" =>
+      br +
+      patt_rect("0", "0", h, h, fg) +
+      patt_line("0", q3, s, q3, fg, "1") +
+      patt_line(q3, "0", q3, s, fg, "1")
+    "divot" =>
+      br + patt_line(q, q, h, q, fg, "1") + patt_line(h, q3, q3, q3, fg, "1")
+    "zigZag" =>
+      br +
+      "<polyline points=\"0," +
+      h +
+      " " +
+      q +
+      ",0 " +
+      h +
+      "," +
+      h +
+      " " +
+      q3 +
+      ",0 " +
+      s +
+      "," +
+      h +
+      "\" fill=\"none\" stroke=\"" +
+      fg +
+      "\" stroke-width=\"1\"/>"
+    "wave" =>
+      br +
+      "<path d=\"M0," +
+      h +
+      " Q" +
+      q +
+      ",0 " +
+      h +
+      "," +
+      h +
+      " Q" +
+      q3 +
+      "," +
+      s +
+      " " +
+      s +
+      "," +
+      h +
+      "\" fill=\"none\" stroke=\"" +
+      fg +
+      "\" stroke-width=\"1\"/>"
+    "diagBrick" =>
+      br +
+      patt_line("0", "0", s, s, fg, "1") +
+      patt_line("0", h, h, "0", fg, "1")
+    "horzBrick" =>
+      br +
+      patt_line("0", h, s, h, fg, "1") +
+      patt_line(h, "0", h, h, fg, "1") +
+      patt_line("0", s, "0", h, fg, "1")
+    "shingle" =>
+      br +
+      patt_line("0", s, s, "0", fg, "1") +
+      patt_line("0", h, h, "0", fg, "1")
+    _ => patt_rect("0", "0", s, s, fg)
   }
 }
 
@@ -601,16 +588,12 @@ fn render_effect_filter(
     let clr = fo.color
     let alpha_str = eff_alpha_str(clr, "1.0")
     // Map OOXML blend modes to SVG feBlend modes
-    let mode = if fo.blend == "mult" {
-      "multiply"
-    } else if fo.blend == "screen" {
-      "screen"
-    } else if fo.blend == "darken" {
-      "darken"
-    } else if fo.blend == "lighten" {
-      "lighten"
-    } else {
-      "normal" // "over" = normal compositing
+    let mode = match fo.blend {
+      "mult" => "multiply"
+      "screen" => "screen"
+      "darken" => "darken"
+      "lighten" => "lighten"
+      _ => "normal" // "over" = normal compositing
     }
     filters = filters +
       "<feFlood flood-color=\"" +

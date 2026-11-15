@@ -109,15 +109,12 @@ fn parse_gradient_fill(
               Some(v) => v
               None => "circle"
             }
-            match
-              @xml.find_child(@xml.get_children(path_node), "a:fillToRect") {
-              Some(ftr) => {
-                fill_to_l = attr_int(ftr, "l")
-                fill_to_t = attr_int(ftr, "t")
-                fill_to_r = attr_int(ftr, "r")
-                fill_to_b = attr_int(ftr, "b")
-              }
-              None => ()
+            if @xml.find_child(@xml.get_children(path_node), "a:fillToRect")
+              is Some(ftr) {
+              fill_to_l = attr_int(ftr, "l")
+              fill_to_t = attr_int(ftr, "t")
+              fill_to_r = attr_int(ftr, "r")
+              fill_to_b = attr_int(ftr, "b")
             }
           }
       }
@@ -572,13 +569,15 @@ fn parse_color_list(children : Array[@xml.XmlNode]) -> Array[Color] {
   for child in children {
     match child {
       @xml.XmlNode::Element(tag, _, _) =>
-        if tag == "a:srgbClr" {
-          if @xml.get_attr(child, "val") is Some(v) {
-            colors.push(parse_hex_color(v))
-          }
-        } else if tag == "a:schemeClr" {
-          // For duotone with scheme colors, use a placeholder (rare case)
-          colors.push(Color::none())
+        match tag {
+          "a:srgbClr" =>
+            if @xml.get_attr(child, "val") is Some(v) {
+              colors.push(parse_hex_color(v))
+            }
+          "a:schemeClr" =>
+            // For duotone with scheme colors, use a placeholder (rare case)
+            colors.push(Color::none())
+          _ => ()
         }
       _ => ()
     }
@@ -1567,102 +1566,110 @@ fn parse_custom_path_segment(path_node : @xml.XmlNode) -> String {
   let mut d = ""
   for i in 0..<ch.length() {
     let tag = @xml.get_tag(ch[i])
-    if tag == "a:moveTo" {
-      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
-      if pts.length() >= 1 {
-        let x = match @xml.get_attr(pts[0], "x") {
+    match tag {
+      "a:moveTo" => {
+        let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+        if pts.length() >= 1 {
+          let x = match @xml.get_attr(pts[0], "x") {
+            Some(v) => v
+            None => "0"
+          }
+          let y = match @xml.get_attr(pts[0], "y") {
+            Some(v) => v
+            None => "0"
+          }
+          if !d.is_empty() {
+            d = d + " "
+          }
+          d = d + "M " + x + " " + y
+        }
+      }
+      "a:lnTo" => {
+        let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+        if pts.length() >= 1 {
+          let x = match @xml.get_attr(pts[0], "x") {
+            Some(v) => v
+            None => "0"
+          }
+          let y = match @xml.get_attr(pts[0], "y") {
+            Some(v) => v
+            None => "0"
+          }
+          if !d.is_empty() {
+            d = d + " "
+          }
+          d = d + "L " + x + " " + y
+        }
+      }
+      "a:cubicBezTo" => {
+        let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+        if pts.length() >= 3 {
+          if !d.is_empty() {
+            d = d + " "
+          }
+          d = d + "C"
+          for j in 0..<3 {
+            let x = match @xml.get_attr(pts[j], "x") {
+              Some(v) => v
+              None => "0"
+            }
+            let y = match @xml.get_attr(pts[j], "y") {
+              Some(v) => v
+              None => "0"
+            }
+            d = d + " " + x + " " + y
+          }
+        }
+      }
+      "a:quadBezTo" => {
+        let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
+        if pts.length() >= 2 {
+          if !d.is_empty() {
+            d = d + " "
+          }
+          d = d + "Q"
+          for j in 0..<2 {
+            let x = match @xml.get_attr(pts[j], "x") {
+              Some(v) => v
+              None => "0"
+            }
+            let y = match @xml.get_attr(pts[j], "y") {
+              Some(v) => v
+              None => "0"
+            }
+            d = d + " " + x + " " + y
+          }
+        }
+      }
+      "a:arcTo" => {
+        let wr = match @xml.get_attr(ch[i], "wR") {
           Some(v) => v
           None => "0"
         }
-        let y = match @xml.get_attr(pts[0], "y") {
+        let hr = match @xml.get_attr(ch[i], "hR") {
+          Some(v) => v
+          None => "0"
+        }
+        let st = match @xml.get_attr(ch[i], "stAng") {
+          Some(v) => v
+          None => "0"
+        }
+        let sw = match @xml.get_attr(ch[i], "swAng") {
           Some(v) => v
           None => "0"
         }
         if !d.is_empty() {
           d = d + " "
         }
-        d = d + "M " + x + " " + y
+        d = d + "A " + wr + " " + hr + " " + st + " " + sw
       }
-    } else if tag == "a:lnTo" {
-      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
-      if pts.length() >= 1 {
-        let x = match @xml.get_attr(pts[0], "x") {
-          Some(v) => v
-          None => "0"
-        }
-        let y = match @xml.get_attr(pts[0], "y") {
-          Some(v) => v
-          None => "0"
-        }
+      "a:close" => {
         if !d.is_empty() {
           d = d + " "
         }
-        d = d + "L " + x + " " + y
+        d = d + "Z"
       }
-    } else if tag == "a:cubicBezTo" {
-      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
-      if pts.length() >= 3 {
-        if !d.is_empty() {
-          d = d + " "
-        }
-        d = d + "C"
-        for j in 0..<3 {
-          let x = match @xml.get_attr(pts[j], "x") {
-            Some(v) => v
-            None => "0"
-          }
-          let y = match @xml.get_attr(pts[j], "y") {
-            Some(v) => v
-            None => "0"
-          }
-          d = d + " " + x + " " + y
-        }
-      }
-    } else if tag == "a:quadBezTo" {
-      let pts = @xml.find_children(@xml.get_children(ch[i]), "a:pt")
-      if pts.length() >= 2 {
-        if !d.is_empty() {
-          d = d + " "
-        }
-        d = d + "Q"
-        for j in 0..<2 {
-          let x = match @xml.get_attr(pts[j], "x") {
-            Some(v) => v
-            None => "0"
-          }
-          let y = match @xml.get_attr(pts[j], "y") {
-            Some(v) => v
-            None => "0"
-          }
-          d = d + " " + x + " " + y
-        }
-      }
-    } else if tag == "a:arcTo" {
-      let wr = match @xml.get_attr(ch[i], "wR") {
-        Some(v) => v
-        None => "0"
-      }
-      let hr = match @xml.get_attr(ch[i], "hR") {
-        Some(v) => v
-        None => "0"
-      }
-      let st = match @xml.get_attr(ch[i], "stAng") {
-        Some(v) => v
-        None => "0"
-      }
-      let sw = match @xml.get_attr(ch[i], "swAng") {
-        Some(v) => v
-        None => "0"
-      }
-      if !d.is_empty() {
-        d = d + " "
-      }
-      d = d + "A " + wr + " " + hr + " " + st + " " + sw
-    } else if tag == "a:close" {
-      if !d.is_empty() {
-        d = d + " "
-      }
-      d = d + "Z"
+      _ => ()
     }
   }
   d
@@ -2041,40 +2048,41 @@ fn parse_shapes_from_children(
   for child in children {
     match child {
       @xml.XmlNode::Element(tag, _, _) =>
-        if tag == "p:sp" {
-          shapes.push(with_nv_props(parse_sp(child, theme), child))
-        } else if tag == "p:pic" {
-          shapes.push(with_nv_props(parse_pic(child, theme), child))
-        } else if tag == "p:graphicFrame" {
-          shapes.push(with_nv_props(parse_graphic_frame(child, theme), child))
-        } else if tag == "p:grpSp" {
-          shapes.push(with_nv_props(parse_grp_sp(child, theme), child))
-        } else if tag == "p:cxnSp" {
-          shapes.push(with_nv_props(parse_cxn_sp(child, theme), child))
-        } else if tag == "mc:AlternateContent" {
-          let ac_ch = @xml.get_children(child)
-          let mut choice_xml = ""
-          let mut fallback_node : @xml.XmlNode? = None
-          for ac_node in ac_ch {
-            match ac_node {
-              @xml.XmlNode::Element(ac_tag, _, _) =>
-                if ac_tag == "mc:Choice" {
-                  choice_xml = @xml.serialize_node(ac_node)
-                } else if ac_tag == "mc:Fallback" {
-                  fallback_node = Some(ac_node)
-                }
-              _ => ()
+        match tag {
+          "p:sp" => shapes.push(with_nv_props(parse_sp(child, theme), child))
+          "p:pic" => shapes.push(with_nv_props(parse_pic(child, theme), child))
+          "p:graphicFrame" =>
+            shapes.push(with_nv_props(parse_graphic_frame(child, theme), child))
+          "p:grpSp" =>
+            shapes.push(with_nv_props(parse_grp_sp(child, theme), child))
+          "p:cxnSp" =>
+            shapes.push(with_nv_props(parse_cxn_sp(child, theme), child))
+          "mc:AlternateContent" => {
+            let ac_ch = @xml.get_children(child)
+            let mut choice_xml = ""
+            let mut fallback_node : @xml.XmlNode? = None
+            for ac_node in ac_ch {
+              match ac_node {
+                @xml.XmlNode::Element(ac_tag, _, _) =>
+                  match ac_tag {
+                    "mc:Choice" => choice_xml = @xml.serialize_node(ac_node)
+                    "mc:Fallback" => fallback_node = Some(ac_node)
+                    _ => ()
+                  }
+                _ => ()
+              }
+            }
+            if fallback_node is Some(fb) {
+              let fb_shapes = parse_shapes_from_children(
+                @xml.get_children(fb),
+                theme,
+              )
+              for fb_shape in fb_shapes {
+                shapes.push({ ..fb_shape, mc_choice_xml: choice_xml, })
+              }
             }
           }
-          if fallback_node is Some(fb) {
-            let fb_shapes = parse_shapes_from_children(
-              @xml.get_children(fb),
-              theme,
-            )
-            for fb_shape in fb_shapes {
-              shapes.push({ ..fb_shape, mc_choice_xml: choice_xml, })
-            }
-          }
+          _ => ()
         }
       _ => ()
     }

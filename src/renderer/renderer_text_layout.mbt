@@ -145,12 +145,10 @@ pub fn build_text_layout(
     last_para_spc_after
   }
   let text_h_for_anchor = total_text_h - trailing_space
-  let anchor_offset = if body_props.anchor == "ctr" {
-    (avail_h - text_h_for_anchor) / 2
-  } else if body_props.anchor == "b" {
-    avail_h - text_h_for_anchor
-  } else {
-    0
+  let anchor_offset = match body_props.anchor {
+    "ctr" => (avail_h - text_h_for_anchor) / 2
+    "b" => avail_h - text_h_for_anchor
+    _ => 0
   }
   let anchor_offset_clamped = if body_props.anchor == "ctr" {
     if anchor_offset >= 0 - pad_t {
@@ -166,8 +164,7 @@ pub fn build_text_layout(
   let base_y = px(t.y, scale) + pad_t + anchor_offset_clamped
   let mut cur_y = base_y
 
-  let mut pi = 0
-  while pi < np {
+  for pi in 0..<np {
     let para = paragraphs[pi]
     let nr = para.runs.length()
     let p_line_h = apply_autofit_scale(
@@ -193,7 +190,6 @@ pub fn build_text_layout(
         runs: [],
       })
       cur_y = cur_y + (p_line_h - p_font_sz)
-      pi = pi + 1
       continue
     }
     let mar_l_emu = if para.mar_l >= 0 {
@@ -238,15 +234,13 @@ pub fn build_text_layout(
       )
       let ind = if vli == 0 { first_line_indent } else { indent }
       let bullet_off = if vli == 0 { bullet_w } else { 0.0 }
-      let line_start : Double = if effective_align == "ctr" ||
-        effective_align == "c" {
-        (text_x + ind).to_double() +
-        (text_w - ind).to_double() / 2.0 -
-        line_w / 2.0
-      } else if effective_align == "r" {
-        (text_x + text_w).to_double() - line_w
-      } else {
-        (text_x + ind).to_double() + bullet_off
+      let line_start : Double = match effective_align {
+        "ctr" | "c" =>
+          (text_x + ind).to_double() +
+          (text_w - ind).to_double() / 2.0 -
+          line_w / 2.0
+        "r" => (text_x + text_w).to_double() - line_w
+        _ => (text_x + ind).to_double() + bullet_off
       }
       let run_boxes : Array[RunBox] = []
       let mut cur_run_idx = -1
@@ -327,7 +321,6 @@ pub fn build_text_layout(
     if para.spc_after > 0 {
       cur_y = cur_y + px(para.spc_after, scale)
     }
-    pi = pi + 1
   }
   layout
 }

@@ -175,32 +175,20 @@ pub fn parse_clr_map_from_node(node : @xml.XmlNode) -> ColorMap {
 ///|
 /// A theme slot (dk1, lt1, accent1, …) by its physical name, without clrMap aliasing.
 fn resolve_slot(name : String, theme : ThemeData) -> Color {
-  if name == "dk1" {
-    theme.dk1
-  } else if name == "lt1" {
-    theme.lt1
-  } else if name == "dk2" {
-    theme.dk2
-  } else if name == "lt2" {
-    theme.lt2
-  } else if name == "accent1" {
-    theme.accent1
-  } else if name == "accent2" {
-    theme.accent2
-  } else if name == "accent3" {
-    theme.accent3
-  } else if name == "accent4" {
-    theme.accent4
-  } else if name == "accent5" {
-    theme.accent5
-  } else if name == "accent6" {
-    theme.accent6
-  } else if name == "hlink" {
-    theme.hlink
-  } else if name == "folHlink" {
-    theme.fol_hlink
-  } else {
-    Color::black()
+  match name {
+    "dk1" => theme.dk1
+    "lt1" => theme.lt1
+    "dk2" => theme.dk2
+    "lt2" => theme.lt2
+    "accent1" => theme.accent1
+    "accent2" => theme.accent2
+    "accent3" => theme.accent3
+    "accent4" => theme.accent4
+    "accent5" => theme.accent5
+    "accent6" => theme.accent6
+    "hlink" => theme.hlink
+    "folHlink" => theme.fol_hlink
+    _ => Color::black()
   }
 }
 
@@ -376,7 +364,7 @@ pub fn parse_text_style_group(
 ) -> TextStyleGroup {
   let ch = @xml.get_children(node)
   let levels : Array[LevelTextDefaults] = []
-  for i = 0; i < max_outline_levels; i = i + 1 {
+  for i in 0..<max_outline_levels {
     let tag = "a:lvl" + @xml.int_to_str(i + 1) + "pPr"
     let lvl = match @xml.find_child(ch, tag) {
       None => LevelTextDefaults::empty()

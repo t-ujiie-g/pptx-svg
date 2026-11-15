@@ -1236,19 +1236,19 @@ fn serialize_stroke(shape : @ooxml.Shape) -> String {
   } else if !shape.stroke_dash.is_empty() {
     out = out + "<a:prstDash val=\"" + shape.stroke_dash + "\"/>"
   }
-  if shape.stroke_join == "round" {
-    out = out + "<a:round/>"
-  } else if shape.stroke_join == "bevel" {
-    out = out + "<a:bevel/>"
-  } else if shape.stroke_join == "miter" {
-    if shape.stroke_miter_limit > 0 {
-      out = out +
-        "<a:miter lim=\"" +
-        int_to_str(shape.stroke_miter_limit) +
-        "\"/>"
-    } else {
-      out = out + "<a:miter/>"
-    }
+  match shape.stroke_join {
+    "round" => out = out + "<a:round/>"
+    "bevel" => out = out + "<a:bevel/>"
+    "miter" =>
+      if shape.stroke_miter_limit > 0 {
+        out = out +
+          "<a:miter lim=\"" +
+          int_to_str(shape.stroke_miter_limit) +
+          "\"/>"
+      } else {
+        out = out + "<a:miter/>"
+      }
+    _ => ()
   }
   out = out +
     serialize_arrow_end(

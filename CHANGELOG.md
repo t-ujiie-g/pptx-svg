@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Refactoring
+
+- **MoonBit sources brought up to the moon 0.1.20261104 idiom** (no behavior change — SVG and round-trip OOXML output are byte-identical to 0.6.8 across all fixture and real-world decks; test counts unchanged).
+  - `PathFill`'s postfix `derive(Eq)` (deprecated, warning [0027] — the one VS Code showed) became a `#derive(Eq)` attribute; `moon build` is warning-free again.
+  - 46 `if s == "a" … else if s == "b"` string-dispatch chains became `match s { "a" | "b" => … }`, with guard arms (`_ if str_starts_with(…) =>`) where a chain ended in a non-literal test (dash patterns, XML entities, URL schemes, header/footer placeholders, warp presets, preset-shadow blur…).
+  - 33 counted loops became range loops: `while` loops with a trailing `i = i + 1` (including the `i = i + 1; continue` form and re-used index variables), every C-style `for i = 0; i < n; i = i + 1`, compound bounds as `0..<a.min(b)`, and `i = len // break` hacks as a real `break`.
+  - The last `match … { Some(x) => …, None => () }` became `if … is Some(x)`.
+
 ## 0.6.8
 
 Editing round-trip release. Editing a slide no longer drops its charts, resets

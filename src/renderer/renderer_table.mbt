@@ -85,12 +85,10 @@ fn render_table_cell_text(
       text_height = text_height + px(paragraphs[thi].spc_after, scale)
     }
   }
-  let y_raw = if anchor == "ctr" {
-    pad_t + (available_h - text_height) / 2
-  } else if anchor == "b" {
-    pad_t + available_h - text_height
-  } else {
-    pad_t
+  let y_raw = match anchor {
+    "ctr" => pad_t + (available_h - text_height) / 2
+    "b" => pad_t + available_h - text_height
+    _ => pad_t
   }
   let y_offset = if y_raw < pad_t { pad_t } else { y_raw }
   let style_fill = if !style_cell.font_color.is_none() {
@@ -114,8 +112,7 @@ fn render_table_cell_text(
     (if style_cell.bold { " font-weight=\"bold\"" } else { "" }) +
     ">"
   let mut cur_y = cell_y + y_offset
-  let mut p_idx = 0
-  while p_idx < np {
+  for p_idx in 0..<np {
     let para = paragraphs[p_idx]
     let lh = para_line_hs[p_idx]
     let nr = para.runs.length()
@@ -125,7 +122,6 @@ fn render_table_cell_text(
     }
     if nr == 0 && para.bullet.is_empty() {
       cur_y = cur_y + lh
-      p_idx = p_idx + 1
       continue
     }
     let algn = para.align
@@ -145,12 +141,10 @@ fn render_table_cell_text(
     for li in 0..<nlines {
       cur_y = cur_y + lh
       let line = wrapped[li]
-      let (line_x, text_anchor) = if algn == "ctr" {
-        (cell_x + cell_w / 2, "middle")
-      } else if algn == "r" {
-        (cell_x + cell_w - pad_r, "end")
-      } else {
-        (text_x, "start")
+      let (line_x, text_anchor) = match algn {
+        "ctr" => (cell_x + cell_w / 2, "middle")
+        "r" => (cell_x + cell_w - pad_r, "end")
+        _ => (text_x, "start")
       }
       if li == 0 && !para.bullet.is_empty() && algn != "ctr" && algn != "r" {
         let bul_x = cell_x + pad_l + bul_mar + bul_indent
@@ -185,7 +179,6 @@ fn render_table_cell_text(
     if para.spc_after > 0 {
       cur_y = cur_y + px(para.spc_after, scale)
     }
-    p_idx = p_idx + 1
   }
   out + "</text>"
 }
@@ -375,7 +368,7 @@ fn render_table(
         }
         let gs = if cell.grid_span > 1 { cell.grid_span } else { 1 }
         let mut cell_w_emu = 0
-        for gsi = 0; gsi < gs && col2 + gsi < ncols; gsi = gsi + 1 {
+        for gsi in 0..<gs.min(ncols - col2) {
           cell_w_emu = cell_w_emu + table.col_widths[col2 + gsi]
         }
         let content_w_emu = cell_w_emu - mar_l_emu - mar_r_emu
@@ -451,8 +444,7 @@ fn render_table(
     ry_accum = ry_accum + row_heights_emu[ri2]
   }
   let style = find_table_style(table.style_id, table_styles)
-  let mut ri = 0
-  while ri < nrows {
+  for ri in 0..<nrows {
     let row = table.rows[ri]
     let ry = base_y + px(row_y_emu[ri], scale)
     let ncells = row.cells.length()
@@ -472,12 +464,12 @@ fn render_table(
       }
       let span = cell.grid_span
       let mut merged_w_emu = 0
-      for si = 0; si < span && col_idx + si < ncols; si = si + 1 {
+      for si in 0..<span.min(ncols - col_idx) {
         merged_w_emu = merged_w_emu + table.col_widths[col_idx + si]
       }
       let rspan = cell.row_span
       let mut merged_h_emu = 0
-      for sri = 0; sri < rspan && ri + sri < nrows; sri = sri + 1 {
+      for sri in 0..<rspan.min(nrows - ri) {
         merged_h_emu = merged_h_emu + row_heights_emu[ri + sri]
       }
       let cx_px = base_x + px(col_x_emu[col_idx], scale)
@@ -625,7 +617,6 @@ fn render_table(
       col_idx = col_idx + span
       cj = cj + 1
     }
-    ri = ri + 1
   }
   out
 }

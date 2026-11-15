@@ -334,6 +334,7 @@ priv enum PathCmd {
 ///|
 /// How a sub-path is filled (a:path fill, ECMA-376 §20.1.10.37). The shade
 ///  modes draw the shape fill darkened or lightened.
+#derive(Eq)
 priv enum PathFill {
   Norm
   NoFill
@@ -341,7 +342,7 @@ priv enum PathFill {
   DarkenLess
   Lighten
   LightenLess
-} derive(Eq)
+}
 
 ///|
 fn PathFill::parse(mode : String) -> PathFill {

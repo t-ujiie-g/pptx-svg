@@ -5,22 +5,17 @@ fn find_placeholder(
   ph_type : String,
   ph_idx : Int32,
 ) -> @ooxml.Shape? {
-  let n = shapes.length()
-  let mut i = 0
   if ph_idx >= 0 {
-    while i < n {
-      if shapes[i].ph_idx == ph_idx {
-        return Some(shapes[i])
+    for shape in shapes {
+      if shape.ph_idx == ph_idx {
+        return Some(shape)
       }
-      i = i + 1
     }
   }
-  i = 0
-  while i < n {
-    if shapes[i].ph_type == ph_type {
-      return Some(shapes[i])
+  for shape in shapes {
+    if shape.ph_type == ph_type {
+      return Some(shape)
     }
-    i = i + 1
   }
   None
 }
@@ -63,11 +58,9 @@ fn resolve_placeholder_inheritance(
   master_opt : @ooxml.SlideMasterData?,
 ) -> Unit {
   let ns = shapes.length()
-  let mut i = 0
-  while i < ns {
+  for i in 0..<ns {
     let shape = shapes[i]
     if shape.ph_type.is_empty() {
-      i = i + 1
       continue
     }
     let mut needs_transform = shape.transform.cx == 0 && shape.transform.cy == 0
@@ -77,7 +70,6 @@ fn resolve_placeholder_inheritance(
       shape.body_props.b_ins < 0 &&
       shape.body_props.anchor.is_empty()
     if !needs_transform && !needs_body_props {
-      i = i + 1
       continue
     }
     if layout_opt is Some(layout) {
@@ -110,7 +102,6 @@ fn resolve_placeholder_inheritance(
         )
       }
     }
-    i = i + 1
   }
 }
 
@@ -361,12 +352,10 @@ fn apply_text_defaults(
   if ph.is_empty() {
     return
   }
-  let style = if ph == "title" || ph == "ctrTitle" {
-    text_styles.title_style
-  } else if ph == "body" || ph == "subTitle" || ph == "obj" {
-    text_styles.body_style
-  } else {
-    text_styles.other_style
+  let style = match ph {
+    "title" | "ctrTitle" => text_styles.title_style
+    "body" | "subTitle" | "obj" => text_styles.body_style
+    _ => text_styles.other_style
   }
   apply_text_style_to_runs(shape.paragraphs, style)
   apply_para_spacing_from_style(shape.paragraphs, style)
@@ -500,28 +489,26 @@ fn inject_placeholder_auto_content(
   master_opt : @ooxml.SlideMasterData?,
 ) -> Unit {
   let ns = shapes.length()
-  let mut i = 0
-  while i < ns {
+  for i in 0..<ns {
     let shape = shapes[i]
     let ph = shape.ph_type
     if ph != "sldNum" && ph != "dt" && ph != "ftr" {
-      i = i + 1
       continue
     }
     // Empty = keep the shape's existing content.
-    let auto_text = if ph == "sldNum" {
-      int_to_str(slide_num)
-    } else if ph == "dt" {
-      let host_date = @ffi.ffi_current_date()
-      if !host_date.is_empty() {
-        host_date
-      } else {
-        find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
+    let auto_text = match ph {
+      "sldNum" => int_to_str(slide_num)
+      "dt" => {
+        let host_date = @ffi.ffi_current_date()
+        if !host_date.is_empty() {
+          host_date
+        } else {
+          find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
+        }
       }
-    } else if has_no_text(shape.paragraphs) {
-      find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
-    } else {
-      ""
+      _ if has_no_text(shape.paragraphs) =>
+        find_ph_text(ph, shape.ph_idx, layout_opt, master_opt)
+      _ => ""
     }
     if !auto_text.is_empty() {
       shapes[i] = {
@@ -529,7 +516,6 @@ fn inject_placeholder_auto_content(
         paragraphs: [replace_auto_content_text(shape.paragraphs, auto_text)],
       }
     }
-    i = i + 1
   }
 }
 

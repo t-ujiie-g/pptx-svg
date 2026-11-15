@@ -426,32 +426,27 @@ fn parse_plot_area(
     match pa_ch[i] {
       @xml.XmlNode::Element(tag, _, _) => {
         let ch = @xml.get_children(pa_ch[i])
-        if tag == "c:barChart" || tag == "c:bar3DChart" {
-          groups.push(parse_bar_chart(ch, theme))
-        } else if tag == "c:lineChart" || tag == "c:line3DChart" {
-          groups.push(parse_line_chart(ch, theme))
-        } else if tag == "c:pieChart" || tag == "c:pie3DChart" {
-          groups.push(parse_pie_chart(ch, theme))
-        } else if tag == "c:doughnutChart" {
-          groups.push(parse_donut_chart(ch, theme))
-        } else if tag == "c:scatterChart" {
-          groups.push(parse_scatter_chart(ch, theme))
-        } else if tag == "c:areaChart" || tag == "c:area3DChart" {
-          groups.push(parse_area_chart(ch, theme))
-        } else if tag == "c:radarChart" {
-          groups.push(parse_radar_chart(ch, theme))
-        } else if tag == "c:bubbleChart" {
-          groups.push(parse_bubble_chart(ch, theme))
-        } else if tag == "c:stockChart" {
-          groups.push(parse_stock_chart(ch, theme))
-        } else if tag == "c:surfaceChart" || tag == "c:surface3DChart" {
-          groups.push(parse_surface_chart(ch, theme))
-        } else if tag == "c:ofPieChart" {
-          groups.push(parse_of_pie_chart(ch, theme))
-        } else if tag == "c:catAx" || tag == "c:dateAx" || tag == "c:serAx" {
-          axes.push(parse_chart_axis(ch, false, theme))
-        } else if tag == "c:valAx" {
-          axes.push(parse_chart_axis(ch, true, theme))
+        match tag {
+          "c:barChart" | "c:bar3DChart" =>
+            groups.push(parse_bar_chart(ch, theme))
+          "c:lineChart" | "c:line3DChart" =>
+            groups.push(parse_line_chart(ch, theme))
+          "c:pieChart" | "c:pie3DChart" =>
+            groups.push(parse_pie_chart(ch, theme))
+          "c:doughnutChart" => groups.push(parse_donut_chart(ch, theme))
+          "c:scatterChart" => groups.push(parse_scatter_chart(ch, theme))
+          "c:areaChart" | "c:area3DChart" =>
+            groups.push(parse_area_chart(ch, theme))
+          "c:radarChart" => groups.push(parse_radar_chart(ch, theme))
+          "c:bubbleChart" => groups.push(parse_bubble_chart(ch, theme))
+          "c:stockChart" => groups.push(parse_stock_chart(ch, theme))
+          "c:surfaceChart" | "c:surface3DChart" =>
+            groups.push(parse_surface_chart(ch, theme))
+          "c:ofPieChart" => groups.push(parse_of_pie_chart(ch, theme))
+          "c:catAx" | "c:dateAx" | "c:serAx" =>
+            axes.push(parse_chart_axis(ch, false, theme))
+          "c:valAx" => axes.push(parse_chart_axis(ch, true, theme))
+          _ => ()
         }
       }
       _ => ()
@@ -1210,22 +1205,26 @@ fn parse_cx_chart_data(cs_ch : Array[@xml.XmlNode]) -> Array[CxDataBlock] {
     for j in 0..<d_ch.length() {
       match d_ch[j] {
         @xml.XmlNode::Element(tag, _, _) =>
-          if tag == "cx:strDim" {
-            let dim_type = match @xml.get_attr(d_ch[j], "type") {
-              Some(v) => v
-              None => ""
+          match tag {
+            "cx:strDim" => {
+              let dim_type = match @xml.get_attr(d_ch[j], "type") {
+                Some(v) => v
+                None => ""
+              }
+              if dim_type == "cat" {
+                cats = parse_cx_str_dim(d_ch[j])
+              }
             }
-            if dim_type == "cat" {
-              cats = parse_cx_str_dim(d_ch[j])
+            "cx:numDim" => {
+              let dim_type = match @xml.get_attr(d_ch[j], "type") {
+                Some(v) => v
+                None => ""
+              }
+              if dim_type == "val" || dim_type == "size" {
+                vals = parse_cx_num_dim(d_ch[j])
+              }
             }
-          } else if tag == "cx:numDim" {
-            let dim_type = match @xml.get_attr(d_ch[j], "type") {
-              Some(v) => v
-              None => ""
-            }
-            if dim_type == "val" || dim_type == "size" {
-              vals = parse_cx_num_dim(d_ch[j])
-            }
+            _ => ()
           }
         _ => ()
       }
@@ -1340,19 +1339,15 @@ fn parse_cx_plot_area(
 ///|
 /// Map layoutId string to ChartKind.
 fn cx_layout_to_kind(layout_id : String) -> ChartKind {
-  if layout_id == "waterfall" {
-    WaterfallChart
-  } else if layout_id == "treemap" {
-    TreemapChart
-  } else if layout_id == "sunburst" {
-    SunburstChart
-  } else if layout_id == "boxWhisker" {
-    BoxWhiskerChart
-  } else if layout_id == "funnel" {
-    FunnelChart
-  } else {
-    // clusteredColumn with binning → Histogram, else generic bar
-    HistogramChart
+  match layout_id {
+    "waterfall" => WaterfallChart
+    "treemap" => TreemapChart
+    "sunburst" => SunburstChart
+    "boxWhisker" => BoxWhiskerChart
+    "funnel" => FunnelChart
+    _ =>
+      // clusteredColumn with binning → Histogram, else generic bar
+      HistogramChart
   }
 }
 

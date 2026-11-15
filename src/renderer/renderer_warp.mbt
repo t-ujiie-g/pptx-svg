@@ -824,25 +824,23 @@ fn render_warp_text(
   if is_path_warp(prst) {
     let path_id = "warp-s" + int_to_str(slide_num) + "-" + int_to_str(shape_idx)
     let d = generate_warp_path(prst, w, h, av1_d, av2_d)
-    let (start_offset, text_anchor) = if prst == "textChevron" ||
-      prst == "textChevronInverted" ||
-      prst == "textTriangle" ||
-      prst == "textTriangleInverted" ||
-      prst == "textStop" {
-      ("50%", "middle")
-    } else if prst == "textArchUp" ||
-      prst == "textArchDown" ||
-      prst == "textArchUpPour" ||
-      prst == "textArchDownPour" ||
-      prst == "textCircle" ||
-      prst == "textCirclePour" ||
-      prst == "textRingInside" ||
-      prst == "textRingOutside" ||
-      prst == "textButton" ||
-      prst == "textButtonPour" {
-      ("25%", "middle")
-    } else {
-      ("0%", "start")
+    let (start_offset, text_anchor) = match prst {
+      "textChevron"
+      | "textChevronInverted"
+      | "textTriangle"
+      | "textTriangleInverted"
+      | "textStop" => ("50%", "middle")
+      "textArchUp"
+      | "textArchDown"
+      | "textArchUpPour"
+      | "textArchDownPour"
+      | "textCircle"
+      | "textCirclePour"
+      | "textRingInside"
+      | "textRingOutside"
+      | "textButton"
+      | "textButtonPour" => ("25%", "middle")
+      _ => ("0%", "start")
     }
     let baseline = " dominant-baseline=\"central\""
     "<defs><path id=\"" +
