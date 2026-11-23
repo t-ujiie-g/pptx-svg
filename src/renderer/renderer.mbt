@@ -683,8 +683,13 @@ fn transform_attr(t : @ooxml.ShapeTransform, scale : Int32) -> String {
 }
 
 ///|
+/// Media targets are either relative to the part's directory (`../media/x.png`,
+/// always one level below `ppt/`) or absolute from the package root
+/// (`/ppt/media/x.png`, what the Open XML SDK writes).
 fn resolve_image_path(target : String) -> String {
-  if target.length() > 3 &&
+  if target.length() > 1 && @xml.char_at(target, 0) == '/' {
+    @xml.str_suffix(target, 1)
+  } else if target.length() > 3 &&
     @xml.char_at(target, 0) == '.' &&
     @xml.char_at(target, 1) == '.' &&
     @xml.char_at(target, 2) == '/' {
