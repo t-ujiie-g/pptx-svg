@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.6.10
+
+Compatibility fix. Pictures whose relationship target is written from the
+package root (`/ppt/media/image1.png`) are now drawn instead of a grey
+placeholder box (#93). The public TypeScript API is unchanged, and so is the SVG
+output for decks with relative targets; the Wasm is ~414 KB (~150 KB gzipped).
 
 ### Fixed
 
