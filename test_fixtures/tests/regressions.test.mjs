@@ -399,5 +399,18 @@ test("regressions (slides 96-107 and patched-fixture cases)", async () => {
     assert('issue88 slide count is unchanged', count === slideCount, `${count} vs ${slideCount}`);
   }
 
+  {
+    console.log('\n── test_features.pptx — package-absolute image targets (issue #93) ──');
+    const relsPath = 'ppt/slides/_rels/slide21.xml.rels';
+    const rels = textFiles.get(relsPath);
+    const patched = rels.replace(/Target="\.\.\/media\//g, 'Target="/ppt/media/');
+    assert('issue93 fixture patch applied', patched !== rels);
+    const relative = (await openFeatures()).renderSlideSvg(20);
+    const absolute = (await openFeatures(new Map([[relsPath, patched]]))).renderSlideSvg(20);
+    assert('issue93 slide21 draws its pictures', relative.includes('<image '));
+    assert('issue93 absolute targets render like relative ones', absolute === relative,
+      `${(absolute.match(/<image /g) || []).length} <image> elements`);
+  }
+
   finishAssertions();
 });

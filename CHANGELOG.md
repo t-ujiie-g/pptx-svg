@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.10
+
+Compatibility fix. Pictures whose relationship target is written from the
+package root (`/ppt/media/image1.png`) are now drawn instead of a grey
+placeholder box (#93). The public TypeScript API is unchanged, and so is the SVG
+output for decks with relative targets; the Wasm is ~414 KB (~150 KB gzipped).
+
+### Fixed
+
+- **A picture whose relationship target is written from the package root (`Target="/ppt/media/image1.png"`) drew as a grey placeholder box** (#93, #94 — thanks @darrensmithwtc). OPC allows such targets, but the image path resolver only understood `../media/…`, so the file was looked up under the wrong name; picture fills and picture bullets with such a target were dropped the same way. Absolute targets now resolve like the layout, master, theme and chart targets already did. Output for decks with relative targets is unchanged.
+
 ## 0.6.9
 
 Compatibility release. A deck with an emoji (or any character outside the BMP)
